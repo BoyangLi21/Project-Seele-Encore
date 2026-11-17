@@ -27,16 +27,18 @@ public final class EvaGameplayMotionR32
     private static final EntityDataAccessor<Boolean> LOW_TARGET=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> SERVER_MOVEMENT=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<CompoundTag> RELEASE_FROM=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.COMPOUND_TAG);
+    /** R64 (EvaLeapR64): how hard the last landing was, 0 to 1. */
+    private static final EntityDataAccessor<Float> IMPACT=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
     private static final WeakIdentityMap<EvaUnit01Entity,State> STATES=new WeakIdentityMap<>();
     private static final Map<Integer,Optional<JsonObject>> PROFILES=new HashMap<>();
     private static final class State
     {
-        boolean air,guard;double y;float velocity;int scan;Vec3 previousContact;
+        boolean air,guard;double y;float velocity,fall;int scan;Vec3 previousContact;
         EvaBodyPose.Sample lastActionPose;String lastClip="";long lastPoseTick=-1;int lastRig=-1;
         Vec3 lastOrigin;float lastYaw;
     }
     public static boolean bootstrap(){return true;}
-    public static void define(SynchedEntityData d){d.define(AIR,-1L);d.define(LAND,-1L);d.define(TAKEOFF,-1L);d.define(FLOOR,-1000000F);d.define(VERTICAL,0F);d.define(GUARD,0F);d.define(LAND_FROM,new CompoundTag());d.define(ACTION_FROM,new CompoundTag());d.define(LOW_TARGET,false);d.define(SERVER_MOVEMENT,false);d.define(RELEASE_FROM,new CompoundTag());}
+    public static void define(SynchedEntityData d){d.define(AIR,-1L);d.define(LAND,-1L);d.define(TAKEOFF,-1L);d.define(FLOOR,-1000000F);d.define(VERTICAL,0F);d.define(GUARD,0F);d.define(LAND_FROM,new CompoundTag());d.define(ACTION_FROM,new CompoundTag());d.define(LOW_TARGET,false);d.define(SERVER_MOVEMENT,false);d.define(RELEASE_FROM,new CompoundTag());d.define(IMPACT,0F);}
     public static boolean serverMovement(EvaUnit01Entity e){return e.getEntityData().get(SERVER_MOVEMENT);}
     public static boolean movementMayComposeR45(EvaUnit01Entity e)
     {
@@ -47,11 +49,21 @@ public final class EvaGameplayMotionR32
     }
     private static int takeoffTicks(EvaUnit01Entity e)
     {
+        if(EvaLeapR64.on(e))return EvaLeapR64.SQUAT_TICKS;
         var c=clip(e,"jump_start");
         // A sixty-metre body needs a visible knee bend before it leaves the
         // ground: in three ticks the squat was gone before it was drawn.
         return c.has("preparation_ticks")?Mth.clamp(c.get("preparation_ticks").getAsInt(),3,10):6;
     }
+    /** R64: how far through its squat a body about to jump is (0 to 1, and on until it leaves the ground); -1 when it is not about to. */
+    public static float takeoffProgressR64(EvaUnit01Entity e,float partial)
+    {
+        float age=age(e,TAKEOFF,partial);
+        return age<0||airAge(e,partial)>=0?-1:age/takeoffTicks(e);
+    }
+    /** R64: how hard the last landing was (0 to 1; 0 for a Unit that jumps as up to R63), and the ticks its pose runs. */
+    public static float impactR64(EvaUnit01Entity e){return EvaLeapR64.on(e)?e.getEntityData().get(IMPACT):0;}
+    public static float landingTicksR64(EvaUnit01Entity e){return EvaLeapR64.landingTicks(impactR64(e));}
     public static boolean prepareJump(EvaUnit01Entity e)
     {
         if(!ready(e))return true;
@@ -123,14 +135,87 @@ public final class EvaGameplayMotionR32
                 byte[] bytes=CombatMotionResourcesR44.read(file,"eva-gameplay-"+key);
                 var data=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
                 if(data.get("schema").getAsInt()!=2||data.get("rig_key").getAsInt()!=key)throw new IllegalArgumentException("Gameplay rig contract");
+                if(key==EvaUnit01Entity.UNIT_01)addKnifeCutsR64(data);
                 com.projectseele.ProjectSeele.LOGGER.info("EVA gameplay profile resolved: rig={} file={} sha256={}",key,file.toAbsolutePath().normalize(),
                         java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
-                return Optional.of(data);
+                // Kept for the whole session and read in place: share equal numbers instead of holding 88 bytes for each.
+                return Optional.of(com.projectseele.util.SharedJsonLeaves.share(data));
             }
             catch(Exception error){throw new IllegalStateException("Gameplay motion rejected: "+file,error);}
         }).orElse(null);
     }
     public static synchronized void reload(){PROFILES.clear();}
+    /**
+     * R64: the knife's ordinary cuts stand in Unit-01's profile beside the thrust they start from. They are this
+     * project's own (tools/finale/slash.py) and come with the mod, written as what each frame differs by from the
+     * knife's guard, the thrust's first frame: the guard itself is the private profile's and is not published. Here
+     * each frame is the guard with that difference put on it; where the blade's tip is in the knife's own space is
+     * taken from the thrust. A profile without the thrust, or without a bone the cuts turn, is left as it is.
+     */
+    private static void addKnifeCutsR64(JsonObject data)
+    {
+        var clips=data.getAsJsonObject("clips");
+        if(!clips.has("r32_knife_forward"))return;
+        try(var stream=EvaGameplayMotionR32.class.getResourceAsStream("/assets/projectseele/motion/eva_knife_r64.json"))
+        {
+            if(stream==null)return;
+            var added=JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            var names=new ArrayList<String>();for(var name:data.getAsJsonArray("bones"))names.add(name.getAsString());
+            var beside=clips.getAsJsonObject("r32_knife_forward");
+            var guard=beside.getAsJsonArray("frames").get(0).getAsJsonObject();
+            for(var entry:added.getAsJsonObject("clips").entrySet())
+            {
+                var clip=entry.getValue().getAsJsonObject();
+                int[] at=new int[clip.getAsJsonArray("bones").size()];
+                for(int b=0;b<at.length;b++){at[b]=names.indexOf(clip.getAsJsonArray("bones").get(b).getAsString());if(at[b]<0)return;}
+                var frames=new JsonArray();
+                for(var element:clip.getAsJsonArray("frames"))
+                {
+                    var change=element.getAsJsonObject();var frame=guard.deepCopy();
+                    var rotations=frame.getAsJsonArray("rotation_wxyz");var deltas=change.getAsJsonArray("rotation_delta_wxyz");
+                    for(int b=0;b<at.length;b++)rotations.set(at[b],afterR64(deltas.get(b).getAsJsonArray(),rotations.get(at[b]).getAsJsonArray()));
+                    if(change.has("root_delta_m"))frame.add("root_m",addedR64(frame.getAsJsonArray("root_m"),change.getAsJsonArray("root_delta_m")));
+                    var offsets=frame.has("bone_position_xyz")?frame.getAsJsonObject("bone_position_xyz"):new JsonObject();
+                    for(var offset:change.getAsJsonObject("position_delta_xyz").entrySet())
+                        offsets.add(offset.getKey(),offsets.has(offset.getKey())?addedR64(offsets.getAsJsonArray(offset.getKey()),offset.getValue().getAsJsonArray()):offset.getValue());
+                    frame.add("bone_position_xyz",offsets);
+                    frame.add("foot_contact",change.get("foot_contact"));
+                    frames.add(frame);
+                }
+                clip.remove("bones");clip.add("frames",frames);
+                for(String field:List.of("contact_point_model","mesh","source_playback_speed"))if(beside.has(field))clip.add(field,beside.get(field));
+                clips.add(entry.getKey(),clip);
+            }
+        }
+        catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}
+    }
+    /** A rotation (w, x, y, z) put after another: the product, as the clips keep rotations. */
+    private static JsonArray afterR64(JsonArray a,JsonArray b)
+    {
+        double aw=a.get(0).getAsDouble(),ax=a.get(1).getAsDouble(),ay=a.get(2).getAsDouble(),az=a.get(3).getAsDouble();
+        double bw=b.get(0).getAsDouble(),bx=b.get(1).getAsDouble(),by=b.get(2).getAsDouble(),bz=b.get(3).getAsDouble();
+        var q=new JsonArray();
+        q.add(aw*bw-ax*bx-ay*by-az*bz);q.add(aw*bx+ax*bw+ay*bz-az*by);q.add(aw*by-ax*bz+ay*bw+az*bx);q.add(aw*bz+ax*by-ay*bx+az*bw);
+        return q;
+    }
+    private static JsonArray addedR64(JsonArray a,JsonArray b)
+    {var sum=new JsonArray();for(int i=0;i<3;i++)sum.add(a.get(i).getAsDouble()+b.get(i).getAsDouble());return sum;}
+    /** The clip of a knife blow by its kind: 0 the thrust in the forward grip, 1 the reverse grip, 2 the cut, 3 the cut back (R64). */
+    public static String knifeClip(int kind)
+    {return switch(kind){case 1->"knife_reverse";case 2->"knife_cut_r64";case 3->"knife_back_r64";default->"knife_forward";};}
+    /** Review only: -Dprojectseele.knifeCutsR64=false keeps the knife's presses as they were, to capture the two beside each other. */
+    private static final boolean KNIFE_CUTS_R64=!"false".equals(System.getProperty("projectseele.knifeCutsR64"));
+    /** The Unit has the knife's ordinary cuts (Unit-01 with the private profile). */
+    public static boolean knifeCutsReadyR64(EvaUnit01Entity e){return KNIFE_CUTS_R64&&hasClip(e,"knife_cut_r64")&&hasClip(e,"knife_back_r64");}
+    /** Called once EvaBodyPose has built its clips from the profiles loaded so far. Each frame's per-bone rotations
+     * and offsets are read only for that, and they are nine tenths of every profile (about 200 MB over the five
+     * rigs). The profiles are replaced by ones without them; a reader still holding an old one is not disturbed. */
+    public static synchronized void dropBoneChannelsR64()
+    {
+        for(var entry:PROFILES.entrySet())
+            if(entry.getValue().isPresent())
+                entry.setValue(Optional.of(com.projectseele.util.JsonClipFrames.without(entry.getValue().get(),"rotation_wxyz","bone_position_xyz")));
+    }
     public static int variant(EvaUnit01Entity e){return e instanceof EvaPrototypeEntity un?3+un.getUNSerial():e.getUnitVariant();}
     public static float guardWeight(EvaUnit01Entity e){return e.getEntityData().get(GUARD);}
     public static boolean ready(EvaUnit01Entity e){return profile(variant(e))!=null;}
@@ -145,13 +230,15 @@ public final class EvaGameplayMotionR32
     public static boolean sharedJumpActive(EvaUnit01Entity e,float partial)
     {
         return sharedJump(e)&&(age(e,TAKEOFF,partial)>=0||airAge(e,partial)>=0
-                ||landAge(e,partial)>=0&&landAge(e,partial)<18);
+                ||landAge(e,partial)>=0&&landAge(e,partial)<landingTicksR64(e));
     }
     public static boolean sharedHands(EvaUnit01Entity e,float partial)
     {
         var p=profile(variant(e));return p!=null
                 &&p.has("hand_pose_revision")&&p.get("hand_pose_revision").getAsInt()>=2&&sharedBody(e,partial);
     }
+    /** Seconds of a clip as it was captured. */
+    static float clipSecondsR64(EvaUnit01Entity e,String name){return clip(e,name).get("duration_seconds").getAsFloat();}
     public static boolean hasClip(EvaUnit01Entity e,String name)
     {var p=profile(variant(e));return p!=null&&p.getAsJsonObject("clips").has("r32_"+name);}
     public static boolean knifeReady(EvaUnit01Entity e)
@@ -183,7 +270,7 @@ public final class EvaGameplayMotionR32
         if(e.getOrdinaryAttackStage()>=0)return ordinary(e.getOrdinaryAttackStage());
         if(e.isKickMotionActive(partial)&&kickReady(e))return "kick";
         int knife=e.getKnifeMotionType(partial);
-        return knife>=0&&knifeReady(e)?knife==1?"knife_reverse":"knife_forward":"";
+        return knife>=0&&knifeReady(e)?knifeClip(knife):"";
     }
     public static float activeGroundPhase(EvaUnit01Entity e,float partial)
     {
@@ -293,8 +380,16 @@ public final class EvaGameplayMotionR32
     public static Vec3 root(EvaUnit01Entity e,String name,float phase)
     {
         phase=phase(e,name,phase);
-        var points=clip(e,name).getAsJsonArray("trajectory_m");float f=Mth.clamp(phase,0,1)*(points.size()-1);int a=(int)f,b=Math.min(a+1,points.size()-1);
+        var points=clip(e,name).getAsJsonArray("trajectory_m");
+        float f=Math.min(EvaRootClosureR63.holdFrom(points,()->forwardR63(points)),Mth.clamp(phase,0,1)*(points.size()-1));int a=(int)f,b=Math.min(a+1,points.size()-1);
         var x=points.get(a).getAsJsonArray();var y=points.get(b).getAsJsonArray();return new Vec3(Mth.lerp(f-a,x.get(0).getAsDouble(),y.get(0).getAsDouble()),0,Mth.lerp(f-a,x.get(2).getAsDouble(),y.get(2).getAsDouble()));
+    }
+    /** How far each point of a root path lies ahead of its first (blocks): the clips advance along -z. */
+    static double[] forwardR63(com.google.gson.JsonArray points)
+    {
+        double[] forward=new double[points.size()];double start=points.get(0).getAsJsonArray().get(2).getAsDouble();
+        for(int i=0;i<forward.length;i++)forward[i]=EvaRootClosureR63.blocks(start-points.get(i).getAsJsonArray().get(2).getAsDouble());
+        return forward;
     }
     public static float airAge(EvaUnit01Entity e,float partial){return age(e,AIR,partial);}
     public static float landAge(EvaUnit01Entity e,float partial){return age(e,LAND,partial);}
@@ -330,6 +425,7 @@ public final class EvaGameplayMotionR32
         boolean air=!blocked&&!e.onGround()&&e.isVisuallyAirborneForRender();
         if(air)
         {
+            state.fall=Math.max(state.fall,-state.velocity);
             double floor=-1000000;float offset=e.getBbWidth()*.3F;
             for(float[] p:new float[][]{{0,0},{offset,offset},{offset,-offset},{-offset,offset},{-offset,-offset}})
             {
@@ -343,7 +439,12 @@ public final class EvaGameplayMotionR32
         {
             e.getEntityData().set(LAND_FROM,EvaShutdownR30.encode(EvaBodyPose.sample(e,0)));
             e.getEntityData().set(LAND,e.level().getGameTime());e.getEntityData().set(AIR,-1L);
+            // R64: by how fast it came down, for the pose and for how long the body takes the landing up.
+            float hard=EvaLeapR64.on(e)?EvaLeapR64.hard(state.fall):0;
+            e.getEntityData().set(IMPACT,hard);
+            if(hard>0)e.leapLandedR64(hard);
         }
+        if(!air)state.fall=0;
         if(blocked){e.getEntityData().set(AIR,-1L);e.getEntityData().set(LAND,-1L);}
         state.air=air;
         if(air||blocked||age(e,TAKEOFF,0)>takeoffTicks(e)+5)e.getEntityData().set(TAKEOFF,-1L);
@@ -373,7 +474,7 @@ public final class EvaGameplayMotionR32
         if(EvaDorsalMechanism.bow(e)>.001F||EvaDorsalMechanism.open(e)>.001F)return false;
         if(EvaFieldActionsR45.active(e)||EvaSwordActionsR45.active(e))return true;
         if(EvaCombatSupportR33.ready(e)&&sharedWeapon(e)&&!e.hasLiveActionForRender(partial)&&e.rifleStanceLevel(partial)<1)return true;
-        return age(e,TAKEOFF,partial)>=0||airAge(e,partial)>=0||landAge(e,partial)>=0&&landAge(e,partial)<18||e.getOrdinaryAttackStage()>=0||e.isHeavyMotionActive()
+        return age(e,TAKEOFF,partial)>=0||airAge(e,partial)>=0||landAge(e,partial)>=0&&landAge(e,partial)<landingTicksR64(e)||e.getOrdinaryAttackStage()>=0||e.isHeavyMotionActive()
                 ||e.isKickMotionActive(partial)&&kickReady(e)||e.getKnifeMotionType(partial)>=0&&knifeReady(e)
                 ||sharedWeapon(e)&&!e.hasLiveActionForRender(partial)&&!e.isPilotProne()&&!e.isPilotCrouching()&&e.getEntityData().get(GUARD)>.01F;
     }
@@ -468,7 +569,7 @@ public final class EvaGameplayMotionR32
             }
             return pose;
         }
-        if(land>=0&&land<EvaJumpChoreographyR57.LANDING_TICKS&&e.getOrdinaryAttackStage()<0&&!e.isHeavyMotionActive())
+        if(land>=0&&land<landingTicksR64(e)&&e.getOrdinaryAttackStage()<0&&!e.isHeavyMotionActive())
         {
             var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(LAND_FROM),from);
             return EvaJumpChoreographyR57.landing(e,from,groundLocomotion(e,base,partial,capturedBase,null),land);
@@ -650,7 +751,16 @@ public final class EvaGameplayMotionR32
         String resolved=resolve(e,name);float phase=phase(e,name,progress);
         var pose=EvaBodyPose.gameplayClip(e,resolved,phase);
         float entryEnd=actionEntryEndR51(e,name);
-        if(progress<entryEnd&&!e.getEntityData().get(ACTION_FROM).isEmpty())
+        var fadeR64=e.rowFadeR64();
+        if(fadeR64!=null&&hasClip(e,fadeR64.clip()))
+        {
+            // R64 (flow): a blow begun out of another. The other runs on along its own clip while this one takes
+            // its place: there is no pose to start from that stands still. (Up to here the blend began at the pose
+            // the server had captured, the other blow frozen at its hit: measured, the chest turned 27 to 60
+            // degrees in the first frame of the next punch.)
+            pose=EvaBodyPose.blend(EvaBodyPose.gameplayClip(e,resolve(e,fadeR64.clip()),phase(e,fadeR64.clip(),fadeR64.phase())),pose,fadeR64.weight());
+        }
+        else if(!e.rowBeganOutOfBlowR64()&&progress<entryEnd&&!e.getEntityData().get(ACTION_FROM).isEmpty())
         {
             var from=EvaBodyPose.neutralForTransportR32(e);
             EvaShutdownR30.decode(e.getEntityData().get(ACTION_FROM),from);

@@ -5,7 +5,6 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.Objects;
 import com.projectseele.ProjectSeele;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -66,26 +65,29 @@ public final class FacilityWorldPolicy
     private FacilityWorldPolicy() {}
 
     private static final Map<MinecraftServer, MarkerSnapshot> MARKERS = new WeakHashMap<>();
-    private record MarkerSnapshot(int tick, Path root, String levelName, Map<String, Boolean> present) {}
+    private record MarkerSnapshot(int tick, Path root, Map<String, Boolean> present) {}
 
-    /** One real marker stat per server/world/tick, including negative results.
-     * Native Windows missing-file stats allocate an exception stack; repeated
-     * door synchronization must not repeat that work for the same decision.
-     * External changes are observed on the next tick, and explicit same-tick
-     * policy changes can call invalidate instead of weakening writer guards. */
+    /** How long one look at the marker files stands, in ticks. */
+    private static final int MARKER_TICKS = 10;
+
+    /** One real marker stat per server/world/half second, including negative results.
+     * Native Windows missing-file stats allocate an exception stack, and a stat
+     * waits behind whatever else the disk is doing; a dozen of them every tick
+     * showed up in the server's long ticks. External changes are observed within
+     * half a second, and explicit policy changes can call invalidate instead of
+     * weakening writer guards. */
     public static boolean markerPresent(MinecraftServer server, String marker)
     {
-        Path root = server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
-        String name = server.getWorldData().getLevelName();
         int tick = server.getTickCount();
         synchronized (MARKERS)
         {
             MarkerSnapshot cached = MARKERS.get(server);
-            if (cached == null || cached.tick() != tick || !cached.root().equals(root) || !Objects.equals(cached.levelName(), name))
+            if (cached == null || tick < cached.tick() || tick - cached.tick() >= MARKER_TICKS)
             {
-                cached = new MarkerSnapshot(tick, root, name, new HashMap<>());
+                cached = new MarkerSnapshot(tick, server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize(), new HashMap<>());
                 MARKERS.put(server, cached);
             }
+            Path root = cached.root();
             return cached.present().computeIfAbsent(marker, value -> Files.isRegularFile(root.resolve(value)));
         }
     }
@@ -100,6 +102,7 @@ public final class FacilityWorldPolicy
     public static void onServerStopped(ServerStoppedEvent event)
     {
         invalidate(event.getServer());
+        CityRigidTopologyR45.clearRuntimeCache();
     }
 
     public static boolean isCleanRebuild(MinecraftServer server)

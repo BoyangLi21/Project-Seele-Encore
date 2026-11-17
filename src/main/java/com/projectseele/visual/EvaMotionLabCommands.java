@@ -1,5 +1,6 @@
 package com.projectseele.visual;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -41,6 +42,20 @@ public final class EvaMotionLabCommands
                                                         context.getSource(),
                                                         StringArgumentType.getString(
                                                                 context, "variant"),
+                                                        StringArgumentType.getString(
+                                                                context, "weapon"))))))
+                        // A UN unit on its own pad: "un 0" or "un 1" boards it, with a weapon named it rearms it.
+                        .then(Commands.literal("un")
+                                .then(Commands.argument("serial",
+                                                IntegerArgumentType.integer(0, 1))
+                                        .executes(context -> enterUn(
+                                                context.getSource(),
+                                                IntegerArgumentType.getInteger(
+                                                        context, "serial")))
+                                        .then(Commands.argument("weapon",
+                                                        StringArgumentType.word())
+                                                .executes(context -> weaponUn(
+                                                        context.getSource(),
                                                         StringArgumentType.getString(
                                                                 context, "weapon"))))))
                         .then(Commands.literal("demo")
@@ -105,6 +120,36 @@ public final class EvaMotionLabCommands
                 || !EvaMotionLabDirector.isMotionLab(source.getLevel())
                 || !EvaMotionLabDirector.selectWeapon(source.getLevel(),
                 variant, weapon))
+        {
+            source.sendFailure(Component.literal(
+                    "Motion-lab weapon selection failed."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal(
+                "Motion-lab loadout changed."), false);
+        return 1;
+    }
+
+    private static int enterUn(CommandSourceStack source, int serial)
+            throws CommandSyntaxException
+    {
+        if (!EvaMotionLabDirector.enterUnR63(source.getPlayerOrException(), serial))
+        {
+            source.sendFailure(Component.literal(
+                    "Motion-lab UN boarding failed."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal(
+                "Motion-lab pilot linked to EVA-UN-0" + serial + "."), false);
+        return 1;
+    }
+
+    private static int weaponUn(CommandSourceStack source, String rawWeapon)
+    {
+        int weapon = weapon(rawWeapon);
+        EvaUnit01Entity eva = EvaMotionLabDirector.isMotionLab(source.getLevel())
+                ? EvaMotionLabDirector.unUnitR63(source.getLevel()) : null;
+        if (weapon < 0 || eva == null || !eva.selectMotionLabWeapon(weapon))
         {
             source.sendFailure(Component.literal(
                     "Motion-lab weapon selection failed."));

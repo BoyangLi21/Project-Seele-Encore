@@ -31,7 +31,7 @@ import net.minecraftforge.fml.common.Mod;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
+import com.projectseele.util.WeakIdentityMap;
 
 /** Finite actual rest-room hardware; no actor movement, inventory issue or world scan. */
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID)
@@ -39,7 +39,9 @@ public final class PilotRestroomServicesR47
 {
     private static final long PHONE_TICKS=1200, RING_TICKS=100, COOLDOWN_TICKS=600;
     private record PhoneCall(ServerLevel level,String room,BlockPos phone,long until) {}
-    private static final Map<ServerPlayer,PhoneCall> CALLS=new WeakHashMap<>();
+    // By object: a respawned player keeps the network id, and a call dialled after the respawn was filed under
+    // the dead player's object and ended whenever that one was collected.
+    private static final WeakIdentityMap<ServerPlayer,PhoneCall> CALLS=new WeakIdentityMap<>();
     private static final class Alarm
     {
         long until,next;

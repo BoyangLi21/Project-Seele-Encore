@@ -9,7 +9,7 @@ import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-/** Lets {@link com.projectseele.client.render.DirectMeshWriter} write whole quads between vertices. */
+/** Lets {@link com.projectseele.client.render.DirectMeshWriter} write whole primitives between vertices. */
 @Mixin(BufferBuilder.class)
 public abstract class BufferBuilderDirectMixin extends DefaultedVertexConsumer implements DirectVertexTarget
 {
@@ -25,6 +25,11 @@ public abstract class BufferBuilderDirectMixin extends DefaultedVertexConsumer i
     @Override public VertexFormat projectseele$quadFormat()
     {
         return building&&mode==VertexFormat.Mode.QUADS&&elementIndex==0&&!defaultColorSet?format:null;
+    }
+
+    @Override public VertexFormat projectseele$triangleFormat()
+    {
+        return building&&mode==VertexFormat.Mode.TRIANGLES&&elementIndex==0&&!defaultColorSet?format:null;
     }
 
     @Override public long projectseele$end()

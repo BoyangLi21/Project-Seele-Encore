@@ -52,7 +52,9 @@ public final class EntryPlugCarrierRenderer
     {
         // The persistent carrier still exists and holds the pilot while seated,
         // but the external shell is physically inside the airframe.
-        if (!animatable.isShellVisible())
+        // R64: its own pilot still sees the cabin until the wall comes on (the LCL and the nerve connection
+        // now run after the lock, inside the Unit).
+        if (!animatable.isShellVisible() && !com.projectseele.client.cockpit.PilotCockpitR64.cabinStillSeen(animatable))
         {
             return;
         }
@@ -67,7 +69,7 @@ public final class EntryPlugCarrierRenderer
                                 double cameraX, double cameraY,
                                 double cameraZ)
     {
-        if (!entity.isShellVisible()) return false;
+        if (!entity.isShellVisible() && !com.projectseele.client.cockpit.PilotCockpitR64.cabinStillSeen(entity)) return false;
         if (!entity.hasCanonicalPose())
             return super.shouldRender(entity, frustum, cameraX, cameraY, cameraZ);
         // Use the complete moving shell, including the open hatch, rather

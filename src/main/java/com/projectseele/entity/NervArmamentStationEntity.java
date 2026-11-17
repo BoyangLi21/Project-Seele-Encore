@@ -83,6 +83,12 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
                     EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Integer> DATA_PAYLOAD_R47 =
             SynchedEntityData.defineId(NervArmamentStationEntity.class,EntityDataSerializers.INT);
+    /** A spare-weapon tower's station: the tower's number in the city, the side of its door, its height, its door. Empty otherwise. */
+    private static final EntityDataAccessor<CompoundTag> DATA_TOWER_R64 =
+            SynchedEntityData.defineId(NervArmamentStationEntity.class,EntityDataSerializers.COMPOUND_TAG);
+    /** Of a tower: the run under way, and while stowed the end the city rests at (ArmamentTowerLogicR64.LOWERED, RAISED or NONE). */
+    private static final EntityDataAccessor<Integer> DATA_TOWER_RUN_R64 =
+            SynchedEntityData.defineId(NervArmamentStationEntity.class,EntityDataSerializers.INT);
 
     private int phaseTicks;
     private float clientLift;
@@ -93,6 +99,11 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     private float clientDoorO;
     private boolean deployQueued;
     private boolean surfaceStateInitializedR54;
+    /** Not saved: a tower's run ends with the session it began in. */
+    private boolean towerRunLiveR64;
+    private int towerReadyTicksR64;
+    private net.minecraft.world.level.block.state.BlockState[] towerClientCellsR64;
+    private int towerClientCellsRunR64;
 
     public NervArmamentStationEntity(
             EntityType<? extends NervArmamentStationEntity> type, Level level)
@@ -112,6 +123,8 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         this.entityData.define(DATA_STOCKED, true);
         this.entityData.define(DATA_DOOR, 0.0F);
         this.entityData.define(DATA_PAYLOAD_R47,EvaUnit01Entity.WEAPON_RIFLE);
+        this.entityData.define(DATA_TOWER_R64,new CompoundTag());
+        this.entityData.define(DATA_TOWER_RUN_R64,0);
     }
 
     @Override
@@ -135,6 +148,11 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
                 Mth.clamp(migratedDoor, 0.0F, 1.0F));
         this.phaseTicks = Math.max(0, tag.getInt("PhaseTicks"));
         this.deployQueued = tag.getBoolean("DeployQueued");
+        if(tag.contains("TowerR64",net.minecraft.nbt.Tag.TAG_COMPOUND))
+        {
+            this.entityData.set(DATA_TOWER_R64,tag.getCompound("TowerR64").copy());
+            this.entityData.set(DATA_TOWER_RUN_R64,Mth.clamp(tag.getInt("TowerRunR64"),0,2));
+        }
     }
 
     @Override
@@ -148,6 +166,11 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         tag.putFloat("DoorProgress", this.entityData.get(DATA_DOOR));
         tag.putInt("PhaseTicks", this.phaseTicks);
         tag.putBoolean("DeployQueued", this.deployQueued);
+        if(this.towerR64()>=0)
+        {
+            tag.put("TowerR64",this.entityData.get(DATA_TOWER_R64).copy());
+            tag.putInt("TowerRunR64",this.towerRunR64());
+        }
     }
 
     @Override
@@ -169,24 +192,33 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
             this.clientHatch = this.entityData.get(DATA_HATCH);
             this.clientDoorO = this.clientDoor;
             this.clientDoor = this.entityData.get(DATA_DOOR);
+            if(this.towerR64()>=0)this.sampleTowerCellsR64();
             return;
         }
 
         if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
         {this.maintainSurfaceSupplyR50();return;}
         if(!com.projectseele.world.EquipmentVaultsR47.beforeMechanicalTick(this))return;
+        if(!com.projectseele.world.ArmamentTowersR64.beforeMechanicalTick(this))return;
         this.phaseTicks++;
-        if(this.level() instanceof ServerLevel server&&this.getStationState()!=STOWED&&this.getStationState()!=READY&&this.tickCount%40==0)
+        // A tower that stands ready has blocks out: its chunk stays loaded until they are back.
+        boolean tower=this.towerR64()>=0;
+        if(this.level() instanceof ServerLevel server&&this.getStationState()!=STOWED&&(tower||this.getStationState()!=READY)&&this.tickCount%40==0)
             keepCommandStationLoaded(server,this.blockPosition());
+        // With the city raised a tower has no pod to lift: its roof locks take the hatch's place, then the door.
+        int run=tower?this.towerRunR64():com.projectseele.world.ArmamentTowerLogicR64.NONE;
+        boolean raisedRun=run==com.projectseele.world.ArmamentTowerLogicR64.RAISED;
+        int hatchTicks=raisedRun?com.projectseele.config.SeeleConfig.ARMAMENT_TOWER_LOCK_TICKS.get():NervArmamentStationEntity.HATCH_TICKS;
+        int doorTicks=raisedRun?com.projectseele.config.SeeleConfig.ARMAMENT_TOWER_DOOR_TICKS.get():NervArmamentStationEntity.DOOR_TICKS;
         switch (this.getStationState())
         {
             case OPENING ->
             {
-                this.setHatch(ease(this.phaseTicks / (float)HATCH_TICKS));
-                if (this.phaseTicks >= HATCH_TICKS)
+                this.setHatch(ease(this.phaseTicks / (float)hatchTicks));
+                if (this.phaseTicks >= hatchTicks)
                 {
                     this.setHatch(1.0F);
-                    this.transition(RISING);
+                    this.transition(tower?com.projectseele.world.ArmamentTowerLogicR64.afterOpening(run):RISING);
                 }
             }
             case RISING ->
@@ -200,8 +232,8 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
             }
             case DOOR_OPENING ->
             {
-                this.setDoor(ease(this.phaseTicks / (float)DOOR_TICKS));
-                if (this.phaseTicks >= DOOR_TICKS)
+                this.setDoor(ease(this.phaseTicks / (float)doorTicks));
+                if (this.phaseTicks >= doorTicks)
                 {
                     this.setDoor(1.0F);
                     this.transition(READY);
@@ -217,11 +249,11 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
             case DOOR_CLOSING ->
             {
                 this.setDoor(1.0F - ease(
-                        this.phaseTicks / (float)DOOR_TICKS));
-                if (this.phaseTicks >= DOOR_TICKS)
+                        this.phaseTicks / (float)doorTicks));
+                if (this.phaseTicks >= doorTicks)
                 {
                     this.setDoor(0.0F);
-                    this.transition(LOWERING);
+                    this.transition(tower?com.projectseele.world.ArmamentTowerLogicR64.afterDoorClosing(run):LOWERING);
                 }
             }
             case LOWERING ->
@@ -237,10 +269,16 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
             case CLOSING ->
             {
                 this.setHatch(1.0F - ease(
-                        this.phaseTicks / (float)HATCH_TICKS));
-                if (this.phaseTicks >= HATCH_TICKS)
+                        this.phaseTicks / (float)hatchTicks));
+                if (this.phaseTicks >= hatchTicks)
                 {
                     this.setHatch(0.0F);
+                    if(tower)
+                    {
+                        // The lot's hatch is back before the tower counts as stowed: a city trip waits for that.
+                        if(!com.projectseele.world.ArmamentTowersR64.finishRun(this))return;
+                        this.entityData.set(DATA_STOCKED,true);this.towerRunLiveR64=false;this.transition(STOWED);return;
+                    }
                     if(this.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE)this.entityData.set(DATA_STOCKED, !com.projectseele.world.TvMissionEquipmentR45.missionRack(this)
                     ||com.projectseele.world.TvMissionEquipmentR45.physicalStockPresent(this));
                     if (this.deployQueued)
@@ -322,7 +360,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         if (cached != null
                 && level.getEntity(cached) instanceof
                 NervArmamentStationEntity station
-                && station.isAlive()
+                && station.isAlive()&&station.towerR64()<0
                 &&station.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE
                 && !com.projectseele.world.TvMissionEquipmentR45.missionRack(station))
         {
@@ -332,7 +370,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         for (Entity entity : level.getAllEntities())
         {
             if (entity instanceof NervArmamentStationEntity station
-                    && station.isAlive()
+                    && station.isAlive()&&station.towerR64()<0
                     &&station.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE
                     && !com.projectseele.world.TvMissionEquipmentR45.missionRack(station)
                     && (selected == null || station.getUUID().compareTo(
@@ -352,12 +390,126 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         return selected;
     }
 
+    // ---- Spare-weapon towers (R64): one station bound to an A-1 armament building of the lifting city ----
+
+    /** The tower's number in the city's table, or -1 for an ordinary lift station. */
+    public int towerR64()
+    {
+        CompoundTag tower=this.entityData.get(DATA_TOWER_R64);
+        return tower.contains("Tower")?tower.getInt("Tower"):-1;
+    }
+    /** The side the door is on: 0 south, 1 west, 2 north, 3 east. */
+    public int towerFacingR64(){return this.entityData.get(DATA_TOWER_R64).getInt("Facing")&3;}
+    public int towerHeightR64(){return this.entityData.get(DATA_TOWER_R64).getInt("Height");}
+    public int towerRunR64(){return this.entityData.get(DATA_TOWER_RUN_R64);}
+    public boolean towerRunLiveR64(){return this.towerRunLiveR64;}
+    public com.projectseele.world.ArmamentTowerLogicR64.Lot towerLotR64()
+    {var at=this.blockPosition();return new com.projectseele.world.ArmamentTowerLogicR64.Lot(at.getX(),at.getY(),at.getZ());}
+    public com.projectseele.world.ArmamentTowerLogicR64.Door towerDoorR64()
+    {
+        CompoundTag tower=this.entityData.get(DATA_TOWER_R64);
+        int width=tower.getInt("DoorWidth"),height=tower.getInt("DoorHeight"),bottom=tower.getInt("DoorBottom");
+        return width>0&&width%2==1&&width<=15&&height>0&&bottom>0
+                ?new com.projectseele.world.ArmamentTowerLogicR64.Door(width,height,bottom)
+                :new com.projectseele.world.ArmamentTowerLogicR64.Door(15,38,1);
+    }
+    /** Binds this station to a tower; called on every pass, so a changed table reaches a station that already exists. */
+    public void bindTowerR64(int tower,int facing,int height,com.projectseele.world.ArmamentTowerLogicR64.Door door)
+    {
+        CompoundTag tag=new CompoundTag();
+        tag.putInt("Tower",tower);tag.putInt("Facing",facing&3);tag.putInt("Height",height);
+        tag.putInt("DoorWidth",door.width());tag.putInt("DoorHeight",door.height());tag.putInt("DoorBottom",door.bottom());
+        if(!tag.equals(this.entityData.get(DATA_TOWER_R64))){this.entityData.set(DATA_TOWER_R64,tag);this.refreshDimensions();}
+    }
+    /** While stowed, clients are told which end the city rests at: that decides which blocks they remember the look of. */
+    public void showCityModeR64(int mode)
+    {if(this.getStationState()==STOWED&&this.towerRunR64()!=mode)this.entityData.set(DATA_TOWER_RUN_R64,mode);}
+    /** Starts a run from stowed; the towers' keeper has checked the city and the blocks. */
+    public boolean beginTowerRunR64(int run)
+    {
+        if(this.level().isClientSide||this.towerR64()<0||this.getStationState()!=STOWED
+                ||run==com.projectseele.world.ArmamentTowerLogicR64.NONE)return false;
+        this.entityData.set(DATA_TOWER_RUN_R64,run);this.entityData.set(DATA_STOCKED,true);
+        this.setDoor(0F);this.setLift(0F);this.setHatch(0F);
+        this.towerRunLiveR64=true;this.towerReadyTicksR64=0;this.transition(OPENING);return true;
+    }
+    /** Brings a tower in from wherever its run stands; a phase turned round carries on from where it was. */
+    public boolean recallTowerR64()
+    {
+        if(this.level().isClientSide||this.towerR64()<0)return false;
+        boolean raised=this.towerRunR64()==com.projectseele.world.ArmamentTowerLogicR64.RAISED;
+        int lock=raised?com.projectseele.config.SeeleConfig.ARMAMENT_TOWER_LOCK_TICKS.get():HATCH_TICKS;
+        int door=raised?com.projectseele.config.SeeleConfig.ARMAMENT_TOWER_DOOR_TICKS.get():DOOR_TICKS;
+        int elapsed=this.phaseTicks;
+        switch(this.getStationState())
+        {
+            case OPENING -> {this.transition(CLOSING);this.phaseTicks=com.projectseele.world.ArmamentTowerLogicR64.reversedTicks(elapsed,lock,lock);}
+            case RISING -> {this.transition(LOWERING);this.phaseTicks=com.projectseele.world.ArmamentTowerLogicR64.reversedTicks(elapsed,RISE_TICKS,LOWER_TICKS);}
+            case DOOR_OPENING -> {this.transition(DOOR_CLOSING);this.phaseTicks=com.projectseele.world.ArmamentTowerLogicR64.reversedTicks(elapsed,door,door);}
+            case READY -> this.transition(DOOR_CLOSING);
+            default -> {return false;}
+        }
+        return true;
+    }
+    /** Ends a run at once, stowed. The towers' keeper has put the blocks back. */
+    public void resetTowerRunR64()
+    {
+        this.setDoor(0F);this.setLift(0F);this.setHatch(0F);
+        this.towerRunLiveR64=false;this.towerReadyTicksR64=0;this.deployQueued=false;this.transition(STOWED);
+    }
+    /** Ticks this tower has stood ready with nobody taking the weapon; the count starts again after combat. */
+    public int towerReadyTicksR64(boolean combat)
+    {
+        if(this.getStationState()!=READY||combat)this.towerReadyTicksR64=0;else this.towerReadyTicksR64++;
+        return this.towerReadyTicksR64;
+    }
+    /** For the command room: how far the weapon is out, by the pod's lift with the city lowered and by the door with it raised. */
+    public int towerShownPercentR64()
+    {
+        float shown=this.towerRunR64()==com.projectseele.world.ArmamentTowerLogicR64.RAISED?this.entityData.get(DATA_DOOR):this.entityData.get(DATA_LIFT);
+        return this.getStationState()==STOWED?0:Mth.clamp(Math.round(shown*100F),0,100);
+    }
+    /**
+     * Clients remember what the hatch or the door looks like while its blocks are in place, and draw that moving
+     * once the blocks are out. Null if nothing was seen: the renderer then draws plain plates.
+     */
+    public net.minecraft.world.level.block.state.BlockState[] towerClientCellsR64()
+    {return this.towerClientCellsRunR64==this.towerRunR64()?this.towerClientCellsR64:null;}
+    private void sampleTowerCellsR64()
+    {
+        int run=this.towerRunR64(),state=this.getStationState();
+        boolean inPlace=state==STOWED||run==com.projectseele.world.ArmamentTowerLogicR64.RAISED&&state==OPENING;
+        if(!inPlace||run==com.projectseele.world.ArmamentTowerLogicR64.NONE)return;
+        if(this.towerClientCellsR64!=null&&this.towerClientCellsRunR64==run&&this.tickCount%20!=0)return;
+        var cells=com.projectseele.world.ArmamentTowerLogicR64.cells(run,this.towerLotR64(),this.towerFacingR64(),this.towerDoorR64());
+        var states=new net.minecraft.world.level.block.state.BlockState[cells.size()];
+        var at=new net.minecraft.core.BlockPos.MutableBlockPos();int solid=0;
+        for(int i=0;i<states.length;i++)
+        {
+            int[] cell=cells.get(i);states[i]=this.level().getBlockState(at.set(cell[0],cell[1],cell[2]));
+            if(!states[i].isAir())solid++;
+        }
+        // The block changes of a run starting can arrive a moment before its state: an emptier look never replaces a fuller one.
+        if(solid*2>=states.length||this.towerClientCellsR64==null||this.towerClientCellsRunR64!=run)
+        {this.towerClientCellsR64=solid>0?states:null;this.towerClientCellsRunR64=run;}
+    }
+    /** The station stands in the lot's hatch layer, and inside the building when the city is raised: light is read in the open in front of the door. */
+    @Override
+    public Vec3 getLightProbePosition(float partialTick)
+    {
+        if(this.towerR64()<0)return super.getLightProbePosition(partialTick);
+        int facing=this.towerFacingR64();double out=com.projectseele.world.ArmamentTowerLogicR64.HALF+2.5D;
+        return this.position().add(com.projectseele.world.ArmamentTowerLogicR64.stepX(facing)*out,3.0D,
+                com.projectseele.world.ArmamentTowerLogicR64.stepZ(facing)*out);
+    }
+
     public boolean deploy()
     {
         if (this.level().isClientSide)
         {
             return false;
         }
+        if(this.towerR64()>=0)return com.projectseele.world.ArmamentTowersR64.requestDeploy(this);
         if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
         {this.surfaceStateInitializedR54=true;this.deployQueued=true;this.maintainSurfaceSupplyR50();return this.isStocked();}
         if(this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE&&!this.isStocked())return false;
@@ -382,6 +534,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
 
     public boolean recall()
     {
+        if(this.towerR64()>=0)return !this.level().isClientSide&&com.projectseele.world.ArmamentTowersR64.requestRecall(this);
         if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
         {if(this.level().isClientSide)return false;this.deployQueued=false;this.maintainSurfaceSupplyR50();return true;}
         if (this.level().isClientSide
@@ -560,21 +713,32 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     @Override
     public EntityDimensions getDimensions(Pose pose)
     {
-        float height = 1.0F + this.podTravelR47() * this.entityData.get(DATA_LIFT);
+        float height = 1.0F + this.presentedHeightR64();
         return EntityDimensions.fixed(this.rackHalfWidthR47()*2+3, height);
     }
 
+    /**
+     * How high the offered weapon stands above the station: the pod's lift, or for a tower in the standing building
+     * the opened part of its door. The hand-over asks that the EVA's hull be within four blocks of this box, so with
+     * the door up an EVA standing on a kerb, a wreck or a low roof still reaches the weapon behind it.
+     */
+    private float presentedHeightR64()
+    {
+        if(this.towerR64()>=0&&this.towerRunR64()==com.projectseele.world.ArmamentTowerLogicR64.RAISED)
+        {var door=this.towerDoorR64();return this.entityData.get(DATA_DOOR)*(door.bottom()+door.height());}
+        return this.podTravelR47()*this.entityData.get(DATA_LIFT);
+    }
     public int payloadR47(){return this.entityData.get(DATA_PAYLOAD_R47);}
-    public int rackHalfWidthR47(){return this.payloadR47()==7?14:4;}
+    public int rackHalfWidthR47(){return this.towerR64()>=0?com.projectseele.world.ArmamentTowerLogicR64.HALF-1:this.payloadR47()==7?14:4;}
     /** Full-size SMG depth is 12.952 m; its original 7 m interior is retired. */
-    public int rackHalfDepthR54(){return this.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE?8:this.rackHalfWidthR47();}
+    public int rackHalfDepthR54(){return this.towerR64()<0&&this.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE?8:this.rackHalfWidthR47();}
 
     @Override
     protected AABB makeBoundingBox()
     {
         if(this.entityData==null||this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE)return super.makeBoundingBox();
         double width=this.rackHalfWidthR47()+1.5D,depth=this.rackHalfDepthR54()+1.5D;
-        double height=1.0D+this.podTravelR47()*this.entityData.get(DATA_LIFT);
+        double height=1.0D+this.presentedHeightR64();
         return new AABB(this.getX()-width,this.getY(),this.getZ()-depth,
                 this.getX()+width,this.getY()+height,this.getZ()+depth);
     }
@@ -582,20 +746,28 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     @Override
     public AABB getBoundingBoxForCulling()
     {
+        if(this.towerR64()>=0)
+        {
+            // The hatch plates slide out past the lot, and the roof locks sit on top of the standing building.
+            double reach=2*com.projectseele.world.ArmamentTowerLogicR64.HALF+2.0D;
+            return new AABB(this.getX()-reach,this.getY()-this.podTravelR47()-1.0D,this.getZ()-reach,
+                    this.getX()+reach,this.getY()+Math.max(this.podHeightR47(),this.towerHeightR64())+8.0D,this.getZ()+reach);
+        }
         if(this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE)return super.getBoundingBoxForCulling();
         double width=2*this.rackHalfWidthR47()+2.0D,depth=this.rackHalfDepthR54()+1.5D;
         return new AABB(this.getX()-width,this.getY()-this.podTravelR47(),this.getZ()-depth,
                 this.getX()+width,this.getY()+this.podHeightR47()+2.0D,this.getZ()+depth);
     }
 
-    public float podTravelR47(){return this.payloadR47()==7?53.0F:43.0F;}
+    public float podTravelR47(){return this.towerR64()>=0?com.projectseele.world.ArmamentTowerLogicR64.POD_TRAVEL:this.payloadR47()==7?53.0F:43.0F;}
     public float podHeightR47(){return this.payloadR47()==7?52.0F:42.0F;}
     public void setPayloadR47(int payload)
     {this.entityData.set(DATA_PAYLOAD_R47,payload==2||payload==6||payload==7?payload:EvaUnit01Entity.WEAPON_RIFLE);this.refreshDimensions();}
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key)
     {
         super.onSyncedDataUpdated(key);
-        if(DATA_LIFT.equals(key)||DATA_PAYLOAD_R47.equals(key))this.refreshDimensions();
+        if(DATA_LIFT.equals(key)||DATA_PAYLOAD_R47.equals(key)||DATA_TOWER_R64.equals(key)
+                ||this.towerR64()>=0&&(DATA_DOOR.equals(key)||DATA_TOWER_RUN_R64.equals(key)))this.refreshDimensions();
     }
     public void returnStoredPayloadR47()
     {
@@ -649,6 +821,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     private void setDoor(float progress)
     {
         this.entityData.set(DATA_DOOR, Mth.clamp(progress, 0.0F, 1.0F));
+        if(this.towerR64()>=0)this.refreshDimensions();
     }
 
     private static float ease(float value)

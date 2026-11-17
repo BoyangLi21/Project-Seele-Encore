@@ -28,6 +28,9 @@ public final class NervAirTransportStateR52 extends SavedData
         public boolean hasStatusReport(){return ownerData.contains("ReportAtR53");}
         public long lastStatusReportTime(){return ownerData.getLong("ReportAtR53");}
         public String lastStatusReportNote(){return ownerData.getString("ReportNoteR53");}
+        /** Whether this task has already reported {@code note}. Reads the stored data in place: finished tasks stay in the save, and copying each one's data every tick to ask this was the largest steady cost of the server tick. */
+        public boolean statusReported(String note)
+        {return hasStatusReport()&&lastStatusReportNote().equals(note)||ownerData.getList("ReportSeenR54",Tag.TAG_STRING).contains(StringTag.valueOf(note));}
         public boolean active(){return phase!=Phase.COMPLETE&&phase!=Phase.CANCELLED;}
         public Job update(int nextLeg,int nextAge,Phase nextPhase,boolean attached,boolean transferred,Set<String> newSpaces,Set<String> newMechanisms,CompoundTag data,String note)
         {return new Job(task,aircraft,original,kind,manifestFingerprint,itinerary,receiver,nextLeg,nextAge,nextPhase,nextPhase==Phase.HOLD?heldPhase:nextPhase,attached,transferred,cancelRequested,newSpaces,newMechanisms,data,note);}

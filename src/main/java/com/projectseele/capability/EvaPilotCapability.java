@@ -44,6 +44,12 @@ public final class EvaPilotCapability
         return 1.0F + maximumBonus * progress;
     }
 
+    /** The same for a bonus given: the server's, on a client. */
+    public static float mobilityMultiplier(float synchronization, float maximumBonus)
+    {
+        return 1.0F + maximumBonus * normalizedGrowth(synchronization);
+    }
+
     /** Used as a divisor for melee and automatic-fire cooldowns. */
     public static float attackSpeedMultiplier(float synchronization)
     {

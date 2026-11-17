@@ -77,16 +77,38 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public static final int CABIN_OPEN = 0;
     /** Pilot seated, hatch sealed, optical feed still completely disconnected. */
     public static final int CABIN_SEALED_DARK = 1;
-    /** PREPARE accepted and the local capsule is filling with LCL. */
-    public static final int CABIN_LCL_FILLING = 2;
-    /** A10 nerve connection and external optical synchronization are running. */
+    /**
+     * PREPARE accepted: the bridge draws back, the crane carries the capsule to its socket and drives it in.
+     * The cabin is sealed and dry. R64: up to R63 this stage was the LCL filling, run on the way to the socket;
+     * the original fills the plug only once it is seated, so the LCL is now the Unit's part of the sequence.
+     */
+    public static final int CABIN_INSERTING = 2;
+    /** Published up to R63 for the nerve connection outside the Unit. No longer set; a save that holds it is read as inserting. */
     public static final int CABIN_SYNCHRONIZING = 3;
-    /** Optical feed is live; ownership is about to transfer to the airframe. */
+    /** Seated in its socket: the Unit's activation has the rest (LCL, nerve connection, synchronisation). */
     public static final int CABIN_ONLINE = 4;
     /** Returned to the wet cage: hatch sealed, normal cabin view, no overlay. */
     public static final int CABIN_RECOVERED_IDLE = 5;
-    /** Percent reached outside the EVA before the seated plug takes over. */
-    public static final int CABIN_TRANSFER_PERCENT = 70;
+    /**
+     * Percent of the cabin sequence reached outside the EVA before the seated plug takes over.
+     * R64: 7, the insertion alone (up to R63 70: the LCL and most of the nerve connection ran outside the Unit).
+     * The Unit's activation runs from here to 100: 112 ticks after the lock, where it was 36.
+     */
+    public static final int CABIN_TRANSFER_PERCENT = 7;
+    /** Percent of it the bridge's retraction covers; the carrying and driving in cover the rest. */
+    public static final int CABIN_BRIDGE_PERCENT = 2;
+
+    /** The cabin sequence while the bridge draws back (done 0..1): 1 to CABIN_BRIDGE_PERCENT. */
+    public static int cabinPercentOnBridge(double done)
+    {
+        return Mth.clamp((int) Math.round(CABIN_BRIDGE_PERCENT * done), 1, CABIN_BRIDGE_PERCENT);
+    }
+
+    /** The cabin sequence while the capsule is carried and driven in (progress 0..1): CABIN_BRIDGE_PERCENT to CABIN_TRANSFER_PERCENT. */
+    public static int cabinPercentInserting(double progress)
+    {
+        return CABIN_BRIDGE_PERCENT + (int) Math.round(Mth.clamp(progress, 0.0D, 1.0D) * (CABIN_TRANSFER_PERCENT - CABIN_BRIDGE_PERCENT));
+    }
     /** Door animation is eight percentage points per server tick. */
     public static final int HATCH_SEAL_TICKS = 13;
 
@@ -853,13 +875,9 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         {
             this.entityData.set(DATA_CABIN_STAGE, CABIN_SEALED_DARK);
         }
-        else if (safe < 45)
-        {
-            this.entityData.set(DATA_CABIN_STAGE, CABIN_LCL_FILLING);
-        }
         else if (safe < CABIN_TRANSFER_PERCENT)
         {
-            this.entityData.set(DATA_CABIN_STAGE, CABIN_SYNCHRONIZING);
+            this.entityData.set(DATA_CABIN_STAGE, CABIN_INSERTING);
         }
         else
         {
@@ -1743,9 +1761,9 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         }
         if (tag.contains("CabinStage"))
         {
-            this.entityData.set(DATA_CABIN_STAGE, Math.max(CABIN_OPEN,
-                    Math.min(CABIN_RECOVERED_IDLE,
-                            tag.getInt("CabinStage"))));
+            int savedStage = Math.max(CABIN_OPEN, Math.min(CABIN_RECOVERED_IDLE, tag.getInt("CabinStage")));
+            // R64: a capsule saved on its way to the socket under the old table (nerve connection outside the Unit).
+            this.entityData.set(DATA_CABIN_STAGE, savedStage == CABIN_SYNCHRONIZING ? CABIN_INSERTING : savedStage);
             this.entityData.set(DATA_CABIN_PROGRESS, Math.max(0,
                     Math.min(CABIN_TRANSFER_PERCENT,
                             tag.getInt("CabinProgress"))));

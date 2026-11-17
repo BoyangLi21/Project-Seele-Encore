@@ -35,6 +35,7 @@ public abstract class CameraMixin
     @org.spongepowered.asm.mixin.Unique private long projectseele$carrierFrame;
     @org.spongepowered.asm.mixin.Unique private boolean projectseele$loosePlugCamera;
     @org.spongepowered.asm.mixin.Unique private Vec3 projectseele$plugOrbitOffset=Vec3.ZERO;
+    @org.spongepowered.asm.mixin.Unique private int projectseele$diagTickR64=-1;
 
     @org.spongepowered.asm.mixin.Unique
     private static boolean projectseele$outsideCapsule(EntryPlugCarrierEntity plug,float partial,Vec3 point)
@@ -143,6 +144,30 @@ public abstract class CameraMixin
             Vec3 base=mechanical?com.projectseele.entity.EvaMechanicalFrameR52.frame(controlled,partialTick).translation()
                     :controlled.hasActiveCarrierMotion()?controlled.carrierRenderPosition(partialTick)
                     :controlled.getPosition(partialTick).add(0,com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick),0);
+            if(!mechanical&&!controlled.hasActiveCarrierMotion()&&!com.projectseele.entity.EvaAirTransportR31.active(controlled)
+                    &&com.projectseele.client.EvaChaseCameraR64.owns(controlled))
+            {
+                // R64 (M3): a Unit of the planted model, on its own feet, has the chase camera of that model.
+                Camera chase=(Camera)(Object)this;
+                double wanted=4*(net.minecraft.client.Minecraft.getInstance().options.getCameraType().isMirrored()?22.0D:11.6D);
+                Vec3 place=com.projectseele.client.EvaChaseCameraR64.place(controlled,subject,partialTick,chase.getXRot(),chase.getYRot(),wanted);
+                this.setPosition(place.x,place.y,place.z);
+                projectseele$carrierZoom=com.projectseele.client.EvaChaseCameraR64.zoom();
+                projectseele$carrierCameraId=controlled.getId();projectseele$carrierFrame=now;projectseele$loosePlugCamera=false;
+                if(com.projectseele.client.EvaStepSmoothingR57.CAMERA_DIAG_R64&&controlled.tickCount!=projectseele$diagTickR64)
+                {
+                    projectseele$diagTickR64=controlled.tickCount;
+                    Vec3 turns=place.add(Vec3.directionFromRotation(chase.getXRot(),chase.getYRot()).scale(projectseele$carrierZoom));
+                    com.projectseele.ProjectSeele.LOGGER.info("R64CAM tick {} zoom {} free {} step {} pivot clear {} camera clear {} pivot y {} entity y {} in unit {} lift {}",controlled.tickCount,
+                            String.format(java.util.Locale.ROOT,"%.1f",projectseele$carrierZoom),String.format(java.util.Locale.ROOT,"%.1f",com.projectseele.client.EvaChaseCameraR64.open()),
+                            String.format(java.util.Locale.ROOT,"%.2f",com.projectseele.client.EvaChaseCameraR64.lag(controlled,partialTick)),
+                            projectseele$cameraPointClear(controlled.level(),subject,turns),projectseele$cameraPointClear(controlled.level(),subject,place),
+                            String.format(java.util.Locale.ROOT,"%.1f",turns.y),String.format(java.util.Locale.ROOT,"%.1f",controlled.getPosition(partialTick).y),
+                            com.projectseele.client.EvaChaseCameraR64.inUnit(controlled,partialTick,place),
+                            String.format(java.util.Locale.ROOT,"%.1f",com.projectseele.client.EvaChaseCameraR64.lift()));
+                }
+                return;
+            }
             // A 60-metre EVA needs a chest-height orbit even when the silo
             // wall contracts its zoom. Never inherit the low rider seat or
             // ease back toward the old 30-metre waist pivot.
@@ -176,12 +201,26 @@ public abstract class CameraMixin
             Camera camera=(Camera)(Object)this;
             Vec3 position=pivot.add(Vec3.directionFromRotation(camera.getXRot(),camera.getYRot()).scale(-projectseele$carrierZoom));
             this.setPosition(position.x, position.y, position.z);
+            if(com.projectseele.client.EvaStepSmoothingR57.CAMERA_DIAG_R64&&controlled.tickCount!=projectseele$diagTickR64)
+            {
+                // Review only: where the camera is against its unit and the ground, once a tick.
+                projectseele$diagTickR64=controlled.tickCount;
+                com.projectseele.ProjectSeele.LOGGER.info("R64CAM tick {} zoom {} free {} step {} pivot clear {} camera clear {} pivot y {} entity y {} in unit {} lift 0.0",controlled.tickCount,
+                        String.format(java.util.Locale.ROOT,"%.1f",projectseele$carrierZoom),String.format(java.util.Locale.ROOT,"%.1f",available),
+                        String.format(java.util.Locale.ROOT,"%.2f",com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick)),
+                        projectseele$cameraPointClear(controlled.level(),subject,pivot),projectseele$cameraPointClear(controlled.level(),subject,position),
+                        String.format(java.util.Locale.ROOT,"%.1f",pivot.y),String.format(java.util.Locale.ROOT,"%.1f",controlled.getPosition(partialTick).y),
+                        com.projectseele.client.EvaChaseCameraR64.inUnit(controlled,partialTick,position));
+            }
             return;
         }
         projectseele$carrierCameraId=-1;projectseele$loosePlugCamera=false;projectseele$plugOrbitOffset=Vec3.ZERO;
         if(!detached&&controlled!=null&&com.projectseele.entity.EvaAirTransportR31.active(controlled))
         {
             Vec3 optical=controlled.getPilotCameraSeatPosition(subject,partialTick).add(0,subject.getEyeHeight(),0);
+            // The facility's route holds the unit in this branch until the tick it is let go, and the eye
+            // of the held pose stands 2.9 blocks above the eye of the stance: the release has to know it.
+            optical=com.projectseele.client.render.EvaRackReleaseR63.seat(controlled,partialTick,optical);
             optical=com.projectseele.client.PilotOpticsContinuity.apply(controlled,partialTick,optical);
             Camera camera=(Camera)(Object)this;
             float localYaw=camera.getYRot()-com.projectseele.entity.EvaAirTransportR31.frameYaw(controlled,partialTick)+180;
@@ -196,7 +235,10 @@ public abstract class CameraMixin
         if(!detached&&controlled!=null&&controlled.isPoweredOn()&&!controlled.isActivationCinematicActive())
         {
             Vec3 optical=controlled.getPilotCameraSeatPosition(subject,partialTick).add(0,subject.getEyeHeight()+com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick),0);
+            optical=com.projectseele.client.render.EvaRackReleaseR63.seat(controlled,partialTick,optical);
             optical=com.projectseele.client.PilotOpticsContinuity.apply(controlled,partialTick,optical);
+            // R64: the pilot sits in the plug, not in the head; the eye takes a share of the head's bob and sway.
+            optical=com.projectseele.client.cockpit.PilotViewSteadyR64.apply(controlled,partialTick,optical);
             this.setPosition(optical.x,optical.y,optical.z);return;
         }
         if(controlled==null)com.projectseele.client.PilotOpticsContinuity.clear();
@@ -210,6 +252,8 @@ public abstract class CameraMixin
         if (plug.isLockedToEva() && eva != null
                 && eva.isActivationCinematicActive())
         {
+            // R64: the seat is drawn down the plug as it locks; the glide starts from there.
+            eye = eye.add(com.projectseele.client.cockpit.PilotCockpitR64.seatSlide(plug, eva, partialTick));
             // Continue from the physical capsule eye into the EVA optical
             // socket during the final 30% of synchronization.  Both endpoints
             // are world-space positions, so no camera frame can escape the

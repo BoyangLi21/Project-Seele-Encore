@@ -79,6 +79,80 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     }
     public void cancelStrikeR31()
     {if(isStrikeActive()){entityData.set(STRIKE_AGE,-1);strikeTarget=null;strikeHit=false;meleeRecovery=Math.max(meleeRecovery,6);}getNavigation().stop();}
+    /** -Dprojectseele.sachielBreakSmoothR63=false, review only: a strike broken off drops to the standing pose at once, to measure against. */
+    private static final boolean BREAK_SMOOTH_R63=!"false".equals(System.getProperty("projectseele.sachielBreakSmoothR63"));
+    /**
+     * R63: calls off a strike of its own to step away. A strike knocked out of its hands (cancelStrikeR31) is taken
+     * over by the reaction to the blow; one it gives up itself is let down from where the wind-up had brought the
+     * body, as at the end of a strike. Given up without that, a raised arm dropped to the standing pose in a frame.
+     */
+    public void callOffStrikeR63()
+    {
+        if(level().isClientSide||!isStrikeActive())return;
+        if(BREAK_SMOOTH_R63&&SachielGameplayMotionR32.naturalRecovery())
+        {
+            var release=EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0));
+            release.putLong("r40_release_at",level().getGameTime());release.putFloat("r40_release_yaw",getYRot());
+            release.putDouble("r40_release_x",getX());release.putDouble("r40_release_z",getZ());entityData.set(STRIKE_FROM,release);
+        }
+        cancelStrikeR31();
+    }
+    /**
+     * R63: gives up a strike it has begun for another at once, with none of the pause a strike that is called off
+     * leaves behind. For the answer to a Unit's blow, while its own is still in the wind-up.
+     */
+    public boolean breakIntoR63(LivingEntity target,int mode)
+    {
+        // Everything beginStrike asks for but the free arm, before the strike in hand is given up for it.
+        if(level().isClientSide||!isStrikeActive()||isFirstBattleActive()||!target.isAlive()||meleeRecovery>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        // The new strike starts from where the old one has brought the body, read while the old one still holds
+        // it: read after it was given up, that was the standing pose, and a raised arm dropped to it in a frame.
+        var from=BREAK_SMOOTH_R63&&SachielGameplayMotionR32.phrases()?EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0)):null;
+        entityData.set(STRIKE_AGE,-1);strikeTarget=null;strikeHit=false;
+        if(!beginStrike(target,mode))return false;
+        if(from!=null)entityData.set(STRIKE_FROM,from);
+        return true;
+    }
+    /**
+     * R64: the jab that gets in ahead of a Unit's heavy blow does not wait for Sachiel's own recovery. It comes
+     * out of the rest of a strike that has been thrown (after its contact; not out of a jab) or out of the pause
+     * that follows one. Sachiel is in one or the other nearly all the time it is not winding up: asked for a jab
+     * at every heavy blow it threw 10 of 17, and with the dice as they are 2 of the 8 it rolled.
+     */
+    public boolean jabOutOfRecoveryR64(LivingEntity target)
+    {
+        if(level().isClientSide||isFirstBattleActive()||!target.isAlive()||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        if(isStrikeActive())
+        {
+            // Still to be thrown, or being thrown: that is no recovery.
+            if(strikeMode()==SachielStrike.JAB||entityData.get(STRIKE_AGE)<=SachielStrike.contactEnd(strikeMode()))return false;
+        }
+        else if(meleeRecovery<=0)return false;
+        var from=BREAK_SMOOTH_R63&&SachielGameplayMotionR32.phrases()?EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0)):null;
+        entityData.set(STRIKE_AGE,-1);strikeTarget=null;strikeHit=false;meleeRecovery=0;
+        if(!beginStrike(target,SachielStrike.JAB))return false;
+        if(from!=null)entityData.set(STRIKE_FROM,from);
+        return true;
+    }
+    /**
+     * R64 (M5): the next strike of a string. It comes out of the rest of the strike before it (once that has been
+     * thrown) or out of the pause that follows one, from the pose the body is in; with the arm free it is begun
+     * as any strike.
+     */
+    public boolean followStrikeR64(LivingEntity target,int mode)
+    {
+        if(level().isClientSide||isFirstBattleActive()||!target.isAlive()||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        if(isStrikeActive())
+        {
+            if(entityData.get(STRIKE_AGE)<=SachielStrike.contactEnd(strikeMode()))return false;
+        }
+        else if(meleeRecovery<=0)return beginStrike(target,mode);
+        var from=BREAK_SMOOTH_R63&&SachielGameplayMotionR32.phrases()?EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0)):null;
+        entityData.set(STRIKE_AGE,-1);strikeTarget=null;strikeHit=false;meleeRecovery=0;
+        if(!beginStrike(target,mode))return false;
+        if(from!=null)entityData.set(STRIKE_FROM,from);
+        return true;
+    }
     public boolean beginStrike(LivingEntity target,int mode)
     {
         if(level().isClientSide||isStrikeActive()||isFirstBattleActive()||!target.isAlive()||meleeRecovery>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
@@ -113,6 +187,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     {
         if(CombatFeelR31.hitPaused(this))return;
         int mode=strikeMode(),age=entityData.get(STRIKE_AGE)+1;entityData.set(STRIKE_AGE,age);getNavigation().stop();setDeltaMovement(getDeltaMovement().multiply(0,1,0));
+        AngelTellsR64.strike(this,mode,age);
         if(age<=SachielStrike.windup(mode)-4&&strikeTarget!=null&&strikeTarget.isAlive())
         {
             Vec3 to=strikeTarget.position().subtract(position());float wanted=(float)Math.toDegrees(Math.atan2(-to.x,to.z));
@@ -146,7 +221,12 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
             if(contact.isPresent())
             {
                 Vec3 impact=contact.orElse(start);
-                strikeHit=true;boolean hit=com.projectseele.event.EvaHitFeedback.hurt(strikeTarget,damageSources().mobAttack(this),mode==SachielStrike.PILE?55:(float)getAttributeValue(Attributes.ATTACK_DAMAGE),impact,f.direction());
+                // The overhead knocks a Unit the way the hand is going. The frame's direction runs along the forearm,
+                // and against a Unit taller than Sachiel's shoulder that points up (0.88 to 0.96 of it): a blow
+                // brought down on a Unit threw it upward.
+                Vec3 struck=f.direction(),going=f.hand().subtract(prior.hand());
+                if(mode==SachielStrike.OVERHEAD&&going.lengthSqr()>1.0E-4)struck=going.normalize();
+                strikeHit=true;boolean hit=com.projectseele.event.EvaHitFeedback.hurt(strikeTarget,damageSources().mobAttack(this),mode==SachielStrike.PILE?55:(float)getAttributeValue(Attributes.ATTACK_DAMAGE),impact,struck);
                 if(hit)
                 {
                     if(!(strikeTarget instanceof EvaUnit01Entity))strikeTarget.push(f.direction().x*.65,.16,f.direction().z*.65);
@@ -237,6 +317,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     @Override
     protected void registerGoals()
     {
+        this.goalSelector.addGoal(1,new SachielIntentR64(this));
         this.goalSelector.addGoal(1,new SachielTacticsR36(this));
         this.goalSelector.addGoal(1,new SachielTacticsR34(this));
         this.goalSelector.addGoal(2, new MeleeAttackGoal(this, 1.0D, true){@Override public boolean canUse(){return !SachielGameplayMotionR32.directed()&&super.canUse();}});

@@ -2,15 +2,17 @@ package com.projectseele.client.render;
 
 import com.projectseele.entity.EvaUnit01Entity;
 import java.util.Map;
-import java.util.WeakHashMap;
+import com.projectseele.util.WeakIdentityMap;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
 import software.bernie.geckolib.cache.object.GeoBone;
 
 final class EvaMechanicalResetR30
 {
     private record Generation(int revision,String asset,int weapon) {}
-    private static final Map<EvaUnit01Entity,Generation> REVISIONS=new WeakHashMap<>();
-    private static final Map<EvaUnit01Entity,Boolean> RESTORE_BIND=new WeakHashMap<>();
+    // By object, not by network id. A map keyed by the entity keeps the first object it saw for an id: once that
+    // one was collected the entry went, and a Unit whose revision is above zero was reset in full at that moment.
+    private static final WeakIdentityMap<EvaUnit01Entity,Generation> REVISIONS=new WeakIdentityMap<>();
+    private static final WeakIdentityMap<EvaUnit01Entity,Boolean> RESTORE_BIND=new WeakIdentityMap<>();
 
     /** Run before Gecko evaluates the entity; clearing post-Gecko is one frame too late. */
     static void prepare(EvaUnit01Entity eva,BakedGeoModel model)

@@ -56,6 +56,46 @@ public final class EvaConnectedActionReview
     private static final boolean STRIKE=Boolean.getBoolean("projectseele.tourStrikeR60");
     /** A.T. Field look: a still Sachiel's field struck from the pilot's side, then the piloted unit's own field, at noon and at dusk. */
     private static final boolean ATF=Boolean.getBoolean("projectseele.tourAtFieldR63");
+    /**
+     * Launch check: one catapult launch of the unit, recorded from the start of its ascent to a few
+     * seconds after control comes back. It builds a test launch complex of its own at a far site of
+     * the review world (-Dprojectseele.launchSite=<n>, a fresh number for every run: a launched unit
+     * does not go back into its cage).
+     */
+    private static final boolean LAUNCH=Boolean.getBoolean("projectseele.tourLaunchR62");
+    private static final int LAUNCH_SITE=Integer.getInteger("projectseele.launchSite",0);
+    /** Ticks recorded after the launch sequence hands the unit back. */
+    private static final int LAUNCH_AFTER=Integer.getInteger("projectseele.launchAfter",160);
+    private static int launchAscentAt=-1,launchIdleAt=-1;
+    /**
+     * A sortie from the GeoFront runs under the launch director, which keeps the unit under the
+     * logistics lock from its cage until the launch sequence has ended on the surface (phase
+     * SILO_READY of EvaLogisticsDirector). The test complex has no director: the review holds
+     * and releases the lock by the same rule. -Dprojectseele.launchCustody=false leaves it out.
+     */
+    private static final boolean LAUNCH_CUSTODY=!"false".equals(System.getProperty("projectseele.launchCustody"));
+    /**
+     * -Dprojectseele.launchReal=true runs the sortie the game runs, in a copy of the facility world
+     * (a save named SEELE_LAUNCH_REVIEW...): the unit is put back in its hangar, the pilot boards its
+     * entry plug through the hatch, and the logistics commands prepare and launch it to the exit
+     * named by -Dprojectseele.launchExit (geofront, surface or hakone). The launch director holds
+     * and releases the unit itself; nothing is emulated.
+     */
+    private static final boolean LAUNCH_REAL=Boolean.getBoolean("projectseele.launchReal");
+    private static final String LAUNCH_EXIT=System.getProperty("projectseele.launchExit","surface");
+    /**
+     * -Dprojectseele.launchWatch=<ticks>: the real mode sends no sortie command and only logs where the toured unit is,
+     * for so many ticks (what a unit left deployed does when its world is loaded again).
+     * -Dprojectseele.launchWatchReset=<unit> also asks for that unit's reset at the start, as a sortie run does.
+     */
+    private static final int LAUNCH_WATCH=Integer.getInteger("projectseele.launchWatch",0);
+    private static final String LAUNCH_WATCH_RESET=System.getProperty("projectseele.launchWatchReset");
+    /**
+     * -Dprojectseele.launchWatchCommand=<command>: one command sent during a watch (for instance "ride @s dismount"),
+     * at step 10 or at -Dprojectseele.launchWatchCommandAt=<step>.
+     */
+    private static final String LAUNCH_WATCH_COMMAND=System.getProperty("projectseele.launchWatchCommand");
+    private static int realStage,realStageAt,realFreeTicks;
     private static final int STRIKE_LEAD=20,STRIKE_CYCLE=140;
     /** Each case: air (1) or ground (0), blocks ahead of the body, blocks to its right, blocks up, the target. */
     private static final int[][] STRIKE_CASES={{0,10,0,0,0},{0,20,0,0,0},{0,32,0,0,0},{0,20,10,0,0},{0,20,-10,0,0},
@@ -72,6 +112,10 @@ public final class EvaConnectedActionReview
     /** The unit the tour pilots: unit00, unit01 or unit02. */
     private static final String UNIT=System.getProperty("projectseele.tourUnit","unit01");
     private static final int UNIT_VARIANT=UNIT.endsWith("00")?EvaUnit01Entity.UNIT_00:UNIT.endsWith("02")?EvaUnit01Entity.UNIT_02:EvaUnit01Entity.UNIT_01;
+    /** -Dprojectseele.tourUnit=un00 or un01: the tour pilots a UN unit, put on the lab's fourth pad for it. */
+    private static final boolean UN=UNIT.equals("un00")||UNIT.equals("un01");
+    /** The lab command that arms the toured unit, up to the weapon's name. */
+    private static final String ARM=UN?"seele dev motionlab un "+(UNIT.endsWith("1")?1:0)+" ":"seele dev motionlab weapon "+UNIT+" ";
     /** Ticks a terrain tour keeps running after its script, unrecorded, so its cleanup is carried out. */
     private static final int TERRAIN_GRACE=30;
     /** Where the piloted unit last stood, and for how many ticks: a tour starts once it stands still on its pad. */
@@ -86,6 +130,9 @@ public final class EvaConnectedActionReview
     private static final boolean EVERY_FRAME=Boolean.getBoolean("projectseele.recordEveryFrame");
     private static float poseTime = Float.NaN;
     private static final int TOUR_END=Integer.getInteger("projectseele.tourEnd",1600)-TOUR_START;
+    /** Where the piloted unit stood as the tour began, and the ticks a tour that built nothing waits after its end for the server to set it back there. */
+    private static Vec3 tourHomeR64;
+    private static final int HOME_GRACE_R64=8;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     private static int wait;
     private static int tick;
@@ -112,7 +159,9 @@ public final class EvaConnectedActionReview
         if (!ENABLED || finished || event.phase != TickEvent.Phase.END
                 || mc.player == null || mc.level == null || mc.getSingleplayerServer() == null) return;
         Path world = mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize();
-        if (!world.getFileName().toString().startsWith("SEELE_EVA_CONNECTED_REVIEW"))
+        String save = world.getFileName().toString();
+        // The launch check may also run in a copy of the facility world, made for it under this name.
+        if (!save.startsWith("SEELE_EVA_CONNECTED_REVIEW") && !(LAUNCH && LAUNCH_REAL && save.startsWith("SEELE_LAUNCH_REVIEW")))
         {
             finished = true;
             ProjectSeele.LOGGER.error("Connected action review requires a disposable SEELE_EVA_CONNECTED_REVIEW save");
@@ -121,19 +170,32 @@ public final class EvaConnectedActionReview
         if(!preferencesSaved){preferencesSaved=true;oldPause=mc.options.pauseOnLostFocus;oldGui=mc.options.hideGui;oldCamera=mc.options.getCameraType();}
         mc.options.pauseOnLostFocus = false;
         if (++wait < 100) return;
+        if (LAUNCH) { launchR62(mc, world); return; }
         if (wait == 100)
         {
+            // The lab's reset clears and remakes the units inside its arena. One left outside by the run before (a
+            // body thrown 650 blocks in a test of the fall's speed limit) stayed where it was, a second was made on
+            // its pad, and the next tour was given the one outside: it stood under the floor and took no blow.
+            // Every unit is brought into the arena first.
+            for (String type : new String[]{"eva_unit00", "eva_unit01", "eva_unit02", "eva_prototype"})
+                mc.player.connection.sendCommand("execute as @e[type=projectseele:" + type + "] run tp @s 0 -40 0");
             mc.player.connection.sendCommand("seele dev motionlab reset");
+            if (UN)
+            {
+                mc.player.connection.sendCommand("seele dev motionlab un " + (UNIT.endsWith("1") ? 1 : 0));
+                if (RIFLE) mc.player.connection.sendCommand(ARM + "rifle");
+                return;
+            }
             mc.player.connection.sendCommand("seele dev motionlab demo " + UNIT + " stop");
             mc.player.connection.sendCommand("seele dev motionlab enter " + UNIT);
-            mc.player.connection.sendCommand("seele dev motionlab weapon " + UNIT + " " + (RIFLE ? "rifle" : "fists"));
+            mc.player.connection.sendCommand(ARM + (RIFLE ? "rifle" : "fists"));
             return;
         }
         EvaUnit01Entity eva = EvaPilotResolver.controlTarget(mc.player);
         // The link to the unit the previous run piloted outlives the request for
         // this one by a few ticks: do not start on it.
         if (eva == null || eva.getActivationTicks() > 0 || !eva.isPoweredOn()
-                || serverStart < 0 && eva.getUnitVariant() != UNIT_VARIANT)
+                || serverStart < 0 && (UN ? !eva.isExperimentalUnit() : eva.isExperimentalUnit() || eva.getUnitVariant() != UNIT_VARIANT))
         {
             if (++missingPilotTicks > 400) finish(mc, "pilot_setup_timeout");
             return;
@@ -151,28 +213,30 @@ public final class EvaConnectedActionReview
             serverStart = mc.getSingleplayerServer().getTickCount();
         }
         tick = mc.getSingleplayerServer().getTickCount() - serverStart;
-        if (poses == null)
-        {
-            ProjectSeele.LOGGER.info("Connected action review started: batch={} entity={} world={}", BATCH, entityId, world);
-            try
-            {
-                Path dir = mc.gameDirectory.toPath().resolve("screenshots/projectseele_connected/" + BATCH);
-                Files.createDirectories(dir);
-                poses = Files.newBufferedWriter(dir.resolve("poses.jsonl"), StandardCharsets.UTF_8);
-            }
-            catch (Exception exception)
-            {
-                throw new IllegalStateException("Unable to create action review", exception);
-            }
-        }
+        openPoses(mc, world);
         if (TOUR)
         {
             tour(mc, eva);
+            // R64 (M2): a tour that has gone far sets its unit back where it began before the client stops. The
+            // lab brings a unit back to its pad as the next tour enters it, but not always one left hundreds of
+            // blocks away (its chunk is not loaded yet): that tour then ran where it stood, in chunks the client
+            // had not loaded. The pose records end at the tour's end, before this.
+            if (tourHomeR64 == null) tourHomeR64 = eva.position();
+            if (at(TOUR_END) && eva.position().distanceTo(tourHomeR64) > 48)
+            {
+                Vec3 home = tourHomeR64;
+                mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT, "tp %s %.2f %.2f %.2f", eva.getStringUUID(), home.x, home.y, home.z));
+                // The pilot's client moves a ridden unit: left where it stood here, it sent the unit back there.
+                eva.setPos(home.x, home.y, home.z);
+                eva.xo = eva.xOld = home.x; eva.yo = eva.yOld = home.y; eva.zo = eva.zOld = home.z;
+                eva.setDeltaMovement(Vec3.ZERO);
+                ProjectSeele.LOGGER.info("Connected action review: unit set back to {} at the tour's end", home);
+            }
             previousTick = tick;
             // A tour that built terrain clears it two ticks before its end; the
             // server needs time to run those commands before the client stops,
             // or half a hill stays in the save and blocks every later tour.
-            if (tick >= TOUR_END + (HILL || STEPS || CLIMB ? TERRAIN_GRACE : 0)) finish(mc, "complete");
+            if (tick >= TOUR_END + (HILL || STEEP_R64 || STREET_R64 || STEPS || CLIMB ? TERRAIN_GRACE : HOME_GRACE_R64)) finish(mc, "complete");
             return;
         }
         if (RIFLE)
@@ -216,6 +280,286 @@ public final class EvaConnectedActionReview
         positionCamera(mc, eva);
         previousTick = tick;
         if (tick >= 690) finish(mc, "complete");
+    }
+
+    private static void openPoses(Minecraft mc, Path world)
+    {
+        if (poses != null) return;
+        ProjectSeele.LOGGER.info("Connected action review started: batch={} entity={} world={}", BATCH, entityId, world);
+        try
+        {
+            Path dir = mc.gameDirectory.toPath().resolve("screenshots/projectseele_connected/" + BATCH);
+            Files.createDirectories(dir);
+            poses = Files.newBufferedWriter(dir.resolve("poses.jsonl"), StandardCharsets.UTF_8);
+        }
+        catch (Exception exception)
+        {
+            throw new IllegalStateException("Unable to create action review", exception);
+        }
+    }
+
+    /**
+     * On the integrated server: where the unit and its own entry plug stand and whether the
+     * facility has finished loading; with {@code board}, the pilot is set before the plug's hatch,
+     * within reach and looking at it, and presses it as a right click does. Boarding itself is the
+     * plug's own check of range, view and line of sight.
+     */
+    private static void boardR63(Minecraft mc,boolean board)
+    {
+        var server=mc.getSingleplayerServer();var id=mc.player.getUUID();int variant=UNIT_VARIANT;
+        server.execute(()->{
+            var pilot=server.getPlayerList().getPlayer(id);
+            if(pilot==null)return;
+            var level=pilot.serverLevel();
+            var unit=com.projectseele.world.EvaLogisticsDirector.canonicalUnit(level,variant);
+            var plug=com.projectseele.world.EntryPlugDirector.canonical(level,variant);
+            boolean ready=com.projectseele.world.NervRouteRuntimeR52.ready(level);
+            ProjectSeele.LOGGER.info("Real launch review: facility ready={} unit={} plug={}",ready,
+                    unit==null?"none":unit.blockPosition().toShortString()+" locked "+unit.isNervLogisticsLocked()+" phase "+unit.getLaunchPhase(),
+                    plug==null?"none":plug.blockPosition().toShortString()+" stage "+plug.getInsertionStage()+" hatch open "+plug.isHatchOpen()+" rider "+(plug.getFirstPassenger()==null?"none":plug.getFirstPassenger().getName().getString()));
+            // Still in the seat of the unit launched before this one: out of it first.
+            if(board&&pilot.isPassenger()&&pilot.getVehicle()!=plug){pilot.stopRiding();return;}
+            if(!board||unit==null||plug==null||!ready||pilot.isPassenger())return;
+            Vec3 hatch=plug.hasCanonicalPose()?plug.transformPlugMarker(com.projectseele.world.EntryPlugKinematics.HATCH_PORTAL_CENTRE_P):plug.getBoundingBox().getCenter();
+            Vec3 out=hatch.subtract(plug.getBoundingBox().getCenter()).multiply(1,0,1);
+            out=out.lengthSqr()<1e-4?new Vec3(0,0,1):out.normalize();
+            Vec3 stand=hatch.add(out.scale(4)).add(0,-1.6,0),look=hatch.subtract(stand.add(0,pilot.getEyeHeight(),0));
+            float yaw=(float)(Mth.atan2(look.z,look.x)*Mth.RAD_TO_DEG)-90,pitch=(float)(-Mth.atan2(look.y,look.horizontalDistance())*Mth.RAD_TO_DEG);
+            pilot.getAbilities().flying=pilot.getAbilities().mayfly;pilot.onUpdateAbilities();
+            pilot.teleportTo(level,stand.x,stand.y,stand.z,yaw,pitch);
+            var result=plug.mobInteract(pilot,net.minecraft.world.InteractionHand.MAIN_HAND);
+            ProjectSeele.LOGGER.info("Real launch review: pressed the hatch from {} -> {} riding {}",stand,result,pilot.getVehicle()==null?"nothing":pilot.getVehicle().getType().toShortString());
+        });
+    }
+
+    /** In the toured unit's own plug or seat: not another unit's, left from the launch before. */
+    private static boolean aboardR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        return mc.player.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity plug&&plug.getAssignedVariant()==UNIT_VARIANT
+                ||eva!=null&&!eva.isExperimentalUnit()&&eva.getUnitVariant()==UNIT_VARIANT;
+    }
+
+    private static void realStage(int stage,int step)
+    {
+        ProjectSeele.LOGGER.info("Real launch review: stage {} at step {}",stage,step);
+        realStage=stage;realStageAt=step;
+    }
+
+    private static boolean launchStrictSent;
+    private static void launchRealR63(Minecraft mc, Path world)
+    {
+        int step=wait-100,since=step-realStageAt;
+        var link=mc.player.connection;
+        EvaUnit01Entity eva=EvaPilotResolver.controlTarget(mc.player);
+        if(step%40==0)ProjectSeele.LOGGER.info("Real launch review: step={} stage={} dim={} at={} vehicle={} eva={}",step,realStage,
+                mc.level.dimension().location(),mc.player.blockPosition().toShortString(),
+                mc.player.getVehicle()==null?"none":mc.player.getVehicle().getType().toShortString(),
+                eva==null?"none":String.format("phase %d ticks %d activation %d locked %s y %.1f",eva.getLaunchPhase(),eva.getLaunchTicks(),eva.getActivationTicks(),eva.isNervLogisticsLocked(),eva.getY()));
+        // The facility's route (NervRouteRuntimeR52) never starts the unit's own launch sequence: the
+        // unit is carried in the mechanical frame and its launch phase stays idle throughout. What the
+        // route is doing is read from its job, and written to the log whenever it changes.
+        String route="none";
+        var geo=mc.getSingleplayerServer().getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
+        if(geo!=null)
+        {
+            try{route=com.projectseele.world.NervRouteRuntimeR52.reviewJobR63(geo,UNIT_VARIANT);}
+            catch(RuntimeException busy){route=realRoute;}
+            String shape=route.replaceAll("-?[0-9]+([.][0-9]+)?(E-?[0-9]+)?[bsLfdBSFD]?","#");
+            if(!shape.equals(realRouteShape)||step%400==0)
+            {
+                realRouteShape=shape;
+                ProjectSeele.LOGGER.info("Real launch review: route server={} step={} {}",mc.getSingleplayerServer().getTickCount(),step,
+                        route.length()>900?route.substring(0,900):route);
+                if(step%400==0)for(String line:com.projectseele.world.NervRouteRuntimeR52.sortieStatusR53(geo))
+                    if(line.startsWith("EVA-0"+UNIT_VARIANT)||!line.startsWith("EVA-0"))ProjectSeele.LOGGER.info("Real launch review: status {}",line.length()>600?line.substring(0,600):line);
+            }
+            realRoute=route;
+            // The step of the deployment's finish (RECEIVE, EJECT_LOWER, EJECT_CLOSE, LAND, RELEASE), with the tick it began.
+            int key=route.indexOf("Finish:\"");
+            String finish=key<0?"":route.substring(key+8,Math.max(key+8,route.indexOf('"',key+8)));
+            if(!finish.equals(realFinish))
+            {
+                realFinish=finish;
+                ProjectSeele.LOGGER.info("Real launch review: finish step '{}' server={} step={}",finish,mc.getSingleplayerServer().getTickCount(),step);
+            }
+        }
+        boolean departing=route.startsWith("DEPARTING")||route.startsWith("FINISHING")||route.startsWith("DEPLOYED");
+        // -Dprojectseele.launchStrict=true: the strict traversal diagnostic is switched on once this sortie's
+        // finish has begun (a job left DEPLOYED by the sortie before does not count). On the review save it then
+        // holds the finish at the deck's drop, shallow_bay_complete_source_stroke_held, whatever the hatch
+        // timing; switched on earlier it already holds the preparation in the hangar bay
+        // (shallow_tray_original_sole_bearing_missing).
+        if(realStage==4&&(realFinish.equals("RECEIVE")||realFinish.equals("EJECT_LOWER"))&&!launchStrictSent&&Boolean.getBoolean("projectseele.launchStrict")){launchStrictSent=true;link.sendCommand("seele dev traversal strict");}
+        if(LAUNCH_WATCH>0)
+        {
+            // Nothing is asked of the facility: where the toured unit is and what holds it, every half second.
+            if(LAUNCH_WATCH_RESET!=null&&step==10)link.sendCommand("seele eva reset "+LAUNCH_WATCH_RESET);
+            if(LAUNCH_WATCH_COMMAND!=null&&step==Integer.getInteger("projectseele.launchWatchCommandAt",10))link.sendCommand(LAUNCH_WATCH_COMMAND);
+            if(step%10==0)
+            {
+                var server=mc.getSingleplayerServer();int variant=UNIT_VARIANT;String job=route.length()>90?route.substring(0,90):route;
+                server.execute(()->
+                {
+                    var level=server.getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
+                    var unit=level==null?null:com.projectseele.world.EvaLogisticsDirector.canonicalUnit(level,variant);
+                    ProjectSeele.LOGGER.info("Real launch review: watch step={} unit={} job={}",step,unit==null?"not loaded"
+                            :String.format("y %.2f vy %.2f ground %s noGravity %s locked %s frame %s riders %d under %s",unit.getY(),unit.getDeltaMovement().y,
+                                    unit.onGround(),unit.isNoGravity(),unit.isNervLogisticsLocked(),com.projectseele.entity.EvaMechanicalFrameR52.active(unit),
+                                    unit.getPassengers().size(),level.getBlockState(unit.blockPosition().below()).getBlock().getDescriptionId()),job);
+                });
+            }
+            if(step>=LAUNCH_WATCH)finish(mc,"watch_complete");
+            return;
+        }
+        switch(realStage)
+        {
+            case 0 ->
+            {
+                // Whatever the last run left: off the seat, and the unit, its plug and the pilot back in the hangar.
+                if(step==0)link.sendCommand("ride @s dismount");
+                if(step==5){link.sendCommand("time set 6000");link.sendCommand("weather clear");}
+                // A spectator is not accepted as a unit's pilot (the facility copy's player was saved as one).
+                if(step==7)link.sendCommand("gamemode creative");
+                if(step==10)link.sendCommand("seele eva reset "+UNIT);
+                // A unit launched by an earlier run stands deployed with this pilot still in its plug, and
+                // neither a dismount nor leaving the seat on the server gets the pilot out of an inserted
+                // plug. Its own reset does: every unit is put back, the toured one first.
+                if(step==12)for(String other:new String[]{"unit00","unit01","unit02"})if(!other.equals(UNIT))link.sendCommand("seele eva reset "+other);
+                // The facility loads in batches for about two minutes and holds the reset until it has.
+                // The pilot boards only after that reset has run: boarded earlier, the reset put the
+                // pilot off the plug again and the preparation waited for a pilot who never came back.
+                if(realInstalledAt<0&&step>10&&step%20==0&&geo!=null)
+                {
+                    var status=com.projectseele.world.NervRouteRuntimeR52.sortieStatusR53(geo);
+                    if(!status.isEmpty()&&status.get(0).contains("installed=true"))
+                    {
+                        realInstalledAt=step;
+                        ProjectSeele.LOGGER.info("Real launch review: facility installed at step {}",step);
+                    }
+                }
+                if(realInstalledAt>=0&&step==realInstalledAt+200)link.sendCommand("seele tp hangar");
+                if(realInstalledAt>=0&&step==realInstalledAt+280){link.sendCommand("seele eva status "+UNIT);realStage(1,step);}
+                if(step>8000)finish(mc,"launch_facility_timeout");
+            }
+            case 1 ->
+            {
+                // The facility loads its units after the world: ask until the unit and its plug are there.
+                if(aboardR63(mc,eva)){realStage(3,step);return;}
+                if(since%40==20)boardR63(mc,since>=100);
+                if(since>2400)finish(mc,"launch_boarding_timeout");
+            }
+            case 3 ->
+            {
+                // A reset asked for before the facility had loaded runs when it has, and can land on the
+                // preparation: asked once, the preparation was refused and never registered. Ask until it is.
+                boolean idle=route.equals("none")||route.startsWith("PARKED")||route.startsWith("CANCELLED");
+                // Put off the plug with nothing registered yet: board again.
+                if(idle&&since>40&&!aboardR63(mc,eva)){realStage(1,step);return;}
+                if(since%100==10&&idle)
+                {
+                    if(geo!=null)mc.getSingleplayerServer().execute(()->ProjectSeele.LOGGER.info("Real launch review: prepare asked at step {}; held by: {}",step,
+                            com.projectseele.world.NervRouteRuntimeR52.reviewPrepareR63(geo,UNIT_VARIANT,LAUNCH_EXIT)));
+                    link.sendCommand("seele eva prepare "+UNIT+" "+LAUNCH_EXIT);
+                }
+                // The director refuses a launch until the unit stands ready in its silo: ask until it goes.
+                if(since>200&&since%60==0)
+                {
+                    link.sendCommand("seele eva status "+UNIT);
+                    link.sendCommand("seele eva launch "+UNIT);
+                }
+                if(eva!=null&&(eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_ASCENT||since>200&&departing)){launchAscentAt=step;realStage(4,step);}
+                else if(since>8000)finish(mc,"launch_prepare_timeout");
+            }
+            default ->
+            {
+                // The unit changes dimension on the way: on the far side the client has a new entity for it.
+                if(eva==null)
+                {
+                    if(++missingPilotTicks>600)finish(mc,"launch_pilot_lost");
+                    return;
+                }
+                missingPilotTicks=0;
+                entityId=eva.getId();
+                if(!Boolean.getBoolean("projectseele.launchFirstPerson"))positionCamera(mc,eva);
+                if(serverStart<0)
+                {
+                    if(warmupFrames<3)return;
+                    serverStart=mc.getSingleplayerServer().getTickCount();
+                }
+                tick=mc.getSingleplayerServer().getTickCount()-serverStart;
+                openPoses(mc,world);
+                // Handed back: the launch over and the lock open for half a second (a new entity reads idle for a tick).
+                realFreeTicks=!eva.isLaunchSequenceActive()&&!eva.isNervLogisticsLocked()?realFreeTicks+1:0;
+                if(launchIdleAt<0&&realFreeTicks>=10)
+                {
+                    launchIdleAt=tick-10;
+                    ProjectSeele.LOGGER.info("Real launch review: control back at tick {} y={} dim={}",launchIdleAt,String.format("%.2f",eva.getY()),mc.level.dimension().location());
+                }
+                previousTick=tick;
+                if(launchIdleAt>=0&&tick>=launchIdleAt+LAUNCH_AFTER)finish(mc,"complete");
+                else if(tick>9000)finish(mc,"launch_timeout");
+            }
+        }
+    }
+    private static String realRoute="none",realRouteShape="",realFinish="";
+    private static int realInstalledAt=-1;
+
+    private static void launchR62(Minecraft mc, Path world)
+    {
+        if(LAUNCH_REAL){launchRealR63(mc,world);return;}
+        int step=wait-100,x=8000+LAUNCH_SITE*400,z=8000,bay=UNIT_VARIANT==0?-42:UNIT_VARIANT==2?42:0;
+        var net=mc.player.connection;
+        // The last run may have ended in a lab unit's seat; a complex is not built from a seat.
+        if(step==0)net.sendCommand("ride @s dismount");
+        if(step==5){net.sendCommand("time set 6000");net.sendCommand("weather clear");}
+        if(step==10)net.sendCommand("tp @s "+x+" -59 "+z);
+        if(step==70)net.sendCommand("seele dev silo setup");
+        // Setup leaves the player on Unit-01's gantry; boarding takes the nearest caged unit.
+        if(step==140&&bay!=0)net.sendCommand("tp @s ~"+bay+" ~ ~");
+        if(step==160)net.sendCommand("seele dev silo board");
+        if(step<180)return;
+        EvaUnit01Entity eva=EvaPilotResolver.controlTarget(mc.player);
+        if(eva==null||eva.getUnitVariant()!=UNIT_VARIANT)
+        {
+            if(++missingPilotTicks>400)finish(mc,"launch_boarding_timeout");
+            return;
+        }
+        missingPilotTicks=0;
+        entityId=eva.getId();
+        // -Dprojectseele.launchFirstPerson=true stays in the pilot's seat, to check what the pilot sees of the landing.
+        if(!Boolean.getBoolean("projectseele.launchFirstPerson"))positionCamera(mc,eva);
+        if(LAUNCH_CUSTODY)
+        {
+            var server=mc.getSingleplayerServer();var id=eva.getUUID();
+            server.execute(()->{
+                for(var level:server.getAllLevels())
+                    if(level.getEntity(id) instanceof EvaUnit01Entity unit)unit.setNervLogisticsLocked(unit.isLaunchSequenceActive());
+            });
+        }
+        // The cage holds the unit until it is released; the pilot's own test release stands in for operations.
+        if(launchAscentAt<0&&eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_LOCKED&&eva.getActivationTicks()<=21&&step%10==0)
+            send(ServerboundEvaControlPacket.ACTION_SELF_LAUNCH);
+        if(launchAscentAt<0&&eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_ASCENT)launchAscentAt=step;
+        if(launchAscentAt<0)
+        {
+            if(step>3000)finish(mc,"launch_release_timeout");
+            return;
+        }
+        if(serverStart<0)
+        {
+            if(warmupFrames<3)return;
+            serverStart=mc.getSingleplayerServer().getTickCount();
+        }
+        tick=mc.getSingleplayerServer().getTickCount()-serverStart;
+        openPoses(mc,world);
+        if(launchIdleAt<0&&!eva.isLaunchSequenceActive())
+        {
+            launchIdleAt=tick;
+            ProjectSeele.LOGGER.info("Launch review: control back at tick {} y={}",tick,String.format("%.2f",eva.getY()));
+        }
+        previousTick=tick;
+        if(launchIdleAt>=0&&tick>=launchIdleAt+LAUNCH_AFTER)finish(mc,"complete");
+        else if(tick>1500)finish(mc,"launch_timeout");
     }
 
     private static boolean at(int requested)
@@ -264,11 +608,29 @@ public final class EvaConnectedActionReview
 
     private static void tour(Minecraft mc,EvaUnit01Entity eva)
     {
+        // A target left standing by an earlier run is in reach of this one's blows (a punch of the evade tour
+        // landed on one). Commands sent in one tick run in order: a tour that places its own target does so later.
+        if(at(1))for(var name:STRIKE_TARGETS)removeTargetR63(mc,name);
         if(FX){fxR58(mc,eva);positionCamera(mc,eva);return;}
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
+        if(GAIT){gaitR64(mc);positionCamera(mc,eva);return;}
+        if(LEAP_R64){leapR64(mc,eva);positionCamera(mc,eva);return;}
         if(HILL){hillR60(mc,lane(eva));positionCamera(mc,eva);return;}
+        if(STEEP_R64){steepR64(mc,eva,lane(eva));positionCamera(mc,eva);return;}
+        if(STREET_R64){streetR64(mc,eva,lane(eva));positionCamera(mc,eva);return;}
         if(STRIKE){strikeR60(mc,eva);positionCamera(mc,eva);return;}
         if(ATF){atFieldR63(mc,eva);positionCamera(mc,eva);return;}
+        if(ARMS!=null){armsR63(mc);positionCamera(mc,eva);return;}
+        if(EVADE){evadeR63(mc,eva);positionCamera(mc,eva);return;}
+        if(COMBAT_R64){combatR64(mc,eva);positionCamera(mc,eva);return;}
+        if(KNIFE_R64){knifeR64(mc,eva);positionCamera(mc,eva);return;}
+        if(IMPACT_R64){impactR64(mc,eva);positionCamera(mc,eva);return;}
+        if(MOVING_R64){movingR64(mc,eva);positionCamera(mc,eva);return;}
+        if(BEAM_R64){beamR64(mc,eva);positionCamera(mc,eva);return;}
+        if(HITS){hitsR63(mc,eva);positionCamera(mc,eva);return;}
+        if(RAMIEL){ramielR63(mc,eva);positionCamera(mc,eva);return;}
+        if(ANSWER){answerR63(mc,eva);positionCamera(mc,eva);return;}
+        if(STOMP){stompR63(mc,eva);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
                 :t>=40&&t<Math.max(140,DASH_END+10)||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
@@ -280,7 +642,7 @@ public final class EvaConnectedActionReview
         mc.player.setYRot(TOUR_START==0&&t>=610&&t<1085?180:0);mc.player.setXRot(0);
         // The ledge check walks onto the step, as a pilot usually does.
         if(tourAt(70-DASH_LEAD)&&!CLIMB)send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
-        if(tourAt(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand("seele dev motionlab weapon "+UNIT+" "+DASH_WEAPON);
+        if(tourAt(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand(ARM+DASH_WEAPON);
         // Optional checks: a full sprint over the run, and kerbs on the walk.
         // The client re-syncs held sprint and dash to the real keys, so hold them.
         int sprintEnd=DASH?DASH_END:110;
@@ -320,12 +682,14 @@ public final class EvaConnectedActionReview
         // Optional chain check: the heavy pressed during the punch string.
         if(COMBO&&tourAt(193))send(ServerboundEvaControlPacket.ACTION_SMASH);
         if(!CLIMB&&tourAt(290))send(ServerboundEvaControlPacket.ACTION_STOMP);
-        if(tourAt(340)||tourAt(820))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
-        if(tourAt(440)||tourAt(920))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
+        // The last crouch is with the knife drawn, after the unit has stood all the way up from prone
+        // (the tour used to end fifty ticks into that rise). Runs that end at 1600 never reach it.
+        if(tourAt(340)||tourAt(820)||tourAt(1650))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
+        if(tourAt(440)||tourAt(920)||tourAt(1730))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
         if(tourAt(470)||tourAt(600)||tourAt(940)||tourAt(1080)||tourAt(1340)||tourAt(1550))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
-        if(tourAt(660))mc.player.connection.sendCommand("seele dev motionlab weapon unit01 rifle");
+        if(tourAt(660))mc.player.connection.sendCommand(ARM+"rifle");
         if((t>=680&&t<900||t>=970&&t<1000)&&tick/4!=previousTick/4)send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
-        if(tourAt(1130))mc.player.connection.sendCommand("seele dev motionlab weapon unit01 knife");
+        if(tourAt(1130))mc.player.connection.sendCommand(ARM+"knife");
         if(tourAt(1150)||tourAt(1165)||tourAt(1180)||tourAt(1370)||tourAt(1385)||tourAt(1400))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(tourAt(1220)||tourAt(1430))send(ServerboundEvaControlPacket.ACTION_SMASH);
         positionCamera(mc,eva);
@@ -342,7 +706,7 @@ public final class EvaConnectedActionReview
         mc.options.keyJump.setDown(false);
         if(index>=STRIKE_CASES.length)
         {
-            if(!strikeCleared){strikeCleared=true;for(var name:STRIKE_TARGETS)mc.player.connection.sendCommand("kill @e[type=projectseele:"+name+"]");}
+            if(!strikeCleared){strikeCleared=true;for(var name:STRIKE_TARGETS)removeTargetR63(mc,name);}
             return;
         }
         var c=STRIKE_CASES[index];
@@ -352,7 +716,7 @@ public final class EvaConnectedActionReview
         {
             strikeSpawned=index;
             Vec3 at=eva.position().add(ahead.scale(c[1])).add(right.scale(c[2])).add(0,c[3],0);
-            for(var name:STRIKE_TARGETS)mc.player.connection.sendCommand("kill @e[type=projectseele:"+name+"]");
+            for(var name:STRIKE_TARGETS)removeTargetR63(mc,name);
             mc.player.connection.sendCommand("summon projectseele:"+STRIKE_TARGETS[c[4]]+" "+at.x+" "+at.y+" "+at.z+" {NoAI:1b,Rotation:["+(eva.getYRot()+180)+"F,0F]}");
             com.projectseele.ProjectSeele.LOGGER.info("R60CASE {} kind {} ahead {} right {} up {} target {}",index,c[0],c[1],c[2],c[3],STRIKE_TARGETS[c[4]]);
         }
@@ -360,12 +724,23 @@ public final class EvaConnectedActionReview
         if(index!=strikeFired&&local>=(c[0]==1?46:30)){strikeFired=index;send(ServerboundEvaControlPacket.ACTION_SMASH);}
     }
 
+    /**
+     * Takes a tour's target away. A Sachiel that is killed stands for 45 ticks more and then goes up in a blast
+     * 32 blocks wide: killed where it stood, the last case's target took 162 points off the unit in the middle of
+     * the next case, and three cases later the unit went berserk. It is lifted out of reach first.
+     */
+    private static void removeTargetR63(Minecraft mc,String name)
+    {
+        mc.player.connection.sendCommand("execute as @e[type=projectseele:"+name+"] at @s run tp @s ~ ~600 ~");
+        mc.player.connection.sendCommand("kill @e[type=projectseele:"+name+"]");
+    }
+
     private static void atFieldR63(Minecraft mc,EvaUnit01Entity eva)
     {
         int t=tick;
         mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
         Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize(),right=new Vec3(-fwd.z,0,fwd.x);
-        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit="@e[type=projectseele:eva_unit01,limit=1,sort=nearest]";
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
         if(at(1))
         {
             // A field turns /kill away: an Angel left by an earlier run is emptied instead.
@@ -397,6 +772,158 @@ public final class EvaConnectedActionReview
         mc.player.setYRot(t<340?0:t<350?(t-340)*9:90);mc.player.setXRot(0);
     }
 
+    /**
+     * -Dprojectseele.tourSteepR64=true: a terraced slope of one block up per block, 130 blocks high, as the
+     * pyramid's flank is; the hill tour's slope is gentle (26 blocks in 150). The unit goes straight up it from
+     * 44 blocks of flat ground (-Dprojectseele.tourSteepGaitR64=walk, run or fast; run by default) and stops on the
+     * flat top; 40 ticks later it is set 100 blocks above the middle of the slope and falls onto it. Run with
+     * tourEnd=340 for a run (460 for a walk). The log carries R64STEEP lines: when it reached the top, when it
+     * was dropped.
+     */
+    private static final boolean STEEP_R64=Boolean.getBoolean("projectseele.tourSteepR64");
+    private static final String STEEP_GAIT_R64=System.getProperty("projectseele.tourSteepGaitR64","run");
+    private static final int STEEP_FOOT_R64=-60,STEEP_RISE_R64=130,STEEP_TOP_R64=40;
+    private static int steepTopTickR64=-1,steepDownEndR64=-1;
+    private static final boolean STEEP_DOWN_R64=Boolean.getBoolean("projectseele.tourSteepDownR64");
+    /** -Dprojectseele.tourSteepEdgeR64=true: on the top the unit goes on to the far edge (a drop of 130) and is left there, toes over it. */
+    private static final boolean STEEP_EDGE_R64=Boolean.getBoolean("projectseele.tourSteepEdgeR64");
+    private static int steepEdgeTickR64=-1;
+    private static void steepR64(Minecraft mc,EvaUnit01Entity eva,int x)
+    {
+        int t=tick;
+        if(at(1)){steepClearR64(mc,x);steepBlocksR64(mc,x);}
+        if(at(TOUR_END-2))steepClearR64(mc,x);
+        boolean fast=STEEP_GAIT_R64.equals("fast"),run=fast||STEEP_GAIT_R64.equals("run");
+        if(steepTopTickR64<0&&t>=40&&eva.getZ()>STEEP_FOOT_R64+STEEP_RISE_R64+STEEP_TOP_R64*.6)
+        {
+            steepTopTickR64=t;
+            ProjectSeele.LOGGER.info("R64STEEP tick {}: on the top at y {}",t,String.format(java.util.Locale.ROOT,"%.1f",eva.getY()));
+        }
+        boolean up=t>=40&&steepTopTickR64<0;
+        if(STEEP_EDGE_R64)
+        {
+            // The top ends at z = foot + rise + top; the box may go half its width past it.
+            up=t>=40&&steepEdgeTickR64<0;
+            if(up&&eva.getZ()>STEEP_FOOT_R64+STEEP_RISE_R64+STEEP_TOP_R64-2.5)
+            {
+                up=false;steepEdgeTickR64=t;
+                ProjectSeele.LOGGER.info("R64STEEP tick {}: left at the edge, z {}",t,String.format(java.util.Locale.ROOT,"%.1f",eva.getZ()));
+            }
+            if(steepEdgeTickR64>=0&&(t-steepEdgeTickR64)%20==0)
+                ProjectSeele.LOGGER.info("R64STEEP tick {}: {} ticks after, z {}",t,t-steepEdgeTickR64,String.format(java.util.Locale.ROOT,"%.1f",eva.getZ()));
+        }
+        // -Dprojectseele.tourSteepDownR64=true: instead of the drop, the unit turns about on the top and comes
+        // back down the slope in the same gait, to 30 blocks out on the flat (tourEnd 420 for a run, 620 for a walk).
+        boolean down=STEEP_DOWN_R64&&steepTopTickR64>=0&&t>=steepTopTickR64+30&&eva.getZ()>STEEP_FOOT_R64-30;
+        up|=down;
+        mc.options.keyUp.setDown(up);mc.player.input.up=up;mc.player.input.forwardImpulse=up?1:0;mc.player.zza=up?1:0;mc.player.xxa=0;
+        mc.player.setYRot(STEEP_DOWN_R64&&steepTopTickR64>=0&&t>=steepTopTickR64+4?180:0);mc.player.setXRot(0);
+        mc.options.keySprint.setDown(up&&run);
+        com.projectseele.client.Keybinds.EVA_DASH.setDown(up&&fast&&t>=44);
+        if(run&&at(40))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(run&&steepTopTickR64==t)send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(STEEP_DOWN_R64)
+        {
+            if(run&&steepTopTickR64>=0&&t==steepTopTickR64+30)send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+            if(run&&steepDownEndR64<0&&steepTopTickR64>=0&&t>steepTopTickR64+30&&!down)
+            {
+                steepDownEndR64=t;send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+                ProjectSeele.LOGGER.info("R64STEEP tick {}: back down on the flat",t);
+            }
+            return;
+        }
+        if(STEEP_EDGE_R64)return;
+        if(steepTopTickR64>=0&&t==steepTopTickR64+40)
+        {
+            // Onto the middle of the slope from 100 blocks above it: a landing on the terraces.
+            int z=STEEP_FOOT_R64+STEEP_RISE_R64/2,y=-60+STEEP_RISE_R64/2+100;
+            mc.player.connection.sendCommand("tp "+eva.getStringUUID()+" "+x+" "+y+" "+z);
+            // The pilot's client moves a ridden unit: left where it stood here, it sent the unit back there.
+            eva.setPos(x+.5,y,z+.5);eva.xo=eva.xOld=eva.getX();eva.yo=eva.yOld=eva.getY();eva.zo=eva.zOld=eva.getZ();eva.setDeltaMovement(Vec3.ZERO);
+            ProjectSeele.LOGGER.info("R64STEEP tick {}: dropped from y {} over the slope at z {}",t,y,z);
+        }
+    }
+
+    /**
+     * -Dprojectseele.tourStreetR64=true: a street 52 blocks wide between two walls 100 high, closed at its far
+     * end. The unit walks in to 20 blocks short of the end, its pilot looks round to the left and behind (the
+     * camera swings through one wall and into the end wall), the unit turns after the look and walks out again.
+     * For the pilot's camera: run with the pilot view and the camera log, tourEnd=360. R64STREET lines mark the
+     * stages. -Dprojectseele.tourStreetHighR64=60 makes the walls that high instead (a camera carried up can
+     * see over those). -Dprojectseele.tourStreetSideR64=true: instead, the unit bears left until its box is
+     * against the left wall and walks on along it, its left arm where the wall is (tourEnd=300).
+     */
+    private static final boolean STREET_R64=Boolean.getBoolean("projectseele.tourStreetR64");
+    private static final int STREET_FROM_R64=-60,STREET_END_R64=40,STREET_HALF_R64=26,STREET_HIGH_R64=-60+Integer.getInteger("projectseele.tourStreetHighR64",100);
+    private static int streetStageR64,streetAtR64=-1;
+    private static final boolean STREET_SIDE_R64=Boolean.getBoolean("projectseele.tourStreetSideR64");
+    private static void streetR64(Minecraft mc,EvaUnit01Entity eva,int x)
+    {
+        int t=tick;
+        if(at(1)){streetBlocksR64(mc,x,"minecraft:air",40);streetBlocksR64(mc,x,"minecraft:stone",STREET_HIGH_R64);}
+        if(at(TOUR_END-2))streetBlocksR64(mc,x,"minecraft:air",40);
+        float yaw=0;boolean go=false;
+        if(STREET_SIDE_R64)
+        {
+            // Left of a body facing +z is +x.
+            boolean against=eva.getX()-x>STREET_HALF_R64-9.2;
+            go=t>=40&&eva.getZ()<STREET_END_R64-20;
+            yaw=go&&!against&&eva.getZ()>STREET_FROM_R64+4?-45:0;
+            if(against&&streetStageR64==0){streetStageR64=1;ProjectSeele.LOGGER.info("R64STREET tick {}: against the wall",t);}
+            if(!go&&t>=40&&streetStageR64<2){streetStageR64=2;ProjectSeele.LOGGER.info("R64STREET tick {}: stopped",t);}
+        }
+        else if(streetStageR64==0)
+        {
+            go=t>=40;
+            if(eva.getZ()>STREET_END_R64-20){streetStageR64=1;streetAtR64=t;ProjectSeele.LOGGER.info("R64STREET tick {}: stopped 20 short of the end",t);}
+        }
+        else if(streetStageR64==1)
+        {
+            // Stands, then looks round: a quarter turn by 30 ticks on, half a turn by 60, held to 90.
+            int since=t-streetAtR64;
+            yaw=since<10?0:Math.min(180,(since-10)*3.6F);
+            if(since==10)ProjectSeele.LOGGER.info("R64STREET tick {}: looking round",t);
+            if(since>=90){streetStageR64=2;ProjectSeele.LOGGER.info("R64STREET tick {}: walking out",t);}
+        }
+        else
+        {
+            yaw=180;go=eva.getZ()>STREET_FROM_R64-30;
+            if(!go&&streetStageR64==2){streetStageR64=3;ProjectSeele.LOGGER.info("R64STREET tick {}: out",t);}
+        }
+        mc.options.keyUp.setDown(go);mc.player.input.up=go;mc.player.input.forwardImpulse=go?1:0;mc.player.zza=go?1:0;mc.player.xxa=0;
+        mc.player.setYRot(yaw);mc.player.setXRot(8);
+        mc.options.keySprint.setDown(false);
+    }
+
+    /** The street's two walls and its end, or the air where they stood. */
+    private static void streetBlocksR64(Minecraft mc,int x,String block,int top)
+    {
+        for(int z=STREET_FROM_R64;z<STREET_END_R64;z++)
+        {
+            mc.player.connection.sendCommand("fill "+(x-STREET_HALF_R64-8)+" -60 "+z+" "+(x-STREET_HALF_R64)+" "+top+" "+z+" "+block);
+            mc.player.connection.sendCommand("fill "+(x+STREET_HALF_R64)+" -60 "+z+" "+(x+STREET_HALF_R64+8)+" "+top+" "+z+" "+block);
+        }
+        for(int z=STREET_END_R64;z<STREET_END_R64+8;z++)
+            mc.player.connection.sendCommand("fill "+(x-STREET_HALF_R64-8)+" -60 "+z+" "+(x+STREET_HALF_R64+8)+" "+top+" "+z+" "+block);
+    }
+
+    /** The slope's own box only. */
+    private static void steepClearR64(Minecraft mc,int x)
+    {
+        for(int z=STEEP_FOOT_R64;z<=STEEP_FOOT_R64+STEEP_RISE_R64+STEEP_TOP_R64;z++)
+            mc.player.connection.sendCommand("fill "+(x-45)+" -60 "+z+" "+(x+46)+" "+(-60+STEEP_RISE_R64+2)+" "+z+" minecraft:air");
+    }
+
+    /** One block up per block along the way, 92 wide, with a flat top. */
+    private static void steepBlocksR64(Minecraft mc,int x)
+    {
+        for(int i=1;i<=STEEP_RISE_R64+STEEP_TOP_R64;i++)
+        {
+            int z=STEEP_FOOT_R64+i-1,height=Math.min(i,STEEP_RISE_R64);
+            mc.player.connection.sendCommand("fill "+(x-45)+" -60 "+z+" "+(x+46)+" "+(-61+height)+" "+z+" minecraft:grass_block");
+        }
+    }
+
     /** The hill's own box only: nothing else on the review ground stands in it. */
     private static void hillClearR60(Minecraft mc,int x)
     {
@@ -419,10 +946,86 @@ public final class EvaConnectedActionReview
         }
     }
 
+    /**
+     * -Dprojectseele.tourGaitR64=true: straight ahead and nothing else, to measure how far a standing foot slides
+     * over the ground: a walk of 130 ticks out, a run of 110 back, a fast run (sprint and dash held) of 30 out again,
+     * the unit turned about while it stands between them. The other tours walk for a second and a half at a time,
+     * and their walks also go backward, sideways and round. Run with tourEnd=420.
+     * -Dprojectseele.tourGaitFastR64=<ticks>: the fast run's length, where 30 is too short to count its cycles (it
+     * is at full speed from its 14th tick); tourEnd is then 390 and these ticks.
+     * -Dprojectseele.tourGaitFastAtR64=<tick>: the tick the fast run starts at, 350 where it is not given. A Unit
+     * turns 4 degrees a tick where it stands, so at 350 it is still 58 degrees short of about: every fast run went
+     * off 30 to 70 blocks to its right, into a wall of the review world at x 59 to 100, z -132, up a stair behind
+     * it and off a ledge 5 high (2026-11-17: the fast run's worst slides and its deepest feet were all there, and
+     * one capture stood against the wall to its end). From 370 it has turned, and it turns about the other way, so
+     * that the 6 degrees it stops short by take it back along the lane it ran in on. tourEnd is then this, 40 and
+     * the fast run's ticks.
+     */
+    private static final boolean GAIT=Boolean.getBoolean("projectseele.tourGaitR64");
+    private static final int GAIT_FAST_R64=Integer.getInteger("projectseele.tourGaitFastR64",30),GAIT_FAST_AT_R64=Integer.getInteger("projectseele.tourGaitFastAtR64",350);
+    private static void gaitR64(Minecraft mc)
+    {
+        int t=tick,at=GAIT_FAST_AT_R64;
+        boolean walk=t>=30&&t<160,run=t>=200&&t<310,fast=t>=at&&t<at+GAIT_FAST_R64,move=walk||run||fast;
+        mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
+        mc.player.setYRot(t>=170&&t<320?180:at>350&&t>=320&&t<335?90:0);mc.player.setXRot(0);
+        // The client re-syncs held sprint and dash to the real keys, so hold them.
+        mc.options.keySprint.setDown(run||fast);
+        com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=at+4&&t<at+GAIT_FAST_R64);
+        if(at(200)||at(at))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(310)||at(at+GAIT_FAST_R64))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+    }
+
+    /**
+     * -Dprojectseele.tourLeapR64=true: jumps on level ground, for tools/fr_jump.py. One from standing, one at a walk,
+     * one at a run (back the way it came), one at the fast run, one from standing again, and one from standing
+     * with a still Sachiel in view, where the server has the Unit's movement as the jump is asked for; then the
+     * kick from near the top of a jump at that Sachiel, and the hammer early in the rise of another. It turns
+     * about only while it stands, so that it stays on its lane. Run with tourEnd=1080.
+     * With -Dprojectseele.tourLeapRoofR64=true a block 50 high is then stood 52 ahead: it jumps onto it at a walk,
+     * jumps again where it stands, and walks off the far edge. Run with tourEnd=1460.
+     */
+    private static final boolean LEAP_R64=Boolean.getBoolean("projectseele.tourLeapR64"),LEAP_ROOF_R64=Boolean.getBoolean("projectseele.tourLeapRoofR64");
+    private static int roofX,roofZ,roofTurn;
+    private static void leapR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        int t=tick;
+        boolean walk=t>=120&&t<230||LEAP_ROOF_R64&&(t>=1120&&t<1175||t>=1320&&t<1400),run=t>=300&&t<400,fast=t>=440&&t<520,move=walk||run||fast;
+        mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
+        mc.player.setYRot(t>=245&&t<385?180:0);mc.player.setXRot(0);
+        // The client re-syncs held sprint and dash to the real keys, so hold them.
+        mc.options.keySprint.setDown(run||fast);
+        com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=444&&t<520);
+        if(at(300)||at(440))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(400)||at(520))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        int[] presses=LEAP_ROOF_R64?new int[]{40,160,335,458,620,780,880,960,1136,1240}:new int[]{40,160,335,458,620,780,880,960};
+        boolean press=false;
+        for(int when:presses){press|=t>=when&&t<when+3;if(at(when))sentR64("jump");}
+        mc.options.keyJump.setDown(press);
+        if(at(720))dummyR64(mc,eva,90,0);
+        // The kick 28 ticks after its press (near the top), the hammer 18 after its (6 ticks off the ground).
+        if(at(908))heavyR64();
+        if(at(978))lightR64();
+        if(at(1050))removeTargetR63(mc,"sachiel");
+        if(!LEAP_ROOF_R64)return;
+        // The block: 41 wide, 99 deep, its top 50 over the ground, its near face 52 ahead of where the Unit stands
+        // (it leaves the ground about 38 on and is back down to 50 about 56 further).
+        if(at(1100)){roofX=Mth.floor(eva.getX());roofZ=Mth.floor(eva.getZ());roofTurn=Math.abs(Mth.wrapDegrees(eva.getYRot()))<90?1:-1;}
+        if(at(1100)||at(1450))
+        {
+            String block=at(1100)?" minecraft:stone":" minecraft:air";
+            int near=roofZ+roofTurn*52,far=roofZ+roofTurn*150,ground=Mth.floor(eva.getY());
+            if(at(1450))ground=roofGround;else roofGround=ground;
+            for(int y=0;y<50;y+=5)
+                mc.player.connection.sendCommand("fill "+(roofX-20)+" "+(ground+y)+" "+Math.min(near,far)+" "+(roofX+20)+" "+(ground+y+4)+" "+Math.max(near,far)+block);
+        }
+    }
+    private static int roofGround;
+
     private static void movesR59(Minecraft mc)
     {
         int t=tick;
-        if(at(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand("seele dev motionlab weapon "+UNIT+" "+DASH_WEAPON);
+        if(at(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand(ARM+DASH_WEAPON);
         boolean sprint=t>=400&&t<500;
         boolean up=t>=320&&t<380||sprint,down=t>=130&&t<175,left=t>=195&&t<240,right=t>=255&&t<300;
         float forward=(up?1:0)-(down?1:0),side=(left?1:0)-(right?1:0);
@@ -435,6 +1038,483 @@ public final class EvaConnectedActionReview
         // A slow quarter turn on the spot and a fast one back; a steady curve; a right angle and a reversal at a run.
         float yaw=t<30?0:t<70?(t-30)*2.25F:t<90?90:t<100?90-(t-90)*9:t<320?0:t<380?(t-320)*3:t<430?180:t<460?270:90;
         mc.player.setYRot(yaw);mc.player.setXRot(0);
+    }
+
+    /**
+     * -Dprojectseele.tourArmsR63=sword or shield, with -Dprojectseele.tourUnit: the unit's own weapon
+     * carried at a walk and a run, a strike string and a heavy strike, a crouch with a few steps in
+     * it, and down to prone and up again (run to tick 560).
+     */
+    private static final String ARMS=System.getProperty("projectseele.tourArmsR63");
+    /**
+     * -Dprojectseele.tourEvadeR63=true: an evade from standing, then one asked for during a punch before its blow
+     * has landed (eight ticks in) and one after (fourteen), one out of the kick's recovery (thirteen) and one out
+     * of the knife cut's (twenty-five); then a still Sachiel strikes the unit five ticks into an evade and twelve
+     * ticks into the next. Run with tourEnd=600.
+     */
+    private static final boolean EVADE=Boolean.getBoolean("projectseele.tourEvadeR63");
+    /**
+     * -Dprojectseele.tourHitsR63=true: the piloted unit is struck with its field off. Two light hits from no body
+     * (a flinch each), two from a still Sachiel ahead (a stagger each), a third while it walks, then three heavy
+     * blows in a row from ahead, from behind and from its right: each row knocks it down, it gets up by itself
+     * and is repaired. Run with tourEnd=1140.
+     */
+    private static final boolean HITS=Boolean.getBoolean("projectseele.tourHitsR63");
+    private static void hitsR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        boolean walk=tick>=200&&tick<270;
+        mc.options.keyUp.setDown(walk);mc.player.setYRot(0);mc.player.setXRot(0);
+        if(!walk){mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;}
+        Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize(),right=new Vec3(-fwd.z,0,fwd.x);
+        // The piloted unit by its own id. Units 00 and 02 and the UN units are entity types of their own: "the nearest
+        // eva_unit01" was Unit-01 on the pad beside them, which took every blow of their tours while they stood idle.
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
+        if(at(1)){mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");}
+        // The still Sachiel each part's blows come from: ahead, behind, to the right.
+        int[] placed={2,560,820};
+        for(int part=0;part<placed.length;part++)
+        {
+            if(at(placed[part]))removeTargetR63(mc,"sachiel");
+            if(at(placed[part]+12))
+            {
+                Vec3 a=eva.position().add((part==0?fwd:part==1?fwd.scale(-1):right).scale(40));
+                double yaw=Math.toDegrees(Math.atan2(-(eva.getX()-a.x),eva.getZ()-a.z));
+                mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:sachiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,yaw));
+            }
+        }
+        if(at(40)||at(70))mc.player.connection.sendCommand("damage "+unit+" 6 minecraft:generic");
+        if(at(110)||at(230))mc.player.connection.sendCommand("damage "+unit+" 6 minecraft:mob_attack by "+angel);
+        if(at(150))mc.player.connection.sendCommand("damage "+unit+" 20 minecraft:mob_attack by "+angel);
+        // The light blows above have taken 44 points, and a piloted Unit-01 at 50 goes berserk: the first row of
+        // heavy blows left it there and the rest of the tour was the berserk unit's. It is repaired first.
+        if(at(300))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
+        // Three heavy blows fill the poise: the third knocks down. They stand 14 ticks apart. Vanilla's hurt cooldown
+        // is ten, and at 11 apart a client drawing 7 frames a second sent two of them within it: the unit took two
+        // blows of a row and stayed on its feet (rows lost in six captures of thirteen).
+        for(int row:new int[]{340,620,880})
+        {
+            for(int n=0;n<3;n++)if(at(row+n*14))mc.player.connection.sendCommand("damage "+unit+" 75 minecraft:mob_attack by "+angel);
+            if(at(row+190))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
+        }
+    }
+    /**
+     * -Dprojectseele.tourRamielR63=true: a still Ramiel ahead with its field sealed takes a punch, a heavy blow and
+     * a shot, a fresh one each time (a crystal without its mind does not count its ripple pause down); a fourth
+     * takes a string of punches, which its field answers by throwing the unit off. The log carries how far the
+     * crystal gives, tips and flashes every other tick. Run with tourEnd=540 and tourCapture.
+     */
+    private static final boolean RAMIEL=Boolean.getBoolean("projectseele.tourRamielR63");
+    private static void ramielR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize();
+        String crystal="@e[type=projectseele:ramiel,limit=1,sort=nearest]";
+        if(at(1)){mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");}
+        for(int placed:new int[]{2,110,210,320})
+        {
+            if(at(placed))removeTargetR63(mc,"ramiel");
+            if(at(placed+10))
+            {
+                // A fist reaches 24 blocks ahead at 47 blocks up, a kicking foot 25 ahead at 38 up (measured): the crystal,
+                // twelve blocks across, stands with its near face 20 ahead and from 36 to 48 up. Two blocks over the
+                // ground and 18 ahead, every punch of the first run passed over it.
+                Vec3 a=eva.position().add(fwd.scale(26)).add(0,36,0);
+                mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:ramiel %.1f %.1f %.1f {NoAI:1b,Silent:1b}",a.x,a.y,a.z));
+            }
+        }
+        if(at(50))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(150))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        // A shot: the crystal is immune to the damage command's arrow, so the unit takes its rifle and fires.
+        if(at(232))mc.player.connection.sendCommand(ARM+"rifle");
+        if(at(262))send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
+        if(at(300))mc.player.connection.sendCommand(ARM+"fists");
+        if(at(370)||at(392)||at(414)||at(436))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(530))removeTargetR63(mc,"ramiel");
+        // The crystal nearest the unit: one taken away stands 600 blocks up until it is gone.
+        com.projectseele.entity.RamielEntity near=null;
+        for(var seen:mc.level.entitiesForRendering())if(seen instanceof com.projectseele.entity.RamielEntity r&&(near==null||r.distanceToSqr(eva)<near.distanceToSqr(eva)))near=r;
+        if(tick>=40&&tick%2==0&&near!=null&&near.distanceToSqr(eva)<120*120)
+        {
+            var r=near;
+            var give=r.struckOffsetR63(0);var tip=r.struckTiltR63(0);
+            ProjectSeele.LOGGER.info("R63RAMIEL tick {} give {} {} {} tip {} flash {} field {}",tick,String.format(java.util.Locale.ROOT,"%.2f",give.x),
+                    String.format(java.util.Locale.ROOT,"%.2f",give.y),String.format(java.util.Locale.ROOT,"%.2f",give.z),String.format(java.util.Locale.ROOT,"%.1f",tip==null?0F:tip.w),
+                    String.format(java.util.Locale.ROOT,"%.2f",r.struckFlashR63(0)),r.getAtFieldEnergy());
+        }
+    }
+    /**
+     * -Dprojectseele.tourAnswerR63=true: a live Sachiel 22 blocks ahead. The piloted unit keeps facing it, walks up
+     * while it is more than 20 blocks off and strikes every 30 ticks while it is within 24, a heavy blow and a
+     * punch in turn; it is repaired every 100 ticks (its field stays down: a blow that reaches it is seen in its
+     * health). The server says of every blow Sachiel reads what it does about it (R63SACHIEL), and the log carries
+     * the range and Sachiel's strike every tick (R63ANSWER). Standing still with its field up, the first form of
+     * this tour had two blows in 540 ticks begin within Sachiel's reach. Run with tourEnd=1500.
+     */
+    private static final boolean ANSWER=Boolean.getBoolean("projectseele.tourAnswerR63");
+    /**
+     * -Dprojectseele.tourAnswerKickUnderR64=true, with the answer tour: the unit throws nothing by the clock, and
+     * begins its heavy blow (the side kick) as Sachiel's overhead reaches its 14th to 17th tick as the client sees
+     * it, in turn; the overhead lands at its 20th or 21st on the server, a tick or two ahead of the client's
+     * count (sent at the 18th, the knock-down came first). For a knock-down in the first ticks of the unit's own move.
+     */
+    private static final boolean KICK_UNDER_R64=Boolean.getBoolean("projectseele.tourAnswerKickUnderR64");
+    /**
+     * R64 (M5), with the answer tour: -Dprojectseele.tourAnswerPassiveR64=true, the unit throws nothing (what Sachiel
+     * does with a free hand: its strings and its breaths); -Dprojectseele.tourAnswerHealR64=N, the unit is repaired
+     * every N ticks instead of every hundred, so that the fight lasts the tour.
+     */
+    private static final boolean ANSWER_PASSIVE_R64=Boolean.getBoolean("projectseele.tourAnswerPassiveR64");
+    private static final int ANSWER_HEAL_R64=Math.max(10,Integer.getInteger("projectseele.tourAnswerHealR64",100));
+    private static int kickUnderTurnR64;private static boolean kickUnderSentR64;
+    private static void answerR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
+        com.projectseele.entity.SachielEntity sachiel=null;
+        for(var seen:mc.level.entitiesForRendering())
+            if(seen instanceof com.projectseele.entity.SachielEntity s&&s.isAlive()&&(sachiel==null||s.distanceToSqr(eva)<sachiel.distanceToSqr(eva)))sachiel=s;
+        double range=sachiel==null?Double.NaN:sachiel.position().subtract(eva.position()).horizontalDistance();
+        boolean close=sachiel!=null&&range>20&&tick>=30;
+        mc.options.keyUp.setDown(close);mc.player.input.up=close;mc.player.input.forwardImpulse=close?1:0;mc.player.zza=close?1:0;mc.player.xxa=0;
+        if(sachiel!=null)
+        {
+            Vec3 to=sachiel.position().subtract(eva.position());
+            mc.player.setYRot((float)Math.toDegrees(Math.atan2(-to.x,to.z)));
+        }
+        else mc.player.setYRot(0);
+        mc.player.setXRot(0);
+        if(at(1)){mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");}
+        if(at(14))
+        {
+            Vec3 a=eva.position().add(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(22));
+            // PersistenceRequired: without it the game's own despawn roll took Sachiel away somewhere between
+            // tick 600 and 900 of most runs (the pilot's own position is more than 32 blocks from it), and the
+            // fight was measured over whatever was left.
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:sachiel %.1f %.1f %.1f {Silent:1b,PersistenceRequired:1b,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,eva.getYRot()+180));
+        }
+        // (the tour's tick can step over one: the last multiple reached is what counts)
+        int repair=tick/ANSWER_HEAL_R64*ANSWER_HEAL_R64,blow=tick/30*30;
+        if(repair>=ANSWER_HEAL_R64&&at(repair))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
+        if(KICK_UNDER_R64)
+        {
+            boolean overhead=sachiel!=null&&sachiel.isStrikeActive()&&sachiel.strikeMode()==4;
+            if(!overhead)kickUnderSentR64=false;
+            else if(!kickUnderSentR64&&sachiel.strikeAge(0)>=14+kickUnderTurnR64%4)
+            {
+                kickUnderSentR64=true;kickUnderTurnR64++;send(ServerboundEvaControlPacket.ACTION_SMASH);
+                ProjectSeele.LOGGER.info("R64KICKUNDER tick {}: heavy blow sent at the overhead's tick {}",tick,String.format(java.util.Locale.ROOT,"%.1f",sachiel.strikeAge(0)));
+            }
+        }
+        else if(!ANSWER_PASSIVE_R64&&blow>=60&&at(blow)&&range<24)
+            send((blow/30)%2==0?ServerboundEvaControlPacket.ACTION_SMASH:ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
+        if(tick>=30&&sachiel!=null)
+            ProjectSeele.LOGGER.info("R63ANSWER tick {} range {} strike {} mode {} live {} phase {} heavy {} health {}",tick,
+                    String.format(java.util.Locale.ROOT,"%.1f",range),sachiel.isStrikeActive(),sachiel.strikeMode(),
+                    eva.hasLiveActionForRender(0),String.format(java.util.Locale.ROOT,"%.2f",eva.combatPhaseR31()),eva.isHeavyMotionActive()||eva.isKickMotionActive(0),Math.round(eva.getHealth()));
+    }
+    /**
+     * -Dprojectseele.tourStompR63=true: a live Sachiel 20 blocks ahead, the piloted unit standing with its field
+     * down. Every 340 ticks three heavy blows knock the unit down toward Sachiel: they are Sachiel's by cause, and
+     * come from a marker 30 blocks behind the unit, so the body falls at Sachiel's feet, where it stomps on a body
+     * that is down. With -Dprojectseele.bodyDiagR63=true the server says what the fallen body does every tick.
+     * The blows are 60 each and the unit is repaired every 16 ticks while it is down: at 50 a piloted Unit-01 goes
+     * berserk and takes no more blows, and the first form's first row (three of 75, then the stomp) left it there
+     * for the rest of the tour. Run with tourEnd=1400.
+     */
+    private static final boolean STOMP=Boolean.getBoolean("projectseele.tourStompR63");
+    private static void stompR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;mc.player.setXRot(0);
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",marker="@e[tag=r63push,limit=1]",unit=eva.getStringUUID();
+        com.projectseele.entity.SachielEntity sachiel=null;
+        for(var seen:mc.level.entitiesForRendering())
+            if(seen instanceof com.projectseele.entity.SachielEntity a&&a.isAlive()&&(sachiel==null||a.distanceToSqr(eva)<sachiel.distanceToSqr(eva)))sachiel=a;
+        if(sachiel!=null){Vec3 to=sachiel.position().subtract(eva.position());mc.player.setYRot((float)Math.toDegrees(Math.atan2(-to.x,to.z)));}
+        if(at(1)){mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");mc.player.connection.sendCommand("kill @e[tag=r63push]");}
+        if(at(14))
+        {
+            Vec3 a=eva.position().add(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(20));
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:sachiel %.1f %.1f %.1f {Silent:1b,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,eva.getYRot()+180));
+            Vec3 m=eva.position().subtract(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(30)).add(0,20,0);
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon minecraft:armor_stand %.1f %.1f %.1f {Invisible:1b,Marker:1b,NoGravity:1b,Tags:[\"r63push\"]}",m.x,m.y,m.z));
+        }
+        int row=60+(tick-60)/340*340;
+        if(tick>=60&&sachiel!=null)
+        {
+            // The marker goes behind the unit, away from Sachiel, before the row's blows.
+            if(at(row-6))
+            {
+                Vec3 away=eva.position().subtract(sachiel.position()).multiply(1,0,1);away=away.lengthSqr()<1e-6?new Vec3(0,0,-1):away.normalize();
+                Vec3 m=eva.position().add(away.scale(30)).add(0,20,0);
+                mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"tp %s %.1f %.1f %.1f",marker,m.x,m.y,m.z));
+            }
+            for(int n=0;n<3;n++)if(at(row+n*14))mc.player.connection.sendCommand("damage "+unit+" 60 minecraft:mob_attack by "+marker+" from "+angel);
+            for(int n=0;n<14;n++)if(at(row+34+n*16))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
+        }
+        if(at(TOUR_END-12)){removeTargetR63(mc,"sachiel");mc.player.connection.sendCommand("kill @e[tag=r63push]");}
+        if(tick>=30&&tick%2==0&&sachiel!=null)
+            ProjectSeele.LOGGER.info("R63STOMP tick {} range {} strike {} mode {} health {} at {} {} {}",tick,
+                    String.format(java.util.Locale.ROOT,"%.1f",sachiel.position().subtract(eva.position()).horizontalDistance()),sachiel.isStrikeActive(),sachiel.strikeMode(),
+                    Math.round(eva.getHealth()),String.format(java.util.Locale.ROOT,"%.1f",eva.getX()),String.format(java.util.Locale.ROOT,"%.1f",eva.getY()),String.format(java.util.Locale.ROOT,"%.1f",eva.getZ()));
+    }
+    /**
+     * -Dprojectseele.tourCombatR64=true (tourEnd=1900): the piloted unit's blows on a Sachiel that stands still with
+     * its field down, the same presses for either combat core, to be read with -Dprojectseele.combatDiagR64=true.
+     * One jab; four light presses six ticks apart; a light and a heavy; a heavy; four light presses twelve apart.
+     * Then two presses three ticks apart and a light with a heavy one tick behind it (what the buffer keeps), an
+     * evade asked for seven ticks into a jab, the target 31 degrees to the right and to the left of the body's
+     * facing, and blows at the air. With the knife: a cut, a cut left for the reverse cut, the reverse cut, and a
+     * light press as an evade ends. Last, the unit is struck standing, and again four ticks into a jab.
+     */
+    private static final boolean COMBAT_R64=Boolean.getBoolean("projectseele.tourCombatR64");
+    private static void sentR64(String what)
+    {ProjectSeele.LOGGER.info("R64TOUR tick {} game {} sent {}",tick,Minecraft.getInstance().level.getGameTime(),what);}
+    private static void lightR64(){sentR64("light");send(ServerboundEvaControlPacket.ACTION_MELEE);}
+    private static void heavyR64(){sentR64("heavy");send(ServerboundEvaControlPacket.ACTION_SMASH);}
+    private static void evadeBackR64()
+    {sentR64("evade");SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH,2));}
+    private static void dummyR64(Minecraft mc,EvaUnit01Entity eva,double ahead,double right)
+    {
+        removeTargetR63(mc,"sachiel");
+        Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize(),side=new Vec3(-fwd.z,0,fwd.x);
+        Vec3 a=eva.position().add(fwd.scale(ahead)).add(side.scale(right));
+        mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,
+                "summon projectseele:sachiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,SachielAtField:0f,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,eva.getYRot()+180));
+        ProjectSeele.LOGGER.info("R64TOUR tick {} game {} target {} ahead {} right",tick,mc.level.getGameTime(),ahead,right);
+    }
+    private static void combatR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
+        // A fresh target for every part: one felled by the part before lies where it fell for three seconds.
+        if(at(20)||at(90)||at(200)||at(290)||at(370)||at(500)||at(590)||at(670)||at(1370)||at(1470)||at(1550))dummyR64(mc,eva,20,0);
+        if(at(60))lightR64();
+        if(at(120)||at(126)||at(132)||at(138))lightR64();
+        if(at(230))lightR64();
+        if(at(236))heavyR64();
+        if(at(320))heavyR64();
+        if(at(400)||at(412)||at(424)||at(436))lightR64();
+        if(at(540)||at(543))lightR64();
+        if(at(620))lightR64();
+        if(at(621))heavyR64();
+        if(at(700))lightR64();
+        if(at(707))evadeBackR64();
+        if(at(790))dummyR64(mc,eva,20,12);
+        if(at(830)||at(838)||at(846))lightR64();
+        if(at(900))dummyR64(mc,eva,20,-12);
+        if(at(940))heavyR64();
+        if(at(1000))removeTargetR63(mc,"sachiel");
+        if(at(1030))lightR64();
+        if(at(1090)||at(1096))lightR64();
+        if(at(1160))heavyR64();
+        if(at(1230))mc.player.connection.sendCommand(ARM+"knife");
+        if(at(1240))dummyR64(mc,eva,20,0);
+        if(at(1320))lightR64();
+        if(at(1400))lightR64();
+        if(at(1422))heavyR64();
+        if(at(1500))heavyR64();
+        if(at(1580))evadeBackR64();
+        if(at(1598)||at(1604))lightR64();
+        if(at(1680))dummyR64(mc,eva,20,0);
+        if(at(1690))mc.player.connection.sendCommand(ARM+"fists");
+        if(at(1730)||at(1790))
+        {
+            mc.player.connection.sendCommand("damage "+unit+" 30 minecraft:mob_attack by "+angel);
+            ProjectSeele.LOGGER.info("R64TOUR tick {} game {} the unit is struck",tick,mc.level.getGameTime());
+        }
+        if(at(1786))lightR64();
+        if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
+        if(tick%2==0)
+        {
+            var near=mc.level.getEntitiesOfClass(com.projectseele.entity.SachielEntity.class,eva.getBoundingBox().inflate(120)).stream()
+                    .min(java.util.Comparator.comparingDouble(eva::distanceToSqr)).orElse(null);
+            if(near!=null)ProjectSeele.LOGGER.info("R64DUMMY tick {} game {} target at {} {} unit at {} {} yaw {}",tick,mc.level.getGameTime(),
+                    String.format(java.util.Locale.ROOT,"%.2f",near.getX()),String.format(java.util.Locale.ROOT,"%.2f",near.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.2f",eva.getX()),String.format(java.util.Locale.ROOT,"%.2f",eva.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.1f",eva.getYRot()));
+        }
+    }
+
+    /**
+     * -Dprojectseele.tourKnifeR64=true (tourEnd=600): the knife's presses on a still Sachiel with its field down,
+     * the same for any jar, to be read with -Dprojectseele.combatDiagR64=true. A light press (60); two light
+     * presses ten ticks apart (150, 160); two light presses and a heavy one (260, 270, 282); a heavy press (370);
+     * two heavy presses 32 ticks apart (470, 502). A fresh target before each.
+     */
+    private static final boolean KNIFE_R64=Boolean.getBoolean("projectseele.tourKnifeR64");
+    private static void knifeR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        if(at(6))mc.player.connection.sendCommand(ARM+"knife");
+        if(at(20)||at(120)||at(230)||at(340)||at(440))dummyR64(mc,eva,20,0);
+        if(at(60))lightR64();
+        if(at(150)||at(160))lightR64();
+        if(at(260)||at(270))lightR64();
+        if(at(282))heavyR64();
+        if(at(370))heavyR64();
+        if(at(470)||at(502))heavyR64();
+        if(at(TOUR_END-14))removeTargetR63(mc,"sachiel");
+        if(at(TOUR_END-10))mc.player.connection.sendCommand(ARM+"fists");
+    }
+
+    /**
+     * -Dprojectseele.tourMovingR64=true (tourEnd=470): blows begun while the Unit walks, and blows taken from it,
+     * with -Dprojectseele.combatDiagR64=true. It walks at a still Sachiel 58 blocks ahead and presses light once
+     * (40); walks at a fresh one and presses light three times six ticks apart (150, 156, 162); walks at a third
+     * and presses heavy (250); stands before a fourth, presses light and steps aside six ticks later (330, 336:
+     * the row is left for the step); presses light and is struck four ticks later (400, 404).
+     */
+    private static final boolean MOVING_R64=Boolean.getBoolean("projectseele.tourMovingR64");
+    private static void movingR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        boolean walk=tick>=22&&tick<70||tick>=132&&tick<190||tick>=232&&tick<280,aside=tick>=336&&tick<346;
+        mc.options.keyUp.setDown(walk);mc.player.input.up=walk;mc.player.input.forwardImpulse=walk?1:0;mc.player.zza=walk?1:0;
+        mc.options.keyLeft.setDown(aside);mc.player.input.left=aside;mc.player.input.leftImpulse=aside?1:0;mc.player.xxa=aside?1:0;
+        mc.options.keySprint.setDown(false);
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        if(at(10)||at(120)||at(220))dummyR64(mc,eva,58,0);
+        if(at(310)||at(380))dummyR64(mc,eva,20,0);
+        if(at(40))lightR64();
+        if(at(150)||at(156)||at(162))lightR64();
+        if(at(250))heavyR64();
+        if(at(330))lightR64();
+        if(at(400))lightR64();
+        if(at(404))
+        {
+            mc.player.connection.sendCommand("damage "+eva.getStringUUID()+" 30 minecraft:mob_attack by @e[type=projectseele:sachiel,limit=1,sort=nearest]");
+            ProjectSeele.LOGGER.info("R64TOUR tick {} game {} the unit is struck",tick,mc.level.getGameTime());
+        }
+        if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
+    }
+
+    /**
+     * -Dprojectseele.tourImpactR64=true (tourEnd=420): what is seen and heard where a body meets a wall or the
+     * ground. A wall of stone is put up 13 blocks behind a still Sachiel with its field down; the unit kicks it
+     * into the wall (62: pictures are taken every forty ticks, and its mark meets the wall at 78), then throws the light string whose last blow fells it (150 to 168), then kicks again a
+     * fresh one with no wall behind it (300). The wall is taken down at the end. With combatDiagR64 (R64TELL).
+     */
+    private static final boolean IMPACT_R64=Boolean.getBoolean("projectseele.tourImpactR64");
+    private static int[] impactWallR64;
+    private static void impactR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        if(at(10)||at(120)||at(270))dummyR64(mc,eva,20,0);
+        if(at(12))
+        {
+            // Yaw 0 looks along +z: the wall stands across it, 33 to 35 blocks ahead of the unit.
+            int x=(int)Math.floor(eva.getX()),y=(int)Math.floor(eva.getY()),z=(int)Math.floor(eva.getZ());
+            impactWallR64=new int[]{x-24,y,z+33,x+24,y+70,z+35};
+            mc.player.connection.sendCommand(String.format("fill %d %d %d %d %d %d minecraft:stone",impactWallR64[0],impactWallR64[1],impactWallR64[2],impactWallR64[3],impactWallR64[1]+34,impactWallR64[5]));
+            mc.player.connection.sendCommand(String.format("fill %d %d %d %d %d %d minecraft:stone",impactWallR64[0],impactWallR64[1]+35,impactWallR64[2],impactWallR64[3],impactWallR64[4],impactWallR64[5]));
+        }
+        if(at(62))heavyR64();
+        if(at(150)||at(156)||at(162)||at(168))lightR64();
+        if(at(255)&&impactWallR64!=null)
+        {
+            mc.player.connection.sendCommand(String.format("fill %d %d %d %d %d %d minecraft:air",impactWallR64[0],impactWallR64[1],impactWallR64[2],impactWallR64[3],impactWallR64[1]+34,impactWallR64[5]));
+            mc.player.connection.sendCommand(String.format("fill %d %d %d %d %d %d minecraft:air",impactWallR64[0],impactWallR64[1]+35,impactWallR64[2],impactWallR64[3],impactWallR64[4],impactWallR64[5]));
+        }
+        if(at(300))heavyR64();
+        if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
+        if(tick%2==0)
+        {
+            var near=mc.level.getEntitiesOfClass(com.projectseele.entity.SachielEntity.class,eva.getBoundingBox().inflate(120)).stream()
+                    .min(java.util.Comparator.comparingDouble(eva::distanceToSqr)).orElse(null);
+            if(near!=null)ProjectSeele.LOGGER.info("R64DUMMY tick {} game {} target at {} {} unit at {} {} yaw {}",tick,mc.level.getGameTime(),
+                    String.format(java.util.Locale.ROOT,"%.2f",near.getX()),String.format(java.util.Locale.ROOT,"%.2f",near.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.2f",eva.getX()),String.format(java.util.Locale.ROOT,"%.2f",eva.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.1f",eva.getYRot()));
+        }
+    }
+
+    /**
+     * -Dprojectseele.tourBeamR64=true (tourEnd=520): a living Ramiel 44 blocks ahead and 14 up (its targeting looks only four blocks above and below its own box), the unit standing
+     * still under it and repaired every forty ticks: its charge, its beam and its open core as the pilot sees
+     * them, three times over. With combatDiagR64 (R64TELL); the server's lines say what was shown and when.
+     */
+    private static final boolean BEAM_R64=Boolean.getBoolean("projectseele.tourBeamR64");
+    private static void beamR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(-20);
+        String unit=eva.getStringUUID();
+        if(at(1)){mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");mc.player.connection.sendCommand("gamerule mobGriefing false");}
+        if(at(12))
+        {
+            Vec3 a=eva.position().add(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(44)).add(0,14,0);
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:ramiel %.1f %.1f %.1f {Silent:1b,PersistenceRequired:1b}",a.x,a.y,a.z));
+        }
+        int repair=tick/40*40;
+        if(repair>=40&&at(repair))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
+        if(at(TOUR_END-12))
+        {
+            mc.player.connection.sendCommand("execute as @e[type=projectseele:ramiel] at @s run tp @s ~ ~600 ~");
+            mc.player.connection.sendCommand("kill @e[type=projectseele:ramiel]");
+        }
+        if(tick%2==0)
+            for(var seen:mc.level.entitiesForRendering())
+                if(seen instanceof com.projectseele.entity.RamielEntity ramiel)
+                    ProjectSeele.LOGGER.info("R64BEAM tick {} game {} charging {} exposed {} beam {} health {}",tick,mc.level.getGameTime(),
+                            ramiel.isCharging(),ramiel.isExposed(),ramiel.getBeamTicks(),Math.round(eva.getHealth()));
+    }
+
+    private static void evadeR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        // In the evade's direction mask two is the backward key and one the forward key. Each evade carries the unit
+        // 46 blocks: all of them backward took it out of the lab after the third (no weapon could be given to it
+        // there, and the Sachiel of the last part was left behind), so they go backward and forward in turn.
+        if(at(40)||at(108)||at(293)||at(440))
+            SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH,2));
+        if(at(194)||at(385)||at(500))
+            SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH,1));
+        if(at(100)||at(180)||at(360))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(280))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        // The evade asked for at 293 plays until 334, and a unit in an action takes no other weapon.
+        if(at(345))mc.player.connection.sendCommand(ARM+"knife");
+        // The slip: a blow by another body five ticks into an evade, and one twelve ticks into the next. The server
+        // is asked for the unit's health before and after each (the answers are in the log).
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
+        if(at(432))
+        {
+            Vec3 a=eva.position().add(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(60));
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:sachiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,eva.getYRot()+180));
+        }
+        if(at(445)||at(512))
+        {
+            mc.player.connection.sendCommand("damage "+unit+" 6 minecraft:mob_attack by "+angel);
+            ProjectSeele.LOGGER.info("R63EVADE blow sent at tour tick {}",tick);
+        }
+        if(at(436)||at(460)||at(530))
+        {
+            mc.player.connection.sendCommand("data get entity "+unit+" Health");
+            ProjectSeele.LOGGER.info("R63EVADE health asked at tour tick {}",tick);
+        }
+        if(at(570))removeTargetR63(mc,"sachiel");
+    }
+
+    private static void armsR63(Minecraft mc)
+    {
+        int t=tick;
+        // The run ends at 95: the strikes that follow carry the unit 120 blocks on, and the open
+        // review ground ends 250 blocks from the pad (a run to 110 left the crouched walk against its edge).
+        boolean move=t>=40&&t<95||t>=300&&t<335;
+        mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        mc.options.keySprint.setDown(t>=75&&t<95);
+        if(at(10))mc.player.connection.sendCommand(ARM+ARMS);
+        if(at(75))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(95))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(at(140)||at(150)||at(160)||at(170))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(210))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        if(at(270))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
+        if(at(350))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
+        if(at(390)||at(470))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
     }
 
     private static void weaponsR57(Minecraft mc,int w)
@@ -477,8 +1557,8 @@ public final class EvaConnectedActionReview
         if(fxAt(1))
         {
             // The review save keeps entities between runs.
-            mc.player.connection.sendCommand("kill @e[type=projectseele:ramiel]");
-            mc.player.connection.sendCommand("kill @e[type=projectseele:sachiel]");
+            removeTargetR63(mc,"ramiel");
+            removeTargetR63(mc,"sachiel");
             mc.player.connection.sendCommand("seele dev motionlab weapon unit01 cannon");
         }
         if(fxAt(30))send(ServerboundEvaControlPacket.ACTION_CHARGE_START);
@@ -500,8 +1580,8 @@ public final class EvaConnectedActionReview
         if(t<620&&fxRamiel!=null){Vec3 mid=fxUnit00.position().lerp(fxRamiel,.5);camPos=mid.add(r0.scale(190)).add(0,10,0);camAim=mid;return;}
         if(fxAt(620))
         {
-            mc.player.connection.sendCommand("kill @e[type=projectseele:ramiel]");
-            mc.player.connection.sendCommand("kill @e[type=projectseele:sachiel]");
+            removeTargetR63(mc,"ramiel");
+            removeTargetR63(mc,"sachiel");
             mc.player.connection.sendCommand("seele dev motionlab weapon unit00 fists");
             mc.player.connection.sendCommand("seele dev motionlab weapon unit01 fists");
         }
@@ -542,8 +1622,22 @@ public final class EvaConnectedActionReview
         SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(action));
     }
 
+    /**
+     * -Dprojectseele.reviewPilotViewR63=true: the view stays with the pilot. What only the pilot's view shows never
+     * happens under the review's camera, an entity of its own: camera kicks and the push of a blow that lands (a
+     * whole tour of blows logged none of either), and where the third-person camera goes on a climb.
+     */
+    private static final boolean PILOT_VIEW_R63=Boolean.getBoolean("projectseele.reviewPilotViewR63");
     private static void positionCamera(Minecraft mc, EvaUnit01Entity eva)
     {
+        if (PILOT_VIEW_R63)
+        {
+            if (mc.getCameraEntity() != mc.player) mc.setCameraEntity(mc.player);
+            mc.options.hideGui = true;
+            // From behind where the third-person camera is the subject (reviewThirdPersonR63), the pilot's eyes otherwise.
+            mc.options.setCameraType(Boolean.getBoolean("projectseele.reviewThirdPersonR63") ? CameraType.THIRD_PERSON_BACK : CameraType.FIRST_PERSON);
+            return;
+        }
         if (camera == null)
         {
             camera = EntityType.ARMOR_STAND.create(mc.level);
@@ -571,7 +1665,10 @@ public final class EvaConnectedActionReview
         camera.xOld = camera.getX(); camera.yOld = camera.getY(); camera.zOld = camera.getZ();
         camera.yRotO = camera.getYRot(); camera.xRotO = camera.getXRot();
         mc.options.hideGui = true;
-        mc.options.setCameraType(CameraType.FIRST_PERSON);
+        // -Dprojectseele.reviewThirdPersonR63=true: the review camera counts as a third-person view. The first
+        // battle cuts into and out of a first-person view and glides into and out of any other: with the
+        // review camera always first-person, a capture never showed the glide.
+        mc.options.setCameraType(Boolean.getBoolean("projectseele.reviewThirdPersonR63") ? CameraType.THIRD_PERSON_BACK : CameraType.FIRST_PERSON);
         mc.setCameraEntity(camera);
     }
 
@@ -584,7 +1681,7 @@ public final class EvaConnectedActionReview
             return;
         }
         // Past the script a terrain tour only waits for its cleanup, the ground gone from under the body.
-        if (poses == null || !EVERY_FRAME && poseTick == tick || TOUR && tick >= TOUR_END) return;
+        if (poses == null || !EVERY_FRAME && poseTick == tick || TOUR && !LAUNCH && tick >= TOUR_END) return;
         // A frame can draw the body more than once (shadow and main pass).
         if (EVERY_FRAME && eva.tickCount + partialTick == poseTime) return;
         poseTick = tick;poseTime = eva.tickCount + partialTick;
@@ -596,7 +1693,30 @@ public final class EvaConnectedActionReview
         row.addProperty("entityTick", eva.tickCount + partialTick);
         row.addProperty("key", eva.poseTransitionKey(partialTick));
         row.addProperty("heavyActive", eva.isHeavyMotionActive());
+        row.addProperty("phaseSent", eva.liveActionPhaseSentR63());
+        row.addProperty("phaseDrawn", eva.liveActionPhaseDrawnR63(partialTick));
+        // The pose key does not tell a struck body from a standing one: the reaction it is in, how long, and
+        // whether the knocked-down body is falling or lying (1) or getting up (2).
+        var beat=com.projectseele.entity.CombatFeelR31.beat(eva);
+        if(beat!=null){row.addProperty("beat",beat.kind());row.addProperty("beatAge",com.projectseele.entity.CombatFeelR31.age(eva,partialTick));}
+        int fallen=com.projectseele.physics.CombatBodyDynamics.phase(eva);
+        if(fallen!=0)row.addProperty("fallen",fallen);
+        row.addProperty("health",eva.getHealth());
         if (TOUR) row.addProperty("writers", com.projectseele.client.render.EvaPoseGraph.traceWriters(eva));
+        if (LAUNCH)
+        {
+            // Which part of the launch this frame belongs to, and what holds the body.
+            JsonArray launch = new JsonArray();
+            launch.add(eva.getLaunchPhase()); launch.add(eva.getLaunchTicks()); launch.add(eva.getActivationTicks());
+            launch.add(eva.onGround() ? 1 : 0); launch.add(eva.isNoGravity() ? 1 : 0); launch.add(eva.isNervLogisticsLocked() ? 1 : 0);
+            launch.add(eva.hasActiveCarrierMotion() ? 1 : 0); launch.add(eva.isVisuallyAirborneForRender() ? 1 : 0);
+            launch.add(eva.isPoweredOn() ? 1 : 0); launch.add(eva.getDeltaMovement().y);
+            launch.add(Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().y);
+            row.addProperty("rack", com.projectseele.client.render.EvaRackReleaseR63.traceR63(eva));
+            row.addProperty("framed", com.projectseele.entity.EvaMechanicalFrameR52.active(eva));
+            row.addProperty("seatY", eva.getPilotCameraSeatPosition(Minecraft.getInstance().player, partialTick).y);
+            row.add("launch", launch);
+        }
         if (eva.isHeavyMotionActive()) row.addProperty("heavyPhase", eva.heavyMotionProgress(partialTick));
         JsonArray world = new JsonArray();
         world.add(eva.getX()); world.add(eva.getY()); world.add(eva.getZ());
@@ -606,6 +1726,11 @@ public final class EvaConnectedActionReview
         JsonArray position = new JsonArray();
         position.add(drawn.x); position.add(drawn.y); position.add(drawn.z);
         row.add("drawnPosition", position);
+        // How far below its entity the body is drawn this frame (zero or negative), and the entity at this frame.
+        row.addProperty("stepOffset", com.projectseele.client.EvaStepSmoothingR57.offset(eva, partialTick));
+        row.addProperty("entityY", eva.getPosition(partialTick).y);
+        row.addProperty("onGround", eva.onGround());
+        row.addProperty("airborne", eva.isVisuallyAirborneForRender());
         row.addProperty("bodyYaw", net.minecraft.util.Mth.rotLerp(partialTick, eva.yBodyRotO, eva.yBodyRot));
         JsonObject transforms = new JsonObject();
         // Every bone, anatomical hand joints included, so offline renders can
@@ -628,7 +1753,9 @@ public final class EvaConnectedActionReview
         row.add("bones", transforms);
         // What the terrain stages decided this frame (EvaFootPlacement.LAST and GROUNDING).
         for (var witness : new Object[][]{{"footPlacement", com.projectseele.client.render.EvaFootPlacement.LAST.get(eva.getId())},
-                {"groundContact", com.projectseele.client.render.EvaFootPlacement.GROUNDING.get(eva.getId())}})
+                {"groundContact", com.projectseele.client.render.EvaFootPlacement.GROUNDING.get(eva.getId())},
+                {"lowestHull", com.projectseele.client.render.EvaFootPlacement.LOWEST_R63.get(eva.getId())},
+                {"planted", com.projectseele.client.render.EvaPlantedGaitR64.LAST.get(eva.getId())}})
         {
             if (!(witness[1] instanceof double[] values)) continue;
             JsonArray list = new JsonArray();
@@ -665,7 +1792,7 @@ public final class EvaConnectedActionReview
                 || tick == capturedTick) return;
         // The tour measures per-frame continuity: a screenshot per tick would
         // halve the frame rate, so it keeps one still every two seconds.
-        if (TOUR && tick >= TOUR_END) return;
+        if (TOUR && !LAUNCH && tick >= TOUR_END) return;
         if (TOUR && FX) { if (!fxCapture(tick)) return; }
         else if (TOUR && ATF) { if (tick < 36) return; }
         else if (TOUR && !Boolean.getBoolean("projectseele.tourCapture") && tick % 40 != 0) return;

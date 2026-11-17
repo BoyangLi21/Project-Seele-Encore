@@ -24,6 +24,8 @@ public final class EvaOrdinaryStandingSupportR52
     /** A floor further than this below the body (blocks) is a drop, not uneven ground. */
     private static final double DROP=8;
     private static final float KNEE_RESERVE=(float)Math.toRadians(20);
+    /** Hull points this far above a sole's lowest (model units: half a block) still bear on the ground with it. */
+    private static final float PATCH=.1F;
     private static final Map<Integer,Map<String,Vector3f[]>> SOURCES=new HashMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,MotionMemory> MEMORY=new com.projectseele.util.WeakIdentityMap<>();
     private static final Map<CombatBodyProfiles.Profile,CombatBodyProfiles.Profile> LEG_PROFILES=new java.util.IdentityHashMap<>();
@@ -85,7 +87,7 @@ public final class EvaOrdinaryStandingSupportR52
         float[] floor=new float[2];int index=0;
         for(String side:List.of("l","r"))
         {
-            var low=lowest(e.getUnitVariant(),pose,side);if(low==null){restoreFeet(pose,authoredFeet);memory.clearFeet();return;}
+            var low=bearing(e.getUnitVariant(),pose,side);if(low==null){restoreFeet(pose,authoredFeet);memory.clearFeet();return;}
             var world=new Vector3f(low).mul(EvaScale.RENDER_SCALE)
                     .rotateY((180-EvaAirTransportR31.frameYaw(e,partial))*(float)Math.PI/180)
                     .add((float)origin.x,(float)origin.y,(float)origin.z);
@@ -305,6 +307,32 @@ public final class EvaOrdinaryStandingSupportR52
             var point=matrix.transformPosition(new Vector3f(vertex));if(low==null||point.y<low.y)low=point;
         }
         return low;
+    }
+
+    /**
+     * Where a sole bears on the ground: the height of its lowest point, over the middle of the hull
+     * points within {@link #PATCH} of it, the nearer the more. Thirteen points of a flat sole tie
+     * for lowest from heel to toe. Which of them won turned on the last bits of the pose, and on a
+     * terraced hillside the floor read under it differed by a block or two from one frame to the
+     * next: a unit standing still had its body and legs set a block up or down each frame.
+     */
+    public static Vector3f bearing(int variant,EvaBodyPose.Sample pose,String side)
+    {
+        String name="foot_"+side;var m=pose.matrix(name);var hull=vertices(variant).get(name);
+        if(hull.length==0)return null;
+        float[] height=new float[hull.length];float low=Float.POSITIVE_INFINITY;
+        for(int i=0;i<hull.length;i++)
+        {
+            var v=hull[i];height[i]=m.m01()*v.x+m.m11()*v.y+m.m21()*v.z+m.m31();low=Math.min(low,height[i]);
+        }
+        float x=0,z=0,total=0;
+        for(int i=0;i<hull.length;i++)
+        {
+            float weight=1-(height[i]-low)/PATCH;if(weight<=0)continue;
+            var v=hull[i];
+            x+=(m.m00()*v.x+m.m10()*v.y+m.m20()*v.z+m.m30())*weight;z+=(m.m02()*v.x+m.m12()*v.y+m.m22()*v.z+m.m32())*weight;total+=weight;
+        }
+        return new Vector3f(x/total,low,z/total);
     }
 
     private static synchronized Map<String,Vector3f[]> vertices(int variant)

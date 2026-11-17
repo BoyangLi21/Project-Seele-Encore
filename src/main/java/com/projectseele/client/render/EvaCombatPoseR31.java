@@ -123,7 +123,10 @@ public final class EvaCombatPoseR31
                 m.getBone("forearm_"+side).ifPresent(b->{EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side));position.add(b.getName());});
             }
         }
-        if(beat!=null&&CombatFeelR31.hitPaused(e))
+        // R64 (flow): the Unit's own blow landing no longer freezes its pose where the row's clock draws the blow:
+        // the clock slows the blow down at its mark and plays all of it (EvaRowClockR64).
+        boolean ownBlowR64=beat!=null&&beat.kind()==CombatFeelR31.CONTACT&&e.rowDrawnByClockR64();
+        if(beat!=null&&CombatFeelR31.hitPaused(e)&&!ownBlowR64)
         {
             var all=new ArrayList<GeoBone>();m.getBone("root").ifPresent(b->collect(b,all));
             if(STAMP.getOrDefault(e,Long.MIN_VALUE)!=beat.start())
@@ -132,6 +135,8 @@ public final class EvaCombatPoseR31
                 FROZEN.put(e,pose);STAMP.put(e,beat.start());
             }
             for(var b:all){var held=FROZEN.get(e).get(b.getName());if(held==null)continue;EvaRigTransforms.rotate(b,held.rotation);b.setPosX(held.position.x);b.setPosY(held.position.y);b.setPosZ(held.position.z);changed.add(b.getName());position.add(b.getName());}
+            var shake=CombatFeelR31.tremble(e,partial);
+            if(shake!=null)m.getBone("root").ifPresent(b->{b.setPosX(b.getPosX()+shake[0]);b.setPosZ(b.getPosZ()+shake[1]);});
         }
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.copyOf(position),"MOTION_ENGINE_LIVE_ACTION");
     }

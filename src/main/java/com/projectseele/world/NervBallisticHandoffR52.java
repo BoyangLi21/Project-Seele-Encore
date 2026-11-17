@@ -11,7 +11,18 @@ import net.minecraft.world.phys.*;
  * Forge gravity remain unchanged. All geometry is the retained original
  * body, 34 hands, closed capsule, native seated pilot and selected dolly. */
 public final class NervBallisticHandoffR52 {
-    public static final int FLIGHT_TICKS=42,CARRIER_TICKS=20,CLOSE_TICKS=20;
+    /**
+     * The hand-off's clock starts when the rack's jaws have let go (the first half of CARRIER_TICKS) and its deck
+     * begins to drop. The hatch starts to close on that same tick, and the unit starts down when the hatch is half
+     * closed, to land two ticks after it has shut. The hatch used to wait for the deck to be stowed and the unit for
+     * the hatch to be shut: 42 ticks, during which a launched unit stood rigid at the surface for 2.65 seconds.
+     */
+    public static final int CARRIER_TICKS=20,CLOSE_TICKS=20,LANDING_START=CLOSE_TICKS/2,FLIGHT_TICKS=CLOSE_TICKS+2;
+    /**
+     * The free flight under native gravity and drag that the hand-off was first written for (launchVelocity and
+     * height below) keeps its own 42 ticks: nothing moves by it any more, and two checks pin its figures.
+     */
+    public static final int NATIVE_FLIGHT_TICKS=42;
     public static final double DRAG=.98,LANDING_DELTA=-3;
     public record Profile(double landingDelta)
     {
@@ -20,12 +31,12 @@ public final class NervBallisticHandoffR52 {
     public static double launchVelocity(double gravity){return launchVelocity(gravity,new Profile(LANDING_DELTA));}
     public static double launchVelocity(double gravity,Profile profile) {
         if(!Double.isFinite(gravity)||gravity<=0)throw new IllegalArgumentException("Actual positive native gravity required");
-        double sum=(1-Math.pow(DRAG,FLIGHT_TICKS))/(1-DRAG);
-        return (profile.landingDelta()+gravity*DRAG/(1-DRAG)*(FLIGHT_TICKS-sum))/sum;
+        double sum=(1-Math.pow(DRAG,NATIVE_FLIGHT_TICKS))/(1-DRAG);
+        return (profile.landingDelta()+gravity*DRAG/(1-DRAG)*(NATIVE_FLIGHT_TICKS-sum))/sum;
     }
     public static double height(int ticks,double gravity){return height(ticks,gravity,new Profile(LANDING_DELTA));}
     public static double height(int ticks,double gravity,Profile profile) {
-        if(ticks<0||ticks>FLIGHT_TICKS)throw new IllegalArgumentException("Native flight clock outside admitted launch");
+        if(ticks<0||ticks>NATIVE_FLIGHT_TICKS)throw new IllegalArgumentException("Native flight clock outside admitted launch");
         double v=launchVelocity(gravity,profile),y=0;for(int t=0;t<ticks;t++){y+=v;v=(v-gravity)*DRAG;}return y;
     }
     public static double closingProgressR53(double fraction){if(!Double.isFinite(fraction)||fraction<0||fraction>1)throw new IllegalArgumentException("Actual normalized closing clock required");return EvaDorsalMechanism.smooth((float)(1-fraction));}
@@ -56,7 +67,7 @@ public final class NervBallisticHandoffR52 {
                 // A pre-update save may already be above the outlet. Carry
                 // its current offset forward once, then consume that offset
                 // over the remaining landing clock without rewinding it.
-                int landingStart=CARRIER_TICKS/2+CLOSE_TICKS;
+                int landingStart=LANDING_START;
                 double a=Math.max(0,(fromTick-landingStart)/(double)(FLIGHT_TICKS-landingStart));
                 double b=Math.max(0,(fromTick+1-landingStart)/(double)(FLIGHT_TICKS-landingStart));
                 double remaining=1-a*a*a*(10+a*(-15+6*a));
@@ -102,7 +113,7 @@ public final class NervBallisticHandoffR52 {
         public double launchVelocity(){return 0;}
         public RigidTransform root(int ticks){
             if(ticks<0||ticks>FLIGHT_TICKS)throw new IllegalArgumentException("Outlet clock outside admitted handoff");
-            int landingStart=CARRIER_TICKS/2+CLOSE_TICKS;
+            int landingStart=LANDING_START;
             double t=Math.max(0,(ticks-landingStart)/(double)(FLIGHT_TICKS-landingStart));
             double height=profile.landingDelta()*t*t*t*(10+t*(-15+6*t));
             return new RigidTransform(start.translation().add(0,height,0),start.qx(),start.qy(),start.qz(),start.qw());
@@ -205,8 +216,9 @@ public final class NervBallisticHandoffR52 {
             float from=door.actualOpenProgressR52(),to=door.proposedDeclaredProgressR52(false);
             if(to>from){rejectionR53="ballistic_hatch_reversed";return false;}
             var carrier=NervOriginalCarrierR52.controller(level,original);
-            if(carrier==null||NervOriginalCarrierR52.progress(carrier,1)!=0)
-            {rejectionR53="ballistic_hatch_rack_not_stowed";return false;}
+            // The deck drops out of the outlet through the second half of the rack's travel; the hatch closes behind it.
+            if(carrier==null||!(NervOriginalCarrierR52.progress(carrier,1)<=.5F))
+            {rejectionR53="ballistic_hatch_rack_still_in_the_outlet";return false;}
             if(!NervTraversalPolicyR53.strict(level))return true;
             var moving=new HashSet<net.minecraft.core.BlockPos>();var supports=new HashSet<net.minecraft.core.BlockPos>();
             for(var row:hatch.collisionSteps())for(var cell:row)moving.add(cell.at());
@@ -274,10 +286,14 @@ public final class NervBallisticHandoffR52 {
             var geometry=((NervSiloDoorEntity)l.getEntity(hatch.visual())).declaredGeometryR52();var stowed=new ArrayList<Surface>();
             if(originalCarrier!=null)try{for(var p:NervOriginalCarrierR52.partsAtR53(e.getUnitVariant(),start,0,NervOriginalCarrierR52.guideUp(originalCarrier),NervOriginalCarrierR52.actualRidePoseR52(originalCarrier),NervOriginalCarrierR52.uprightDirectionR52(originalCarrier,1),0))stowed.add(new Surface(originalCarrier.getUUID(),p.name(),p.mesh(),start.inverse().compose(p.frame())));}catch(java.io.IOException missing){return false;}
             else NervMappedPlugMechanicsR52.selectedMachinery().carrierParts(e.getUnitVariant(),0,e.recoveryRackR39(),0,EvaMechanicalFrameR52.carrierDeckTravelR52(e)).values().forEach(v->stowed.add(new Surface(original.eva(),"legacy_carrier",new NervRigidMeshSweepR52(v),RigidTransform.identity())));
+            // The hatch closes while the deck drops, its first CARRIER_TICKS/2 ticks: the deck where it stands at the
+            // start and the end of each of those ticks is checked against the closing leaves as well.
+            var dropping=new ArrayList<java.util.List<Surface>>();
+            if(originalCarrier!=null)try{for(int t=0;t<=CARRIER_TICKS/2;t++){var deck=new ArrayList<Surface>();for(var p:NervOriginalCarrierR52.partsAtR53(e.getUnitVariant(),start,Math.max(0F,.5F-t/(float)CARRIER_TICKS),NervOriginalCarrierR52.guideUp(originalCarrier),NervOriginalCarrierR52.actualRidePoseR52(originalCarrier),NervOriginalCarrierR52.uprightDirectionR52(originalCarrier,1),0))deck.add(new Surface(originalCarrier.getUUID(),p.name(),p.mesh(),start.inverse().compose(p.frame())));dropping.add(deck);}}catch(java.io.IOException missing){return false;}
             double dp=1D/(CLOSE_TICKS*8),ex=hatch.siloHatch().pocketX()*(21.09375/.49+9/.7)*dp*dp/8+.001,ey=hatch.siloHatch().maximumTier()*(21.09375/.09+9/.3)*dp*dp/8+.001;
             for(int t=1;t<=CLOSE_TICKS;t++)for(int sub=0;sub<8;sub++) {
-                double a=(t-1+sub/8D)/CLOSE_TICKS,b=(t-1+(sub+1)/8D)/CLOSE_TICKS;var first=geometry.pieces((float)closingProgressR53(a));var last=geometry.pieces((float)closingProgressR53(b));var bodyFrom=root(CARRIER_TICKS+t-1).interpolate(root(CARRIER_TICKS+t),sub/8D);var bodyTo=root(CARRIER_TICKS+t-1).interpolate(root(CARRIER_TICKS+t),(sub+1)/8D);
-                for(int i=0;i<first.size();i++){var piece=first.get(i);var mesh=new NervRigidMeshSweepR52(piece.part().xyz());var f=hatch.frame().compose(piece.local());var n=hatch.frame().compose(last.get(i).local());var error=piece.moving()?new Vec3(ex,ey,0):Vec3.ZERO;for(var s:payload)if(s.mesh().intersects(bodyFrom.compose(s.local()),bodyTo.compose(s.local()),mesh,f,n,.003,error))return false;for(var s:stowed){var at=start.compose(s.local());if(s.mesh().intersects(at,at,mesh,f,n,.003,error))return false;}}
+                double a=(t-1+sub/8D)/CLOSE_TICKS,b=(t-1+(sub+1)/8D)/CLOSE_TICKS;var first=geometry.pieces((float)closingProgressR53(a));var last=geometry.pieces((float)closingProgressR53(b));var bodyFrom=root(t-1).interpolate(root(t),sub/8D);var bodyTo=root(t-1).interpolate(root(t),(sub+1)/8D);
+                for(int i=0;i<first.size();i++){var piece=first.get(i);var mesh=new NervRigidMeshSweepR52(piece.part().xyz());var f=hatch.frame().compose(piece.local());var n=hatch.frame().compose(last.get(i).local());var error=piece.moving()?new Vec3(ex,ey,0):Vec3.ZERO;for(var s:payload)if(s.mesh().intersects(bodyFrom.compose(s.local()),bodyTo.compose(s.local()),mesh,f,n,.003,error))return false;for(var s:stowed){var at=start.compose(s.local());if(s.mesh().intersects(at,at,mesh,f,n,.003,error))return false;}if(t<=CARRIER_TICKS/2&&!dropping.isEmpty())for(var deck:java.util.List.of(dropping.get(t-1),dropping.get(t)))for(var s:deck){var at=start.compose(s.local());if(s.mesh().intersects(at,at,mesh,f,n,.003,error))return false;}}
             }
             return true;
         }

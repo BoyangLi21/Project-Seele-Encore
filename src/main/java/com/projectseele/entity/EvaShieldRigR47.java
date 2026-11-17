@@ -86,8 +86,58 @@ public final class EvaShieldRigR47
         body.positions.put("shield",local.transformPosition(new Vector3f(socket.pivot())).sub(socket.pivot()));body.dirty();
     }
 
+    /** Share of the arm's length the rail may lie from the shoulder. */
+    private static final float REACH_R63=.97F;
+    /** How far behind the chest's own plane the arm may point (a sine: 25 degrees). */
+    private static final float BEHIND_R63=.42F;
+    private static float[] dropR63;
+    /** How far below its handle the plate's lowest point lies when it leans back by each whole degree. */
+    private static synchronized float[] dropR63()
+    {
+        if(dropR63!=null)return dropR63;
+        var mesh=surface();var handle=mesh.attachment().source();
+        float[] result=new float[91];
+        for(int degree=0;degree<=90;degree++)
+        {
+            double cos=Math.cos(Math.toRadians(degree)),sin=Math.sin(Math.toRadians(degree)),lowest=0;
+            for(var triangle:mesh.triangles())
+                for(Vec3 point:List.of(triangle.a(),triangle.a().add(triangle.edge1()),triangle.a().add(triangle.edge2())))
+                    lowest=Math.min(lowest,(point.y/16-handle.y)*cos-(point.z/16-handle.z)*sin);
+            result[degree]=(float)-lowest;
+        }
+        return dropR63=result;
+    }
+    private record LeanR63(Quaternionf hand,Vector3f target){}
+    /**
+     * The hand for a plate leaning back by so many degrees with its foot on the ground, or null
+     * where the arm cannot hold it there: the wrist at the rail's height, as far ahead as the arm
+     * reaches, no nearer the body than the upright rail and not behind the chest's own plane.
+     */
+    private static LeanR63 leanR63(float degrees,Quaternionf upright,Quaternionf fit,Vector3f grip,Vector3f right,Vector3f forward,
+            Vector3f between,Vector3f origin,Vector3f chest,float reach)
+    {
+        float[] drop=dropR63();int whole=(int)degrees;
+        float rail=.15F+drop[whole]+(degrees-whole)*(drop[Math.min(90,whole+1)]-drop[whole]);
+        var hand=new Quaternionf().rotationAxis((float)Math.toRadians(degrees),right.x,right.y,right.z).mul(upright).mul(fit);
+        var offset=hand.transform(new Vector3f(grip));
+        float up=rail-offset.y-origin.y,side=new Vector3f(between).sub(offset).sub(origin).dot(right);
+        float ahead=reach*reach-up*up-side*side;
+        if(ahead<0)return null;
+        ahead=(float)Math.sqrt(ahead);
+        if(origin.dot(forward)+ahead+offset.dot(forward)<between.dot(forward)+2F)return null;
+        var arm=new Vector3f(forward).mul(ahead).fma(side,right).add(0,up,0);
+        if(arm.dot(chest)<-BEHIND_R63*reach)return null;
+        return new LeanR63(hand,arm.add(origin));
+    }
+
     /** Carry the full-size plate upright, with the real rear handrail in the palm.
-     * The library's generic shield hand is not calibrated to this tall rail. */
+     * The library's generic shield hand is not calibrated to this tall rail.
+     * <p>
+     * The rail stands eight units (40 blocks) above the plate's foot, twice an arm's length. A
+     * unit lying down cannot hold it there: the arm went straight up from the prone chest and the
+     * plate hung from it with its lower 13 blocks in the ground. Where the arm cannot reach the
+     * upright rail, the plate keeps its foot on the ground and leans back over the unit by the
+     * least angle at which the arm can hold the rail. */
     public static void applyCarryR48(EvaUnit01Entity entity,EvaBodyPose.Sample body)
     {
         if(!equipped(entity)||entity.isNervLogisticsLocked()||entity.isFirstBattleActive()
@@ -102,17 +152,35 @@ public final class EvaShieldRigR47
                 .setColumn(0,right).setColumn(1,new Vector3f(0,1,0)).setColumn(2,new Vector3f(forward).negate()));
         var shoulder=body.matrix(upper).transformPosition(new Vector3f(body.rig.get(upper).pivot()));
         var other=body.matrix("arm_r").transformPosition(new Vector3f(body.rig.get("arm_r").pivot()));
-        var rail=shoulder.lerp(other,.5F).fma(2F,forward);
+        var between=shoulder.lerp(other,.5F);
+        var rail=new Vector3f(between).fma(2F,forward);
         float minimumRail=attachment.source().y-(float)surface().bounds().minY/16F+.15F;
         rail.y=Math.max(minimumRail,rail.y-1.5F);
-        var handRotation=new Quaternionf(shieldRotation).mul(new Quaternionf(attachment.rotation()).invert());
-        var target=new Vector3f(rail).sub(handRotation.transform(new Vector3f(attachment.target()).sub(body.rig.get(hand).pivot())));
+        var fit=new Quaternionf(attachment.rotation()).invert();
+        var grip=new Vector3f(attachment.target()).sub(body.rig.get(hand).pivot());
+        var handRotation=new Quaternionf(shieldRotation).mul(fit);
+        var target=new Vector3f(rail).sub(handRotation.transform(new Vector3f(grip)));
         var joint=com.projectseele.physics.AnatomicalLimbConstraints.elbowJoint(physics,"l",body.rig.get(lower).pivot());
         var upperWorld=body.matrix(upper).getUnnormalizedRotation(new Quaternionf()).normalize();
         var lowerWorld=body.matrix(lower).getUnnormalizedRotation(new Quaternionf()).normalize();
         var origin=body.matrix(upper).transformPosition(new Vector3f(body.rig.get(upper).pivot()));
         var middle=body.matrix(upper).transformPosition(new Vector3f(joint));
         var end=body.matrix(hand).transformPosition(new Vector3f(body.rig.get(hand).pivot()));
+        float reach=REACH_R63*(origin.distance(middle)+middle.distance(end));
+        if(target.distance(origin)>reach)
+        {
+            var chest=body.matrix("torso_upper").transformDirection(new Vector3f(0,0,-1)).normalize();
+            LeanR63 lean=null;float held=0;
+            for(int degree=0;degree<=88&&lean==null;degree++)
+            {lean=leanR63(degree,shieldRotation,fit,grip,right,forward,between,origin,chest,reach);held=degree;}
+            // Between the last whole degree the arm cannot hold and the first it can.
+            for(float free=held-1,step=0;lean!=null&&free>=0&&step<6;step++)
+            {
+                float half=(free+held)/2;var nearer=leanR63(half,shieldRotation,fit,grip,right,forward,between,origin,chest,reach);
+                if(nearer==null)free=half;else{lean=nearer;held=half;}
+            }
+            if(lean!=null){handRotation=lean.hand();target=lean.target();}
+        }
         var pole=new Vector3f(origin).fma(-.55F,right).add(0,-1.2F,.4F);
         var solved=com.projectseele.physics.AuthoredTwoBoneIKR45.solveWithPole(origin,middle,end,target,pole,new Vector3f(right));
         if(solved==null)return;

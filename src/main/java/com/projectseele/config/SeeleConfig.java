@@ -46,6 +46,19 @@ public final class SeeleConfig
 
     // ----- common: EVA Unit-01 -----
     public static final ForgeConfigSpec.DoubleValue EVA_MAX_HEALTH;
+    // ----- common: EVA gait (R64) -----
+    public static final ForgeConfigSpec.DoubleValue EVA_WALK_SPEED_SCALE;
+    public static final ForgeConfigSpec.DoubleValue EVA_WALK_CADENCE_SCALE;
+    public static final ForgeConfigSpec.DoubleValue EVA_RUN_SPEED_SCALE;
+    public static final ForgeConfigSpec.DoubleValue EVA_RUN_CADENCE_SCALE;
+    public static final ForgeConfigSpec.DoubleValue EVA_SPRINT_CADENCE_SCALE;
+    // ----- common: EVA movement model (R64, M1) -----
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_MOTION_MODEL;
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_GAIT_TIER;
+    public static final ForgeConfigSpec.DoubleValue EVA_JUMP_HEIGHT;
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_COMBAT_MODEL;
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_HIT_STOP;
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_COMBAT_FLOW;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_RANGE;
     public static final ForgeConfigSpec.IntValue EVA_RIFLE_INTERVAL_TICKS;
@@ -54,6 +67,9 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.IntValue CANNON_CHARGE_TICKS;
     public static final ForgeConfigSpec.DoubleValue CANNON_RANGE;
     public static final ForgeConfigSpec.IntValue CANNON_COOLDOWN_TICKS;
+    public static final ForgeConfigSpec.IntValue ARMAMENT_TOWER_LOCK_TICKS;
+    public static final ForgeConfigSpec.IntValue ARMAMENT_TOWER_DOOR_TICKS;
+    public static final ForgeConfigSpec.IntValue ARMAMENT_TOWER_IDLE_RECALL_SECONDS;
     public static final ForgeConfigSpec.DoubleValue CANNON_MOB_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue CANNON_CORE_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue CANNON_EXPLOSION_RADIUS;
@@ -102,10 +118,17 @@ public final class SeeleConfig
     // ----- client -----
     public static final ForgeConfigSpec.BooleanValue ALARM_VIGNETTE;
     public static final ForgeConfigSpec.DoubleValue FX_INTENSITY;
+    public static final ForgeConfigSpec.IntValue SMALL_ENTITY_SHADOW_DISTANCE;
+    public static final ForgeConfigSpec.IntValue MEDIUM_ENTITY_SHADOW_DISTANCE;
     public static final ForgeConfigSpec.IntValue VIDEO_TARGET_FPS;
     public static final ForgeConfigSpec.IntValue VIDEO_CAPTURE_WIDTH;
     public static final ForgeConfigSpec.DoubleValue VIDEO_JPEG_QUALITY;
     public static final ForgeConfigSpec.IntValue VIDEO_FRAME_BUDGET_KIB;
+    public static final ForgeConfigSpec.BooleanValue COCKPIT_INTERIOR;
+    public static final ForgeConfigSpec.DoubleValue COCKPIT_STEADY_VIEW;
+    public static final ForgeConfigSpec.BooleanValue COCKPIT_LCL;
+    public static final ForgeConfigSpec.DoubleValue COCKPIT_LCL_TINT;
+    public static final ForgeConfigSpec.BooleanValue COCKPIT_CHAT_PANEL;
 
     static
     {
@@ -214,6 +237,75 @@ public final class SeeleConfig
                 .defineInRange("maxHealth", 300.0D, 1.0D, 10000.0D);
         common.pop();
 
+        common.push("eva_gait");
+        EVA_WALK_SPEED_SCALE = common
+                .comment("Walking speed of a piloted EVA, times the built-in one (Unit-00 19.4, Unit-01 22.6, Unit-02 25.7 blocks a second).",
+                        "A foot on the ground slides backward unless speed and cadence fit the stride of the gait.",
+                        "What is left of the slide, as a share of what the body covers: about 2.4 * walkCadenceScale / walkSpeedScale - 1",
+                        "(1.4 with both at 1; 0 when the speed scale is 2.4 times the cadence scale).",
+                        "A first pair to try: walkSpeedScale 1.4 with walkCadenceScale 0.75 (about 0.3 left).")
+                .defineInRange("walkSpeedScale", 1.0D, 0.25D, 4.0D);
+        EVA_WALK_CADENCE_SCALE = common
+                .comment("Steps a second at a walk, times the built-in cadence (Unit-01: 1.9 steps a second).")
+                .defineInRange("walkCadenceScale", 1.0D, 0.2D, 2.0D);
+        EVA_RUN_SPEED_SCALE = common
+                .comment("Running speed, times the built-in one (Unit-00 34.6, Unit-01 41.9, Unit-02 47.8 blocks a second). The fast run is a multiple of it.",
+                        "What is left of the slide: about 2.7 * runCadenceScale / runSpeedScale - 1 (1.7 with both at 1).",
+                        "A first pair to try: runSpeedScale 1.4 with runCadenceScale 0.75 (about 0.45 left).")
+                .defineInRange("runSpeedScale", 1.0D, 0.25D, 4.0D);
+        EVA_RUN_CADENCE_SCALE = common
+                .comment("Steps a second at a run, times the built-in cadence (Unit-01: 2.8 steps a second).")
+                .defineInRange("runCadenceScale", 1.0D, 0.2D, 2.0D);
+        EVA_SPRINT_CADENCE_SCALE = common
+                .comment("Steps a second at the fast run (dash held), times the cadence it had through R63 (Unit-01: 5.6 steps a second at full speed).",
+                        "Its speed does not change with this. 0.7 since R64, where a foot on the ground stands about still; 1 is the old cadence.")
+                .defineInRange("sprintCadenceScale", 0.7D, 0.2D, 1.5D);
+        common.pop();
+
+        common.push("eva_motion");
+        EVA_MOTION_MODEL = common
+                .comment("How a piloted EVA moves. legacy: as up to R63. planted: a foot on the ground stays where it was set down,",
+                        "the body is carried by its feet, and it gathers way, brakes and turns with weight (Unit-01 only for now;",
+                        "the other Units keep the old model). The server's value goes for everyone on it. In game: /seele motion.")
+                .defineInList("model", "legacy", java.util.List.of("legacy", "planted"));
+        EVA_GAIT_TIER = common
+                .comment("The planted model's gait, Unit-01's speed in blocks a second and its steps a second:",
+                        "A: walk 32 at 1.35, run 66 at 2.0 (steps of 0.8 leg).",
+                        "B: walk 43 at 1.78, run 88 at 2.68 (the cadence up to R63, so nearly twice its speed).",
+                        "C: walk 22.6 at 1.25, run 41.9 at 1.75 (the speeds up to R63, in small steps).",
+                        "The fast run is 189 at 3.8 in all three. Up to R63: walk 22.6 at 1.78, run 41.9 at 2.68, the feet sliding.")
+                .defineInList("gaitTier", "A", java.util.List.of("A", "B", "C"));
+        EVA_JUMP_HEIGHT = common
+                .comment("How high a Unit of the planted model jumps: blocks from the ground to the top of its jump (a Unit stands 60",
+                        "tall). 90 since R64, one and a half times its height. 0 keeps the jump as up to R63 (26 blocks). The",
+                        "server's value goes for everyone on it. In game: /seele motion jump <blocks>.")
+                .defineInRange("jumpHeight", 90D, 0D, 120D);
+        common.pop();
+
+        common.push("eva_combat");
+        EVA_COMBAT_MODEL = common
+                .comment("How a piloted EVA fights. legacy: as up to R63. frames: every blow is a row of frame data (start-up,",
+                        "active, recovery, what it cancels into) read by one machine, with the pilot's presses buffered (Unit-01",
+                        "with bare hands or the knife for now; the rest keeps the old core). The server's value goes for",
+                        "everyone on it. In game: /seele combat. The Angels follow it: under frames Sachiel walks at the Unit, stands",
+                        "and regards it, then strikes with the lance and the palm and seizes a blow that misses; Ramiel gathers",
+                        "light where it faces its target before it fires; a body driven into a wall or the ground raises dust.")
+                .defineInList("model", "legacy", java.util.List.of("legacy", "frames"));
+        EVA_HIT_STOP = common
+                .comment("Under the frames core, the pause at a hit. tiered: by how hard the blow is (light 2 to 3 ticks, heavy 4",
+                        "to 6, a finisher 8), both bodies held. flat: as up to R63. In game: /seele combat hitstop.")
+                .defineInList("hitStop", "tiered", java.util.List.of("tiered", "flat"));
+        EVA_COMBAT_FLOW = common
+                .comment("Under the frames core, how a blow is timed and drawn. off: as first built (the server sends the clip's",
+                        "place every tick and a client chases it; a hit freezes the pose). on: the four parts below. Or any of",
+                        "them by name, with commas: clock (a client plays the blow by its own frame time: no late start, an even",
+                        "pace at any frame rate), stop (a hit slows the blow for a moment and drops none of it; both bodies are",
+                        "held 1 tick for a light blow, 2 medium, 3 heavy, 4 a finisher, where tiered holds 2 to 8), curve (the",
+                        "pace does not break between wind-up, blow and recovery; no recovery faster than 1.15 times as captured),",
+                        "fade (a blow begun out of another takes its place over a few ticks). In game: /seele combat flow.")
+                .define("flow", "off", value -> value instanceof String);
+        common.pop();
+
         common.push("eva_pallet_smg");
         EVA_RIFLE_DAMAGE = common
                 .comment("Damage per EVA pallet-SMG pulse. Angel A.T. Fields still block it completely.")
@@ -255,6 +347,19 @@ public final class SeeleConfig
         CANNON_CRATER_DEPTH = common
                 .comment("Depth of the staged cannon crater. N2 uses exactly three times this depth.")
                 .defineInRange("craterDepth", 32, 4, 128);
+        common.pop();
+
+        common.push("armament_tower");
+        ARMAMENT_TOWER_LOCK_TICKS = common
+                .comment("Spare-weapon towers of Tokyo-3, city raised: ticks the roof locks take to lift, and to drop again.")
+                .defineInRange("raisedLockTicks", 24, 1, 400);
+        ARMAMENT_TOWER_DOOR_TICKS = common
+                .comment("Spare-weapon towers, city raised: ticks the door takes to go up, and to come down.")
+                .defineInRange("raisedDoorTicks", 30, 1, 400);
+        ARMAMENT_TOWER_IDLE_RECALL_SECONDS = common
+                .comment("Seconds a tower stands ready with nobody taking the weapon before it comes in by itself.",
+                        "The count does not run during combat and starts again when combat ends. 0: never.")
+                .defineInRange("idleRecallSeconds", 180, 0, 3600);
         common.pop();
 
         common.push("strategic_explosions");
@@ -380,6 +485,15 @@ public final class SeeleConfig
                 .comment("Global brightness/opacity multiplier for beam and explosion effects (0 disables cross explosions).")
                 .defineInRange("fxIntensity", 1.0D, 0.0D, 1.0D);
         client.pop();
+        client.push("shadows");
+        SMALL_ENTITY_SHADOW_DISTANCE = client
+                .comment("With a shader pack: entities under 4 blocks across cast no shadow beyond this many blocks from the camera.",
+                        "Evangelions, Angels and this mod's own entities always cast one. 0 keeps every shadow.")
+                .defineInRange("smallEntityShadowDistance", 64, 0, 512);
+        MEDIUM_ENTITY_SHADOW_DISTANCE = client
+                .comment("The same for entities from 4 to under 12 blocks across, such as vehicles. 0 keeps every shadow.")
+                .defineInRange("mediumEntityShadowDistance", 128, 0, 512);
+        client.pop();
         client.push("cockpit_video");
         VIDEO_TARGET_FPS=client.comment("Target optical-feed frame rate; stale work is dropped instead of queued.")
                 .defineInRange("targetFps",15,5,20);
@@ -389,6 +503,23 @@ public final class SeeleConfig
                 .defineInRange("quality",.86D,.35D,.94D);
         VIDEO_FRAME_BUDGET_KIB=client.comment("Per-frame budget below the transport ceiling. High-detail frames reduce quality or resolution to fit.")
                 .defineInRange("frameBudgetKiB",384,64,768);
+        client.pop();
+        client.push("cockpit");
+        COCKPIT_INTERIOR = client
+                .comment("First person while piloting: draw the plug's inside (the seat's front, the two control yokes and the pilot's hands).")
+                .define("interior", true);
+        COCKPIT_STEADY_VIEW = client
+                .comment("First person while piloting: how much steadier the view is than the Unit's head (0 rides the head as before, 1 as designed).")
+                .defineInRange("steadyView", 1.0D, 0.0D, 1.0D);
+        COCKPIT_LCL = client
+                .comment("Show the LCL filling the plug on boarding, its trace while piloting, and its running out on leaving.")
+                .define("lcl", true);
+        COCKPIT_LCL_TINT = client
+                .comment("How strongly the settled LCL colours the view while piloting (1 as designed, 0 none).")
+                .defineInRange("lclTint", 1.0D, 0.0D, 2.0D);
+        COCKPIT_CHAT_PANEL = client
+                .comment("First person in the plug: show the chat as a small window in the upper right corner, each line tagged with its source, instead of the game's chat (which stays as it is with the chat opened, outside the plug and in third person).")
+                .define("chatPanel", true);
         client.pop();
         CLIENT_SPEC = client.build();
     }

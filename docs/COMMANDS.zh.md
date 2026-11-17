@@ -54,11 +54,21 @@
 | `/seele eva prepare <机体> [geofront\|surface\|hakone]` | 整备，可指定出口 |
 | `/seele eva cancel\|launch\|recover <机体>` | 取消后续操作、发射、回收 |
 | `/seele eva reset <机体>` | 抢救用：把机体、插入栓、驾驶员复位到机库 |
-| `/seele armament deploy\|recall [rifle\|sword\|shield]` | 升起或收回武器井；不写类型时操作 128 格内最近的一座 |
-| `/seele armament status` | 最近兵装升降站的状态 |
+| `/seele motion` | 查看 EVA 的移动模型和步态档 |
+| `/seele motion legacy\|planted` | 切换移动模型：`legacy` 是 R63 及以前的，`planted` 是 R64 的落脚模型（脚落地不滑，暂时只有初号机）。写进服务器的 `[eva_motion]` 配置，全服生效 |
+| `/seele motion jump <0-120>` | 落脚模型的跳跃高度（格，从地面到最高点；机体高 60 格）。默认 90；`0` 用回 R63 的跳（26 格）。写进服务器的 `[eva_motion] jumpHeight` |
+| `/seele motion tier A\|B\|C` | 落脚模型的步态档（初号机速度 / 步频）：A 走 32 / 1.35、跑 66 / 2.0；B 走 43 / 1.78、跑 88 / 2.68；C 走 22.6 / 1.25、跑 41.9 / 1.75 |
+| `/seele combat` | 查看 EVA 的战斗核心和顿帧方式 |
+| `/seele combat legacy\|frames` | 切换战斗核心：`legacy` 是 R63 及以前的，`frames` 是 R64 的帧表核心（每一招一条帧数据，输入有缓冲；暂时只有初号机徒手和持刀）。写进服务器的 `[eva_combat] model`，对全服生效。使徒跟着这个开关：`frames` 下萨基尔缓步走向机体、站定凝视、然后突然出光枪和掌击，会抓住打空的招；拉米尔开火前光聚在朝向目标的一面；身体撞墙砸地有烟尘和声音（不改方块） |
+| `/seele combat hitstop tiered\|flat` | 帧表核心下命中时的停顿：`tiered` 按招的轻重分档，`flat` 同 R63 |
+| `/seele combat flow on\|off` | 帧表核心下出招的时序和画法：`off` 同原来（客户端追服务器每刻发来的进度，命中时姿态整体定住）；`on` 打开下面四项。写进服务器的 `[eva_combat] flow` |
+| `/seele combat flow clock\|stop\|curve\|fade` | 单独开关其中一项：`clock` 客户端按自己的帧时间播招（起手不晚、任何帧率都匀）；`stop` 命中时改成短暂慢放、不丢动作，定格缩短为轻 1、中 2、重 3、终结 4 刻；`curve` 起手、判定、收招之间速度连续，收招不快过采集速度的 1.15 倍；`fade` 招接招时上一招继续走、几刻内淡入下一招（要先开 `clock`） |
+| `/seele armament deploy\|recall [rifle\|sword\|shield]` | 升起或收回武器井；不写类型时操作 128 格内最近的一座。有备用武器楼的世界里，`rifle` 是离下令的人最近的一栋楼；城市正在升降时请求会记下，停稳后展开（见 `docs/ARMAMENT_TOWERS_R64.zh.md`） |
+| `/seele armament status` | 最近兵装升降站或备用武器楼的状态 |
 | `/seele city status` | 第三新东京市升降状态 |
 | `/seele city raise` | 楼群升回地表（原 `tokyo3 restore`） |
 | `/seele city lower` | 楼群降入地下（原 `tokyo3 retract`） |
+| `/seele city recover` | 升降被中断（崩溃、断电）后停在故障状态时，从中断的那一步重做 |
 | `/seele un reset <un0\|un1>` | UN 机体维护复位：回到库位，机体和插入栓复位；驾驶员在舱内时拒绝 |
 | `/seele un defense\|power` | 切换 UN 基地防御系统、防御能源网 |
 | `/seele admin server [status]` | 服务器、地图接入、驾驶舱画面和岗位概况 |
@@ -88,7 +98,7 @@
 | `/seele dev silo setup\|board\|status\|audit` | 发射井测试场 |
 | `/seele dev motionlab setup\|reset\|enter\|weapon\|demo\|camera` | 动作实验室 |
 | `/seele dev firstbattle begin\|cancel\|status` | 初战的独立回放（正式流程已由作战系统接管） |
-| `/seele dev armament spawn_here\|remove` | 放置或删除兵装升降站 |
+| `/seele dev armament spawn_here\|remove` | 放置或删除兵装升降站；备用武器楼的站由世界记录，不能用它删 |
 | `/seele dev visit <地点>` | port、un_base、un0_hangar、un0_gantry、un1_control、un1_gantry；随 UN 基地和港口的存档偏移移动 |
 | `/seele dev seedscout <数量>\|seed <种子>\|fine <种子>\|anchor <种子>` | 海岸种子扫描（原 `/seele_coastal_seed_scout`） |
 

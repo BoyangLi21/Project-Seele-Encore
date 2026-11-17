@@ -1,6 +1,5 @@
 package com.projectseele.client.render;
 
-import com.google.gson.JsonParser;
 import com.projectseele.entity.EvaAirTransportR31;
 import com.projectseele.entity.EvaBodyPose;
 import com.projectseele.entity.EvaScale;
@@ -28,10 +27,8 @@ import java.util.Map;
  */
 final class EvaGroundContactR56
 {
-    private static final String[] PARTS={"foot_l","foot_r","shin_l","shin_r","leg_l","leg_r","torso_lower","torso_upper",
-            "arm_l","arm_r","forearm_l","forearm_r","hand_l","hand_r","head"};
+    static final String[] PARTS=EvaMeshPointsR63.PARTS;
     /** Rest-pose hull samples per part (model units): the extremes along 26 directions. */
-    private static final Map<Integer,Map<String,Vector3f[]>> HULLS=new HashMap<>();
     private record Ankle(float x,float z,long time,float planted,float rate) {}
     /** Last ankle position per EVA and side (world), its frame time and planted weight. */
     private static final Map<String,Ankle> ANKLES=new HashMap<>();
@@ -70,15 +67,15 @@ final class EvaGroundContactR56
         float floor=lowest(model,root,hulls);
         if(!Float.isFinite(floor))return;
         float floorL=footFloor(eva,"l",ground,floor),floorR=footFloor(eva,"r",ground,floor);
-        float left=soleHeight(model,root,hulls,"l")-floorL,right=soleHeight(model,root,hulls,"r")-floorR;
+        float left=soleHeight(eva,model,root,hulls,"l")-floorL,right=soleHeight(eva,model,root,hulls,"r")-floorR;
         float walking=eva.isPilotProne()?0:Mth.clamp(eva.rifleMoveBlend(partial),0,1);
         settleFoot(eva,model,root,hulls,"l",floorL,right,now,walking);
         settleFoot(eva,model,root,hulls,"r",floorR,left,now,walking);
-        float support=lowestAboveFeet(model,root,hulls)-ground,sinkWanted=0;
+        float support=clearanceAboveFeet(eva,model,root,hulls,ground),sinkWanted=0;
         for(String side:new String[]{"l","r"})
         {
             double under=EvaFootPlacement.groundUnder(eva,side);
-            float sole=soleHeight(model,root,hulls,side);
+            float sole=soleHeight(eva,model,root,hulls,side);
             if(!Double.isFinite(under)||Math.abs(under-ground)<=.5){support=Math.min(support,sole-ground);continue;}
             // A sole on ground of its own only holds the body up. Measured against the drawn ground,
             // one on a ledge pulled the body down onto it, and one on lower ground lifted the whole
@@ -123,7 +120,7 @@ final class EvaGroundContactR56
             if(last==null||last.planted()<=.1F)continue;
             // On ground of its own a planted sole is set on that ground wherever the pelvis went.
             double under=EvaFootPlacement.groundUnder(eva,side);
-            float drop=Double.isFinite(under)&&Math.abs(under-ground)>.5?soleHeight(model,root,hulls,side)-(float)under:lift;
+            float drop=Double.isFinite(under)&&Math.abs(under-ground)>.5?soleHeight(eva,model,root,hulls,side)-(float)under:lift;
             // A stance foot takes the whole difference; a partial share
             // left the sole floating while the foot eased onto the ground.
             if(Math.abs(drop)>.01F)reachGround(model,root,side,drop*step((last.planted()-.1F)/.3F));
@@ -134,7 +131,7 @@ final class EvaGroundContactR56
             if(contact<=.01F)continue;
             double under=EvaFootPlacement.groundUnder(eva,side);
             float floorHere=Double.isFinite(under)&&under>ground+.5?(float)under:ground;
-            float gapHere=soleHeight(model,root,hulls,side)-floorHere;
+            float gapHere=soleHeight(eva,model,root,hulls,side)-floorHere;
             // It lets go as the clip lifts the foot: held down to the end of the window,
             // the leg straightened and the knee snapped back in the frame it was released.
             reachGround(model,root,side,gapHere*contact*(1-step((Math.abs(gapHere)-PIN_NEAR)/(PIN_FAR-PIN_NEAR))));
@@ -157,7 +154,7 @@ final class EvaGroundContactR56
         {
             double under=EvaFootPlacement.groundUnder(eva,side);
             float floor=Double.isFinite(under)?(float)under:ground;
-            float depth=soleHeight(model,root,hulls,side)-floor;
+            float depth=soleHeight(eva,model,root,hulls,side)-floor;
             if(depth<0)reachGround(model,root,side,depth);
         }
     }
@@ -238,7 +235,7 @@ final class EvaGroundContactR56
     }
 
     /** Bend or reach a planted leg so its sole moves down by {@code drop} blocks (up when negative). */
-    private static void reachGround(BakedGeoModel model,Matrix4f root,String side,float drop)
+    static void reachGround(BakedGeoModel model,Matrix4f root,String side,float drop)
     {
         var leg=model.getBone("leg_"+side).orElse(null);var shin=model.getBone("shin_"+side).orElse(null);
         var ankle=model.getBone("ankle_"+side).orElse(null);var foot=model.getBone("foot_"+side).orElse(null);
@@ -276,6 +273,27 @@ final class EvaGroundContactR56
     {
         var foot=model.getBone("foot_"+side).orElse(null);var points=hulls.get("foot_"+side);
         return foot==null||points==null?Float.POSITIVE_INFINITY:lowest(new Matrix4f(root).mul(EvaRigTransforms.model(foot)),points);
+    }
+
+    /**
+     * The height of a sole for comparing with the ground under it. On a slope that ground is a
+     * line: each point of the sole is read against the line's height under it, so a sole lying
+     * along the slope is on the ground and not a block and a half into it at its low end.
+     */
+    private static float soleHeight(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls,String side)
+    {
+        double[] line=EvaFootPlacement.slopeUnder(eva,side);
+        if(line==null)return soleHeight(model,root,hulls,side);
+        var foot=model.getBone("foot_"+side).orElse(null);var points=hulls.get("foot_"+side);
+        if(foot==null||points==null)return Float.POSITIVE_INFINITY;
+        var matrix=new Matrix4f(root).mul(EvaRigTransforms.model(foot));var at=new Vector3f();
+        float minimum=Float.POSITIVE_INFINITY;
+        for(var p:points)
+        {
+            matrix.transformPosition(p,at);
+            minimum=Math.min(minimum,at.y-(float)(line[2]*((at.x-line[3])*line[5]+(at.z-line[4])*line[6])));
+        }
+        return minimum;
     }
 
     private static void settleFoot(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls,
@@ -324,7 +342,16 @@ final class EvaGroundContactR56
         var modelRotation=EvaRigTransforms.rotation(EvaRigTransforms.model(foot));
         var parent=EvaRigTransforms.rotation(EvaRigTransforms.model(foot.getParent()));
         var up=modelRotation.transform(new Vector3f(0,1,0));
-        var flat=new Quaternionf().rotationTo(up,new Vector3f(0,1,0)).mul(modelRotation);
+        // Flat on the ground it stands on: on a slope that is the slope's own plane, as far as the sole follows it.
+        var normal=new Vector3f(0,1,0);
+        double[] line=EvaFootPlacement.slopeUnder(eva,side);
+        if(line!=null)
+        {
+            float rise=(float)Math.atan(line[2]);
+            normal.set(-(float)line[5]*Mth.sin(rise),Mth.cos(rise),-(float)line[6]*Mth.sin(rise));
+            root.invert(new Matrix4f()).transformDirection(normal).normalize();
+        }
+        var flat=new Quaternionf().rotationTo(up,normal).mul(modelRotation);
         float lying=lying(model,side);
         var instep=new Quaternionf(parent).mul(new Quaternionf().rotationX(INSTEP_POINT*Mth.DEG_TO_RAD));
         var wanted=new Quaternionf(modelRotation).slerp(new Quaternionf(flat).slerp(instep,lying),level);
@@ -342,6 +369,29 @@ final class EvaGroundContactR56
         return step((tilt-LEVEL_SHIN)/(INSTEP_SHIN-LEVEL_SHIN));
     }
 
+    /**
+     * Review witness: the world height of the lowest point of the body as this frame draws it, and the index in
+     * PARTS of the part it belongs to. On the unit's own hull points, whatever owns the pose: the offline scan has
+     * no mesh for UN-00 and put a UN unit's bones on Unit-01's.
+     */
+    static void witnessLowestR63(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root)
+    {
+        if(root==null||!com.projectseele.client.visual.EvaConnectedActionReview.ENABLED)return;
+        var hulls=hulls(eva);
+        if(hulls.isEmpty())return;
+        float lowest=Float.POSITIVE_INFINITY;int part=-1;
+        for(int i=0;i<PARTS.length;i++)
+        {
+            var bone=model.getBone(PARTS[i]).orElse(null);var points=hulls.get(PARTS[i]);
+            if(bone==null||points==null||bone.isHidden())continue;
+            float y=lowest(new Matrix4f(root).mul(EvaRigTransforms.model(bone)),points);
+            if(y<lowest){lowest=y;part=i;}
+        }
+        if(part<0)return;
+        if(EvaFootPlacement.LOWEST_R63.size()>32)EvaFootPlacement.LOWEST_R63.clear();
+        EvaFootPlacement.LOWEST_R63.put(eva.getId(),new double[]{lowest,part});
+    }
+
     private static float lowest(BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls)
     {
         float lowest=Float.POSITIVE_INFINITY;
@@ -354,18 +404,30 @@ final class EvaGroundContactR56
         return lowest;
     }
 
-    /** The lowest part of the body other than its soles (+infinity if none is known). */
-    private static float lowestAboveFeet(BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls)
+    /**
+     * How far the lowest part of the body other than its soles is over the ground (+infinity if none
+     * is known). A leg whose foot stands on lower ground of its own is over that ground, not the
+     * drawn plane. Read against the plane, the shins of a unit standing on a hillside with both
+     * feet below it counted as underground, and the whole body was raised off its feet: 1.2 blocks
+     * on the review hill, the soles left that far over the ground they had just been set on.
+     */
+    private static float clearanceAboveFeet(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls,float ground)
     {
-        float lowest=Float.POSITIVE_INFINITY;
+        float least=Float.POSITIVE_INFINITY;
         for(String name:PARTS)
         {
             if(name.startsWith("foot_"))continue;
             var bone=model.getBone(name).orElse(null);var points=hulls.get(name);
             if(bone==null||points==null||bone.isHidden())continue;
-            lowest=Math.min(lowest,lowest(new Matrix4f(root).mul(EvaRigTransforms.model(bone)),points));
+            float floor=ground;
+            if(name.startsWith("shin_")||name.startsWith("leg_"))
+            {
+                double under=EvaFootPlacement.groundUnder(eva,name.endsWith("_l")?"l":"r");
+                if(Double.isFinite(under)&&under<ground-.5)floor=(float)under;
+            }
+            least=Math.min(least,lowest(new Matrix4f(root).mul(EvaRigTransforms.model(bone)),points)-floor);
         }
-        return lowest;
+        return least;
     }
 
     private static float lowest(Matrix4f matrix,Vector3f[] points)
@@ -381,38 +443,12 @@ final class EvaGroundContactR56
         return t*t*(3-2*t);
     }
 
+    /** Reads the unit's hull samples now if no frame has needed them yet (taken from the mesh held for drawing). */
+    static void warm(EvaUnit01Entity eva){hulls(eva);}
     private static Map<String,Vector3f[]> hulls(EvaUnit01Entity eva)
     {
-        return HULLS.computeIfAbsent(EvaBodyPose.rigKey(eva),v->
-        {
-            Map<String,Vector3f[]> result=new HashMap<>();
-            String asset=eva.isExperimentalUnit()?eva.experimentalAssetName():"eva_unit0"+v;
-            try(var reader=Minecraft.getInstance().getResourceManager().getResource(new ResourceLocation("projectseele","mesh/"+asset+".mesh.json")).orElseThrow().openAsReader())
-            {
-                var document=JsonParser.parseReader(reader).getAsJsonObject();var parts=document.getAsJsonObject("parts");
-                int stride=document.has("stride")?document.get("stride").getAsInt():8;
-                List<Vector3f> directions=new ArrayList<>();
-                for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++)for(int z=-1;z<=1;z++)
-                    if(x!=0||y!=0||z!=0)directions.add(new Vector3f(x,y,z).normalize());
-                for(String name:PARTS)
-                {
-                    if(!parts.has(name))continue;
-                    var part=parts.getAsJsonObject(name);var pivot=part.getAsJsonArray("pivot");var a=part.getAsJsonArray("vertices");
-                    float px=pivot.get(0).getAsFloat(),py=pivot.get(1).getAsFloat(),pz=pivot.get(2).getAsFloat();
-                    Vector3f[] best=new Vector3f[directions.size()];float[] score=new float[directions.size()];
-                    java.util.Arrays.fill(score,Float.NEGATIVE_INFINITY);
-                    for(int i=0;i+2<a.size();i+=stride)
-                    {
-                        var p=new Vector3f(-(a.get(i).getAsFloat()+px)/16,(a.get(i+1).getAsFloat()+py)/16,(a.get(i+2).getAsFloat()+pz)/16);
-                        for(int d=0;d<best.length;d++){float s=p.dot(directions.get(d));if(s>score[d]){score[d]=s;best[d]=p;}}
-                    }
-                    var kept=java.util.Arrays.stream(best).filter(java.util.Objects::nonNull).distinct().toArray(Vector3f[]::new);
-                    if(kept.length>0)result.put(name,kept);
-                }
-            }
-            catch(Exception failure){com.projectseele.ProjectSeele.LOGGER.warn("R56 ground contact hull unavailable for variant {}",v,failure);}
-            return result;
-        });
+        // Empty when the unit has no mesh to draw: it then stands as posed.
+        return EvaMeshPointsR63.of(eva,PARTS).hulls();
     }
 
     private EvaGroundContactR56() {}

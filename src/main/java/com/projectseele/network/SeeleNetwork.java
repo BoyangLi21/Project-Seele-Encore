@@ -14,7 +14,9 @@ public final class SeeleNetwork
 {
     // R52 includes the independent original carrier, cannon cradle and armor-beam
     // state. Older clients must reject the changed synchronized accessor layout.
-    private static final String PROTOCOL_VERSION = "77";
+    // 78 is the R63r release (R63 plus the R64 audio); main adds synchronized entity
+    // data beyond it (planted model, gait keys), so it must not accept an R63r peer.
+    private static final String PROTOCOL_VERSION = "80";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),
@@ -52,6 +54,11 @@ public final class SeeleNetwork
                 .encoder(ClientboundAlarmPacket::encode)
                 .decoder(ClientboundAlarmPacket::new)
                 .consumerMainThread(ClientboundAlarmPacket::handle)
+                .add();
+        CHANNEL.messageBuilder(ClientboundHeadsetSoundPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundHeadsetSoundPacket::encode)
+                .decoder(ClientboundHeadsetSoundPacket::new)
+                .consumerMainThread(ClientboundHeadsetSoundPacket::handle)
                 .add();
         CHANNEL.messageBuilder(ClientboundAtFieldRipplePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(ClientboundAtFieldRipplePacket::encode)

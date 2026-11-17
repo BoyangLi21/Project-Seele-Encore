@@ -21,6 +21,8 @@ public final class TrainingPilotRenderer
     {
         super(context, new PlayerModel<>(
                 context.bakeLayer(ModelLayers.PLAYER_SLIM), true), 0.5F);
+        // R64: seated in the capsule the pilot's limbs are bent, as a player's are.
+        this.addLayer(new PlugPilotLimbLayerR64<>(this, true));
     }
 
     @Override
@@ -40,6 +42,8 @@ public final class TrainingPilotRenderer
                        net.minecraft.client.renderer.MultiBufferSource buffers,int light)
     {
         boolean reclined=com.projectseele.client.EntryPlugPilotPoseR47.push(pose,entity,partial);
+        // The seated pose hides the straight limbs; unlike the player's renderer this one does not show them again by itself.
+        this.getModel().setAllVisible(true);
         try { super.render(entity,yaw,partial,pose,buffers,light); }
         finally { if(reclined)pose.popPose(); }
     }

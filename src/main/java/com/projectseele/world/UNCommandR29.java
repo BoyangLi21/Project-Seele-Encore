@@ -60,7 +60,7 @@ public final class UNCommandR29
         if(plug.isVehicle()||eva.getPilotEntity()!=null)return "驾驶舱已有乘员。";
         if(plug.isLockedToEva())
         {
-            if(!p.startRiding(plug,true)||!eva.bindEntryPlug(plug,70)){p.stopRiding();return "驾驶连接未被接受。";}
+            if(!p.startRiding(plug,true)||!eva.bindEntryPlug(plug,EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT)){p.stopRiding();return "驾驶连接未被接受。";}
             plug.syncPilotPositionNow();l.getChunkSource().move(p);return "已接入插入栓，正在完成同步。";
         }
         return plug.boardPassenger(p)?"已进入插入栓，等待吊机把插入栓接入机体。":"插入栓当前不可登机。";

@@ -44,7 +44,13 @@ public final class AngelCombatPoseR31
         if(beat!=null&&CombatFeelR31.hitPaused(actor))
         {
             if(frame.beat!=beat.start()){frame.beat=beat.start();frame.held=frame.last;}
-            if(!frame.held.isEmpty()){write(model,frame.held);return;}
+            if(!frame.held.isEmpty())
+            {
+                write(model,frame.held);
+                var shake=CombatFeelR31.tremble(actor,partial);
+                if(shake!=null)model.topLevelBones().forEach(b->{b.setPosX(b.getPosX()+shake[0]);b.setPosZ(b.getPosZ()+shake[1]);});
+                return;
+            }
         }
         if(actor instanceof ShamshelEntity shamshel)
         {

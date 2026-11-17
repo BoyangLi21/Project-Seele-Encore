@@ -9,6 +9,7 @@ import com.projectseele.world.EvaPilotResolver;
 import net.minecraft.client.Camera;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -33,6 +34,16 @@ public final class FirstBattleClient
     private static UUID savedActor;
     private static Vec3 entryPosition,entryTarget,lastPosition,lastTarget,returnPosition,returnTarget;
     private static boolean returning;
+    /**
+     * How far the blends at both ends keep from a body's upright axis. Sachiel's shoulders reach 22 blocks from its
+     * axis and Unit-01's spread arms 20; the authored shots never come nearer than this.
+     */
+    private static final double ANGEL_CLEAR=24,EVA_CLEAR=20;
+    /** A camera that starts this near Sachiel's axis starts inside its body. No path out of a body is clean: the first shot is cut to. */
+    private static final double ANGEL_CORE=12;
+    /** How far the pilot's own camera stood from each axis when the battle began, no more than the clearance. */
+    private static double entryAngel=Double.NaN,entryEva=Double.NaN;
+    private static boolean cutIn;
     private static EvaUnit01Entity actor()
     {
         var mc=Minecraft.getInstance();if(mc.player==null||mc.level==null)return null;
@@ -56,6 +67,24 @@ public final class FirstBattleClient
     {
         if(savedCamera!=null)Minecraft.getInstance().options.setCameraType(savedCamera);
         savedCamera=null;savedActor=null;entryPosition=entryTarget=lastPosition=lastTarget=returnPosition=returnTarget=null;returning=false;
+        entryAngel=entryEva=Double.NaN;cutIn=false;
+    }
+    /**
+     * How far the camera has gone back to the pilot's own view, 0 to 1, from 21.6 s. A first-person view is cut to:
+     * the way into it runs through Unit-01's head, which is only hidden from within three blocks of the eye.
+     */
+    private static double returned(float time)
+    {
+        return time<FirstBattleClip.RETURN_TICK/20F?0:savedCamera!=null&&savedCamera.isFirstPerson()?1:FirstBattleClip.smooth((time-21.6F)/1.4F);
+    }
+    /** The point of a body's axis nearest to a camera: the upright line from 10 to 50 blocks above its root (both bodies stand about 60 tall). */
+    private static Vec3 onAxis(Vec3 root,Vec3 camera){return new Vec3(root.x,Mth.clamp(camera.y,root.y+10,root.y+50),root.z);}
+    /** The camera moved straight away from a body's axis until it is the given distance from it; unchanged when it already is. */
+    private static Vec3 clearOf(Vec3 root,Vec3 camera,double radius,Vec3 toward)
+    {
+        Vec3 axis=onAxis(root,camera),out=camera.subtract(axis);double distance=out.length();if(distance>=radius)return camera;
+        if(distance<1e-3){out=toward.subtract(axis).multiply(1,0,1);distance=out.length();if(distance<1e-3){out=new Vec3(1,0,0);distance=1;}}
+        return axis.add(out.scale(radius/distance));
     }
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent event)
     {
@@ -76,17 +105,44 @@ public final class FirstBattleClient
         capture(eva,camera);var shot=FirstBattleClip.camera(spec,time);Vec3 p=shot.position(),target=shot.target();
         // The authored shot covers the actors and the single blast. Replacing
         // it with a fixed skyline hid the actual recovery and return pose.
+        Vec3 body=FirstBattleClip.point(spec,true,"root_blocks",time);
         if(time<1.2F)
         {
-            float mix=FirstBattleClip.smooth(time/1.2F);p=entryPosition.lerp(p,mix);target=entryTarget.lerp(target,mix);
+            // Sachiel is carried from where it really stood to where the clip has it over this same time.
+            Vec3 angel=FirstBattleClip.point(spec,false,"root_blocks",time);
+            if(Double.isNaN(entryAngel))
+            {
+                entryAngel=Math.min(ANGEL_CLEAR,entryPosition.distanceTo(onAxis(angel,entryPosition)));
+                entryEva=Math.min(EVA_CLEAR,entryPosition.distanceTo(onAxis(body,entryPosition)));
+                // Out of a first-person view the camera would also leave through Unit-01's own head and shoulders.
+                cutIn=savedCamera.isFirstPerson()||entryAngel<ANGEL_CORE;
+            }
+            if(!cutIn)
+            {
+                float mix=FirstBattleClip.smooth(time/1.2F);p=entryPosition.lerp(p,mix);target=entryTarget.lerp(target,mix);
+                // The straight line from the pilot's camera to the first shot can run through either body. Each
+                // body's clearance opens from what the camera started with (a first-person camera starts inside
+                // Unit-01's head) to its full size over the first half, so the camera leaves a body outward and
+                // goes round the other one. A line that touches neither stays as it is.
+                double open=FirstBattleClip.smooth(mix/.5F);
+                for(int pass=0;pass<3;pass++)
+                {
+                    p=clearOf(angel,p,Mth.lerp(open,entryAngel,ANGEL_CLEAR),entryPosition);
+                    p=clearOf(body,p,Mth.lerp(open,entryEva,EVA_CLEAR),entryPosition);
+                }
+            }
             mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
         }
         if(time>=FirstBattleClip.RETURN_TICK/20F)
         {
             if(!returning){returnPosition=lastPosition==null?p:lastPosition;returnTarget=lastTarget==null?target:lastTarget;returning=true;}
             Vec3 normal=savedCamera.isFirstPerson()?FirstBattleClip.point(spec,true,"eye_blocks",time):camera.getPosition();
-            Vec3 look=normal.add(new Vec3(camera.getLookVector()).scale(40));float mix=FirstBattleClip.smooth((time-21.6F)/1.4F);
+            Vec3 look=normal.add(new Vec3(camera.getLookVector()).scale(40));float mix=(float)returned(time);
             p=returnPosition.lerp(normal,mix);target=returnTarget.lerp(look,mix);
+            // Back to the pilot's own view round Unit-01, not through it (Sachiel is no longer drawn). The clearance
+            // closes over the second half to what the pilot's camera itself keeps: a first-person eye is inside the head.
+            double end=Math.min(EVA_CLEAR,normal.distanceTo(onAxis(body,normal)));
+            p=clearOf(body,p,Mth.lerp(FirstBattleClip.smooth((mix-.5F)/.5F),EVA_CLEAR,end),returnPosition);
         }
         p=clearCamera(target,p);lastPosition=p;lastTarget=target;return new FirstBattleClip.CameraPose(p,target,shot.fov());
     }
@@ -113,7 +169,7 @@ public final class FirstBattleClient
     {
         var eva=actor();if(eva==null)return;float time=eva.firstBattleSignals().time(eva,1);
         if(EvaCommandFeedClient.isOpticalRenderPass()){event.setFOV(70);return;}
-        double mix=FirstBattleClip.smooth(time/1.2F)*(1-FirstBattleClip.smooth((time-21.6F)/1.4F));
+        double mix=(cutIn?1:FirstBattleClip.smooth(time/1.2F))*(1-returned(time));
         double directed=FirstBattleClip.camera(eva.firstBattleSignals().spec(eva),time).fov();event.setFOV(event.getFOV()*(1-mix)+directed*mix);
     }
     @SubscribeEvent public static void key(InputEvent.Key event)

@@ -128,11 +128,13 @@ public class ClientEvents
         if (standard != null)
         {
             standard.addLayer(new GendoPoseArmLayer(standard, false));
+            standard.addLayer(new com.projectseele.client.render.PlugPilotLimbLayerR64<>(standard, false));
         }
         PlayerRenderer slim = event.getSkin("slim");
         if (slim != null)
         {
             slim.addLayer(new GendoPoseArmLayer(slim, true));
+            slim.addLayer(new com.projectseele.client.render.PlugPilotLimbLayerR64<>(slim, true));
         }
     }
 
@@ -140,10 +142,14 @@ public class ClientEvents
     public static void onRegisterGuiOverlays(RegisterGuiOverlaysEvent event)
     {
         event.registerAboveAll("angel_alarm", AlarmOverlay.INSTANCE);
+        // The plug's inside and the LCL lie over the picture and under every readout.
+        event.registerAboveAll("eva_plug_interior_r64",com.projectseele.client.cockpit.PilotCockpitR64.OVERLAY);
         event.registerAboveAll("eva_cockpit",(gui,g,p,w,h)->{if(!FirstBattleClient.active())EvaHud.COCKPIT.render(gui,g,p,w,h);});
         event.registerAboveAll("eva_combat_r31",EvaCombatHudR31.OVERLAY);
         event.registerAboveAll("sniper_scope", EvaHud.SCOPE);
         event.registerAboveAll("plug_insertion", EvaHud.INSERTION);
+        // The pilot's chat: in the plug it is a window on the wall, not the game's chat.
+        event.registerAboveAll("eva_plug_chat_r64",com.projectseele.client.cockpit.PilotChatPanelR64.OVERLAY);
         event.registerAboveAll("nuclear_flash", EvaHud.NUCLEAR_FLASH);
         event.registerAboveAll("eva_command_feed_capture", EvaCommandFeedClient.CAPTURE_OVERLAY);
         event.registerAboveAll("first_battle",FirstBattleClient.OVERLAY);
@@ -170,6 +176,7 @@ public class ClientEvents
     @SubscribeEvent
     public static void onRegisterReloadListeners(RegisterClientReloadListenersEvent event)
     {
+        event.registerReloadListener(com.projectseele.client.render.HeavyTextureLoad.reloadListener());
         event.registerReloadListener((ResourceManagerReloadListener) resourceManager ->
         {
             LocalTriangleMeshLayer.clearCache();
@@ -177,6 +184,7 @@ public class ClientEvents
             RiggedAngelLayer.clearCache();
             com.projectseele.client.render.EvaFootPlacement.clear();
             LocalVisualAssetFingerprint.clearCache();
+            com.projectseele.client.render.GroundHatchTurfR64.forget();
             EvaPoseGraph.reload(resourceManager);
             EvaMotionEngineV2.reload(resourceManager);
             EvaUnit01Renderer.prewarmLocalBodyMeshes(resourceManager);

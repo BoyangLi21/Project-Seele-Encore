@@ -30,6 +30,10 @@ public final class EvaLogisticsCommands
             Component.literal("机体请用 unit00、unit01、unit02 或 all（也可写 0、1、2、rei、shinji、asuka）。"));
     private static final SimpleCommandExceptionType NO_GEOFRONT = new SimpleCommandExceptionType(
             Component.literal("GeoFront 维度未加载。"));
+    /** The status line's key. Its arguments: the Unit's label, its phase's name, loaded or not, then what a pilot need not see. */
+    public static final String STATUS_KEY = "message.projectseele.eva_status";
+    /** The third argument of a Unit that is not loaded. */
+    public static final String STATUS_UNLOADED = "未加载";
 
     private EvaLogisticsCommands() {}
 
@@ -104,12 +108,16 @@ public final class EvaLogisticsCommands
             {
                 loaded++;
             }
-            source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d：阶段 %s，%s，登记 %s，LCL %d/%d 层，计时 %d",
-                    status.variant(), status.phase(), status.loaded() ? "已加载" : "未加载",
-                    status.canonicalId() == null ? "无" : status.canonicalId(),
-                    status.lclLayers(), EvaHangarBuilder.LCL_SHOULDER_LAYERS,
-                    status.ticks())), false);
+            // The line reads as it always did, in the chat and on the console (no language file has the key, so
+            // its fallback is what is shown). The key lets the pilot's chat panel know this line from any other
+            // and say the phase in plain words, without the registry id.
+            source.sendSuccess(() -> Component.translatableWithFallback(STATUS_KEY,
+                    "%s：阶段 %s，%s，登记 %s，LCL %s/%s 层，计时 %s",
+                    String.format(Locale.ROOT, "EVA-%02d", status.variant()), status.phase(),
+                    status.loaded() ? "已加载" : STATUS_UNLOADED,
+                    status.canonicalId() == null ? "无" : status.canonicalId().toString(),
+                    String.valueOf(status.lclLayers()), String.valueOf(EvaHangarBuilder.LCL_SHOULDER_LAYERS),
+                    String.valueOf(status.ticks())), false);
         }
         return loaded;
     }

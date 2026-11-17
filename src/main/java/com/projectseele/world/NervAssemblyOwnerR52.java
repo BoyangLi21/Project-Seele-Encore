@@ -36,7 +36,12 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     public record Visual(UUID id,RigidTransform frame,List<FixedCell> supports){public Visual{supports=List.copyOf(supports);}}
     public record Crane(Visual visual,RigidTransform stow,double initialBottom,double stowBottom,Vec3 railAxis,double railMin,double railMax,double hoistStep,List<FixedCell> frameCells){public Crane{frameCells=List.copyOf(frameCells);}}
     public record Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports,SiloHatchMechanism.Spec siloHatch,NervHangarGateGeometryR52.Spec hangarStack)
-    {public Gate{collisionSteps=collisionSteps.stream().map(List::copyOf).toList();supports=List.copyOf(supports);}public Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports){this(resource,visual,kind,variant,stage,frame,width,height,collisionSteps,supports,null,null);}public Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports,SiloHatchMechanism.Spec siloHatch){this(resource,visual,kind,variant,stage,frame,width,height,collisionSteps,supports,siloHatch,null);}}
+    {public Gate{collisionSteps=collisionSteps.stream().map(List::copyOf).toList();supports=List.copyOf(supports);}
+        /** Whether the collision cells stand open at this door progress. A gate keeps its closed cells until it
+         * is fully open. A hatch level with open ground has a visible cover for its closed cells, which would hide
+         * the moving leaves: its cells are closed only while it is fully closed. */
+        public boolean cellsOpenAt(float progress){return siloHatch!=null&&siloHatch.groundFlush()?progress>0:progress==1;}
+        public Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports){this(resource,visual,kind,variant,stage,frame,width,height,collisionSteps,supports,null,null);}public Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports,SiloHatchMechanism.Spec siloHatch){this(resource,visual,kind,variant,stage,frame,width,height,collisionSteps,supports,siloHatch,null);}}
     public record HullHandoff(List<FixedCell> supports,int lowerTicks){public HullHandoff{supports=List.copyOf(supports);require(!supports.isEmpty()&&lowerTicks>0,"Actual fallen-hull receiver required");}}
     public record UnitPlant(int variant,UUID eva,UUID plug,UUID npc,UUID seat,RigidTransform bay,RigidTransform dock,Vec3 boarding,List<Vec3> dismount,List<List<FixedCell>> bridgeStates,List<List<Cell>> lcl,Visual gantry,Crane crane,List<FixedCell> carrierSupport,int raiseTicks,RigidTransform seatFrame,List<FixedCell> chair,Vec3 phone,Vec3 standby,List<Vec3> boardPath,List<Vec3> returnPath,double boardingRadius,HullHandoff hullHandoff,List<List<Cell>> personnelDoors)
     {public UnitPlant{dismount=List.copyOf(dismount);bridgeStates=bridgeStates.stream().map(List::copyOf).toList();lcl=lcl.stream().map(List::copyOf).toList();carrierSupport=List.copyOf(carrierSupport);boardPath=List.copyOf(boardPath);returnPath=List.copyOf(returnPath);chair=List.copyOf(chair);personnelDoors=personnelDoors.stream().map(List::copyOf).toList();}}
@@ -710,7 +715,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             case BRIDGE ->
             {
                 int wanted=NervAssemblyClocksR52.bridgeRemaining((ticks+1)*(quick?2:1));if((ticks+1)%(quick?2:5)==0||ticks>=bridgeTicks-1)if(!applyBridgeState(l,p,wanted,data,own)){hold(o,"complete_original_bridge_state_blocked_"+wanted);return Preparation.WAITING;}
-                capsule.setCabinSequenceProgress(Math.min(30,Math.max(1,(int)Math.round(30D*(ticks+1)/bridgeTicks))));
+                capsule.setCabinSequenceProgress(EntryPlugCarrierEntity.cabinPercentOnBridge((ticks+1)/(double)bridgeTicks));
                 if(ticks>=bridgeTicks-1){if(!bridgeMatches(l,p,0)||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_OCCUPIED||!capsule.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_OCCUPIED,EntryPlugCarrierEntity.STAGE_INSERTING)){hold(o,"original_insertion_epoch_or_bridge_changed");return Preparation.WAITING;}advance(data,Prepare.INSERT);}
             }
             case INSERT ->
@@ -724,7 +729,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                 // Mapped producer performs actual full geometry sweep; absent
                 // permission/geometry is a concrete HOLD, never a teleport.
                 if(!NervMappedPlugMechanicsR52.applyInsertion(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id())){hold(o,"actual_capsule_sweep_blocked");return Preparation.WAITING;}
-                if(!internalDrive&&l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&age>=36)hoist.linkCranePlug(capsule);capsule.setInsertionProgress((int)Math.round(progress*100));capsule.setCabinSequenceProgress(30+(int)Math.round(progress*40));
+                if(!internalDrive&&l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&age>=36)hoist.linkCranePlug(capsule);capsule.setInsertionProgress((int)Math.round(progress*100));capsule.setCabinSequenceProgress(EntryPlugCarrierEntity.cabinPercentInserting(progress));
                 if(age>=(quick?NervAssemblyClocksR52.QUICK_INSERTION_TICKS_R54:EntryPlugDirector.INSERTION_TICKS)){if(!capsule.lockToEva(e)||!e.bindEntryPlug(capsule,capsule.getCabinProgress())){hold(o,"original_lock_graph_rejected");return Preparation.WAITING;}advance(data,Prepare.SEAL);}
             }
             case SEAL -> {if(!originalLaunchLock(l,p.variant(),e,capsule)){hold(o,"real_launch_lock_changed");return Preparation.WAITING;}EvaDorsalMechanism.seal(e,(ticks+1)*(quick?2:1));if(!crane(l,p,capsule,p.dock(),true,quick?3:1))return Preparation.WAITING;if(ticks>=(quick?29:59))advance(data,Prepare.DRAIN);}
@@ -1275,7 +1280,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(gateTicks.getOrDefault(g.resource(),Long.MIN_VALUE)==l.getGameTime())return gateLeafAtRestR54(l,g,open);
         if(l.getEntity(g.visual()) instanceof NervHangarDoorEntity door){door.applyDeclaredR52(g.variant(),g.hangarStack(),open);proposed=door.proposedDeclaredProgressR52(open);}
         else {var door=(NervSiloDoorEntity)l.getEntity(g.visual());door.configureDeclaredR52(g.variant(),g.stage(),g.frame(),open,g.siloHatch());proposed=door.proposedDeclaredProgressR52(open);}
-        int completed=proposed==1?g.collisionSteps().size():0;
+        int completed=g.cellsOpenAt(proposed)?g.collisionSteps().size():0;
 
 
         var moving=new HashSet<BlockPos>();for(var step:g.collisionSteps())for(var cell:step)moving.add(cell.at());var supports=new HashSet<BlockPos>();for(var cell:g.supports())supports.add(cell.at());
@@ -1586,7 +1591,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {
         var start=getFrame(data,"FinishRoot");var landing=deploymentLandingRootR53(hatch,start);if(landing==null)return null;var profile=new NervBallisticHandoffR52.Profile(landing.translation().y-start.translation().y);var expected=new CompoundTag();expected.putInt("Version",1);expected.putString("Route",data.getString("RouteR52"));expected.putString("Gate",hatch.resource());expected.putUUID("GateUUID",hatch.visual());expected.putDouble("Gravity",e.getAttributeValue(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get()));expected.putDouble("LandingDelta",profile.landingDelta());expected.putInt("FlightTicks",NervBallisticHandoffR52.FLIGHT_TICKS);expected.putInt("CarrierTicks",NervBallisticHandoffR52.CARRIER_TICKS);expected.putInt("CloseTicks",hatch.siloHatch().closeTicks());putFrame(expected,"Start",start);putFrame(expected,"Landing",landing);putFrame(expected,"Hatch",hatch.frame());
         // Older saved profiles also carry source digests; only the physical profile is compared.
-        if(data.contains("BallisticProfileR53")){var saved=data.getCompound("BallisticProfileR53").copy();for(String key:List.of("Directory","HatchSource","PayloadSource"))saved.remove(key);if(!saved.equals(expected))return null;}else{if(directory.schemaVersionR52()>=2&&!data.getString("Finish").equals(Finish.RECEIVE.name()))return null;data.put("BallisticProfileR53",expected);}
+        if(data.contains("BallisticProfileR53")){var saved=data.getCompound("BallisticProfileR53").copy();for(String key:List.of("Directory","HatchSource","PayloadSource"))saved.remove(key);if(!saved.equals(expected)){if(!data.getString("Finish").equals(Finish.RECEIVE.name()))return null;data.put("BallisticProfileR53",expected);}}else{if(directory.schemaVersionR52()>=2&&!data.getString("Finish").equals(Finish.RECEIVE.name()))return null;data.put("BallisticProfileR53",expected);}
         var proof=ballistic.get(o.eva());if(proof!=null&&!proof.profile().equals(profile))return null;if(proof==null){proof=NervBallisticHandoffR52.capture(l,o,e,start,profile);if(proof!=null)ballistic.put(o.eva(),proof);}return proof;
     }
     private NervOriginalCarrierR52.CheckedStep outletPairHeldR53(Original original, String reason)
@@ -1635,7 +1640,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     }
 
     private boolean advanceOutletPairR53(ServerLevel level, Original original, EvaUnit01Entity eva,
-            CompoundTag data, Set<UUID> own, NervBallisticHandoffR52.Proof proof, float next)
+            CompoundTag data, Set<UUID> own, NervBallisticHandoffR52.Proof proof, float next, Gate hatch)
     {
         var carrier = NervOriginalCarrierR52.controller(level, original);
         var admission = carrierActuatorAdmissionR52(level, original, data);
@@ -1651,6 +1656,15 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if (payload == null) return hold(original, proof.rejectionR53());
         var rack = outletPairR53(level, original, eva, data, own, payload, next);
         if (rack == null) return false;
+        if (hatch != null)
+        {
+            // The hatch's step of this tick, taken before the rack's and the body's are committed (as EJECT_CLOSE does).
+            if (!proof.clearHatchStepR53(level, eva, hatch, payload)) return hold(original, proof.rejectionR53());
+            var door = (NervSiloDoorEntity) level.getEntity(hatch.visual());
+            float proposed = door.proposedDeclaredProgressR52(false);
+            gate(level, hatch, false, own);
+            if (door.actualOpenProgressR52() != proposed) return hold(original, "outlet_hatch_step_not_accepted");
+        }
         if (!rack.commit(level) || !EvaMechanicalFrameR52.acceptBallisticStepR53(eva, payload))
             throw new IllegalStateException("Current paired outlet proof changed during same-tick commit");
         eva.setCarrierRiseProgress(next);return true;
@@ -1665,8 +1679,10 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         {
             case RECEIVE -> {for(String id:receiver.gates())if(!gateAtRest(l,gates.get(id),true))return hold(o,"deployment_hatch_must_be_physically_open");if(!carrierSupportReadyR53(l,e)||((!EvaMechanicalFrameR52.beginControlledBallisticR53(e,o,proof))))return hold(o,"actual_full_payload_carrier_and_hatch_ballistic_sweep_blocked");data.putString("Finish",Finish.EJECT_LOWER.name());data.putInt("FinishTicks",0);}
             case EJECT_LOWER -> {
-                if(!proof.placement(l,e)||!gateAtRest(l,hatch,true))return hold(o,"actual_ballistic_custody_or_open_hatch_changed");
                 float next=Math.max(0,1-age/(float)NervBallisticHandoffR52.CARRIER_TICKS);
+                // The jaws let go under an open hatch. Once the deck drops (the second half) the hatch closes with it.
+                boolean dropping=next<.5F;
+                if(!proof.placement(l,e)||!dropping&&!gateAtRest(l,hatch,true))return hold(o,"actual_ballistic_custody_or_open_hatch_changed");
                 {
                     if(!EvaMechanicalFrameR52.controlledBallisticR53(e))
                     {
@@ -1675,7 +1691,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                                 :EvaMechanicalFrameR52.adoptControlledBallisticR53(e,proof);
                         if(!admitted)return hold(o,"outlet_original_supported_launch_or_preserved_flight_required");
                     }
-                    if(!advanceOutletPairR53(l,o,e,data,own,proof,next))return false;
+                    if(!advanceOutletPairR53(l,o,e,data,own,proof,next,dropping?hatch:null))return false;
                 }
                 if(next==0){data.putString("Finish",Finish.EJECT_CLOSE.name());data.putInt("FinishTicks",0);}
             }

@@ -218,7 +218,35 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
 
     static float[] nativeTrianglePositions(ResourceLocation resource,String name)
     {
-        MeshData mesh=getMesh(resource);if(mesh==null)return null;
+        MeshData mesh=getMesh(resource);return mesh==null?null:positions(mesh,name);
+    }
+
+    /**
+     * A part's vertices where the mesh holds them, read in place: x, y, z in blocks of the model, the pivot in, as
+     * nativeTrianglePositions gives them. UN-00's parts are four million vertices; a copy of them made while the
+     * mesh was still being parsed stood on top of the heap's highest point.
+     */
+    record PartView(float[] vertices,int stride,float pivotX,float pivotY,float pivotZ)
+    {
+        int count(){return vertices.length/stride;}
+        float x(int vertex){return -(vertices[vertex*stride]+pivotX)/16;}
+        float y(int vertex){return (vertices[vertex*stride+1]+pivotY)/16;}
+        float z(int vertex){return (vertices[vertex*stride+2]+pivotZ)/16;}
+    }
+    /** Render thread only, as the mesh itself is. */
+    static PartView partView(ResourceLocation resource,String name)
+    {
+        MeshData mesh=getMesh(resource);return mesh==null?null:view(mesh,name);
+    }
+    private static PartView view(MeshData mesh,String name)
+    {
+        MeshPart part=mesh.parts().get(name);
+        return part==null?null:new PartView(part.vertices(),mesh.stride(),part.pivotX(),part.pivotY(),part.pivotZ());
+    }
+
+    /** x, y, z of every vertex of a part in blocks of the model, the pivot in; touches no shared state. */
+    private static float[] positions(MeshData mesh,String name)
+    {
         MeshPart part=mesh.parts().get(name);if(part==null)return null;
         float[] source=part.vertices(),result=new float[source.length/mesh.stride()*3];
         for(int i=0,j=0;i<source.length;i+=mesh.stride(),j+=3)
@@ -244,8 +272,15 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         {
             if (!LOAD_ATTEMPTED.contains(meshResource) && !PENDING.containsKey(meshResource))
             {
-                PENDING.put(meshResource, CompletableFuture.supplyAsync(
-                        () -> read(resourceManager, meshResource), Util.backgroundExecutor()));
+                int started=EvaMeshPointsR63.generation();
+                PENDING.put(meshResource, CompletableFuture.supplyAsync(() ->
+                {
+                    MeshData mesh=read(resourceManager, meshResource);
+                    // A unit's body: what standing on the ground needs of it is taken here, off the render thread.
+                    if(mesh!=null&&mesh.parts().containsKey("foot_l")&&mesh.parts().containsKey("torso_lower"))
+                        EvaMeshPointsR63.prepare(meshResource,started,name->view(mesh,name));
+                    return mesh;
+                }, Util.backgroundExecutor()));
             }
         }
     }

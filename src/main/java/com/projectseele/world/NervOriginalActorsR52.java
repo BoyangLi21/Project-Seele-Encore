@@ -217,6 +217,16 @@ public final class NervOriginalActorsR52
     {var owner=personnelAccess(level);return owner==null?null:owner.originalStaffIdentity(level,post);}
     public static void tickStaff(ServerLevel level)
     {var owner=personnelAccess(level);if(owner!=null)owner.maintainOriginalStaff(level);}
+    /**
+     * The vanilla teleports (the /tp command, an ender pearl, chorus fruit) of a pilot this owner would not let
+     * dismount: refused for the same reason. They do not ask the seat; they move the rider and leave the seat behind.
+     */
+    @SubscribeEvent public static void teleport(net.minecraftforge.event.entity.EntityTeleportEvent event)
+    {
+        if(event.getEntity() instanceof ServerPlayer player&&player.getVehicle() instanceof EntryPlugCarrierEntity plug&&managed(plug)
+                &&plug.level() instanceof ServerLevel level&&!plug.getPersistentData().getBoolean("AdministrativeResetR53")
+                &&dismountAnchor(level,plug,player)==null)event.setCanceled(true);
+    }
     @SubscribeEvent public static void mount(EntityMountEvent event)
     {
         if(!(event.getEntityBeingMounted() instanceof EntryPlugCarrierEntity plug)||!managed(plug)

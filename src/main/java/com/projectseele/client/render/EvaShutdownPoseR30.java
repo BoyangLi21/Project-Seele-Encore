@@ -11,7 +11,7 @@ import java.util.*;
 /** Retain the fully composed last live pose; the server persists the pilot's power-loss snapshot. */
 final class EvaShutdownPoseR30
 {
-    private static final Map<EvaUnit01Entity,View> VIEWS=new WeakHashMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,View> VIEWS=new com.projectseele.util.WeakIdentityMap<>();
     static void resetEntityR31(EvaUnit01Entity eva){VIEWS.remove(eva);EvaCombatPoseR31.resetEntityR31(eva);CombatFeelR31.clear(eva);}
     private static final class View {CompoundTag live=new CompoundTag(),held=new CompoundTag(),entry=new CompoundTag();int mode,sentMode=-1;boolean localPilot;UUID localOwner;long sent=-1,released,episodeStamp=Long.MIN_VALUE;}
     private static void invalidateForeignOwnerR45(EvaUnit01Entity eva,View view)

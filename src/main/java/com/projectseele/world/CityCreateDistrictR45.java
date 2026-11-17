@@ -510,6 +510,8 @@ public final class CityCreateDistrictR45
                 if (state.queued < 0 || state.queued == state.depth || !state.queueFault.isBlank()) return;
                 level.resetEmptyTime(); claim(true); if (!resident()) return;
                 occupied = occupied(); if (occupied) return;
+                // A spare-weapon tower that is out has its door or its lot's hatch open: the trip begins once all are in.
+                if (!ArmamentTowersR64.stowedForCityTrip(level)) return;
                 try { begin(state.queued); }
                 catch (Exception failure)
                 {
@@ -540,8 +542,9 @@ public final class CityCreateDistrictR45
                     String entry = pending.join(); pending = null; state.journalEntries.add(entry);
                     state.savedPlans = plans.size(); state.index++;
                     state.phase = state.index == towers.size() ? "OPEN" : "PREPARE";
-                    if (state.phase.equals("OPEN")) state.index = state.cursor = 0;
-                    persist();
+                    // Loading starts an unfinished preparation again from nothing,
+                    // so the ledger is written once, when every tower is prepared.
+                    if (state.phase.equals("OPEN")) { state.index = state.cursor = 0; persist(); }
                 }
                 case "OPEN" -> applyStage(0, "DETACH", start);
                 case "DETACH" -> applyStage(1, "SPAWN", start);
@@ -553,7 +556,10 @@ public final class CityCreateDistrictR45
                     for (Entity entity : entities.values()) if (!CityCreateBridgeR45.collisionReady(entity)) return;
                     state.phase = "MOVE"; persist();
                 }
-                case "MOVE" -> { if (level.getGameTime() % 20 == 0) persist(); }
+                // The ledger keeps the motion tick MOVE began with. A clean stop
+                // writes the current one; after a crash an explicit recovery
+                // puts the buildings back where MOVE began and moves them again.
+                case "MOVE" -> { }
                 case "PLACE" -> applyStage(2, "COVER", start);
                 case "COVER" -> applyStage(3, "FLUSH", start);
                 case "RECONCILE" -> reconcile(start);
@@ -701,7 +707,7 @@ public final class CityCreateDistrictR45
                             }
                             catch (IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
                         });
-                        preparing = null; state.phase = "WAL_WAIT"; persist(); return;
+                        preparing = null; state.phase = "WAL_WAIT"; return;
                     }
                     int plane = prepCursor++;
                     BlockPos pos = new BlockPos(spec.centre().getX() + spec.minX() + plane / depth, 80,
@@ -785,7 +791,11 @@ public final class CityCreateDistrictR45
                 entity.setPos(checkpointPose.x, checkpointPose.y, checkpointPose.z);
                 entity.xo = entity.getX(); entity.yo = entity.getY(); entity.zo = entity.getZ();
             }
-            entities.put(state.index, entity); state.index++; state.created = Math.max(state.created, state.index); persist();
+            // Written with READY, not per district. A crash during SPAWN leaves
+            // the count at its value when SPAWN began, so loading finds the
+            // districts that reached the disk and makes the rest again from the
+            // durable cargo, instead of holding for the ones that never did.
+            entities.put(state.index, entity); state.index++; state.created = Math.max(state.created, state.index);
         }
 
         Tokyo3RetractionDirector.Motion observedMotion()
@@ -1005,7 +1015,8 @@ public final class CityCreateDistrictR45
             for (var spec : towers)
             {
                 AABB volume = route(spec).inflate(.01);
-                if (!level.getEntities((Entity) null, volume, actor -> !ownsActor(actor)).isEmpty()) return true;
+                if (!level.getEntities((Entity) null, volume, actor -> !ownsActor(actor)
+                        && !(actor instanceof com.projectseele.entity.NervArmamentStationEntity station && station.towerR64() >= 0)).isEmpty()) return true;
             }
             return false;
         }
@@ -1068,8 +1079,10 @@ public final class CityCreateDistrictR45
             // All images are already durable. An older partial cursor is safe:
             // restart replays known before/after images from index zero. Every
             // phase transition and first WorldTouched barrier remains forced.
-            if (!state.phase.equals(lastPersistPhase) || lastPersistTick == Long.MIN_VALUE
-                    || level.getGameTime() - lastPersistTick >= 20) persist();
+            // The cursor inside a phase is not written: loading discards it and
+            // starts the phase again, so writing it every second bought nothing
+            // for its fsync on the server thread.
+            if (!state.phase.equals(lastPersistPhase) || lastPersistTick == Long.MIN_VALUE) persist();
         }
     }
 

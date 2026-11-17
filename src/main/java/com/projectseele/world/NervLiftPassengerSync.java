@@ -44,6 +44,7 @@ public final class NervLiftPassengerSync
         boolean moving;
         int arrivalGuard;
         AABB lastBounds;
+        AABB corridor;
         Vec3 cageAnchor;
         List<AABB> cageBoxes=List.of();
         int observedTick=Integer.MIN_VALUE;
@@ -51,7 +52,7 @@ public final class NervLiftPassengerSync
     private static void invalidate(Riders riders)
     {
         riders.passengers.clear();riders.previousFloor=Double.NaN;riders.moving=false;
-        riders.arrivalGuard=0;riders.lastBounds=null;riders.cageAnchor=null;
+        riders.arrivalGuard=0;riders.lastBounds=null;riders.corridor=null;riders.cageAnchor=null;
         riders.cageBoxes=List.of();riders.observedTick=Integer.MIN_VALUE;
     }
 
@@ -69,6 +70,7 @@ public final class NervLiftPassengerSync
             if(Math.abs(p.getX()-car.getCenter().x)>12||Math.abs(p.getZ()-car.getCenter().z)>12)continue;
             double margin=1+p.getBbWidth()*.5+.065;
             double x=Mth.clamp(p.getX(),car.minX+margin,car.maxX-margin),z=Mth.clamp(p.getZ(),car.minZ+margin,car.maxZ-margin);
+            if(inCorridor(riders.corridor,p,margin)){x=p.getX();z=p.getZ();}
             double floor=car.minY+1,top=car.maxY-1-p.getBbHeight();
             if(riders.cageAnchor!=null)for(var local:riders.cageBoxes)
             {
@@ -126,6 +128,7 @@ public final class NervLiftPassengerSync
             }
             final double currentFloor=floor;
             final AABB car=bounds;
+            final AABB corridor=group.isMoving()?transferCorridor(group):null;
             riders.passengers.retainAll(available);
             // Sample every tick, including the very first movement tick. A
             // caller can enter and press a floor before a five-tick scan runs.
@@ -146,6 +149,7 @@ public final class NervLiftPassengerSync
                     double margin=1.0D+player.getBbWidth()*.5D+.06D;
                     double x=Mth.clamp(player.getX(),car.minX+margin,car.maxX-margin);
                     double z=Mth.clamp(player.getZ(),car.minZ+margin,car.maxZ-margin);
+                    if(inCorridor(corridor,player,margin)){x=player.getX();z=player.getZ();}
                     double y=player.getY();double top=car.maxY-1.0D-player.getBbHeight();
                     var anchor=group.getCageAnchorPos(group.getCurrentY());
                     for(var local:group.getCage().collisionBoxes)
@@ -171,12 +175,30 @@ public final class NervLiftPassengerSync
                 }
                 else if(!inside)riders.passengers.remove(player.getUUID());
             }
-            riders.lastBounds=bounds;
+            riders.lastBounds=bounds;riders.corridor=corridor;
             if(group.getCage()!=null){riders.cageBoxes=group.getCage().collisionBoxes;riders.cageAnchor=group.getCageAnchorPos(group.getCurrentY());}
             riders.arrivalGuard=group.isMoving()?2:Math.max(0,riders.arrivalGuard-1);
             riders.previousFloor=floor;riders.moving=group.isMoving();
             riders.observedTick=event.getServer().getTickCount();
         }
+    }
+    /**
+     * While a car changes shaft, the ground it covers between the two shafts. Each side times the
+     * horizontal move by its own game clock, so behind a lagging server the client's car (and its
+     * rider) runs blocks ahead; held to the server's car, the rider was teleported out of their own.
+     */
+    private static AABB transferCorridor(com.supermartijn642.movingelevators.elevator.ElevatorGroup group)
+    {
+        if(!(group instanceof NervPersonnelTransferR53.NativeState state)||!state.seele$transferActive()||group.getCage()==null)return null;
+        var path=state.seele$transferPath();if(path==null)return null;
+        var upper=group.getCage().bounds.move(group.getCageAnchorPos(path.transferY()+1));
+        var lower=group.getCage().bounds.move(group.getCageAnchorPos(path.transferY()-1));
+        return upper.minmax(lower);
+    }
+    private static boolean inCorridor(AABB corridor,ServerPlayer player,double margin)
+    {
+        return corridor!=null&&player.getX()>corridor.minX+margin&&player.getX()<corridor.maxX-margin
+                &&player.getZ()>corridor.minZ+margin&&player.getZ()<corridor.maxZ-margin;
     }
     @SubscribeEvent public static void stopping(net.minecraftforge.event.server.ServerStoppingEvent event)
     {LEVELS.keySet().removeIf(level->level.getServer()==event.getServer());}

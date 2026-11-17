@@ -20,6 +20,7 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
     {
         if(mixin.endsWith("client.MtrRailMathCacheR51Mixin"))return FMLLoader.getDist()==Dist.CLIENT
                 &&com.projectseele.compat.MtrRailMathCompatibilityR51.accepted(getClass().getClassLoader());
+        if(mixin.endsWith("CreateContraptionFlagsMixin"))return createFlagsAbi();
         if (!mixin.endsWith("CityExactUnionCreateMixinR45") && !mixin.endsWith("CitySavedOwnerUnionMixinR45")) return true;
         if (!CityUnionPortableBootstrapR45.requested()) return false;
         if(cityAbiAccepted!=null)return cityAbiAccepted;
@@ -46,6 +47,17 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
             return cityAbiAccepted=accepted;
         }
         catch (Exception unavailable) { CityUnionActivationR45.backendAbi("",false,unavailable.toString());return cityAbiAccepted=false; }
+    }
+    /** The flag map and its reader as Create 6.0.8 declares them; any other shape keeps Create's own map. */
+    private boolean createFlagsAbi()
+    {
+        try
+        {
+            ClassNode base=readCityClass("Contraption");
+            return field(base,"isLegacy","Lit/unimi/dsi/fastutil/objects/Object2BooleanMap;")
+                    &&method(base,"readBlocksCompound","(Lnet/minecraft/nbt/Tag;Lnet/minecraft/world/level/Level;Z)V")!=null;
+        }
+        catch(Exception absent){return false;}
     }
     private ClassNode readCityClass(String name)throws Exception
     {

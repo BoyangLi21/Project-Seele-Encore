@@ -15,6 +15,7 @@ public final class ModelRenderTypesR49 extends RenderType
     private static final Map<ResourceLocation, RenderType> OPTICS = new HashMap<>();
     private static final Map<ResourceLocation, RenderType> LIT_OPTICS = new HashMap<>();
     private static final Map<ResourceLocation, RenderType> COMMAND_SCREENS = new HashMap<>();
+    private static final Map<ResourceLocation, RenderType> GROUND_COVER = new HashMap<>();
     private record TriangleTexture(ResourceLocation texture, boolean smooth) { }
     private static final Map<TriangleTexture, RenderType> TRIANGLES = new HashMap<>();
     private static final Map<ResourceLocation, RenderType> TRIANGLE_OPTICS = new HashMap<>();
@@ -50,6 +51,20 @@ public final class ModelRenderTypesR49 extends RenderType
                 VertexFormat.Mode.QUADS,256,true,false,CompositeState.builder()
                         .setShaderState(RENDERTYPE_ENTITY_SOLID_SHADER)
                         .setTextureState(new TextureStateShard(key,true,false))
+                        .setLightmapState(LIGHTMAP).setOverlayState(OVERLAY).createCompositeState(true)));
+    }
+
+    /**
+     * Ground drawn on top of a machine. Sampled the way the block atlas is (nearest, mipmapped) so that it
+     * reads like the terrain beside it at every distance, and biased over the plate it lies on.
+     */
+    static RenderType groundCover(ResourceLocation texture)
+    {
+        return GROUND_COVER.computeIfAbsent(texture,key->create("entity_solid",DefaultVertexFormat.NEW_ENTITY,
+                VertexFormat.Mode.QUADS,256,true,false,CompositeState.builder()
+                        .setShaderState(RENDERTYPE_ENTITY_SOLID_SHADER)
+                        .setTextureState(new TextureStateShard(key,false,true))
+                        .setLayeringState(POLYGON_OFFSET_LAYERING)
                         .setLightmapState(LIGHTMAP).setOverlayState(OVERLAY).createCompositeState(true)));
     }
 
@@ -139,7 +154,7 @@ public final class ModelRenderTypesR49 extends RenderType
     static void clear()
     {
         TYPES.clear();SOLID.clear();OPTICS.clear();LIT_OPTICS.clear();
-        COMMAND_SCREENS.clear();
+        COMMAND_SCREENS.clear();GROUND_COVER.clear();
         TRIANGLES.clear();TRIANGLE_OPTICS.clear();TRIANGLE_LIT_OPTICS.clear();
         TRIANGLE_SOLID.clear();
     }

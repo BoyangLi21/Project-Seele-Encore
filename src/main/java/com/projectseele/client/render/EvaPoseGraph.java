@@ -178,6 +178,8 @@ public final class EvaPoseGraph
         }
         EvaCervicalPivotR25.apply(entity,model,partialTick);
         EvaPoseTransition.rememberGecko(model);
+        // R64 (M1): the planted model steps its feet before any clip is sampled, so the clips are on its steps.
+        boolean planted=EvaPlantedGaitR64.begin(entity,partialTick);
         if(entity.isFirstBattleActive())
         {
             // The paired performance owns the complete skeleton. In the old
@@ -234,6 +236,10 @@ public final class EvaPoseGraph
             EvaPoseContinuity.trace(entity,model,"combat.body");
             var hands=EvaHandPoseR28.apply(entity,model,partialTick);
             EvaPoseContinuity.trace(entity,model,"combat.hands");
+            // R64 (M1): this owner walks a bare-handed Unit where its combat data is installed; the planted
+            // model takes the pelvis and the legs from it here as it does from the old stack below.
+            if(planted)EvaPlantedGaitR64.apply(entity,model,partialTick,modelToWorld);
+            EvaPoseContinuity.trace(entity,model,"planted.gait");
             var exit=EvaMotionEngineV2.BoneWrites.empty();
             return finish(entity,model,partialTick,modelToWorld,body,exit,hands);
         }
@@ -292,7 +298,10 @@ public final class EvaPoseGraph
         EvaPoseContinuity.trace(entity,model,"flight");
         var firearm=EvaRifleContactRig.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"rifle.contact");
-        var terrain=EvaFootPlacement.apply(entity,model,partialTick,modelToWorld);
+        var terrain=planted?EvaPlantedGaitR64.apply(entity,model,partialTick,modelToWorld):EvaMotionEngineV2.BoneWrites.empty();
+        // A rig the planted model cannot walk (no ankles) falls back to the old layer.
+        if(!EvaPlantedGaitR64.applied(entity))terrain=EvaFootPlacement.apply(entity,model,partialTick,modelToWorld);
+        else EvaPoseContinuity.trace(entity,model,"planted.gait");
         EvaPoseContinuity.trace(entity,model,"foot.placement");
         var optics=EvaUNLaserPose.apply(entity,model,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"optics");
@@ -339,9 +348,20 @@ public final class EvaPoseGraph
         return finish(entity,model,partialTick,modelToWorld,motionWrites,transitions,firearm);
     }
 
+    /**
+     * The finishing layers a body goes without while the simulation owns it (knocked down, lying, getting up).
+     * The server has held that pose to the body's ranges and set it on the ground by its own hulls; the layers
+     * below are made for a body standing on its feet. Held back to the hips' standing range, the thighs of a body
+     * getting up came round and its feet and shins stood 11 to 21 blocks in the ground for 8 to 18 ticks.
+     * -Dprojectseele.physicalFinishR63=none runs every layer on it, as before.
+     */
+    private static final Set<String> PHYSICAL_SKIPS_R63=Set.of(System.getProperty("projectseele.physicalFinishR63","feet,stance,turn,limits,weight,arms").split(","));
+    private static boolean runsR63(boolean physical,String layer){return !physical||!PHYSICAL_SKIPS_R63.contains(layer);}
+
     private static Snapshot finish(EvaUnit01Entity entity,BakedGeoModel model,float partialTick,org.joml.Matrix4f modelToWorld,
                                    EvaMotionEngineV2.BoneWrites motionWrites,EvaMotionEngineV2.BoneWrites transitions,EvaMotionEngineV2.BoneWrites firearm)
     {
+        boolean physical=com.projectseele.physics.CombatBodyDynamics.active(entity);
         EvaDorsalPose.applyVisibility(entity, model);
         EvaCannonContactRigR45.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"cannon.contact");
@@ -358,28 +378,48 @@ public final class EvaPoseGraph
                     ||com.projectseele.entity.EvaGameplayMotionR32.sharedJumpActive(entity,partialTick)))
             transitions=EvaPoseTransition.applySharedExitR45(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"shared.exit");
-        EvaFootPlacement.ensure(entity,model,partialTick,modelToWorld);
+        // R64 (M1): where the planted model posed the legs and the pelvis, the layers that put a clip's feet right
+        // afterwards have nothing to do, and would move what stands exactly where it should.
+        boolean planted=EvaPlantedGaitR64.applied(entity);
+        if(!planted&&runsR63(physical,"feet"))EvaFootPlacement.ensure(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"foot.placement.finish");
-        EvaStanceFinishR56.apply(entity,model,partialTick,modelToWorld);
+        if(!planted&&runsR63(physical,"stance"))EvaStanceFinishR56.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"stance.finish");
-        EvaTurnStepR59.apply(entity,model,partialTick,modelToWorld);
-        EvaGroundContactR56.apply(entity,model,partialTick,modelToWorld);
+        if(!planted&&runsR63(physical,"turn"))EvaTurnStepR59.apply(entity,model,partialTick,modelToWorld);
+        // The body is set on the ground as it will be drawn: with its joints already held to their
+        // ranges and its forearms and shins seated on their elbows and knees. Both used to come
+        // after. Kneeling down and lying, the hips are turned out past their 45 degrees; held back
+        // to it afterwards, the thighs came round and the whole body, set down a moment before,
+        // stood 0.7 to 0.9 blocks in the ground (shins, upper arms and belly) for as long as it lay.
+        if(runsR63(physical,"limits")){EvaJointLimitsR57.apply(model);EvaKneeHingeR63.apply(entity,model,modelToWorld,partialTick);}
+        EvaPoseContinuity.trace(entity,model,"joint.limits");
+        seatHinges(model);
+        if(!planted)EvaGroundContactR56.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"ground.contact");
-        EvaBodyWeightR59.apply(entity,model,partialTick);
+        if(!planted&&runsR63(physical,"weight"))EvaBodyWeightR59.apply(entity,model,partialTick);
         EvaFollowThroughR56.apply(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"follow.through");
-        EvaJointLimitsR57.apply(model);
-        EvaPoseContinuity.trace(entity,model,"joint.limits");
+        if(runsR63(physical,"arms"))EvaArmClearanceR63.apply(entity,model,modelToWorld,partialTick);
+        EvaPoseContinuity.trace(entity,model,"arm.clearance");
+        // Follow-through leans the spine and the head: back within their ranges once more.
+        if(runsR63(physical,"limits"))EvaJointLimitsR57.apply(model);
+        EvaPoseContinuity.trace(entity,model,"joint.limits.after");
         String continuityOwner=motionWrites.owner();
-        EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
-        EvaGroundContactR56.keepSolesUp(entity,model,modelToWorld);
+        EvaPoseContinuity.settle(entity,model,planted?EvaPlantedGaitR64.OWNER:EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
+        // The blend from the pose before may have moved the pelvis and turned the legs: the feet go back where they stand.
+        if(planted)EvaPlantedGaitR64.finishLegs(entity,model,modelToWorld);
+        // R64 (M3): and its arms keep out of walls.
+        if(planted){EvaArmWallR64.apply(entity,model,modelToWorld);EvaPoseContinuity.trace(entity,model,"arm.wall");}
+        // Follow-through, the joint limits and the settle each turn a shin: seated again before the soles are checked.
+        seatHinges(model);
+        if(!planted)EvaGroundContactR56.keepSolesUp(entity,model,modelToWorld);
+        EvaRackReleaseR63.apply(entity,model,modelToWorld);
+        if(EvaRackReleaseR63.active(entity))EvaGroundContactR56.keepSolesUp(entity,model,modelToWorld);
+        EvaPoseContinuity.trace(entity,model,"rack.release");
         // Last word on the joints: every layer above may have turned a forearm or shin (lag, limits,
         // continuity residuals decayed apart from rotation); seat each back on its real elbow/knee centre.
-        for(String side:new String[]{"l","r"})
-        {
-            model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
-            model.getBone("shin_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.knee(b)));
-        }
+        seatHinges(model);
+        EvaGroundContactR56.witnessLowestR63(entity,model,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         EvaPoseTransition.recordFinal(entity,model);
         EvaShutdownPoseR30.rememberFinalLiveR45(entity,model);
@@ -404,6 +444,15 @@ public final class EvaPoseGraph
         return committed;
     }
 
+
+    private static void seatHinges(BakedGeoModel model)
+    {
+        for(String side:new String[]{"l","r"})
+        {
+            model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
+            model.getBone("shin_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.knee(b)));
+        }
+    }
 
     private static Snapshot snapshot(EvaUnit01Entity entity,
                                      float partialTick,

@@ -77,7 +77,12 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         // ----- crystal body (spins around Y) -----
         poseStack.pushPose();
         poseStack.translate(0.0D, coreHeight, 0.0D);
+        // R63: the crystal gives under a blow and tips over it, before its own turning.
+        var give = entity.struckOffsetR63(partialTick);
+        poseStack.translate(give.x, give.y, give.z);
         poseStack.scale(entity.modelScaleR52(),entity.modelScaleR52(),entity.modelScaleR52());
+        var tip = entity.struckTiltR63(partialTick);
+        if (tip != null) poseStack.mulPose(new org.joml.Quaternionf().rotationAxis((float) Math.toRadians(tip.w), tip.x, tip.y, tip.z));
         poseStack.mulPose(Axis.YP.rotationDegrees(entity.getSpin(partialTick)));
 
         int fullBright = LightTexture.FULL_BRIGHT;
@@ -87,7 +92,7 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         float expose = entity.getExposeProgress(partialTick);
         float halfGap = 3.75F * expose;
 
-        if (!RamielSourceModelR53.draw(poseStack, buffer, expose, time, entity.isCharging(), packedLight))
+        if (!RamielSourceModelR53.draw(poseStack, buffer, expose, time, entity.isCharging(), packedLight, entity.struckFlashR63(partialTick)))
         {
             VertexConsumer body = buffer.getBuffer(RenderType.entityTranslucent(TEXTURE));
             float corePulse = entity.isCharging()
@@ -167,7 +172,7 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         boolean exposed=(charging&&age<20||state.beamTicks()>age)&&(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.EXPOSED)!=0;
         float time=state.poseTick()+partial,gap=exposed?3.75F:0;
         poses.pushPose();poses.translate(0,center,0);poses.scale(scale,scale,scale);poses.mulPose(Axis.YP.rotationDegrees(time*.75F));
-        if (!RamielSourceModelR53.draw(poses,buffers,exposed?1:0,time,charging,LightTexture.pack(0,15)))
+        if (!RamielSourceModelR53.draw(poses,buffers,exposed?1:0,time,charging,LightTexture.pack(0,15),0F))
         {
             var body=buffers.getBuffer(RenderType.entityTranslucent(TEXTURE));
             float core=(exposed?4F:2.6F)*(charging?1.1F+.3F*Mth.sin(time*.5F):.95F);

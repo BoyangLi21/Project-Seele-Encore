@@ -35,7 +35,9 @@ public final class VenueReverbR61
         CAVERN(1F, .90F, .55F, .40F, 8.5F, .45F, .22F, .150F, 1.2F, .10F, .25F, 0F),
         HANGAR(1F, .95F, .60F, .55F, 5.2F, .55F, .55F, .060F, 1.4F, .06F, .25F, 0F),
         SHAFT(.75F, .55F, .55F, .65F, 4.2F, .70F, .75F, .030F, 1.2F, .04F, .12F, .25F),
-        ROOM(.90F, 1F, .45F, .75F, 1.6F, .80F, .60F, .012F, 1F, .02F, .25F, 0F);
+        ROOM(.90F, 1F, .45F, .75F, 1.6F, .80F, .60F, .012F, 1F, .02F, .25F, 0F),
+        // R64, owner: Ramiel's attack as "一整个城市的夜空的回响": a long dark tail over the whole city with a slap-back echo.
+        CITY_NIGHT(1F, .85F, .70F, .45F, 7.5F, .40F, .35F, .090F, 1.6F, .05F, .25F, .60F);
 
         final float density, diffusion, gain, gainHf, decay, decayHf, reflections, reflectionsDelay, late, lateDelay, echoTime, echoDepth;
 
@@ -66,12 +68,27 @@ public final class VenueReverbR61
     // speaker reads as distant instead of simply quieter.
     private static final float WET_DISTANCE_ROLLOFF = .7F;
 
+    /** The city-night tail fades with distance far more slowly than the direct sound: a shot heard from afar is mostly echo. */
+    private static final float CITY_DISTANCE_ROLLOFF = .3F;
+    /** Echo copies lose their highs like reflections from far hills and towers. */
+    private static final float ECHO_LOWPASS_GAINHF = .35F;
+
     private static volatile Venue current = Venue.OPEN;
     private static int tick;
     private static long context;
-    private static int effect;
     private static int slot;
-    private static Venue loaded;
+    private static int lowpass;
+
+    /** One reverb per use, each with its own slot so loading one never changes another's sound. */
+    private static final class Send
+    {
+        int effect;
+        int slot;
+        Venue loaded;
+    }
+    private static final Send VENUE = new Send();
+    private static final Send BAY = new Send();
+    private static final Send CITY = new Send();
 
     private static int[][] directions()
     {
@@ -169,7 +186,21 @@ public final class VenueReverbR61
     private static boolean announcement(SoundInstance sound)
     {
         var id = sound.getLocation();
-        return sound instanceof DryTake || ProjectSeele.MODID.equals(id.getNamespace()) && id.getPath().startsWith("pa_");
+        return sound instanceof DryTake || ProjectSeele.MODID.equals(id.getNamespace())
+                && (id.getPath().startsWith("pa_") || id.getPath().equals("facility_siren"));
+    }
+
+    /** A hangar bay's PA sounds at least like the hangar, wherever the listener stands in or around it. */
+    static Venue bayVenue(Venue listener)
+    {
+        return listener == Venue.CAVERN ? Venue.CAVERN : Venue.HANGAR;
+    }
+
+    private static boolean cityNight(SoundInstance sound)
+    {
+        var id = sound.getLocation();
+        return sound instanceof HeadsetSoundsR64.EchoTake || ProjectSeele.MODID.equals(id.getNamespace())
+                && (id.getPath().equals("beam_charge") || id.getPath().equals("beam_fire") || id.getPath().equals("cross_explosion"));
     }
 
     /** Called from the render thread for take selection and the sound thread for sends. */
@@ -179,29 +210,37 @@ public final class VenueReverbR61
         if (active == context) return slot != 0;
         context = active;
         slot = 0;
-        loaded = null;
         if (active == 0L || !ALC10.alcIsExtensionPresent(ALC10.alcGetContextsDevice(active), "ALC_EXT_EFX"))
         {
             ProjectSeele.LOGGER.warn("OpenAL EFX is unavailable; hangars keep their recorded reverb, other announcements stay dry");
             return false;
         }
         AL10.alGetError();
-        effect = EXTEfx.alGenEffects();
-        EXTEfx.alEffecti(effect, EXTEfx.AL_EFFECT_TYPE, EXTEfx.AL_EFFECT_EAXREVERB);
-        int created = EXTEfx.alGenAuxiliaryEffectSlots();
+        for (Send send : new Send[]{VENUE, BAY, CITY})
+        {
+            send.effect = EXTEfx.alGenEffects();
+            EXTEfx.alEffecti(send.effect, EXTEfx.AL_EFFECT_TYPE, EXTEfx.AL_EFFECT_EAXREVERB);
+            send.slot = EXTEfx.alGenAuxiliaryEffectSlots();
+            send.loaded = null;
+        }
+        lowpass = EXTEfx.alGenFilters();
+        EXTEfx.alFilteri(lowpass, EXTEfx.AL_FILTER_TYPE, EXTEfx.AL_FILTER_LOWPASS);
+        EXTEfx.alFilterf(lowpass, EXTEfx.AL_LOWPASS_GAIN, 1F);
+        EXTEfx.alFilterf(lowpass, EXTEfx.AL_LOWPASS_GAINHF, ECHO_LOWPASS_GAINHF);
         int error = AL10.alGetError();
         if (error != AL10.AL_NO_ERROR)
         {
             ProjectSeele.LOGGER.warn("OpenAL EFX reverb rejected (0x{}); hangars keep their recorded reverb, other announcements stay dry", Integer.toHexString(error));
             return false;
         }
-        slot = created;
-        ProjectSeele.LOGGER.info("OpenAL EFX reverb ready for facility announcements");
+        slot = VENUE.slot;
+        ProjectSeele.LOGGER.info("OpenAL EFX reverb ready for facility announcements, hangar bays and Ramiel's city-night echo");
         return true;
     }
 
-    private static void load(Venue venue)
+    private static void load(Send send, Venue venue)
     {
+        int effect = send.effect;
         EXTEfx.alEffectf(effect, EXTEfx.AL_EAXREVERB_DENSITY, venue.density);
         EXTEfx.alEffectf(effect, EXTEfx.AL_EAXREVERB_DIFFUSION, venue.diffusion);
         EXTEfx.alEffectf(effect, EXTEfx.AL_EAXREVERB_GAIN, venue.gain);
@@ -220,18 +259,40 @@ public final class VenueReverbR61
         EXTEfx.alEffectf(effect, EXTEfx.AL_EAXREVERB_MODULATION_DEPTH, 0F);
         EXTEfx.alEffectf(effect, EXTEfx.AL_EAXREVERB_AIR_ABSORPTION_GAINHF, .994F);
         EXTEfx.alEffecti(effect, EXTEfx.AL_EAXREVERB_DECAY_HFLIMIT, AL10.AL_TRUE);
-        EXTEfx.alAuxiliaryEffectSloti(slot, EXTEfx.AL_EFFECTSLOT_EFFECT, effect);
-        loaded = venue;
+        EXTEfx.alAuxiliaryEffectSloti(send.slot, EXTEfx.AL_EFFECTSLOT_EFFECT, effect);
+        send.loaded = venue;
     }
 
     private static void attach(SoundInstance sound, Channel channel)
     {
-        if (!announcement(sound) || !ready()) return;
-        Venue venue = current;
-        if (venue != loaded) load(venue);
+        Send send;
+        Venue venue;
+        float rolloff = WET_DISTANCE_ROLLOFF;
+        if (cityNight(sound))
+        {
+            send = CITY;
+            venue = Venue.CITY_NIGHT;
+            rolloff = CITY_DISTANCE_ROLLOFF;
+        }
+        else if (sound instanceof DryTake)
+        {
+            // R64: the server only sends a hangar take for a PA line inside a hangar bay, so it always sounds
+            // like the hangar (or the bigger cavern), even to a listener on a narrow bridge or gantry.
+            send = BAY;
+            venue = bayVenue(current);
+        }
+        else if (announcement(sound))
+        {
+            send = VENUE;
+            venue = current;
+        }
+        else return;
+        if (!ready()) return;
+        if (venue != send.loaded) load(send, venue);
         int source = ((SoundChannelAccessorR61) channel).seele$source();
-        AL11.alSource3i(source, EXTEfx.AL_AUXILIARY_SEND_FILTER, slot, 0, EXTEfx.AL_FILTER_NULL);
-        AL10.alSourcef(source, EXTEfx.AL_ROOM_ROLLOFF_FACTOR, WET_DISTANCE_ROLLOFF);
+        AL11.alSource3i(source, EXTEfx.AL_AUXILIARY_SEND_FILTER, send.slot, 0, EXTEfx.AL_FILTER_NULL);
+        AL10.alSourcef(source, EXTEfx.AL_ROOM_ROLLOFF_FACTOR, rolloff);
+        AL10.alSourcei(source, EXTEfx.AL_DIRECT_FILTER, sound instanceof HeadsetSoundsR64.EchoTake ? lowpass : EXTEfx.AL_FILTER_NULL);
     }
 
     /** Keeps the baked event's name so the server's stop packets still reach it, but plays the dry recording. */

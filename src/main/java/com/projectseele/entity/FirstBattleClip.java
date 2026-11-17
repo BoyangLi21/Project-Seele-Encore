@@ -200,13 +200,23 @@ public final class FirstBattleClip
     {
         float t=Mth.clamp(value,0,1);return t*t*t*(10+t*(-15+6*t));
     }
+    /**
+     * How much is left, 1 to 0 over the first 1.2 s, of the way from where an actor really stood to where the clip
+     * has it. Most of the way goes at once: Sachiel may begin 14 blocks ahead, the clip's two bodies are 27 deep
+     * together, and they stand inside each other until it has been carried clear (0.43 s on an eased start, 0.10 s
+     * on this one; tools/finale/contact.py --entry).
+     */
+    public static float carried(float seconds)
+    {
+        float left=Mth.clamp(1-seconds/1.2F,0,1);return left*left*left;
+    }
     public static Vec3 localPoint(FirstBattleSignals.Spec spec,boolean eva,String curve,float seconds)
     {
         if(DATA==null)return Vec3.ZERO;Role role=DATA.roles.get(eva?"eva":"angel");
         Vec3 p=sample(role.curves.get(curve),seconds);
         // Match each real actor at entry; every authored curve follows the same rebase.
         Vec3 initial=eva?Vec3.ZERO:new Vec3(0,spec.initialHeight(),spec.initialDistance());
-        Vec3 correction=initial.subtract(role.curves.get("root_blocks")[0]).scale(1-smooth(seconds/1.2F));
+        Vec3 correction=initial.subtract(role.curves.get("root_blocks")[0]).scale(carried(seconds));
         p=p.add(correction);
         if(!curve.equals("root_blocks"))
         {

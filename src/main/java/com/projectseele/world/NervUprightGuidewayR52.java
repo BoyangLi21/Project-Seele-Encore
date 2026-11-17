@@ -36,27 +36,45 @@ public final class NervUprightGuidewayR52 {
  public static synchronized void install(byte[] source,String expectedSha,NervRouteDirectoryR52 directory)throws IOException {
   String sha;try{sha=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(source));}catch(NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
   if(fixed!=null&&installedSha.equals(sha)){if(!matchesDirectory(directory))throw new IllegalStateException("A different upright guideway is already installed");return;}
-  NervOuterCarrierGuideR52.install();var binding=new ArrayList<PathBinding>();var steel=new ArrayList<RailPiece>();var names=new HashSet<String>();var feet=new ArrayList<Anchor>();String schema=null;boolean complete=false;
+  NervOuterCarrierGuideR52.install();var binding=new ArrayList<PathBinding>();var steel=new ArrayList<RailPiece>();var names=new HashSet<String>();var feet=new ArrayList<Anchor>();String schema=null;boolean complete=false;var shared=new SharedSteelR64();
   // The actual source is over 180 MB. Consume one authored primitive at a
   // time; a full decimal String/Gson tree would exceed the native host heap.
   try(var reader=new JsonReader(new InputStreamReader(new ByteArrayInputStream(source),StandardCharsets.UTF_8))){reader.beginObject();while(reader.hasNext()){String key=reader.nextName();switch(key){
    case "schema" -> schema=reader.nextString();case "supports_complete" -> complete=reader.nextBoolean();
    case "paths" -> {reader.beginArray();while(reader.hasNext()){var p=JsonParser.parseReader(reader).getAsJsonObject();binding.add(new PathBinding(p.get("leg").getAsString(),p.get("reverse_leg").getAsString(),p.get("variant").getAsInt(),readFrame(p.getAsJsonObject("from")),readFrame(p.getAsJsonObject("to")),p.getAsJsonObject("centre_curve").deepCopy()));}reader.endArray();}
-   case "pieces" -> {reader.beginArray();while(reader.hasNext()){var p=readSteelR52(reader);if(!names.add(p.name()))throw new IllegalArgumentException("Unique exact upright steel source pieces required");steel.add(p);}reader.endArray();}
+   case "pieces" -> {reader.beginArray();while(reader.hasNext()){var p=readSteelR52(reader,shared);if(!names.add(p.name()))throw new IllegalArgumentException("Unique exact upright steel source pieces required");steel.add(p);}reader.endArray();}
    case "anchors" -> {reader.beginArray();while(reader.hasNext()){var a=JsonParser.parseReader(reader).getAsJsonObject();var at=a.getAsJsonArray("at");var n=readPoint(a.getAsJsonArray("normal"));if(Math.abs(n.length()-1)>1e-9||Math.abs(n.x)+Math.abs(n.y)+Math.abs(n.z)!=1)throw new IllegalArgumentException("Actual finite native face required");feet.add(new Anchor(a.get("leg").getAsString(),new BlockPos(at.get(0).getAsInt(),at.get(1).getAsInt(),at.get(2).getAsInt()),a.get("state").getAsString(),readPoint(a.getAsJsonArray("bearing")),n,a.get("seat_piece").getAsString()));}reader.endArray();}
    default -> reader.skipValue();
   }}reader.endObject();}
   if(!"projectseele.r52.upright-captured-paths.v1".equals(schema)||binding.isEmpty()||steel.isEmpty()||feet.stream().anyMatch(a->!names.contains(a.seatPiece())))throw new IllegalArgumentException("Selected real outer model, paths, steel and native seats required");paths=List.copyOf(binding);fixed=List.copyOf(steel);anchors=List.copyOf(feet);installedSha=sha;supportsComplete=complete;matchedDirectory=null;index=new NervStaticSpatialIndexR52<>(fixed,p->p.steel().mesh().envelope(p.steel().frame(),p.steel().frame()));if(!matchesDirectory(directory)){paths=null;fixed=null;anchors=null;index=null;installedSha="";supportsComplete=false;throw new IllegalArgumentException("Upright source controls/Root directory differ");}
  }
- private static RailPiece readSteelR52(JsonReader reader)throws IOException {String name=null,leg=null,component=null;int side=0;RigidTransform frame=null;double[] rgb=null;reader.beginObject();while(reader.hasNext()){switch(reader.nextName()){case "name" -> name=reader.nextString();case "leg" -> leg=reader.nextString();case "side" -> side=reader.nextInt();case "component" -> component=reader.nextString();case "frame" -> frame=readFrame(JsonParser.parseReader(reader).getAsJsonObject());case "triangles_rgb" -> {double[] values=new double[256];int n=0;reader.beginArray();while(reader.hasNext()){if(n==values.length)values=Arrays.copyOf(values,n*2);double v=reader.nextDouble();if(!Double.isFinite(v))throw new IllegalArgumentException("Finite actual upright vertices required");values[n++]=v;}reader.endArray();rgb=Arrays.copyOf(values,n);}default -> reader.skipValue();}}reader.endObject();if(name==null||leg==null||frame==null||side!=-1&&side!=1||component==null||!Set.of("head","web","bracket","native_seat").contains(component)||rgb==null||rgb.length==0||rgb.length%18!=0)throw new IllegalArgumentException("Complete actual fixed upright primitive required");double[] xyz=new double[rgb.length/2];for(int i=0,k=0;i<rgb.length;i+=6){xyz[k++]=rgb[i];xyz[k++]=rgb[i+1];xyz[k++]=rgb[i+2];}return new RailPiece(name,leg,side,component,new NervServiceFootDriveR52.Piece(name,rgb,new NervRigidMeshSweepR52(xyz),frame,false));}
+ /** One document's rail steel. Of its 55,248 pieces only 18,571 local shapes are distinct (a rail is the same
+  * short box again and again along its curve), so equal shapes share one vertex array and one mesh. Equal
+  * means every coordinate bit for bit; each piece keeps its own frame. */
+ private static final class SharedSteelR64 {
+  private record Key(double[] rgb){
+   @Override public boolean equals(Object other){return other instanceof Key key&&Arrays.equals(rgb,key.rgb);}
+   @Override public int hashCode(){return Arrays.hashCode(rgb);}
+  }
+  private record Shape(double[] rgb,NervRigidMeshSweepR52 mesh){}
+  private final Map<Key,Shape> shapes=new HashMap<>();
+  private final Map<String,String> words=new HashMap<>();
+  Shape shape(double[] rgb){
+   return shapes.computeIfAbsent(new Key(rgb),key->{
+    double[] xyz=new double[rgb.length/2];for(int i=0,k=0;i<rgb.length;i+=6){xyz[k++]=rgb[i];xyz[k++]=rgb[i+1];xyz[k++]=rgb[i+2];}
+    return new Shape(rgb,new NervRigidMeshSweepR52(xyz));});
+  }
+  String word(String text){return words.computeIfAbsent(text,word->word);}
+ }
+ private static RailPiece readSteelR52(JsonReader reader,SharedSteelR64 shared)throws IOException {String name=null,leg=null,component=null;int side=0;RigidTransform frame=null;double[] rgb=null;reader.beginObject();while(reader.hasNext()){switch(reader.nextName()){case "name" -> name=reader.nextString();case "leg" -> leg=reader.nextString();case "side" -> side=reader.nextInt();case "component" -> component=reader.nextString();case "frame" -> frame=readFrame(JsonParser.parseReader(reader).getAsJsonObject());case "triangles_rgb" -> {double[] values=new double[256];int n=0;reader.beginArray();while(reader.hasNext()){if(n==values.length)values=Arrays.copyOf(values,n*2);double v=reader.nextDouble();if(!Double.isFinite(v))throw new IllegalArgumentException("Finite actual upright vertices required");values[n++]=v;}reader.endArray();rgb=Arrays.copyOf(values,n);}default -> reader.skipValue();}}reader.endObject();if(name==null||leg==null||frame==null||side!=-1&&side!=1||component==null||!Set.of("head","web","bracket","native_seat").contains(component)||rgb==null||rgb.length==0||rgb.length%18!=0)throw new IllegalArgumentException("Complete actual fixed upright primitive required");var shape=shared.shape(rgb);return new RailPiece(name,shared.word(leg),side,shared.word(component),new NervServiceFootDriveR52.Piece(name,shape.rgb(),shape.mesh(),frame,false));}
  /** Pure visual read. Consumers must build unpublished local buffers; only a
   * normal return permits publication. expectedSha is ignored (identity only).
   * This does not install paths, change physics fields or enable movement. */
  public static void readVisualR52(InputStream source,String expectedSha,java.util.function.Consumer<RailPiece> pieceConsumer,java.util.function.Consumer<Anchor> anchorConsumer)throws IOException {
-  String schema=null;boolean complete=false;int pieceCount=0,anchorCount=0;var names=new HashSet<String>();var anchorNames=new HashSet<String>();
+  String schema=null;boolean complete=false;int pieceCount=0,anchorCount=0;var names=new HashSet<String>();var anchorNames=new HashSet<String>();var shared=new SharedSteelR64();
   try(var reader=new JsonReader(new InputStreamReader(source,StandardCharsets.UTF_8))){reader.beginObject();while(reader.hasNext()){switch(reader.nextName()){
    case "schema" -> schema=reader.nextString();case "supports_complete" -> complete=reader.nextBoolean();
-   case "pieces" -> {reader.beginArray();while(reader.hasNext()){var p=readSteelR52(reader);if(!names.add(p.name()))throw new IllegalArgumentException("Duplicate visual steel name");pieceConsumer.accept(p);pieceCount++;}reader.endArray();}
+   case "pieces" -> {reader.beginArray();while(reader.hasNext()){var p=readSteelR52(reader,shared);if(!names.add(p.name()))throw new IllegalArgumentException("Duplicate visual steel name");pieceConsumer.accept(p);pieceCount++;}reader.endArray();}
    case "anchors" -> {reader.beginArray();while(reader.hasNext()){var a=JsonParser.parseReader(reader).getAsJsonObject();var at=a.getAsJsonArray("at");var n=readPoint(a.getAsJsonArray("normal"));if(Math.abs(n.length()-1)>1e-9||Math.abs(n.x)+Math.abs(n.y)+Math.abs(n.z)!=1)throw new IllegalArgumentException("Actual visual native face required");var p=new Anchor(a.get("leg").getAsString(),new BlockPos(at.get(0).getAsInt(),at.get(1).getAsInt(),at.get(2).getAsInt()),a.get("state").getAsString(),readPoint(a.getAsJsonArray("bearing")),n,a.get("seat_piece").getAsString());anchorNames.add(p.seatPiece());anchorConsumer.accept(p);anchorCount++;}reader.endArray();}
    default -> reader.skipValue();
   }}reader.endObject();if(reader.peek()!=com.google.gson.stream.JsonToken.END_DOCUMENT)throw new IllegalArgumentException("One exact visual source document required");}

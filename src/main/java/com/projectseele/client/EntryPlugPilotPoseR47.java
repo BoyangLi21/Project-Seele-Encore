@@ -20,6 +20,13 @@ public final class EntryPlugPilotPoseR47
 {
     private static final ThreadLocal<ArrayDeque<UUID>> PLAYER_PASSES=ThreadLocal.withInitial(ArrayDeque::new);
 
+    /** R64: the figure lies in a capsule's seat (and is drawn there): its limbs are the seated layer's, its hands hold nothing. */
+    public static boolean seated(LivingEntity rider)
+    {
+        return com.projectseele.client.cockpit.PilotCockpitR64.ON&&rider.getVehicle() instanceof EntryPlugCarrierEntity plug
+                &&plug.hasCanonicalPose()&&(!plug.isLockedToEva()||plug.usesPhysicalPilotSeatR52());
+    }
+
     public static boolean push(PoseStack pose,LivingEntity rider,float partial)
     {
         if(!(rider.getVehicle() instanceof EntryPlugCarrierEntity plug)||(plug.isLockedToEva()&&!plug.usesPhysicalPilotSeatR52())
@@ -33,6 +40,24 @@ public final class EntryPlugPilotPoseR47
         float headDelta=Mth.clamp(Mth.wrapDegrees(headYaw-vehicleYaw),-85F,85F);
         float bodyYaw=headYaw-headDelta;
         if(headDelta*headDelta>2500F)bodyYaw+=headDelta*.2F;
+        if(com.projectseele.client.cockpit.PilotCockpitR64.ON)
+        {
+            // R64: half lying along the plug, the hips where the seat is and the head at the eye marker.
+            // The straight figure leant about its middle put the feet through the plug's underside.
+            var eye=com.projectseele.world.EntryPlugKinematics.PILOT_EYE_P;
+            var hip=com.projectseele.client.cockpit.PilotSeatPoseR64.hip((float)eye.x,(float)eye.y,(float)eye.z);
+            var seated=frame.transformPoint(new net.minecraft.world.phys.Vec3(hip.x,hip.y,hip.z));
+            pose.pushPose();
+            pose.translate(seated.x-Mth.lerp((double)partial,rider.xOld,rider.getX()),
+                    seated.y-Mth.lerp((double)partial,rider.yOld,rider.getY()),
+                    seated.z-Mth.lerp((double)partial,rider.zOld,rider.getZ()));
+            pose.mulPose(new Quaternionf(frame.qx(),frame.qy(),frame.qz(),frame.qw())
+                    .rotateX(com.projectseele.client.cockpit.PilotSeatPoseR64.recline())
+                    .rotateY((bodyYaw-180F)*Mth.DEG_TO_RAD));
+            // The model's hip joint, not its feet, is what sits at that point.
+            pose.translate(0,-com.projectseele.client.cockpit.PilotSeatPoseR64.HIP,0);
+            return true;
+        }
         var rotation=new Quaternionf(frame.qx(),frame.qy(),frame.qz(),frame.qw())
                 .rotateX(com.projectseele.world.EntryPlugKinematics.pilotReclineRadiansR48())
                 .rotateY((bodyYaw-180F)*Mth.DEG_TO_RAD);

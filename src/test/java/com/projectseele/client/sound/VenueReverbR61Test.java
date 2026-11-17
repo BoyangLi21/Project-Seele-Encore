@@ -52,6 +52,33 @@ public final class VenueReverbR61Test
         // A walled street under open sky is still open air, not a room.
         float[] street = rays(kind -> kind >= 99 ? RANGE : kind == 10 ? 30 : RANGE);
         check(VenueReverbR61.Venue.OPEN, VenueReverbR61.classify(false, true, street, RANGE), "walled street");
+
+        // R64: a hangar bay's PA is at least the hangar wherever the listener stands; only the cavern is bigger.
+        for (var listener : VenueReverbR61.Venue.values())
+            check(listener == VenueReverbR61.Venue.CAVERN ? VenueReverbR61.Venue.CAVERN : VenueReverbR61.Venue.HANGAR,
+                    VenueReverbR61.bayVenue(listener), "hangar bay PA heard from " + listener);
+
+        // Every preset must stay inside OpenAL's EAX reverb ranges, or the effect is rejected and the send goes silent.
+        for (var v : VenueReverbR61.Venue.values())
+        {
+            range(v, "density", v.density, 0, 1);
+            range(v, "diffusion", v.diffusion, 0, 1);
+            range(v, "gain", v.gain, 0, 1);
+            range(v, "gainHf", v.gainHf, 0, 1);
+            range(v, "decay", v.decay, .1F, 20);
+            range(v, "decayHf", v.decayHf, .1F, 2);
+            range(v, "reflections", v.reflections, 0, 3.16F);
+            range(v, "reflectionsDelay", v.reflectionsDelay, 0, .3F);
+            range(v, "late", v.late, 0, 10);
+            range(v, "lateDelay", v.lateDelay, 0, .1F);
+            range(v, "echoTime", v.echoTime, .075F, .25F);
+            range(v, "echoDepth", v.echoDepth, 0, 1);
+        }
+    }
+
+    private static void range(VenueReverbR61.Venue venue, String name, float value, float low, float high)
+    {
+        if (value < low || value > high) throw new AssertionError(venue + "." + name + " = " + value + " outside " + low + ".." + high);
     }
 
     private VenueReverbR61Test() { }

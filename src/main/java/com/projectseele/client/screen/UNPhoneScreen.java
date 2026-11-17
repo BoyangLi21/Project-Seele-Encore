@@ -11,8 +11,7 @@ import net.minecraft.network.chat.Component;
 public final class UNPhoneScreen extends Screen
 {
     private ClientboundUNStatusPacket view;
-    private int serial,age,x,y,w,h,savedScale=-1,statusScroll,replyScroll,actionScroll,actionScrollMax;
-    private boolean restoring,scaling;
+    private int serial,age,x,y,w,h,statusScroll,replyScroll,actionScroll,actionScrollMax;
     private EditBox targetX,targetZ;
     private final Map<AbstractWidget,Integer> actionRows=new LinkedHashMap<>();
     private UNPhoneScreen(ClientboundUNStatusPacket view){super(Component.literal("UN 指挥通信"));this.view=view;}
@@ -39,15 +38,10 @@ public final class UNPhoneScreen extends Screen
     private int statusHeight(){return Math.max(54,(h-98)*52/100);}
     @Override protected void init()
     {
-        if(savedScale<0)savedScale=minecraft.options.guiScale().get();
-        if(!restoring&&!scaling)
-        {
-            var window=minecraft.getWindow();boolean unicode=minecraft.isEnforceUnicode();
-            int preferred=window.calculateScale(savedScale,unicode);
-            int selected=StaffConversationScreen.readableGuiScale(preferred,window.getWidth(),window.getHeight(),unicode);
-            if(minecraft.options.guiScale().get()!=selected)
-            {scaling=true;try{minecraft.options.guiScale().set(selected);minecraft.resizeDisplay();}finally{scaling=false;}return;}
-        }
+        var window=minecraft.getWindow();
+        int fitScale=StaffConversationScreen.readableGuiScale(ScreenGuiScale.normal(minecraft),window.getWidth(),window.getHeight(),minecraft.isEnforceUnicode());
+        // resize() comes back here with the new scale already set, and builds the widgets.
+        if(ScreenGuiScale.set(minecraft,fitScale)){resize(minecraft,window.getGuiScaledWidth(),window.getGuiScaledHeight());return;}
         String oldX=targetX==null?Integer.toString(minecraft.player.getBlockX()):targetX.getValue();
         String oldZ=targetZ==null?Integer.toString(minecraft.player.getBlockZ()):targetZ.getValue();
         w=Math.min(640,width-16);h=Math.min(410,height-16);x=(width-w)/2;y=(height-h)/2;actionRows.clear();
@@ -98,8 +92,7 @@ public final class UNPhoneScreen extends Screen
     }
     @Override public void removed()
     {
-        if(savedScale>=0&&!restoring&&minecraft.options.guiScale().get()!=savedScale)
-        {restoring=true;try{minecraft.options.guiScale().set(savedScale);minecraft.resizeDisplay();}finally{restoring=false;}}
+        ScreenGuiScale.set(minecraft,ScreenGuiScale.normal(minecraft));
         super.removed();
     }
     @Override public void render(GuiGraphics g,int mx,int my,float partial)

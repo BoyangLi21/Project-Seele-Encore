@@ -26,7 +26,13 @@ public final class CombatBodyDynamics
             net.minecraft.server.level.TicketType.create("projectseele_articulated_terrain",Comparator.comparingLong(net.minecraft.world.level.ChunkPos::toLong),80);
     private static final Map<LivingEntity,State> SERVER=new IdentityHashMap<>();
     private static final com.projectseele.util.WeakIdentityMap<LivingEntity,ClientState> CLIENT=new com.projectseele.util.WeakIdentityMap<>();
-    private record History(long tick,Vec3 position,float yaw,Map<String,Matrix4f> matrices) {}
+    /**
+     * The most of an actor's own going that a knocked-down body starts with (physics units a second; one is 25
+     * blocks): out of a move (a run is 1.7), in a move, and with the fast run held (7.6).
+     */
+    private static final float OWN_GOING_R64=2F,OWN_GOING_IN_A_MOVE_R64=1F,OWN_GOING_FAST_R64=8F;
+    /** A body's pose a tick or two ago, and where the actor stood at the record before that one. */
+    private record History(long tick,Vec3 position,float yaw,Map<String,Matrix4f> matrices,Vec3 earlier,long earlierTick) {}
     private static final com.projectseele.util.WeakIdentityMap<LivingEntity,History> HISTORY=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<LivingEntity,Long> HANDOFF=new com.projectseele.util.WeakIdentityMap<>();
     private static final Set<EvaUnit01Entity> ACTION_OWNERS=Collections.newSetFromMap(new IdentityHashMap<>());
@@ -34,7 +40,7 @@ public final class CombatBodyDynamics
     private static final class State
     {
         CombatBodyProfiles.Profile profile;ArticulatedBody simulation;EvaBodyPose.Sample template,pose,resting;
-        boolean groundImpact,thrown;
+        boolean groundImpact,thrown;int fuseSaidR63;
         Vec3 origin,position;float yaw;AABB bounds,terrainCoverage;long started;int age,stable,recoveryAge=-1;float recoveryStart,recoveryYaw,groundY;Vector3f recoveryOffset,endShift;
     }
     private static final class ClientState
@@ -78,7 +84,9 @@ public final class CombatBodyDynamics
         if(actor.tickCount%2!=0||active(actor)||scripted(actor)||!(actor instanceof EvaUnit01Entity||actor instanceof SachielEntity)||!available(actor))return;
         if(actor instanceof EvaUnit01Entity eva&&(eva.isNervLogisticsLocked()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)))return;
         var profile=CombatBodyProfiles.get(actor);var pose=raw(actor,0);AnatomicalLimbConstraints.apply(pose,profile);
-        HISTORY.put(actor,new History(actor.level().getGameTime(),actor.position(),actor.getYRot(),CombatBodyProfiles.physicalMatrices(pose,profile)));
+        var before=HISTORY.get(actor);
+        HISTORY.put(actor,new History(actor.level().getGameTime(),actor.position(),actor.getYRot(),CombatBodyProfiles.physicalMatrices(pose,profile),
+                before==null?null:before.position(),before==null?Long.MIN_VALUE:before.tick()));
     }
     public static EvaBodyPose.Sample sample(LivingEntity entity,float partial)
     {
@@ -137,22 +145,61 @@ public final class CombatBodyDynamics
         {
             var transform=new Matrix4f().translation(local(s,history.position)).rotateY((s.yaw-history.yaw)*Mth.DEG_TO_RAD);
             Map<String,Matrix4f> previousFrames=new HashMap<>();history.matrices.forEach((n,m)->previousFrames.put(n,new Matrix4f(transform).mul(m)));
-            s.simulation.motionFromPose(previousFrames,since/20F);
+            // The actor's own going since that pose, in the body's frame: what a pose adds to it is believed only so far.
+            Vector3f went=POSE_CUT_R64?local(s,history.position).negate().div(since/20F):null;
+            float measured=went==null?0:went.length(),earlier=Float.NaN;
+            if(went!=null)
+            {
+                // And the actor's going itself only as far as it was going before: a move's first frame sets the
+                // actor aside as it sets the pose aside (a side kick, 3.8 to 7.3 blocks in its first tick), and read
+                // as the body's speed that threw a Unit 65 and 148 blocks with the pose's own share already cut.
+                // Before is what it covered between the two records before this, or its own motion where there is one record.
+                long gap=history.earlier==null?0:history.tick-history.earlierTick;
+                Vector3f was=gap>0&&gap<=4&&history.earlier.distanceTo(history.position)<12
+                        ?local(s,history.position).sub(local(s,history.earlier)).div(gap/20F)
+                        :motion.toVector3f().rotateY(-(180-s.yaw)*Mth.DEG_TO_RAD).mul(20*SCALE);
+                earlier=was.length();
+                Vector3f jump=new Vector3f(went).sub(was);float size=jump.length();
+                if(size>ArticulatedBody.POSE_CARRY_R64)
+                    went=was.add(jump.mul(Math.max(0,(ArticulatedBody.POSE_CUT_R64-size)/(ArticulatedBody.POSE_CUT_R64-ArticulatedBody.POSE_CARRY_R64))));
+                // And no more of it than the body's own legs give it. A move carries the actor along its own path:
+                // a side kick's lunge, 55 and then 77 blocks a second over two records running, agreed with itself
+                // and went into the fall whole, and the Unit slid 53 and 86 blocks. In a move a walk's pace is
+                // believed; out of one a run's, and the fast run's while that is held.
+                float most=OWN_GOING_R64;
+                if(entity instanceof EvaUnit01Entity eva)
+                    most=eva.hasLiveActionForRender(0)?OWN_GOING_IN_A_MOVE_R64:Mth.lerp(com.projectseele.entity.EvaSprintR50.blend(eva,1),OWN_GOING_R64,OWN_GOING_FAST_R64);
+                if(went.length()>most)went.mul(most/went.length());
+            }
+            float[] carried=s.simulation.motionFromPose(previousFrames,since/20F,went);
+            if(DIAG_R63&&carried!=null)ProjectSeele.LOGGER.info("R63BODY start from the pose of {} ticks before: the actor went {} units a second ({} before that, {} believed), the pose carried the mass centre {} beyond that, {} of it kept",
+                    since,String.format(java.util.Locale.ROOT,"%.2f",measured),String.format(java.util.Locale.ROOT,"%.2f",earlier),String.format(java.util.Locale.ROOT,"%.2f",went.length()),
+                    String.format(java.util.Locale.ROOT,"%.2f",carried[0]),String.format(java.util.Locale.ROOT,"%.2f",carried[1]));
         }
+        if(FUSE_R63)s.simulation.fuseR63(FUSE_SIDE_R63,FUSE_UP_R63);
         if(strength>=0)impulse(s,point,direction,strength);SERVER.put(entity,s);
         if(entity instanceof EvaUnit01Entity eva){eva.beginPhysicalControlR35();EvaCombatR31.clear(eva);if(eva instanceof EvaPrototypeEntity un)un.stopUNFlight();}
         if(entity instanceof SachielEntity angel)angel.cancelStrikeR31();
         send(entity,s,1);ProjectSeele.LOGGER.info("Articulated impact started actor={} rig={} point={}",entity.getUUID(),s.profile.key(),point);return true;
     }
+    private static final boolean FUSE_R63=!"false".equals(System.getProperty("projectseele.bodyFuseR63"));
+    /** -Dprojectseele.bodyPoseCutR64=false: every part starts at the speed its pose changed by, a cut between moves included. */
+    private static final boolean POSE_CUT_R64=!"false".equals(System.getProperty("projectseele.bodyPoseCutR64"));
+    private static final float FUSE_SIDE_R63=Float.parseFloat(System.getProperty("projectseele.bodyFuseSideR63","6")),FUSE_UP_R63=Float.parseFloat(System.getProperty("projectseele.bodyFuseUpR63","4"));
+    /** Review: every blow's impulse times this, and pointed up as Sachiel's overhead points it, to blow the fuse on purpose. */
+    private static final float BLOW_SCALE_R63=Float.parseFloat(System.getProperty("projectseele.bodyBlowScaleR63","1"));
+    private static final boolean BLOW_UP_R63=Boolean.getBoolean("projectseele.bodyBlowUpR63");
     private static void impulse(State s,Vec3 point,Vec3 direction,float strength)
     {
-        Vector3f p=local(s,point),force=direction.toVector3f().rotateY(-(180-s.yaw)*Mth.DEG_TO_RAD).normalize().mul(45+30*strength);
+        if(BLOW_UP_R63){Vec3 flat=direction.multiply(1,0,1);direction=(flat.lengthSqr()<1e-8?new Vec3(0,1,0):flat.normalize().scale(.35).add(0,.93,0)).normalize();}
+        Vector3f p=local(s,point),force=direction.toVector3f().rotateY(-(180-s.yaw)*Mth.DEG_TO_RAD).normalize().mul((45+30*strength)*BLOW_SCALE_R63);
         var frame=s.simulation.frame();String nearest="torso_upper";double distance=Double.MAX_VALUE;
         for(var entry:frame.deformation().entrySet())
         {
             var pivot=new Vector3f(s.profile.rig().get(entry.getKey()).pivot()).mul(CombatBodyProfiles.MODEL_TO_PHYSICS);
             float d=entry.getValue().transformPosition(pivot).distanceSquared(p);if(d<distance){distance=d;nearest=entry.getKey();}
         }
+        if(DIAG_R63)ProjectSeele.LOGGER.info("R63BODY impulse age {} strength {} direction {} force {} on {}",s.age,strength,direction,force,nearest);
         s.simulation.impulse(nearest,p,force);
     }
     public static boolean thrown(LivingEntity entity,Vec3 velocity)
@@ -211,9 +258,11 @@ public final class CombatBodyDynamics
         AABB result=null;for(float x:new float[]{min.x,max.x})for(float y:new float[]{min.y,max.y})for(float z:new float[]{min.z,max.z})
         {Vec3 p=world(s,new Vector3f(x,y,z));AABB point=new AABB(p,p);result=result==null?point:result.minmax(point);}return result;
     }
+    private static final boolean DIAG_R63=Boolean.getBoolean("projectseele.bodyDiagR63");
+    private static final boolean ACTORS_R63=!"false".equals(System.getProperty("projectseele.bodyActorsR63"));
     private static void updateStandingActors(LivingEntity entity,State s)
     {
-        if(!CombatReactionsR36.enabled(entity))return;s.simulation.beginActorFrame();
+        if(!CombatReactionsR36.enabled(entity)||!ACTORS_R63)return;s.simulation.beginActorFrame();
         for(var other:entity.level().getEntitiesOfClass(LivingEntity.class,s.bounds.inflate(45),e->e!=entity&&(e instanceof EvaUnit01Entity||e instanceof SachielEntity)&&e.isAlive()&&!active(e)))
         {
             if(other instanceof EvaUnit01Entity eva&&(eva.isNervLogisticsLocked()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)))continue;
@@ -243,6 +292,10 @@ public final class CombatBodyDynamics
         {
             LivingEntity entity=entry.getKey();State s=entry.getValue();
             if(entity.isRemoved()||scripted(entity)||entity instanceof EvaUnit01Entity e&&(e.isNervLogisticsLocked()||EvaAirTransportR31.active(e))){cancel(entity);acknowledgeHandoff(entity);continue;}
+            // R64 (M4), hit-stop "tiered": a body felled by a blow stands held on it with the one that struck, and
+            // falls when the hold ends. (A hold of one tick or two, all there was up to R63, is not waited for.)
+            var heldR64=com.projectseele.entity.CombatFeelR31.beat(entity);
+            if(heldR64!=null&&heldR64.stopTicks()>2&&com.projectseele.entity.CombatFeelR31.hitPaused(entity))continue;
             try
             {
                 s.age++;
@@ -255,7 +308,15 @@ public final class CombatBodyDynamics
                     {if(!addTerrain((ServerLevel)entity.level(),entity,s)){entity.setDeltaMovement(Vec3.ZERO);continue;}}
                     else if(s.age%20==0&&!retainTerrain((ServerLevel)entity.level(),s.terrainCoverage))
                     {s.terrainCoverage=null;entity.setDeltaMovement(Vec3.ZERO);continue;}
+                    Vec3 beforeR63=s.position;
                     if(s.age>2)s.simulation.step(.05F);var frame=s.simulation.frame();s.bounds=worldBounds(s,frame.min(),frame.max());
+                    float fused=s.simulation.fusedR63();
+                    if(fused>0&&s.age>=s.fuseSaidR63)
+                    {
+                        s.fuseSaidR63=s.age+10;
+                        ProjectSeele.LOGGER.warn("Fallen body held to its speed limit: actor={} rig={} age={} mass centre {} units a second at {}; {}",entity.getUUID(),s.profile.key(),s.age,
+                                String.format(java.util.Locale.ROOT,"%.1f",fused),s.position,s.simulation.actorContactsR63());
+                    }
                     if(!s.groundImpact&&s.age>5&&frame.groundImpulse()>4)
                     {s.groundImpact=true;groundImpact((ServerLevel)entity.level(),world(s,frame.impactPoint()));}
                     var hip=new Vector3f(s.profile.rig().get("leg_l").pivot()).add(s.profile.rig().get("leg_r").pivot()).mul(.5F*CombatBodyProfiles.MODEL_TO_PHYSICS);
@@ -263,6 +324,17 @@ public final class CombatBodyDynamics
                     Vector3f offset=new Vector3f(moved.x-hip.x,frame.min().y,moved.z-hip.z);s.position=world(s,offset);
                     s.pose=CombatBodyProfiles.render(s.template,frame.deformation(),offset);
                     stitch(s.pose,s.profile);
+                    if(DIAG_R63&&(s.age<=120||s.position.distanceTo(beforeR63)>3))
+                    {
+                        StringBuilder near=new StringBuilder();
+                        for(var other:entity.level().getEntitiesOfClass(LivingEntity.class,s.bounds.inflate(45),e->e!=entity&&(e instanceof EvaUnit01Entity||e instanceof SachielEntity)&&e.isAlive()))
+                            near.append(String.format(java.util.Locale.ROOT," %s at %.1f moved %.2f%s",other.getType().toShortString(),other.position().distanceTo(s.position),
+                                    other.position().distanceTo(new Vec3(other.xo,other.yo,other.zo)),other instanceof SachielEntity a?" strike "+a.isStrikeActive()+" mode "+a.strikeMode()+" age "+a.strikeAge(0):""));
+                        ProjectSeele.LOGGER.info("R63BODY {} age {} at {} moved {} torso speed {} contacts {}; {};{}",entity.getType().toShortString(),s.age,
+                                String.format(java.util.Locale.ROOT,"%.1f %.1f %.1f",s.position.x,s.position.y,s.position.z),
+                                String.format(java.util.Locale.ROOT,"%.2f",s.position.distanceTo(beforeR63)),String.format(java.util.Locale.ROOT,"%.2f",frame.speed()),
+                                frame.supportContacts(),s.simulation.actorContactsR63(),near);
+                    }
                     s.stable=frame.supportContacts()>1&&frame.speed()<.40F?s.stable+1:0;
                     var beat=CombatFeelR31.beat(entity);
                     if(s.stable>0&&s.age>10&&s.thrown)
@@ -376,11 +448,27 @@ public final class CombatBodyDynamics
         if(entity instanceof EvaUnit01Entity eva&&eva.getPilotEntity() instanceof net.minecraft.server.level.ServerPlayer pilot)
             pilot.connection.send(new net.minecraft.network.protocol.game.ClientboundMoveVehiclePacket(entity));
     }
+    private static final boolean HANDBACK_R63=!"false".equals(System.getProperty("projectseele.physicalHandbackR63"));
     public static void receive(LivingEntity entity,ClientboundCombatBodyPose packet)
     {
         if(entity instanceof FirstBattleSignals.Actor actor&&actor.firstBattleSignals().active(entity))
         {CLIENT.remove(entity);return;}
-        if(packet.mode()==0){CLIENT.remove(entity);entity.setPos(packet.position().x,packet.position().y,packet.position().z);entity.setYRot(packet.yaw());entity.yBodyRot=entity.yHeadRot=packet.yaw();entity.setDeltaMovement(Vec3.ZERO);entity.resetFallDistance();entity.refreshDimensions();entity.setOnGround(true);return;}
+        if(packet.mode()==0)
+        {
+            CLIENT.remove(entity);entity.setPos(packet.position().x,packet.position().y,packet.position().z);entity.setYRot(packet.yaw());entity.yBodyRot=entity.yHeadRot=packet.yaw();
+            // The get-up ends on the standing pose with the unit set under it, 20 blocks and more from where the
+            // simulation held it and turned. Only the present position and yaw were set: a frame drawn before the
+            // next tick stood between the old place and the new, and the interpolation still running toward the
+            // last position sent took the unit back to it over the following ticks. With the standing pose on it,
+            // the body was drawn 24 blocks off and 137 degrees round for a frame (7 FPS), then back.
+            if(HANDBACK_R63)
+            {
+                entity.lerpTo(entity.getX(),entity.getY(),entity.getZ(),packet.yaw(),entity.getXRot(),1,true);
+                entity.xo=entity.xOld=entity.getX();entity.yo=entity.yOld=entity.getY();entity.zo=entity.zOld=entity.getZ();
+                entity.yRotO=entity.yBodyRotO=entity.yHeadRotO=packet.yaw();
+            }
+            entity.setDeltaMovement(Vec3.ZERO);entity.resetFallDistance();entity.refreshDimensions();entity.setOnGround(true);return;
+        }
         var profile=CombatBodyProfiles.get(entity);if(profile==null)return;var pose=new EvaBodyPose.Sample(profile.rig());EvaShutdownR30.decode(packet.pose(),pose);
         ClientState s=CLIENT.get(entity);if(s==null){s=new ClientState();s.current=pose;s.position=packet.position();CLIENT.put(entity,s);if(entity instanceof EvaUnit01Entity eva)eva.beginPhysicalControlR35();}
         float alpha=s.blendClock.sample(System.nanoTime());

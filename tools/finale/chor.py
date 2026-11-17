@@ -332,12 +332,17 @@ def kneel(eva, t0, t1):
 
 # --------------------------------------------------------------- 12.4 - 16.35 ground and pound
 BLOWS = (12.75, 13.35, 14.15, 14.75, 15.35, 16.05)
+# A fist stays on the core this long before it comes off: the clip has 30 frames a second and a blow that turns
+# round in less than a frame is never drawn touching (contact.py measured every fist 1.0 to 1.7 blocks short).
+DWELL = 0.05
 
 
 def pound(eva, ang):
     """Hands are keyed relative to Sachiel's core (channels pound_l/pound_r, see contacts)."""
     both_up = ((2.2, 37.0, -11.0), (-2.2, 37.0, -11.0))
-    both_hit = ((2.3, 2.6, -0.4), (-2.3, 2.6, -0.4))
+    # the knuckles are 0.3 to 0.5 under the hand's own point and the core's surface 0.6 over its point
+    # (the lying body is not the same height on both sides of the core)
+    both_hit = ((2.3, 0.9, -0.4), (-2.3, 0.55, -0.4))
     plans = [  # (raise time, impact, kind)
         (12.58, 12.75, 'both'), (13.18, 13.35, 'both'), (13.95, 14.15, 'right'),
         (14.56, 14.75, 'left'), (15.17, 15.35, 'both'), (15.84, 16.05, 'final')]
@@ -352,6 +357,7 @@ def pound(eva, ang):
                 eva.key(raise_t + 0.06, ease='flat', pound_l=up[0], pound_r=up[1])
             eva.key(hit - 0.06, pound_l=(2.3, 21.0, 6.5), pound_r=(-2.3, 21.0, 6.5))
             eva.key(hit, pound_l=(both_hit[0], 'fast'), pound_r=(both_hit[1], 'fast'))
+            eva.key(hit + DWELL, pound_l=both_hit[0], pound_r=both_hit[1])
             body_up = dict(hip=(0, 18.6 if kind == 'both' else 20.0, KNEEL_Z - 0.6), pelvis_rot=(0, -6 if kind == 'both' else -10, 0),
                            chest=(0, -22 if kind == 'both' else -30, 0), head=(0, 4, 0), jaw=30.0,
                            elbow_l=(0.7, 0.3, -0.6), elbow_r=(-0.7, 0.3, -0.6))
@@ -361,10 +367,12 @@ def pound(eva, ang):
             s = 1 if kind == 'left' else -1
             strike = 'pound_l' if kind == 'left' else 'pound_r'
             brace = 'pound_r' if kind == 'left' else 'pound_l'
-            eva.key(raise_t, ease='flat', **{strike: (s * 6.0, 36.0, -10.0), brace: (-s * 6.5, 2.4, -3.5)})
+            land, lean = (s * 1.2, 1.4 if s > 0 else 1.9, -0.2), (-s * 4.2, -0.5, -3.0)
+            eva.key(raise_t, ease='flat', **{strike: (s * 6.0, 36.0, -10.0), brace: lean})
             eva.key(raise_t, elbow_l=(1.0, 0.1, -0.3), elbow_r=(-1.0, 0.1, -0.3))
             eva.key(hit - 0.06, **{strike: (s * 2.0, 21.0, 6.0)})
-            eva.key(hit, **{strike: ((s * 1.2, 2.6, -0.2), 'fast'), brace: (-s * 6.5, 2.4, -3.5)})
+            eva.key(hit, **{strike: (land, 'fast'), brace: lean})
+            eva.key(hit + DWELL, **{strike: land, brace: lean})
             body_up = dict(hip=(0, 18.2, KNEEL_Z - 0.4), pelvis_rot=(0, -2, -4 * s), chest=(s * 18, -14, 0), head=(s * 6, 6, 0),
                            jaw=32.0)
             body_hit = dict(hip=(0, 16.2, KNEEL_Z + 0.6), pelvis_rot=(0, 18, 4 * s), chest=(-s * 14, 28, 0), head=(-s * 4, 24, 0),
@@ -372,7 +380,7 @@ def pound(eva, ang):
         eva.key(raise_t, ease='flat', **body_up)
         eva.key(hit, **{k: (v, 'fast') if k in ('hip', 'chest', 'pelvis_rot') else v for k, v in body_hit.items()})
         # recoil off the core, then the fists come back up in front of the chest
-        rec = hit + 0.08
+        rec = hit + DWELL + 0.08
         eva.key(rec, pound_l=(2.7, 5.4, -1.0), pound_r=(-2.7, 5.4, -1.0))
         nxt = plans[plans.index((raise_t, hit, kind)) + 1][2] if hit != BLOWS[-1] else None
         if nxt in ('both', 'final', 'left'):
@@ -381,7 +389,7 @@ def pound(eva, ang):
             eva.key(rec + 0.2, pound_r=(-3.2, 21.0, 3.0))
         eva.key(rec, hip=(0, 16.4, KNEEL_Z + 0.4), pelvis_rot=(0, 16, 0), chest=(0, 24, 0), head=(0, 20, 0))
     # after the last blow: fists stay ground into the cracked core
-    eva.key(16.3, pound_l=(2.6, 3.4, -0.8), pound_r=(-2.6, 3.4, -0.8), hip=(0, 16.0, KNEEL_Z + 0.6),
+    eva.key(16.3, pound_l=(2.6, 0.7, -0.8), pound_r=(-2.6, 0.7, -0.8), hip=(0, 16.0, KNEEL_Z + 0.6),
             pelvis_rot=(0, 18, 0), chest=(0, 28, 0), head=(0, 24, 0), jaw=24.0)
     # Sachiel convulses under each blow
     for hit in BLOWS:

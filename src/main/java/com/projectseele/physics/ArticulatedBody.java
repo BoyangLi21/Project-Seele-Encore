@@ -1,6 +1,5 @@
 package com.projectseele.physics;
 
-import com.bulletphysics.collision.broadphase.DbvtBroadphase;
 import com.bulletphysics.collision.dispatch.*;
 import com.bulletphysics.collision.shapes.*;
 import com.bulletphysics.dynamics.*;
@@ -15,7 +14,7 @@ public final class ArticulatedBody implements AutoCloseable
 {
     public record Frame(Map<String,org.joml.Matrix4f> deformation,org.joml.Vector3f min,org.joml.Vector3f max,float speed,int supportContacts,float groundImpulse,org.joml.Vector3f impactPoint) {}
     private final CollisionDispatcher dispatcher;
-    private final DiscreteDynamicsWorld world;
+    private final TerrainSteadyWorld world;
     private final Map<String,RigidBody> bodies=new LinkedHashMap<>();
     private final Map<String,Transform> binds=new LinkedHashMap<>();
     private final Map<String,List<Vector3f>> surfaceVertices=new HashMap<>();
@@ -44,7 +43,7 @@ public final class ArticulatedBody implements AutoCloseable
     public ArticulatedBody(JsonObject definition,Map<String,org.joml.Matrix4f> initialDeformation)
     {
         var configuration=new DefaultCollisionConfiguration();dispatcher=new CollisionDispatcher(configuration);
-        world=new DiscreteDynamicsWorld(dispatcher,new DbvtBroadphase(),new SequentialImpulseConstraintSolver(),configuration);
+        world=new TerrainSteadyWorld(dispatcher,new TerrainPruningBroadphase(),new SequentialImpulseConstraintSolver(),configuration);
         world.setGravity(new Vector3f(0,-9.81F,0));world.getSolverInfo().numIterations=30;
         // Separating an overlap with an animated opponent must not become
         // launch velocity that drives a connected limb through a thin floor.
@@ -100,7 +99,7 @@ public final class ArticulatedBody implements AutoCloseable
     public void addStaticBox(org.joml.Vector3f centre,org.joml.Vector3f halfSize,org.joml.Quaternionf orientation)
     {
         Transform pose=new Transform();pose.setIdentity();pose.origin.set(centre.x,centre.y,centre.z);pose.setRotation(new Quat4f(orientation.x,orientation.y,orientation.z,orientation.w));
-        var body=makeBody(0,new BoxShape(new Vector3f(halfSize.x,halfSize.y,halfSize.z)),pose);body.setUserPointer("terrain");scenery.add(body);
+        var body=makeBody(0,new BoxShape(new Vector3f(halfSize.x,halfSize.y,halfSize.z)),pose);body.setUserPointer("terrain");world.terrain(body);scenery.add(body);
         if(Math.abs(orientation.x)<1e-5F&&Math.abs(orientation.z)<1e-5F){Transform inverse=new Transform(pose);inverse.inverse();Vector3f low=new Vector3f(),high=new Vector3f();body.getAabb(low,high);surfaces.add(new TerrainSurface(inverse,new Vector3f(halfSize.x,halfSize.y,halfSize.z),low,high));}
     }
     public void clearTerrain()
@@ -131,8 +130,76 @@ public final class ArticulatedBody implements AutoCloseable
             body.setCenterOfMassTransform(at);body.setInterpolationWorldTransform(at);body.getMotionState().setWorldTransform(at);
         }
     }
+    /**
+     * What the standing bodies are doing to this one: points of contact with them, the deepest overlap (physics
+     * units, negative inside), the largest impulse a contact applied, and the fastest part with its speed.
+     */
+    public String actorContactsR63()
+    {
+        int points=0;float deepest=0,impulse=0;String part="-";
+        for(int i=0;i<dispatcher.getNumManifolds();i++)
+        {
+            var contact=dispatcher.getManifoldByIndexInternal(i);var a=(CollisionObject)contact.getBody0();var b=(CollisionObject)contact.getBody1();
+            boolean first="other-actor".equals(a.getUserPointer());
+            if(!first&&!"other-actor".equals(b.getUserPointer()))continue;
+            for(int n=0;n<contact.getNumContacts();n++)
+            {
+                var point=contact.getContactPoint(n);points++;impulse=Math.max(impulse,point.appliedImpulse);
+                if(point.getDistance()<deepest){deepest=point.getDistance();part=String.valueOf(first?b.getUserPointer():a.getUserPointer());}
+            }
+        }
+        String fastest="-";float speed=0,mass=0;Vector3f momentum=new Vector3f();
+        for(var body:bodies.values())
+        {
+            float m=body.getInvMass()>0?1/body.getInvMass():0;Vector3f v=body.getLinearVelocity(new Vector3f());
+            mass+=m;momentum.x+=v.x*m;momentum.y+=v.y*m;momentum.z+=v.z*m;
+        }
+        if(mass>0)momentum.scale(1/mass);
+        String centre=String.format(java.util.Locale.ROOT,"; mass centre %.2f %.2f %.2f; swept lift %.3f in %d sub-steps",momentum.x,momentum.y,momentum.z,liftedR63,liftsR63);
+        liftedR63=0;liftsR63=0;
+        for(var entry:bodies.entrySet())
+        {
+            float v=entry.getValue().getLinearVelocity(new Vector3f()).length();
+            if(v>speed){speed=v;fastest=entry.getKey();}
+        }
+        return String.format(java.util.Locale.ROOT,"actors %d parts (%d passed through), %d points, deepest %.3f at %s, impulse %.2f; fastest %s %.2f",actors.size(),ghostsR63,points,deepest,part,impulse,fastest,speed)+centre;
+    }
     public void endActorFrame()
-    {var it=actors.entrySet().iterator();while(it.hasNext()){var e=it.next();if(!actorFrame.contains(e.getKey())){world.removeRigidBody(e.getValue());it.remove();}}world.updateAabbs();}
+    {
+        var it=actors.entrySet().iterator();while(it.hasNext()){var e=it.next();if(!actorFrame.contains(e.getKey())){world.removeRigidBody(e.getValue());it.remove();}}world.updateAabbs();
+        if(GHOST_R63>0&&!actors.isEmpty())ghostDeepActorsR63();
+    }
+    /**
+     * Overlap (units of 25 blocks) past which a standing body's part does not push this one. A standing body is
+     * set where its pose puts it each tick, with no speed of its own, and two bodies at arm's length stand with
+     * their legs through each other's hulls. The solver answers an overlap it is handed with whatever impulse
+     * parts them. Up to two blocks that is a shove, as it always was. Deeper, it was 556 and 621 units, eight
+     * blows' worth: the body left its knock-down at 155 blocks a second, and one before the fuse went 904 blocks.
+     * A part that deep in is passed through until the bodies have come within two blocks of apart by themselves.
+     * A body that falls against a standing one meets it at no depth and is stopped as before.
+     * 0 turns it off; .02 passes through nearly every part that touches (measured: no impulse over 61, but the
+     * body lies 7 blocks into Sachiel for most of a second).
+     */
+    private static final float GHOST_R63=Float.parseFloat(System.getProperty("projectseele.bodyGhostR63",".08"));
+    private int ghostsR63;
+    private void ghostDeepActorsR63()
+    {
+        world.performDiscreteCollisionDetection();
+        Set<CollisionObject> deep=Collections.newSetFromMap(new IdentityHashMap<>());
+        for(int i=0;i<dispatcher.getNumManifolds();i++)
+        {
+            var contact=dispatcher.getManifoldByIndexInternal(i);var a=(CollisionObject)contact.getBody0();var b=(CollisionObject)contact.getBody1();
+            boolean first="other-actor".equals(a.getUserPointer());
+            if(!first&&!"other-actor".equals(b.getUserPointer()))continue;
+            for(int n=0;n<contact.getNumContacts();n++)if(contact.getContactPoint(n).getDistance()<-GHOST_R63){deep.add(first?a:b);break;}
+        }
+        for(var body:actors.values())
+        {
+            int flags=body.getCollisionFlags();
+            body.setCollisionFlags(deep.contains(body)?flags|CollisionFlags.NO_CONTACT_RESPONSE:flags&~CollisionFlags.NO_CONTACT_RESPONSE);
+        }
+        ghostsR63=deep.size();
+    }
     public void impulse(String bone,org.joml.Vector3f point,org.joml.Vector3f impulse)
     {
         var body=bodies.getOrDefault(bone,bodies.get("torso_upper"));var origin=body.getCenterOfMassPosition(new Vector3f());
@@ -140,18 +207,59 @@ public final class ArticulatedBody implements AutoCloseable
     }
     public void velocity(org.joml.Vector3f velocity)
     {for(var body:bodies.values())body.setLinearVelocity(new Vector3f(velocity.x,velocity.y,velocity.z));}
-    public void motionFromPose(Map<String,org.joml.Matrix4f> previous,float seconds)
+    /** As far as this beyond its actor's own going, a pose is believed to have carried the body (units a second). */
+    public static final float POSE_CARRY_R64=1.5F;
+    /** From here on the difference between two poses is a cut from one move to the next, and no speed at all. */
+    public static final float POSE_CUT_R64=3F;
+    /**
+     * Starts every part at the speed its pose changed by since {@code previous}, {@code seconds} ago.
+     * {@code actor}, where given: how fast the actor itself went meanwhile (units a second, this body's frame).
+     * What the mass centre did beyond that is the pose's doing, and a pose carries a body only so fast: a move
+     * begun the tick before starts from a frame of its clip that stands elsewhere than the frame it follows (a
+     * side kick's first frame is five blocks aside of standing), and read as speed that threw a Unit 135 blocks.
+     * Up to POSE_CARRY_R64 the pose is believed; from there to POSE_CUT_R64 less and less of what it adds to the
+     * actor's going is kept, turning included, and past that none.
+     * Returns the mass centre's speed beyond the actor's and the share kept, or null where no actor was given.
+     */
+    public float[] motionFromPose(Map<String,org.joml.Matrix4f> previous,float seconds,org.joml.Vector3f actor)
     {
-        if(seconds<=0)return;
+        if(seconds<=0)return null;
+        Map<String,Vector3f> linear=new LinkedHashMap<>(),turning=new HashMap<>();float mass=0;Vector3f centre=new Vector3f();
         for(var entry:bodies.entrySet())
         {
             var before=previous.get(entry.getKey());if(before==null)continue;
             Transform old=transform(before);old.mul(binds.get(entry.getKey()));Transform now=entry.getValue().getCenterOfMassTransform(new Transform());
-            Vector3f speed=new Vector3f(now.origin);speed.sub(old.origin);speed.scale(1/seconds);if(speed.length()>5)speed.scale(5/speed.length());entry.getValue().setLinearVelocity(speed);
+            Vector3f speed=new Vector3f(now.origin);speed.sub(old.origin);speed.scale(1/seconds);linear.put(entry.getKey(),speed);
             Quat4f a=old.getRotation(new Quat4f()),b=now.getRotation(new Quat4f());a.conjugate();b.mul(a);if(b.w<0)b.scale(-1);
             float sin=(float)Math.sqrt(b.x*b.x+b.y*b.y+b.z*b.z),angle=2*(float)Math.atan2(sin,b.w);Vector3f angular=new Vector3f(b.x,b.y,b.z);
-            if(sin>.00001F)angular.scale(Math.min(9,angle/seconds)/sin);else angular.set(0,0,0);entry.getValue().setAngularVelocity(angular);
+            if(sin>.00001F)angular.scale(Math.min(9,angle/seconds)/sin);else angular.set(0,0,0);turning.put(entry.getKey(),angular);
+            if(entry.getValue().getInvMass()>0){float m=1/entry.getValue().getInvMass();mass+=m;centre.scaleAdd(m,speed,centre);}
         }
+        float beyond=0,kept=1;Vector3f went=actor==null?null:new Vector3f(actor.x,actor.y,actor.z);
+        if(went!=null&&mass>0)
+        {
+            centre.scale(1/mass);centre.sub(went);beyond=centre.length();
+            kept=beyond<=POSE_CARRY_R64?1:Math.max(0,(POSE_CUT_R64-beyond)/(POSE_CUT_R64-POSE_CARRY_R64));
+        }
+        for(var entry:linear.entrySet())
+        {
+            Vector3f speed=entry.getValue(),angular=turning.get(entry.getKey());
+            if(kept<1){speed.sub(went);speed.scale(kept);speed.add(went);angular.scale(kept);}
+            if(speed.length()>5)speed.scale(5/speed.length());
+            var body=bodies.get(entry.getKey());body.setLinearVelocity(speed);body.setAngularVelocity(angular);
+        }
+        return went==null?null:new float[]{beyond,kept};
+    }
+    /** The mass centre's velocity (units a second). */
+    public org.joml.Vector3f massCentreVelocity()
+    {
+        float mass=0;Vector3f sum=new Vector3f();
+        for(var body:bodies.values())
+        {
+            if(body.getInvMass()<=0)continue;
+            float m=1/body.getInvMass();mass+=m;sum.scaleAdd(m,body.getLinearVelocity(new Vector3f()),sum);
+        }
+        return mass<=0?new org.joml.Vector3f():new org.joml.Vector3f(sum.x/mass,sum.y/mass,sum.z/mass);
     }
     public void step(float seconds)
     {
@@ -161,6 +269,37 @@ public final class ArticulatedBody implements AutoCloseable
         {
             Map<String,Transform> previous=new HashMap<>();bodies.forEach((n,b)->previous.put(n,b.getCenterOfMassTransform(new Transform())));
             world.stepSimulation(dt,0,dt);projectSweptTerrain(previous);
+            if(fuseSideR63>0)limitMassCentreR63();
+        }
+    }
+    private float fuseSideR63,fuseUpR63,fusedR63;
+    /**
+     * A fuse, not a feel: the body's mass centre goes no faster than this sideways or upward (units a second;
+     * falling is not limited). Of 90 knock-downs measured, the fastest mass centre went 4.1 units a second, most
+     * of it downward; one body left its knock-down at about 19 and landed 904 blocks away, and what threw it has
+     * not been found. Over the limit, the excess is taken off every part alike: the body keeps its tumbling.
+     */
+    public void fuseR63(float sideways,float upward){fuseSideR63=sideways;fuseUpR63=upward;}
+    /** The fastest the mass centre was found over its limits since this was last asked, 0 if it never was. */
+    public float fusedR63(){float f=fusedR63;fusedR63=0;return f;}
+    private void limitMassCentreR63()
+    {
+        float mass=0,x=0,y=0,z=0;
+        for(var body:bodies.values())
+        {
+            if(body.getInvMass()<=0)continue;
+            float m=1/body.getInvMass();Vector3f v=body.getLinearVelocity(new Vector3f());mass+=m;x+=v.x*m;y+=v.y*m;z+=v.z*m;
+        }
+        if(mass<=0)return;
+        x/=mass;y/=mass;z/=mass;float side=(float)Math.sqrt(x*x+z*z);
+        if(side<=fuseSideR63&&y<=fuseUpR63)return;
+        fusedR63=Math.max(fusedR63,Math.max(side,y));
+        float keep=side>fuseSideR63?fuseSideR63/side:1;
+        Vector3f excess=new Vector3f(x*(1-keep),y>fuseUpR63?y-fuseUpR63:0,z*(1-keep));
+        for(var body:bodies.values())
+        {
+            if(body.getInvMass()<=0)continue;
+            Vector3f v=body.getLinearVelocity(new Vector3f());v.sub(excess);body.setLinearVelocity(v);
         }
     }
     // A matched surface-vertex sweep catches rotational crossings missed by
@@ -168,6 +307,7 @@ public final class ArticulatedBody implements AutoCloseable
     // cannot separate a knee or shoulder. A restitution-free contact impulse
     // removes closing velocity at the actual surface; tangential motion remains.
     // Side walls and ceilings remain owned by Bullet collision detection.
+    private float liftedR63;private int liftsR63;
     private void projectSweptTerrain(Map<String,Transform> previous)
     {
         float lift=0;
@@ -202,6 +342,7 @@ public final class ArticulatedBody implements AutoCloseable
             }
         }
         if(lift<=0)return;
+        liftedR63+=lift;liftsR63++;
         Vector3f normal=new Vector3f(0,1,0);
         for(var contact:contacts.entrySet())
         {

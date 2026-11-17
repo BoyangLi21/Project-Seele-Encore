@@ -92,6 +92,39 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> DATA_AT_ENERGY =
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.FLOAT);
+    /**
+     * R63: the last blow the crystal answered. Where it came from, seen from the core, times how hard it was (0 to
+     * 1.5), and a count that moves with every blow so two alike are still two.
+     */
+    private static final EntityDataAccessor<Vector3f> DATA_STRUCK_R63 =
+            SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.VECTOR3);
+    private static final EntityDataAccessor<Integer> DATA_STRUCK_COUNT_R63 =
+            SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.INT);
+    /** How hard the crystal answers a deflected shot, a Unit's blow on the field, and the field breaking. */
+    public static final float STRUCK_SHOT_R63=.2F,STRUCK_BLOW_R63=.45F,STRUCK_BREAK_R63=1.1F;
+    /**
+     * The answer itself, for strength 1: the crystal gives this far away from the blow (blocks) and tips this far
+     * over (degrees), swinging back and forth with this period and dying out over this time (ticks); it flashes
+     * white for this long.
+     */
+    public static final float RECOIL_R63=1.6F,TILT_R63=7F,SWING_R63=11F,DECAY_R63=7F,FLASH_R63=3F;
+    /**
+     * R63: the crystal's answer to a Unit that keeps striking its field. BURST_BLOWS blows inside BURST_WINDOW ticks
+     * and the field throws the Unit off: it staggers back as from a blow of BURST_FORCE (no damage is done), and
+     * the field does not do it again for BURST_REST ticks.
+     */
+    public static final int BURST_BLOWS_R63=3,BURST_WINDOW_R63=60,BURST_REST_R63=100;
+    public static final float BURST_FORCE_R63=14F;
+    private int fieldBlowsR63;
+    /**
+     * Long ago, and still a time the game's clock can be taken from: from Long.MIN_VALUE the difference wrapped
+     * round to a negative number, the rest after a burst never ended and no first burst ever came.
+     */
+    private static final long NEVER_R63=Long.MIN_VALUE/2;
+    private long fieldBlowAtR63=NEVER_R63,burstAtR63=NEVER_R63;
+    private int struckSeenR63;
+    private float struckAgeR63=1000,struckAgeOR63=1000;
+    private Vector3f struckR63=new Vector3f();
 
     // Balance values (damage, ranges, cooldowns) live in SeeleConfig; the
     // constants left here are presentation/geometry, not tuning knobs.
@@ -191,79 +224,6 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                         && !state.is(net.minecraft.world.level.block.Blocks.CAVE_AIR)
                         && !state.is(net.minecraft.world.level.block.Blocks.VOID_AIR))) return false;
         return super.isInWall();
-    }
-
-    @Override
-    protected void checkInsideBlocks()
-    {
-        AABB bounds = this.getBoundingBox();
-        BlockPos first = BlockPos.containing(bounds.minX + 1e-7, bounds.minY + 1e-7, bounds.minZ + 1e-7);
-        BlockPos last = BlockPos.containing(bounds.maxX - 1e-7, bounds.maxY - 1e-7, bounds.maxZ - 1e-7);
-        if (!this.level().hasChunksAt(first, last)) return;
-        int firstChunkX = first.getX() >> 4, firstChunkZ = first.getZ() >> 4;
-        int columns = (last.getX() >> 4) - firstChunkX + 1, rows = (last.getZ() >> 4) - firstChunkZ + 1;
-        var chunks = new net.minecraft.world.level.chunk.ChunkAccess[columns][rows];
-        for (int x = 0; x < columns; x++) for (int z = 0; z < rows; z++)
-        {
-            chunks[x][z] = this.level().getChunkSource().getChunk(firstChunkX + x, firstChunkZ + z,
-                    net.minecraft.world.level.chunk.ChunkStatus.FULL, false);
-            if (chunks[x][z] == null) return;
-        }
-        var at = new BlockPos.MutableBlockPos();
-        int minY = Math.max(first.getY(), this.level().getMinBuildHeight());
-        int maxY = Math.min(last.getY(), this.level().getMaxBuildHeight() - 1);
-        if (minY > maxY) return;
-        int firstSection = this.level().getSectionIndex(minY);
-        int sectionCount = this.level().getSectionIndex(maxY) - firstSection + 1;
-        var inspectedAfter = new long[columns * rows * sectionCount];
-        var empty = new boolean[inspectedAfter.length];
-        long callbackGeneration = 1;
-        java.util.function.Predicate<BlockState> customAir = state -> state.isAir()
-                && !state.is(net.minecraft.world.level.block.Blocks.AIR)
-                && !state.is(net.minecraft.world.level.block.Blocks.CAVE_AIR)
-                && !state.is(net.minecraft.world.level.block.Blocks.VOID_AIR);
-        // Preserve vanilla's x/y/z callback order. Skip only current empty
-        // sections and vanilla air; modded air blocks retain their callbacks.
-        for (int x = first.getX(); x <= last.getX(); x++)
-            for (int y = minY; y <= maxY; y++)
-                for (int z = first.getZ(); z <= last.getZ();)
-                {
-                    int endZ = Math.min(last.getZ(), (z & ~15) + 15);
-                    int sectionIndex = this.level().getSectionIndex(y);
-                    var section = chunks[(x >> 4) - firstChunkX][(z >> 4) - firstChunkZ]
-                            .getSections()[sectionIndex];
-                    int slot = (((x >> 4) - firstChunkX) * rows + (z >> 4) - firstChunkZ)
-                            * sectionCount + sectionIndex - firstSection;
-                    if (inspectedAfter[slot] != callbackGeneration)
-                    {
-                        empty[slot] = section.hasOnlyAir() && !section.maybeHas(customAir);
-                        inspectedAfter[slot] = callbackGeneration;
-                    }
-                    if (empty[slot]) { z = endZ + 1;continue; }
-                    for (; z <= endZ; z++)
-                    {
-                        var state = section.getBlockState(x & 15, y & 15, z & 15);
-                        if (state.is(net.minecraft.world.level.block.Blocks.AIR)
-                                || state.is(net.minecraft.world.level.block.Blocks.CAVE_AIR)
-                                || state.is(net.minecraft.world.level.block.Blocks.VOID_AIR)) continue;
-                        at.set(x, y, z);
-                        try
-                        {
-                            state.entityInside(this.level(), at, this);
-                            this.onInsideBlock(state);
-                            // A callback may change any later section. Reuse an
-                            // empty palette only until the next real callback.
-                            callbackGeneration++;
-                        }
-                        catch (Throwable failure)
-                        {
-                            var report = net.minecraft.CrashReport.forThrowable(failure, "Colliding entity with block");
-                            var category = report.addCategory("Block being collided with");
-                            net.minecraft.CrashReportCategory.populateBlockDetails(category, this.level(), at, state);
-                            throw new net.minecraft.ReportedException(report);
-                        }
-                    }
-                }
     }
 
     private boolean fluidSectionsEmpty()
@@ -386,6 +346,101 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         this.entityData.define(DATA_DRILL_DEPTH, 0.0F);
         this.entityData.define(DATA_EXPOSED, false);
         this.entityData.define(DATA_AT_ENERGY, 1750.0F);
+        this.entityData.define(DATA_STRUCK_R63, new Vector3f());
+        this.entityData.define(DATA_STRUCK_COUNT_R63, 0);
+    }
+
+    /** True while the field stands closed round the crystal: a blow lands on it, not on nothing. */
+    public boolean fieldSealedR63()
+    {
+        return !this.isExposed() && this.hasAtField();
+    }
+
+    /** -Dprojectseele.poseDiag=true: every blow on the field and every burst goes to the log. */
+    private static final boolean TOLD_R63 = Boolean.getBoolean("projectseele.poseDiag");
+    /** Server: a Unit's blow has landed on the standing field. A run of them throws the Unit off. */
+    private void fieldBlowR63(EvaUnit01Entity striker)
+    {
+        long now = this.level().getGameTime();
+        this.fieldBlowsR63 = now - this.fieldBlowAtR63 > BURST_WINDOW_R63 ? 1 : this.fieldBlowsR63 + 1;
+        this.fieldBlowAtR63 = now;
+        if (TOLD_R63) com.projectseele.ProjectSeele.LOGGER.info("R63RAMIELBLOW at {} blows {} since the last burst {}", now, this.fieldBlowsR63, now - this.burstAtR63);
+        // R64 (M5): the blow before the one that is thrown back rings a warning.
+        if (this.fieldBlowsR63 == BURST_BLOWS_R63 - 1 && now - this.burstAtR63 >= BURST_REST_R63 && this.level() instanceof ServerLevel warnLevel)
+        {
+            Vec3 toward = striker.position().subtract(this.position()).multiply(1, 0, 1);
+            AngelTellsR64.fieldWarns(warnLevel, this.beamOrigin(), toward.lengthSqr() < 1.0E-4D ? new Vec3(1, 0, 0) : toward.normalize());
+        }
+        if (this.fieldBlowsR63 < BURST_BLOWS_R63 || now - this.burstAtR63 < BURST_REST_R63) return;
+        this.fieldBlowsR63 = 0;
+        this.burstAtR63 = now;
+        Vec3 away = striker.position().subtract(this.position()).multiply(1, 0, 1);
+        away = away.lengthSqr() < 1.0E-4D ? new Vec3(1, 0, 0) : away.normalize();
+        // The beat alone: the Unit is driven back and loses its footing for a moment, its hull is not touched.
+        CombatFeelR31.acceptedHit(striker, this, BURST_FORCE_R63, away, false);
+        // A stagger taken in the middle of a punch is read down to a flinch, and the burst that answers a run of
+        // punches finds the Unit in one: it is sent again as what it is. A berserk Unit in its strike is left with
+        // the flinch: nothing staggers it there.
+        var given = CombatFeelR31.beat(striker);
+        boolean raised = given != null && given.kind() == CombatFeelR31.FLINCH && !EvaBerserkMotionR34.striking(striker);
+        if (raised) CombatFeelR31.send(striker, CombatFeelR31.STAGGER, away, given.strength(), 16, 1);
+        this.spawnAtFieldRipple(this.beamOrigin().add(away.scale(SHELL_SURFACE_RADIUS * this.modelScaleR52())), away);
+        this.playSound(ModSounds.CRYSTAL_HIT.get(), 3.0F, 0.4F);
+        if (TOLD_R63)
+        {
+            var beat = CombatFeelR31.beat(striker);
+            com.projectseele.ProjectSeele.LOGGER.info("R63RAMIELBLOW burst: the Unit's beat is now {}, raised from a flinch {} (attack stage {} phase {})", beat == null ? "none" : beat.kind(),
+                    raised, striker.getOrdinaryAttackStage(), striker.getOrdinaryAttackProgress(0));
+        }
+    }
+
+    /** Server: the crystal answers a blow that came from there. */
+    private void struckR63(Vec3 from, float strength)
+    {
+        Vec3 core = this.beamOrigin();
+        Vec3 dir = from != null && from.distanceToSqr(core) > 1.0E-4D ? from.subtract(core).normalize() : new Vec3(0, 1, 0);
+        float s = Mth.clamp(strength, 0, 1.5F);
+        this.entityData.set(DATA_STRUCK_R63, new Vector3f((float) dir.x * s, (float) dir.y * s, (float) dir.z * s));
+        this.entityData.set(DATA_STRUCK_COUNT_R63, this.entityData.get(DATA_STRUCK_COUNT_R63) + 1);
+    }
+
+    /** How far the crystal's answer has died out, 1 to 0, and where in its swing it is (radians). */
+    private float struckEnvelopeR63(float partialTick)
+    {
+        float age = Mth.lerp(partialTick, this.struckAgeOR63, this.struckAgeR63);
+        return age > DECAY_R63 * 6 ? 0 : (float) Math.exp(-age / DECAY_R63);
+    }
+
+    /** Client: where the crystal is drawn from its place, in blocks: away from the blow and back. */
+    public Vec3 struckOffsetR63(float partialTick)
+    {
+        float envelope = this.struckEnvelopeR63(partialTick);
+        if (envelope <= 0) return Vec3.ZERO;
+        float age = Mth.lerp(partialTick, this.struckAgeOR63, this.struckAgeR63);
+        // Starts at rest, is farthest a quarter of a swing later.
+        float give = -RECOIL_R63 * envelope * Mth.sin(age * Mth.TWO_PI / SWING_R63);
+        return new Vec3(this.struckR63.x() * give, this.struckR63.y() * give, this.struckR63.z() * give);
+    }
+
+    /** Client: the axis the crystal tips about (level, across the blow) and by how much (degrees); null when it stands still. */
+    public org.joml.Vector4f struckTiltR63(float partialTick)
+    {
+        float envelope = this.struckEnvelopeR63(partialTick);
+        float strength = this.struckR63.length();
+        if (envelope <= 0 || strength < 1.0E-4F) return null;
+        float age = Mth.lerp(partialTick, this.struckAgeOR63, this.struckAgeR63);
+        // The tip follows the give by a quarter of a swing: the top goes last.
+        float angle = TILT_R63 * strength * envelope * Mth.sin((age - SWING_R63 / 4) * Mth.TWO_PI / SWING_R63);
+        float x = -this.struckR63.z(), z = this.struckR63.x(), flat = Mth.sqrt(x * x + z * z);
+        if (flat < 1.0E-4F) return null;
+        return new org.joml.Vector4f(x / flat, 0, z / flat, angle);
+    }
+
+    /** Client: how white the crystal is drawn, 0 to 1. */
+    public float struckFlashR63(float partialTick)
+    {
+        float age = Mth.lerp(partialTick, this.struckAgeOR63, this.struckAgeR63);
+        return age > FLASH_R63 * 4 ? 0 : Math.min(1, this.struckR63.length()) * (float) Math.exp(-age / FLASH_R63);
     }
 
     public boolean isExposed()
@@ -518,12 +573,27 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             this.entityData.set(DATA_BEAM_TICKS, remaining);
             int chargeRemaining=com.projectseele.world.TvYashimaCombatCommsR54.chargeRemainingR54(this);
             this.setExposed(remaining > 0 || this.isCharging() && chargeRemaining > 0 && chargeRemaining <= 20);
+            // R64 (M5): the open core is ringed with light that thins as its window runs out, and seals with a note.
+            if(!com.projectseele.world.ShieldCoverR48.yashima(this)&&this.level() instanceof ServerLevel tellLevel)
+            {
+                if(remaining>0)AngelTellsR64.exposed(tellLevel,this.beamOrigin(),remaining,BEAM_RENDER_TICKS);
+                else if(previous>0)AngelTellsR64.sealed(tellLevel,this.beamOrigin());
+            }
             if(previous>0&&remaining==0)com.projectseele.world.TvYashimaCombatCommsR54.onBeamEnded(this,
                     pacedRemainingR54(this.beamCooldown,this.beamCooldownReadyAtR54));
         }
         super.tick();
         if (this.level().isClientSide)
         {
+            int struck = this.entityData.get(DATA_STRUCK_COUNT_R63);
+            this.struckAgeOR63 = this.struckAgeR63;
+            if (struck != this.struckSeenR63)
+            {
+                this.struckSeenR63 = struck;
+                this.struckR63 = new Vector3f(this.entityData.get(DATA_STRUCK_R63));
+                this.struckAgeR63 = this.struckAgeOR63 = 0;
+            }
+            else if (this.struckAgeR63 < 1000) this.struckAgeR63++;
             this.spinO = this.spin;
             this.spin += this.isCharging() || this.isDrilling() ? 6.0F : 0.75F;
             this.exposeProgressO = this.exposeProgress;
@@ -559,7 +629,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                     && eva.isMeleeWeapon() && !source.is(DamageTypeTags.IS_EXPLOSION);
             if (!this.level().isClientSide)
             {
-                this.deflect(source);
+                this.deflect(source, evaMelee ? STRUCK_BLOW_R63 : STRUCK_SHOT_R63);
                 if (evaMelee)
                 {
                     float remaining = Math.max(0.0F, this.getAtFieldEnergy() - amount);
@@ -567,21 +637,28 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                     if (remaining <= 0.0F)
                     {
                         this.playSound(ModSounds.CRYSTAL_BREAK.get(), 3.0F, 0.65F);
+                        this.struckR63(source.getSourcePosition(), STRUCK_BREAK_R63);
                     }
+                    else if (source.getDirectEntity() instanceof EvaUnit01Entity striker) this.fieldBlowR63(striker);
                 }
             }
             return false;
         }
-        return super.hurt(source, amount);
+        boolean hurt = super.hurt(source, amount);
+        // A hit that reaches the crystal itself: by how much of its health it took.
+        if (hurt && !this.level().isClientSide)
+            this.struckR63(source.getSourcePosition(), .5F + 3 * amount / Math.max(1, this.getMaxHealth()));
+        return hurt;
     }
 
-    private void deflect(DamageSource source)
+    private void deflect(DamageSource source, float strength)
     {
         if (this.rippleCooldown > 0)
         {
             return;
         }
         this.rippleCooldown = 3;
+        this.struckR63(source.getSourcePosition(), strength);
         Vec3 origin = source.getSourcePosition() != null ? source.getSourcePosition() : null;
         Vec3 core = this.beamOrigin();
         Vec3 dir = origin != null && origin.distanceToSqr(core) > 1.0E-4D
@@ -765,6 +842,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             SeeleNetwork.CHANNEL.send(
                     PacketDistributor.DIMENSION.with(serverLevel::dimension),
                     new ClientboundNukeFxPacket(impact.x, impact.y, impact.z, 2.6F, true));
+            com.projectseele.world.MissionAudioR64.echo(serverLevel, impact, ModSounds.CROSS_EXPLOSION.get(),
+                    net.minecraft.sounds.SoundSource.HOSTILE);
             serverLevel.sendParticles(ParticleTypes.END_ROD, impact.x, impact.y, impact.z, 64, 2.0D, 2.0D, 2.0D, 0.22D);
             serverLevel.sendParticles(ParticleTypes.EXPLOSION_EMITTER, impact.x, impact.y + 2.0D, impact.z, 9, 5.0D, 2.5D, 5.0D, 0.0D);
             // Mushroom stem and cap.
@@ -779,6 +858,9 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                     impact.x, impact.y + 1.0D, impact.z, 70, 4.5D, 1.6D, 4.5D, 0.09D);
         }
         this.playSound(ModSounds.BEAM_FIRE.get(), 5.0F, 1.0F);
+        // R64: the shot echoes across the city at night for everyone within 1,500 blocks.
+        if (this.level() instanceof ServerLevel echoLevel)
+            com.projectseele.world.MissionAudioR64.echo(echoLevel, this.position(), ModSounds.BEAM_FIRE.get(), this.getSoundSource());
     }
 
     // ----- boss bar -----
@@ -961,6 +1043,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     }
 
     /** Telegraphed charge-up followed by a hitscan beam and explosion. */
+    private static final boolean BEAM_TOLD_R64=Boolean.getBoolean("projectseele.combatDiagR64");
     static class BeamAttackGoal extends Goal
     {
         private final RamielEntity ramiel;
@@ -978,6 +1061,12 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         {
             LivingEntity target = this.ramiel.getTarget();
             double range = this.ramiel.effectiveBeamRangeR45();
+            // Review only (-Dprojectseele.combatDiagR64=true): why the beam does or does not begin, twice a second.
+            if(BEAM_TOLD_R64&&this.ramiel.tickCount%20<2)
+                com.projectseele.ProjectSeele.LOGGER.info("R64RAMIELAI tick {} target {} cooldown {} allowed {} drilling {} distance {} of {} sight {}",this.ramiel.level().getGameTime(),
+                        target==null?"none":target.getType().toShortString(),pacedRemainingR54(this.ramiel.beamCooldown,this.ramiel.beamCooldownReadyAtR54),
+                        com.projectseele.world.TvYashimaDirectorR50.fireAiAllowedR50(this.ramiel),this.ramiel.isDrilling(),
+                        target==null?"-":String.valueOf(Math.round(Math.sqrt(this.ramiel.distanceToSqr(target)))),Math.round(range),target!=null&&this.ramiel.beamLineOfSightR45(target));
             return pacedRemainingR54(this.ramiel.beamCooldown,this.ramiel.beamCooldownReadyAtR54) <= 0
                     && com.projectseele.world.TvYashimaDirectorR50.fireAiAllowedR50(this.ramiel)
                     && (!this.ramiel.isDrilling()||com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this.ramiel)!=null)
@@ -1042,6 +1131,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             {
                 Vec3 core = this.ramiel.beamOrigin();
                 serverLevel.sendParticles(CHARGE_DUST, core.x, core.y, core.z, 4, 1.6D, 1.6D, 1.6D, 0.0D);
+                // R64 (M5): where the beam would land now. The Yashima mission counts its own charge down.
+                if(!com.projectseele.world.ShieldCoverR48.yashima(this.ramiel))AngelTellsR64.charge(serverLevel,core,target,this.chargeTicks);
             }
 
             this.chargeTicks=pacedRemainingR54(Math.max(0,this.chargeTicks-1),this.chargeReadyAtR54);

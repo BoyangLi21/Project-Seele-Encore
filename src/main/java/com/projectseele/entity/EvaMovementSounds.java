@@ -50,6 +50,8 @@ public final class EvaMovementSounds
             EvaActionFoleyR61.crawl(eva,previous,phase,moving);
         if(previous==null||!eva.onGround()||!eva.isPoweredOn()||eva.isNervLogisticsLocked()||eva.isPilotProne()||eva.isSilent()||EvaCombatSupportR33.strike(eva))
         {SOLES.remove(eva);return;}
+        // R64 (M1): the planted model's footfalls are where each client draws them; it sounds them itself.
+        if(EvaMotionModelR64.walks(eva)){SOLES.remove(eva);return;}
         if(GEOMETRIC_CONTACTS&&!eva.isExperimentalUnit()
                 &&(eva.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||eva.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE
                    ||eva.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE

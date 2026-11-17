@@ -29,6 +29,8 @@ public final class AngelAlarmSystem
 {
     private static final Set<UUID> ENGAGED = new HashSet<>();
     private static final Set<Mob> TRACKED = new HashSet<>();
+    /** Holds the alarm for a TV combat mission, whatever its Angels target (they fight EVAs, and never creative players). */
+    private static final UUID MISSION = UUID.nameUUIDFromBytes("projectseele:tv-mission-alarm-r64".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
     private AngelAlarmSystem() {}
 
@@ -76,6 +78,20 @@ public final class AngelAlarmSystem
                 removed = true;
             }
         }
+        // A combat mission sounds the alarm from its alert phase until its Angel is confirmed dead or it ends,
+        // and drops it while the mission pauses for its commander or has lost its Angel (MissionAudioR64).
+        boolean mission = com.projectseele.config.SeeleConfig.ALARM_ENABLED.get()
+                && com.projectseele.world.MissionAudioR64.missionActive(server);
+        if (mission && !ENGAGED.contains(MISSION))
+        {
+            boolean wasIdle = ENGAGED.isEmpty();
+            ENGAGED.add(MISSION);
+            if (wasIdle) broadcastStart(server, null);
+        }
+        else if (!mission && ENGAGED.remove(MISSION))
+        {
+            removed = true;
+        }
         if (removed && ENGAGED.isEmpty())
         {
             broadcastStop(server);
@@ -107,8 +123,8 @@ public final class AngelAlarmSystem
             player.connection.send(new ClientboundSetTitlesAnimationPacket(5, 50, 15));
             player.connection.send(new ClientboundSetSubtitleTextPacket(subtitle));
             player.connection.send(new ClientboundSetTitleTextPacket(title));
-            // Witnessing the attack begins the story chain.
-            if (player.level() == angel.level()
+            // Witnessing the attack begins the story chain (a mission alarm has no Angel to witness yet).
+            if (angel != null && player.level() == angel.level()
                     && player.distanceToSqr(angel) < 192.0D * 192.0D)
             {
                 award(player, "witness_angel");

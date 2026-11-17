@@ -130,9 +130,11 @@ final class RamielSourceModelR53
                 "open_faces", parts.stream().filter(Part::open).mapToInt(p -> p.vertices().length / 24).sum());
     }
 
-    static boolean draw(PoseStack poses, MultiBufferSource buffers, float expose, float time, boolean charging, int packedLight)
+    /** flash: how white the whole crystal is drawn, 0 to 1 (vanilla's own whitening overlay, as a primed charge has). */
+    static boolean draw(PoseStack poses, MultiBufferSource buffers, float expose, float time, boolean charging, int packedLight, float flash)
     {
         if (!selected()) return false;
+        int overlay = flash <= .01F ? OverlayTexture.NO_OVERLAY : OverlayTexture.pack(OverlayTexture.u(Math.min(1, flash)), 10);
         float blend = Mth.clamp(expose, 0, 1);
         blend = blend * blend * (3 - 2 * blend);
         for (var part : parts)
@@ -185,7 +187,7 @@ final class RamielSourceModelR53
                 posed[at] = POSITION.x; posed[at + 1] = POSITION.y; posed[at + 2] = POSITION.z;
                 posed[at + 3] = NORMAL.x; posed[at + 4] = NORMAL.y; posed[at + 5] = NORMAL.z;
             }
-            DirectMeshWriter.write(consumer, posed, part.corners().inputs(), v, alpha, OverlayTexture.NO_OVERLAY, light);
+            DirectMeshWriter.write(consumer, posed, part.corners().inputs(), v, alpha, overlay, light);
             poses.popPose();
         }
         return true;

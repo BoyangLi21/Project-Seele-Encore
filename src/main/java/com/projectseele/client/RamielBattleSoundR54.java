@@ -18,6 +18,8 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid = ProjectSeele.MODID, value = Dist.CLIENT)
 public final class RamielBattleSoundR54
 {
+    /** ModSounds.BEAM_FIRE's fixed range (R64): every player this close hears the shot itself. */
+    private static final double REAL_SHOT_RANGE = 1280;
     private static ClientLevel level;
     private static UUID session;
     private static long generation;
@@ -40,10 +42,15 @@ public final class RamielBattleSoundR54
         { level = mc.level; session = state.target(); generation = packet.generation(); charging = firing = false; sustainTicks = 0; }
         boolean nextCharge = (state.flags() & ClientboundEncounterObserverPacket.CHARGING) != 0;
         boolean nextFire = state.beamTicks() > 0;
-        boolean distant = mc.player.distanceToSqr(state.position()) > 96 * 96;
+        double away = mc.player.distanceToSqr(state.position());
+        boolean distant = away > 96 * 96;
         if (distant && nextCharge && !charging) play(state.position(), ModSounds.BEAM_CHARGE.get(), 1.15F, .75F);
         if (distant && nextFire && !firing)
-        { play(state.beamEnd(), ModSounds.BEAM_FIRE.get(), 2.0F, .72F); sustainTicks = 0; }
+        {
+            // Inside the real shot's broadcast range it is heard already; this cue on top doubled it.
+            if (away > REAL_SHOT_RANGE * REAL_SHOT_RANGE) play(state.beamEnd(), ModSounds.BEAM_FIRE.get(), 2.0F, .72F);
+            sustainTicks = 0;
+        }
         if (nextFire && state.beamTicks() > view.ageClientTicks() && ++sustainTicks % 20 == 0 && distant)
             play(state.beamEnd(), ModSounds.RAMIEL_HUM.get(), .85F, .55F);
         if (!nextFire) sustainTicks = 0;

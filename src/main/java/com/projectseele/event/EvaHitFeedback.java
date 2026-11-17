@@ -18,15 +18,21 @@ public final class EvaHitFeedback
 {
     private record Contact(LivingEntity target,Vec3 point,Vec3 direction) {}
     private static final ThreadLocal<Contact> CONTACT=new ThreadLocal<>();
+    /** What a blow takes from before it reaches the body. Ramiel's field counts while it stands sealed. */
+    private static float fieldR63(LivingEntity target)
+    {
+        if(target instanceof com.projectseele.entity.RamielEntity crystal)return crystal.fieldSealedR63()?crystal.getAtFieldEnergy():0;
+        return target instanceof Angel angel?angel.getAtField():target instanceof EvaUnit01Entity eva?eva.getAtFieldEnergy():0;
+    }
     public static boolean hurt(LivingEntity target,DamageSource source,float amount,Vec3 point,Vec3 direction)
     {
         Contact old=CONTACT.get();CONTACT.set(new Contact(target,point,direction));
-        float health=target.getHealth(),field=target instanceof Angel angel?angel.getAtField():target instanceof EvaUnit01Entity eva?eva.getAtFieldEnergy():0;
+        float health=target.getHealth(),field=fieldR63(target);
         try
         {
             boolean accepted=target instanceof GaghielEntity marine
                     ? marine.hurtAt(source,amount,point) : target.hurt(source,amount);
-            float after=target instanceof Angel angel?angel.getAtField():target instanceof EvaUnit01Entity eva?eva.getAtFieldEnergy():0;
+            float after=fieldR63(target);
             if(target.getHealth()>=health&&after<field&&source.getEntity() instanceof LivingEntity attacker)
             {
                 CombatFeelR31.acceptedHit(target,attacker,amount,direction,true,point);

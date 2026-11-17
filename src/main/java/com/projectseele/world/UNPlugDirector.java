@@ -87,7 +87,7 @@ public final class UNPlugDirector
         if(stage==EntryPlugCarrierEntity.STAGE_OCCUPIED&&atDock(eva))
         {
             if(eva.isNervLogisticsLocked())return;
-            plug.sealCabin();d.putInt("UNSequenceTicks",++tick);plug.setCabinSequenceProgress(Math.min(30,tick));
+            plug.sealCabin();d.putInt("UNSequenceTicks",++tick);plug.setCabinSequenceProgress(EntryPlugCarrierEntity.cabinPercentOnBridge(tick/36D));
             if(tick>=36&&plug.isHatchFullySealed())
             {
                 RigidTransform previous=dock(eva);boolean clear=true;
@@ -106,8 +106,8 @@ public final class UNPlugDirector
             int driveTick=source?tick-Math.min(36,Math.max(0,tick-NervAssemblyClocksR52.INSERT_HANDOFF_TICK)):tick;
             double p=source?NervAssemblyClocksR52.insertionProgress(driveTick):EvaDorsalMechanism.smooth((tick-36)/154F);RigidTransform next=EntryPlugKinematics.insertionTransform(eva,dock(eva),p);
             if(!clear(level,eva,plug,plug.getCanonicalTransform(),next)){plug.transitionInsertionStage(stage,EntryPlugCarrierEntity.STAGE_ABORT_RETURNING);return;}
-            plug.setCanonicalTransform(next);plug.setInsertionProgress((int)Math.round(p*100));plug.setCabinSequenceProgress(30+(int)Math.round(40*p));hoist(level,eva,plug,source?Math.max(0,Math.min(1,(tick-NervAssemblyClocksR52.INSERT_HANDOFF_TICK)/36D)):0);
-            if(tick>=(source?226:190)&&plug.lockToEva(eva)&&eva.bindEntryPlug(plug,70))d.putInt("UNSequenceTicks",0);
+            plug.setCanonicalTransform(next);plug.setInsertionProgress((int)Math.round(p*100));plug.setCabinSequenceProgress(EntryPlugCarrierEntity.cabinPercentInserting(p));hoist(level,eva,plug,source?Math.max(0,Math.min(1,(tick-NervAssemblyClocksR52.INSERT_HANDOFF_TICK)/36D)):0);
+            if(tick>=(source?226:190)&&plug.lockToEva(eva)&&eva.bindEntryPlug(plug,EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT))d.putInt("UNSequenceTicks",0);
             return;
         }
         if(stage==EntryPlugCarrierEntity.STAGE_LOCKED&&atDock(eva))
@@ -151,7 +151,7 @@ public final class UNPlugDirector
         boolean source=Unit03SourceRigR53.uses(eva);
         double p=source?NervAssemblyClocksR52.extractionProgress(ticks):1-Math.max(0,Math.min(1,(ticks-36)/105D));RigidTransform next=EntryPlugKinematics.insertionTransform(eva,dock(eva),p);
         if(!clear(level,eva,plug,plug.getCanonicalTransform(),next))return;
-        plug.setCanonicalTransform(next);plug.setInsertionProgress((int)Math.round(p*100));plug.setCabinRecoveryProgress((int)Math.round(p*70));hoist(level,eva,plug,source?Math.max(0,Math.min(1,(100-ticks)/36D)):ticks<=36?1-EvaDorsalMechanism.smooth(ticks/36F):0);
+        plug.setCanonicalTransform(next);plug.setInsertionProgress((int)Math.round(p*100));plug.setCabinRecoveryProgress((int)Math.round(p*EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT));hoist(level,eva,plug,source?Math.max(0,Math.min(1,(100-ticks)/36D)):ticks<=36?1-EvaDorsalMechanism.smooth(ticks/36F):0);
         if(ticks>=197)
         {
             plug.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_EJECTING,EntryPlugCarrierEntity.STAGE_SUSPENDED);

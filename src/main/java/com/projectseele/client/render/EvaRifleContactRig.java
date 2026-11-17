@@ -174,6 +174,15 @@ public final class EvaRifleContactRig
         leftPole=groundedPole(eva.getId(),model,"l",leftTarget,leftPole,root,(float)eva.getY()+3.5F,Math.max(prone,support));
         double re=solve(model,"r",rightTarget,qR,rightPole,root);
         double le=solve(model,"l",leftTarget,qL,leftPole,root);
+        // A hand going down to the ground turns palm-down on the way. Until it lies flat its fingers
+        // hang under the wrist, and with the wrist brought to its resting height they went a block
+        // and three quarters into the ground, kneeling down to prone and getting up again. The hand
+        // is raised by what its lowest joint stands under the ground and the arm solved once more.
+        if(support>0)
+        {
+            float under=(float)eva.getY()+HAND_CLEAR-lowestJoint(model.getBone("hand_l").orElseThrow(),root);
+            if(under>0){leftTarget.y+=under;le=solve(model,"l",leftTarget,qL,leftPole,root);}
+        }
         absolute(cannon,gun,root);
         // Lean the gaze toward the existing sight line. This never moves the weapon.
         var head=model.getBone("head").orElseThrow();var headWorld=new Quaternionf(f.headRotation());
@@ -185,6 +194,15 @@ public final class EvaRifleContactRig
         rotations.addAll(Set.of("neck","head","arm_r","forearm_r","wrist_r","hand_r","arm_l","forearm_l","wrist_l","hand_l","cannon"));
         positions.addAll(Set.of("forearm_r","wrist_r","hand_r","forearm_l","wrist_l","hand_l","cannon"));
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(rotations),Set.copyOf(positions),"MOTION_ENGINE_LIVE_ACTION");
+    }
+    /** A hand's joints stay this far over the ground (blocks): the fingers' thickness and their tips past the last joint. */
+    private static final float HAND_CLEAR=1.3F;
+    /** The height of the lowest joint of a hand: its own pivot and those of all its finger bones (world). */
+    private static float lowestJoint(GeoBone bone,Matrix4f root)
+    {
+        float lowest=EvaRigTransforms.point(bone,EvaRigTransforms.pivot(bone),root).y;
+        for(var child:bone.getChildBones())lowest=Math.min(lowest,lowestJoint(child,root));
+        return lowest;
     }
     /** Where the clip put each sole and knee (world) before the hips turned. */
     private record Plant(Matrix4f foot,Vector3f knee) {}

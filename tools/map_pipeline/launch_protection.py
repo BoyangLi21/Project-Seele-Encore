@@ -83,7 +83,34 @@ class LaunchProtection:
         return checked
 
 
-def load(world):
+def airshaft_volume(gates, shafts):
+    """The retained air shaft: the opening between its gates, over the whole height its aircraft fly.
+
+    The gates give the opening. The declared AIRCRAFT shaft cells give the height: the aircraft
+    also need the shaft clear below the lower gate, down into the cavern, and above the upper one.
+    Terrain written under the lower gate once closed the shaft while this volume ended at the gate.
+    """
+    if not gates:
+        return None
+    bounds = []
+    for g in gates:
+        x, y, z = g['frame']['position']; h = g['silo_hatch']
+        bounds.append([int(np.floor(x-h['opening_x']/2-2)), int(np.floor(y-3)),
+                       int(np.floor(z-h['opening_z']/2-2)),
+                       int(np.ceil(x+h['opening_x']/2+2)), int(np.ceil(y+3)),
+                       int(np.ceil(z+h['opening_z']/2+2))])
+    a = np.asarray(bounds)
+    box = [*a[:, :3].min(0).tolist(), *a[:, 3:].max(0).tolist()]
+    levels = [int(m.group(2)) * 32 for shaft in shafts if shaft.get('motion') == 'AIRCRAFT'
+              for m in map(CELL.fullmatch, shaft.get('occupancy', ())) if m]
+    if levels:
+        box[1] = min(box[1], min(levels)); box[4] = max(box[4], max(levels) + 31)
+    return box
+
+
+def load(world, allow_air_shaft=False):
+    """allow_air_shaft: only for work on the remote air shaft itself (clearing its travel space,
+    rebuilding its surface door); its volume and its two gates' cells are then left unguarded."""
     world = Path(world)
     directory = read_json(world / AUTHORITY[0])
     owner = read_json(world / AUTHORITY[1])
@@ -104,7 +131,7 @@ def load(world):
         boxes.append((name, [x, y, z, x+31, y+31, z+31]))
 
     points = set()
-    def gather(value):
+    def gather(value, points=points):
         if isinstance(value, dict):
             p = value.get('position')
             if p is not None and ('state' in value or 'closed' in value):
@@ -114,12 +141,12 @@ def load(world):
                     relative = Path(item)
                     if relative.is_absolute() or '..' in relative.parts:
                         raise ValueError('Unsafe mechanical cell-table path')
-                    gather(read_json(world / relative))
+                    gather(read_json(world / relative), points)
                 elif key not in ('mechanism_sources', 'ground_guides'):
-                    gather(item)
+                    gather(item, points)
         elif isinstance(value, list):
             for item in value:
-                gather(item)
+                gather(item, points)
     # Native support blocks, every door collision layer, and receiver seats.
     gather(owner)
     gather(read_json(world / 'launch_hatch_layers_r54.json'))
@@ -129,24 +156,23 @@ def load(world):
     for anchor in guideway['anchors']:
         points.add(tuple(int(v) for v in anchor['at']))
     del guideway
+    # The separately retained underground airshaft is not a launch route leg.
+    # Its two gates and its declared flight cells give the volume to keep clear.
+    gates = [g for g in owner['gates'] if g['resource'].startswith('remote_airshaft_')]
+    if allow_air_shaft:
+        own = set()
+        gather(gates, own)
+        points -= own
     for p in sorted(points):
         boxes.append(('mechanical-cell', [*p, *p]))
-    # The separately retained underground airshaft is not a launch route leg.
-    # Its actual two gates specify the complete intervening opening volume.
-    gates = [g for g in owner['gates'] if g['resource'].startswith('remote_airshaft_')]
-    if gates:
-        bounds = []
-        for g in gates:
-            x, y, z = g['frame']['position']; h = g['silo_hatch']
-            bounds.append([int(np.floor(x-h['opening_x']/2-2)), int(np.floor(y-3)),
-                           int(np.floor(z-h['opening_z']/2-2)),
-                           int(np.ceil(x+h['opening_x']/2+2)), int(np.ceil(y+3)),
-                           int(np.ceil(z+h['opening_z']/2+2))])
-        a = np.asarray(bounds)
-        boxes.append(('retained-airshaft', [*a[:, :3].min(0).tolist(), *a[:, 3:].max(0).tolist()]))
+    air = world / AUTHORITY[4]
+    volume = airshaft_volume(gates, read_json(air).get('shafts', []) if air.exists() else [])
+    if volume and not allow_air_shaft:
+        boxes.append(('retained-airshaft', volume))
     return LaunchProtection(boxes, dict(source='installed ROOT route and mechanical authority',
         routes=len(routes), ports=len(directory['ports']), legs=len(used),
         finite_occupied_cells=len(cells), native_mechanical_cells=len(points),
+        air_shaft=None if allow_air_shaft else volume,
         column_freeze=False, runtime_scan=False))
 
 

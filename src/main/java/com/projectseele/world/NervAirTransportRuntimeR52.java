@@ -209,6 +209,7 @@ public final class NervAirTransportRuntimeR52
         final Map<UUID,NervHullGroundRecoveryR52.Plan> hullPlans=new HashMap<>();
         final Set<UUID> flightProofAttemptsR53=new HashSet<>();
         final Map<UUID,Long> heldRetryAtR53=new HashMap<>();
+        final AirshaftGateClosingR64 closingGatesR64=new AirshaftGateClosingR64();boolean closingGatesSeededR64;
         Controller(ServerLevel l,NervAirTransportManifestR52 m,NervAirframeGeometryR52 g,NervAirTransportStateR52 s){level=l;manifest=m;geometry=g;saved=s;}
         NervRouteRuntimeR52.FlightContext ground(){return NervRouteRuntimeR52.flightContext(level);}
         Original original(int variant,UUID commander)
@@ -456,36 +457,43 @@ public final class NervAirTransportRuntimeR52
             for(var aircraft:manifest.aircraft().values())try{pulseStoppedRotors(aircraft);}catch(IllegalArgumentException|IllegalStateException invalid){var j=saved.aircraft(aircraft.entity());if(j!=null)hold(j,"原旋翼实际停止样本验证失败："+invalid.getMessage());}
             // Retain only gates leased by the current passage. A distant held pickup must not leave the entire shaft open.
             var used=new HashSet<String>();for(var j:saved.jobs())if(j.active())used.addAll(j.mechanisms());
+            long gateTime=level.getGameTime();
             for(var resource:manifest.directory().declaredResources().values())
             {
                 String id=resource.id();
-                if(resource.kind()==NervRouteDirectoryR52.ResourceKind.DOOR
-                        &&(id.startsWith("bank_")||id.startsWith("remote_airshaft_"))
-                        &&!used.contains(id)&&ground().pool().resourcesAvailable(null,Set.of(id)))
-                    ground().owner().closeIdleAirshaftGateR53(level,id);
+                if(resource.kind()!=NervRouteDirectoryR52.ResourceKind.DOOR
+                        ||!(id.startsWith("bank_")||id.startsWith("remote_airshaft_")))continue;
+                // The remote shaft's two doors are also looked at once after loading, for a session
+                // that stopped mid-stroke and left them ajar.
+                if(used.contains(id)||!closingGatesSeededR64&&id.startsWith("remote_airshaft_"))closingGatesR64.noted(id,gateTime);
+                if(used.contains(id)||!ground().pool().resourcesAvailable(null,Set.of(id)))continue;
+                // The closing stroke outlasts the passage's own chunk tickets.
+                if(closingGatesR64.keepLoaded(id,gateTime))tickets(Set.of(id));
+                if(ground().owner().closeIdleAirshaftGateR53(level,id))closingGatesR64.closed(id);
             }
+            closingGatesSeededR64=true;
             NervAirRescueApproachR53.settleParked(level);
             long now=System.currentTimeMillis();
             for(var j:saved.jobs())
             {
                 if(!j.active()&&!j.hasStatusReport())continue;
                 String note=phaseLabelR52(j.phase())+" · "+humanWaitingR52(j.waiting());
-                var data=j.ownerData();
-                var reported=data.getList("ReportSeenR54",Tag.TAG_STRING);
                 // Retry/recovery can alternate between HOLD and the same
                 // phase. Each task reports each meaningful state only once.
+                if(j.statusReported(note))continue;
+                long last=j.lastStatusReportTime();
+                if(j.active()&&now-last<1500&&now>=last)continue;
+                var owner=level.getServer().getPlayerList().getPlayer(j.original().owner());
+                var plane=level.getEntity(j.aircraft());
+                if(owner==null||!(plane instanceof UNTransportEntity aircraft))continue;
+                var data=j.ownerData();
+                var reported=data.getList("ReportSeenR54",Tag.TAG_STRING);
                 if(j.hasStatusReport())
                 {
                     var previous=StringTag.valueOf(j.lastStatusReportNote());
                     if(!reported.contains(previous))reported.add(previous);
                 }
                 var key=StringTag.valueOf(note);
-                if(reported.contains(key))continue;
-                long last=j.lastStatusReportTime();
-                if(j.active()&&now-last<1500&&now>=last)continue;
-                var owner=level.getServer().getPlayerList().getPlayer(j.original().owner());
-                var plane=level.getEntity(j.aircraft());
-                if(owner==null||!(plane instanceof UNTransportEntity aircraft))continue;
                 owner.sendSystemMessage(net.minecraft.network.chat.Component.literal("[NERV 运输管制] 运输机"
                             +aircraft.serial()+" · "+plane.blockPosition().toShortString()+" · "
                             +NervStaffDialogue.unitName(j.original().variant())+" · "+note));

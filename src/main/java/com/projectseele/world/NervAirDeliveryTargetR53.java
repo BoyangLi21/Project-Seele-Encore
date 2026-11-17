@@ -88,10 +88,23 @@ final class NervAirDeliveryTargetR53
         return true;
     }
 
+    /**
+     * How far a node of the receiver's column moves with the landing measured at request time.
+     * The column's top is where the last cruise leg arrives. It follows the landing sideways and keeps the cruise
+     * height Root gave it: a landing lower than the template's would otherwise pull the far end of that leg down
+     * with it, and the leg would run through whatever stands between (the Hakone column set down in the city came
+     * in at y 199 through a hilltop at y 204). A landing higher than the template's still raises it. The nodes
+     * below the top keep their heights over the landing, so the descent happens in the column.
+     */
+    static Vec3 columnShift(Vec3 delta,boolean top)
+    {
+        return top&&delta.y<0?new Vec3(delta.x,0,delta.z):delta;
+    }
+
     static Frame frame(Mission mission,String node,Receiver template,Frame current,CompoundTag data)
     {
         if(data.getCompound("DeliveryTargetR53").isEmpty()||node.equals(mission.pickupNode())||node.startsWith(mission.pickupNode()+"/")||!(node.equals(template.node())||node.startsWith(template.node()+"/")))return current;
-        var delta=receiver(template,data).stopped().translation().subtract(template.stopped().translation());
+        var delta=columnShift(receiver(template,data).stopped().translation().subtract(template.stopped().translation()),node.equals(template.node()+"/main"));
         var plane=RigidTransform.of(current.plane().translation().add(delta),current.plane().rotation());
         var cargo=current.cargo()==null?null:RigidTransform.of(current.cargo().translation().add(delta),current.cargo().rotation());
         return new Frame(plane,cargo,current.rig());
