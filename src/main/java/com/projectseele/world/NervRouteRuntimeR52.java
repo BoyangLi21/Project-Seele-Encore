@@ -207,6 +207,24 @@ public final class NervRouteRuntimeR52
         if(job!=null&&!job.snapshot().original().pilot().equals(pilot))return new EvaLogisticsDirector.ActionResult(false,"只有本机驾驶员可以中止发射。");
         return c.pilotAbortR55(variant);
     }
+    /** R64: the pilot asks to leave a Unit the facility holds. With the sortie called off (the operator's cancel
+     * stops the Unit where it stands, its capsule in) nothing is left to abort and there was no way out: the
+     * abort's way home is taken, which finishes what cannot be undone and brings the Unit back to its bay, where
+     * the crane draws the capsule out. While a sortie still runs the pilot is told what calls it off. Null where
+     * the runtime has nothing to say (no job, deployed, parked). */
+    public static EvaLogisticsDirector.ActionResult exitHeldR64(ServerLevel level,int variant,UUID pilot)
+    {
+        var c=LIVE.get(level);if(c==null||!ready(level))return null;var job=c.saved.job(variant);if(job==null)return null;
+        boolean aborted=job.ownerData().getBoolean(Controller.PILOT_ABORT_R55);
+        return switch(job.phase())
+        {
+            case CANCELLED -> pilotAbortR55(level,variant,pilot);
+            case PREPARING,READY,DEPARTING -> aborted?new EvaLogisticsDirector.ActionResult(true,"中止已登记，机体正在回库；插入栓拔出后即可离舱。")
+                    :new EvaLogisticsDirector.ActionResult(false,"出击流程进行中不能离舱。先按中止键（默认 C）中止出击，机体回库、插入栓拔出后离舱。");
+            case RETURNING,FINISHING -> new EvaLogisticsDirector.ActionResult(true,"机体正在回库；插入栓拔出后即可离舱。");
+            default -> null;
+        };
+    }
     public static void cancelOwner(ServerLevel level,UUID owner,int variant)
     {var c=LIVE.get(level);if(c==null)return;for(int v=0;v<3;v++)if(variant<0||variant==v)c.cancel(v,owner);}
     public static EvaUnit01Entity resetOriginalMaintenanceR53(ServerLevel level,int variant){var c=LIVE.get(level);if(c==null||!(c.owner instanceof NervAssemblyOwnerR52 owner))throw new IllegalStateException("原编队正在加载，尚未执行复位");var eva=owner.resetOriginalMaintenanceR53(level,variant);c.pool.clearOriginalMaintenanceR53(eva.getUUID());c.saved.clearOriginalMaintenanceR53(variant);return eva;}
@@ -376,15 +394,26 @@ public final class NervRouteRuntimeR52
                 if(stopped.stage()!=Stage.CANCELLED||stopped.leg()!=0||stopped.fraction()!=0
                         ||!stopped.original().equals(original)||!stopped.route().equals(route)
                         ||!(owner instanceof NervAssemblyOwnerR52 plant)
-                        ||!plant.canResumeDockPreparationR53(level,original,existing.ownerData()))
+                        ||!plant.canResumeDockPreparationR53(level,original,existing.ownerData())&&!resumableAtBayR64(existing))
                     return new EvaLogisticsDirector.ActionResult(false,"取消后的机体不在可继续整备的登乘位置，请从它停下的位置安排回收。");
                 preparation=existing.ownerData().copy();
-                preparation.remove("ReleaseWhenReady");preparation.remove("ContinuousAutoLaunchR52");
+                preparation.remove("ReleaseWhenReady");preparation.remove("ContinuousAutoLaunchR52");preparation.remove("Prepared");
                 preparation.putUUID("ResumedPreparationTaskR53",stopped.task());
             }
             var result=pool.reserve(UUID.randomUUID(),original,route,nativeAccess);if(!result.accepted())return new EvaLogisticsDirector.ActionResult(false,result.reason());
             if(level.getEntity(original.eva()) instanceof EvaUnit01Entity eva)TvMissionEquipmentR45.issueFromRecoveryStorage(eva,eva.getPilotEntity());
             saved.put(new Job(result.state(),Phase.PREPARING,preparation,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"整备已登记，机体完成整备后转移到预备位。");
+        }
+        /** R64: a preparation called off after the capsule had left its dock (driven in, sealed, the bay draining
+         * ...) is taken up where it stopped, the way the pilot's abort takes it up (resumeAbortedPreparationR55):
+         * the Unit still at its bay, nothing run on the route, the bay as the record left it. Up to R63 only a
+         * preparation stopped before the insertion could be asked for again; later ones were refused for good. */
+        private boolean resumableAtBayR64(Job job)
+        {
+            var data=job.ownerData();
+            return Set.of("INSERT","SEAL","DRAIN","LOWER_FRAME_OPEN","PIT_OPEN","FRONT_SEAL_OPEN","SERVICE_BRIDGE_OPEN","RAISE","RELEASE_CLAMPS").contains(data.getString("Prepare"))
+                    &&!data.getBoolean(PILOT_ABORT_R55)&&data.getDouble("ContinuousDistanceR52")==0&&data.getCompound("ContinuousClockR52").isEmpty()
+                    &&owner.restoreOriginalPreparation(level,job.snapshot().original(),data);
         }
         EvaLogisticsDirector.ActionResult launch(int variant,String intent)
         {
@@ -465,7 +494,13 @@ public final class NervRouteRuntimeR52
             var selected=directory.route(job.snapshot().route());var clock=job.ownerData().getCompound("ContinuousClockR52");if(selected!=null&&selected.continuousUpright()&&clock.getDouble("SpeedMps")>0)
             {var data=job.ownerData().copy();NervMechanicalTravelR52.brakeContinuousR52(data,selected.id(),directory.fingerprint(),directory.routeLength(selected),"CANCEL");saved.put(job.update(job.snapshot(),job.phase(),data,"原路减速取消中"));return new EvaLogisticsDirector.ActionResult(true,"取消已接受：机体沿当前轨道减速，停稳后结束任务。");}
             owner.brakeOriginalInPlace(level,job.snapshot().original(),job.ownerData());if(job.snapshot().stage()==Stage.COMPLETE)pool.releaseCompletion(job.snapshot().task(),commander);else pool.cancel(job.snapshot().task(),commander);
-            var s=job.snapshot();var cancelled=new Snapshot(s.task(),s.original(),s.directoryFingerprint(),s.route(),s.leg(),s.fraction(),Stage.CANCELLED,"",s.kind());saved.put(job.update(cancelled,Phase.CANCELLED,job.ownerData(),"原位停止；未瞬移回库"));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"已取消，机体在原位停止。");
+            var s=job.snapshot();var cancelled=new Snapshot(s.task(),s.original(),s.directoryFingerprint(),s.route(),s.leg(),s.fraction(),Stage.CANCELLED,"",s.kind());saved.put(job.update(cancelled,Phase.CANCELLED,job.ownerData(),"原位停止；未瞬移回库"));mirror(saved.job(variant));tellSeatedPilotR64(s.original().pilot());return new EvaLogisticsDirector.ActionResult(true,"已取消，机体在原位停止。");
+        }
+        /** R64: the pilot who sits in a Unit that was stopped where it stands, and will not move again by itself, is told the way out. */
+        private void tellSeatedPilotR64(UUID pilot)
+        {
+            if(level.getPlayerByUUID(pilot) instanceof ServerPlayer seated&&seated.getRootVehicle() instanceof EvaUnit01Entity)
+                seated.sendSystemMessage(net.minecraft.network.chat.Component.literal("出击已取消，机体原位停止。要出舱请按离舱键：机体回库、拔出插入栓后即可离舱。"));
         }
         static final String PILOT_ABORT_R55="PilotAbortR55",ABORT_RETRY_R55="PilotAbortRetryR55",ABORT_MISSION_R55="R55PilotAbortMission";
         EvaLogisticsDirector.ActionResult pilotAbortR55(int variant)

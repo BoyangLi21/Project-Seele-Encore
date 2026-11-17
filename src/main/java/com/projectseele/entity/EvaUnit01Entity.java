@@ -4841,8 +4841,28 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             boolean inAssignedHangar = this.level() instanceof ServerLevel server
                     && this.isInsideActiveAssignedHangar(server);
-            if (this.isLaunchSequenceActive() || this.isCrucified()
-                    || (this.isNervLogisticsLocked() && !inAssignedHangar))
+            if (this.isLaunchSequenceActive() || this.isCrucified())
+            {
+                pilot.displayClientMessage(Component.translatable("message.projectseele.launch_interlock"), true);
+                return;
+            }
+            // R64: held by the facility on a sortie that was called off, or that is still being prepared or is on
+            // its way back: the route runtime has the way out (the abort's way home) or says what the pilot can do.
+            // Up to R63 the request was refused without a word of how to get out, and a cancelled sortie had no way.
+            if (!this.isExperimentalUnit() && this.level() instanceof ServerLevel held
+                    && (this.isNervLogisticsLocked() || EvaMechanicalFrameR52.active(this))
+                    && com.projectseele.world.NervRouteRuntimeR52.claimed(held))
+            {
+                EvaLogisticsDirector.ActionResult way = com.projectseele.world.NervRouteRuntimeR52.exitHeldR64(
+                        held, this.getUnitVariant(), pilot.getUUID());
+                if (way != null)
+                {
+                    pilot.displayClientMessage(Component.literal(way.message())
+                            .withStyle(way.accepted() ? ChatFormatting.GREEN : ChatFormatting.RED), true);
+                    return;
+                }
+            }
+            if (this.isNervLogisticsLocked() && !inAssignedHangar)
             {
                 pilot.displayClientMessage(Component.translatable("message.projectseele.launch_interlock"), true);
                 return;
