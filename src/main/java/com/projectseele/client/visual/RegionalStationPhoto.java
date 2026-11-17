@@ -186,7 +186,7 @@ public final class RegionalStationPhoto
                             if(!(level.getBlockEntity(at) instanceof com.projectseele.world.StationDepartureBoardBlockEntity board)){valid=false;continue;}
                             var row=new com.google.gson.JsonObject();row.addProperty("pos",at.toShortString());row.addProperty("platform",board.linkedPlatformId());row.addProperty("title",board.title());
                             row.add("departures",new com.google.gson.Gson().toJsonTree(board.departureTimes()));row.add("rows",new com.google.gson.Gson().toJsonTree(board.rows()));observations.add(row);
-                            valid&=board.linkedPlatformId()==5148309000717330621L&&!board.departureTimes().isEmpty()&&board.title().contains("航班动态")
+                            valid&=board.linkedPlatformId()==5148309000717330621L&&!board.departureTimes().isEmpty()&&board.title().contains("フライト案内")
                                     &&board.rows().stream().allMatch(s->s.contains("联合国"));
                         }
                         if(valid){try{Files.writeString(world.resolve("r30_terminal_departures.json"),observations.toString());}catch(java.io.IOException e){throw new IllegalStateException(e);}actionReady=true;}
