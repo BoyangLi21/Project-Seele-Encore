@@ -75,6 +75,28 @@ public final class PilotCockpitReviewR64
     /** -Dprojectseele.plugWatchChatR64=true: lines of every source are sent to the pilot after the lock and after leaving the capsule, for the chat panel's pictures. */
     private static final boolean PLUG_CHAT = Boolean.getBoolean("projectseele.plugWatchChatR64");
     private static boolean recoverSent, exitSent, leaveAsked;
+    /**
+     * -Dprojectseele.plugWatchYashimaR64=true (with the launch review's -Dprojectseele.launchMissionR64=ramiel): the
+     * Yashima operation from Unit-01's seat. Once the Unit stands free at the Hakone exit it is walked along the
+     * emplacement's own approach to the gun, the position's three grid switches are closed, the raised gun is taken
+     * (as a right click on it does), and then the cannon is worked through Ramiel's firing cycles: charged and fired
+     * into the open core, watched through its reload, aimed off beyond the barrel's sector and swung back while
+     * charging, and fired into the next open core. A picture every fourth tick from the gun's rising on, every tick
+     * while the trigger is held and for five seconds after a shot.
+     * -Dprojectseele.plugWatchVideoR64=true: in those every-tick stretches every drawn frame is kept instead (v_*.png,
+     * with video.csv giving each one's time), for a clip at the frame rate the game ran at.
+     */
+    private static final boolean YASHIMA = Boolean.getBoolean("projectseele.plugWatchYashimaR64");
+    private static final boolean YASHIMA_VIDEO = Boolean.getBoolean("projectseele.plugWatchVideoR64");
+    private record YashimaSite(Vec3 prone, java.util.List<Vec3> approach, java.util.List<net.minecraft.core.BlockPos> grid) {}
+    private record YashimaState(String phase, String notice, Vec3 core, int charge, boolean exposed, int beam, float health, boolean alive, String service, long slowest) {}
+    private static volatile YashimaSite yashimaSite;
+    private static volatile YashimaState yashimaState = new YashimaState("", "", null, 0, false, 0, 0, false, "", 0);
+    private static int yashimaStage, yashimaSince, yashimaCursor, yashimaShot, yashimaShotAt = -1, yashimaDense, yashimaFrame = -1, yashimaVideoFrames, yashimaDrawn;
+    private static double yashimaProgress = Double.MAX_VALUE;
+    private static boolean yashimaHolding, yashimaSiteAsked, yashimaCarried;
+    private static float yashimaOff;
+    private static BufferedWriter yashimaVideo;
     private static int freeTicks, afterTicks, offTicks, lastStage = -1;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     /**
@@ -94,7 +116,8 @@ public final class PilotCockpitReviewR64
 
     private static int wait, tick = -1, serverStart = -1, settledTicks, missing, frame, capturedTick = -1, lockedTicks, watchTicks;
     private static Vec3 settledAt;
-    private static boolean finished, sprinting;
+    private static volatile boolean finished;
+    private static boolean sprinting;
     private static BufferedWriter rows;
     private static Path directory;
     private static Entity camera;
@@ -223,6 +246,8 @@ public final class PilotCockpitReviewR64
         if (UN && at(previous, 135)) tell(mc.getSingleplayerServer(), mc.player.getUUID(), "[UN 运输管制 · 00] 运输机已到达接应点。");
     }
 
+    private static Vec3 cannonTarget;
+
     /**
      * The positron cannon as it stands: charged to the full and fired four times, standing and prone, from the seat
      * and then from behind. (-Dprojectseele.cockpitReviewScriptR64=cannon)
@@ -231,8 +256,35 @@ public final class PilotCockpitReviewR64
     {
         int t = tick;
         if (eva == null) return;
-        mc.player.setYRot(0); mc.player.setXRot(0);
         if (at(previous, 5)) mc.player.connection.sendCommand(ARM + "cannon");
+        // -Dprojectseele.cockpitReviewCannonTargetR64=true: a Ramiel that does nothing hangs 180 blocks to the east (its
+        // core shut), and each charge begins seven degrees to the side of the core and comes onto it. To the east and
+        // in the air: every shot digs a crater where it lands, the shots of earlier runs have dug theirs ahead, and a
+        // Ramiel left by one of them lies there. (Those do not die of /kill, their field takes it: their health is
+        // taken instead, asked three times while the lab loads round the Unit.)
+        boolean targeted = Boolean.getBoolean("projectseele.cockpitReviewCannonTargetR64");
+        if (targeted && (at(previous, 2) || at(previous, 14) || at(previous, 26)))
+            mc.player.connection.sendCommand("execute as @e[type=projectseele:ramiel,tag=!cockpit_review] run data merge entity @s {Health:0f}");
+        if (targeted && at(previous, 6))
+        {
+            cannonTarget = new Vec3(eva.getX() + 180, eva.getY() + 24, eva.getZ());
+            mc.player.connection.sendCommand(String.format(Locale.ROOT, "summon projectseele:ramiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,NoGravity:1b,Tags:[\"cockpit_review\"]}",
+                    cannonTarget.x, cannonTarget.y, cannonTarget.z));
+        }
+        if (targeted && at(previous, END - 30)) mc.player.connection.sendCommand("execute as @e[type=projectseele:ramiel] run data merge entity @s {Health:0f}");
+        Vec3 core = null;
+        if (targeted && cannonTarget != null)
+            for (var entity : mc.level.entitiesForRendering())
+                if (entity instanceof com.projectseele.entity.RamielEntity ramiel && ramiel.isAlive() && ramiel.position().distanceToSqr(cannonTarget) < 900)
+                    core = ramiel.position().add(0, ramiel.getBbHeight() * .5, 0);
+        if (core == null) { mc.player.setYRot(0); mc.player.setXRot(0); }
+        else
+        {
+            Vec3 eye = mc.gameRenderer.getMainCamera().getPosition();
+            int into = 1000;
+            for (int start : new int[]{40, 340, 640, 940}) if (t >= start) into = t - start;
+            turn(mc, yawTo(eye, core) + (into < 50 ? 7F * (1 - into / 50F) : into > 130 ? 7F : 0), pitchTo(eye, core), 3);
+        }
         boolean hold = false;
         for (int start : new int[]{40, 340, 640, 940})
         {
@@ -481,6 +533,7 @@ public final class PilotCockpitReviewR64
     {
         if (finished || directory == null || event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getInstance();
+        yashimaDrawn++;
         if (DRIVE)
         {
             if (tick < 0 || tick == capturedTick || "false".equals(System.getProperty("projectseele.cockpitCaptureR64"))) return;
@@ -488,6 +541,36 @@ public final class PilotCockpitReviewR64
             // Named by its tick: two drives are laid side by side tick for tick, whatever frames either dropped.
             frame++;
             Screenshot.grab(mc.gameDirectory, "projectseele_cockpit/" + BATCH + String.format("/frame_%04d.png", tick), mc.getMainRenderTarget(), ignored -> {});
+            return;
+        }
+        else if (YASHIMA)
+        {
+            if (mc.player == null || yashimaStage < 2) return;
+            boolean dense = yashimaDense > 0 || yashimaHolding;
+            if (dense && YASHIMA_VIDEO)
+            {
+                // Every drawn frame, with the time it was drawn at: the clip is cut to the rate the game ran at.
+                try
+                {
+                    if (yashimaVideo == null)
+                    {
+                        yashimaVideo = Files.newBufferedWriter(directory.resolve("video.csv"), StandardCharsets.UTF_8);
+                        yashimaVideo.write("frame,nanos,tick,partial\n");
+                    }
+                    yashimaVideo.write(String.format(Locale.ROOT, "%d,%d,%d,%.3f%n", yashimaVideoFrames, System.nanoTime(), watchTicks, event.renderTickTime));
+                }
+                catch (Exception exception)
+                {
+                    throw new IllegalStateException("cockpit review video row", exception);
+                }
+                tap(mc, yashimaVideoFrames++);
+                return;
+            }
+            tapFlush();
+            if (watchTicks == yashimaFrame || !dense && watchTicks % 4 != 0) return;
+            yashimaFrame = watchTicks;
+            frame++;
+            Screenshot.grab(mc.gameDirectory, "projectseele_cockpit/" + BATCH + String.format("/y_%05d.png", watchTicks), mc.getMainRenderTarget(), ignored -> {});
             return;
         }
         else
@@ -621,8 +704,315 @@ public final class PilotCockpitReviewR64
             }
         }
         else if (exitSent && ++afterTicks >= 260) { finish(mc, "capsule_thrown_clear"); return; }
+        if (YASHIMA && locked && eva != null && yashima(mc, eva, free)) return;
         if (lockedTicks >= PLUG_END) finish(mc, "plug_locked");
-        else if (watchTicks > 12000) finish(mc, "plug_watch_timeout");
+        else if (watchTicks > (YASHIMA ? 40000 : 12000)) finish(mc, "plug_watch_timeout");
+    }
+
+    /**
+     * Every drawn frame of a stretch, kept without holding the game back. A screenshot a frame (read back, turned over
+     * and packed as a PNG by the game's own workers) brought the game from 60 frames a second to under 40, and reading
+     * the frame at once (which makes the game wait until the graphics card has finished drawing it) to 48: a clip
+     * made from those is not a clip of the game at 60. Here the read is only asked for (into one of three buffers on
+     * the graphics card) and fetched three frames later, when it has long been done; three threads of the review's own
+     * pack each frame lightly and write it (v_NNNNNN.rgbz: width, height, then the deflated rows, bottom row first).
+     * video60.py turns them over and cuts the clip.
+     */
+    private static final java.util.concurrent.ArrayBlockingQueue<Object[]> TAPPED = new java.util.concurrent.ArrayBlockingQueue<>(180);
+    private static final java.util.concurrent.ConcurrentLinkedQueue<java.nio.ByteBuffer> SPARE = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private static final java.util.concurrent.atomic.AtomicInteger TAP_WRITTEN = new java.util.concurrent.atomic.AtomicInteger();
+    private static Thread[] tappers;
+    private static int tapDropped, tapAsked, tapSize, tapWidth, tapHeight;
+    private static final int[] TAP_BUFFER = new int[3], TAP_FRAME = {-1, -1, -1};
+
+    private static void tap(Minecraft mc, int index)
+    {
+        var target = mc.getMainRenderTarget();
+        int width = target.width, height = target.height, size = width * height * 3;
+        if (size != tapSize)
+        {
+            // The window's size (first, or changed): what was asked for at the old size is given up.
+            for (int i = 0; i < 3; i++)
+            {
+                if (TAP_BUFFER[i] == 0) TAP_BUFFER[i] = org.lwjgl.opengl.GL15.glGenBuffers();
+                org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, TAP_BUFFER[i]);
+                org.lwjgl.opengl.GL15.glBufferData(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, size, org.lwjgl.opengl.GL15.GL_STREAM_READ);
+                TAP_FRAME[i] = -1;
+            }
+            tapSize = size; tapWidth = width; tapHeight = height;
+        }
+        // The buffer asked three frames ago is fetched and then asked again for this frame.
+        int slot = tapAsked++ % 3;
+        fetch(slot);
+        com.mojang.blaze3d.platform.GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER, target.frameBufferId);
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, TAP_BUFFER[slot]);
+        org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_PACK_ALIGNMENT, 1);
+        org.lwjgl.opengl.GL11.glReadPixels(0, 0, width, height, org.lwjgl.opengl.GL11.GL_RGB, org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE, 0L);
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, 0);
+        TAP_FRAME[slot] = index;
+        if (tappers == null)
+        {
+            tappers = new Thread[3];
+            for (int i = 0; i < tappers.length; i++)
+            {
+                tappers[i] = new Thread(PilotCockpitReviewR64::tapWriter, "cockpit-review-frames-" + i);
+                tappers[i].setDaemon(true);
+                tappers[i].start();
+            }
+        }
+    }
+
+    /** What one of the three buffers holds is brought over and handed to the writers. */
+    private static void fetch(int slot)
+    {
+        if (TAP_FRAME[slot] < 0) return;
+        java.nio.ByteBuffer pixels = SPARE.poll();
+        if (pixels == null || pixels.capacity() != tapSize) pixels = org.lwjgl.system.MemoryUtil.memAlloc(tapSize);
+        pixels.clear();
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, TAP_BUFFER[slot]);
+        org.lwjgl.opengl.GL15.glGetBufferSubData(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, 0L, pixels);
+        org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, 0);
+        // A full queue means the writers have fallen three seconds behind: that frame is counted and let go, never waited for.
+        if (!TAPPED.offer(new Object[]{pixels, TAP_FRAME[slot], tapWidth, tapHeight, directory})) { tapDropped++; SPARE.add(pixels); }
+        TAP_FRAME[slot] = -1;
+    }
+
+    /** The end of a stretch: the frames still asked for are fetched, the oldest first. */
+    private static void tapFlush()
+    {
+        if (tapSize == 0) return;
+        for (int i = 0; i < 3; i++) fetch((tapAsked + i) % 3);
+    }
+
+    private static void tapWriter()
+    {
+        var deflater = new java.util.zip.Deflater(java.util.zip.Deflater.BEST_SPEED);
+        byte[] raw = new byte[0], packed = new byte[1 << 16];
+        try
+        {
+            while (true)
+            {
+                Object[] job = TAPPED.poll(500, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (job == null) { if (finished) return; continue; }
+                java.nio.ByteBuffer pixels = (java.nio.ByteBuffer) job[0];
+                int width = (Integer) job[2], height = (Integer) job[3], size = width * height * 3;
+                if (raw.length != size) raw = new byte[size];
+                pixels.rewind(); pixels.get(raw, 0, size);
+                SPARE.add(pixels);
+                try (var out = new java.io.DataOutputStream(new java.io.BufferedOutputStream(Files.newOutputStream(((Path) job[4]).resolve(String.format("v_%06d.rgbz", (Integer) job[1]))), 1 << 20)))
+                {
+                    out.writeInt(width); out.writeInt(height);
+                    deflater.reset(); deflater.setInput(raw, 0, size); deflater.finish();
+                    while (!deflater.finished()) out.write(packed, 0, deflater.deflate(packed));
+                }
+                TAP_WRITTEN.incrementAndGet();
+            }
+        }
+        catch (Exception exception)
+        {
+            ProjectSeele.LOGGER.error("Cockpit review: writing frames", exception);
+        }
+    }
+
+    private static float yawTo(Vec3 from, Vec3 to) { return (float) (Mth.atan2(to.z - from.z, to.x - from.x) * Mth.RAD_TO_DEG) - 90F; }
+
+    private static float pitchTo(Vec3 from, Vec3 to) { Vec3 d = to.subtract(from); return (float) (-Mth.atan2(d.y, d.horizontalDistance()) * Mth.RAD_TO_DEG); }
+
+    /** The pilot's view turned towards a direction, no faster than a hand turns it. */
+    private static void turn(Minecraft mc, float yaw, float pitch, float most)
+    {
+        mc.player.setYRot(mc.player.getYRot() + Mth.clamp(Mth.wrapDegrees(yaw - mc.player.getYRot()), -most, most));
+        mc.player.setXRot(mc.player.getXRot() + Mth.clamp(pitch - mc.player.getXRot(), -most, most));
+    }
+
+    private static void hold(Minecraft mc, boolean down)
+    {
+        if (down != yashimaHolding)
+        {
+            yashimaHolding = down;
+            send(down ? ServerboundEvaControlPacket.ACTION_CHARGE_START : ServerboundEvaControlPacket.ACTION_CHARGE_STOP);
+            ProjectSeele.LOGGER.info("Plug watch: Yashima trigger {} at tick {}", down ? "held" : "let go", watchTicks);
+        }
+        mc.options.keyUse.setDown(down);
+    }
+
+    /** The operation from the seat; true when the watch has been finished. */
+    private static boolean yashima(Minecraft mc, EvaUnit01Entity eva, boolean free)
+    {
+        var server = mc.getSingleplayerServer();
+        yashimaSince++;
+        // What only the server knows, asked every other tick: the operation's phase and notice, Ramiel's charge and core.
+        if (watchTicks % 2 == 0) server.execute(() ->
+        {
+            var level = server.getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
+            if (level == null) return;
+            var data = com.projectseele.world.TvCampaignSavedData.get(level);
+            var boss = data.angel != null && level.getEntity(data.angel) instanceof com.projectseele.entity.RamielEntity ramiel ? ramiel : null;
+            var service = com.projectseele.world.TvYashimaSavedDataR50.get(level);
+            yashimaState = new YashimaState(data.phase, data.notice, boss == null ? null : boss.position().add(0, boss.getBbHeight() * .5, 0),
+                    boss == null ? 0 : com.projectseele.world.TvYashimaCombatCommsR54.chargeRemainingR54(boss), boss != null && boss.isExposed(), boss == null ? 0 : boss.getBeamTicks(),
+                    boss == null ? 0 : boss.getHealth(), boss != null && boss.isAlive(),
+                    "shots " + service.shots + " service " + service.serviceTicksR53 + " reload " + service.reloadReady + " coolant " + service.coolantReady + " locked " + service.fireControlLocked,
+                    // The longest of the server's last hundred ticks, in milliseconds: a stall shows here.
+                    java.util.Arrays.stream(server.tickTimes).max().orElse(0) / 1_000_000);
+            if (yashimaSite == null && !yashimaSiteAsked)
+            {
+                yashimaSiteAsked = true;
+                try
+                {
+                    var plan = com.projectseele.world.TvYashimaStationR52.plan(level).orElseThrow();
+                    var root = com.google.gson.JsonParser.parseString(Files.readString(server.getWorldPath(LevelResource.ROOT).resolve("tv_encounter_sites_r45.json"))).getAsJsonObject();
+                    var grid = new java.util.ArrayList<net.minecraft.core.BlockPos>();
+                    for (var row : root.getAsJsonObject("sites").getAsJsonObject("ramiel").getAsJsonObject("yashima_controls").getAsJsonArray("grid_switches"))
+                    {
+                        var at = row.getAsJsonArray();
+                        grid.add(new net.minecraft.core.BlockPos(at.get(0).getAsInt(), at.get(1).getAsInt(), at.get(2).getAsInt()));
+                    }
+                    yashimaSite = new YashimaSite(plan.prone(), plan.access(), java.util.List.copyOf(grid));
+                    ProjectSeele.LOGGER.info("Plug watch: Yashima site prone {} approach {} points from {} grid {}", plan.prone(), plan.access().size(), plan.access().get(0), grid);
+                }
+                catch (Exception exception)
+                {
+                    ProjectSeele.LOGGER.error("Plug watch: Yashima site not read", exception);
+                }
+            }
+        });
+        YashimaSite site = yashimaSite;
+        YashimaState state = yashimaState;
+        var gun = eva.fixedCannonBodyR52();
+        if (watchTicks % 20 == 0)
+        {
+            // How many frames the game drew in the last twenty ticks, and whether every one of them was being kept.
+            ProjectSeele.LOGGER.info("Plug watch: Yashima frames {} in twenty ticks, every frame kept {}", yashimaDrawn, YASHIMA_VIDEO && (yashimaDense > 0 || yashimaHolding));
+            yashimaDrawn = 0;
+        }
+        if (watchTicks % 20 == 0)
+            ProjectSeele.LOGGER.info("Plug watch: Yashima tick {} stage {} shot {} phase {} at {} free {} gun {} bound {} prone {} weapon {} charge {} cooldown {} | ramiel charge {} exposed {} beam {} health {} seen {} | {} slowest tick {} ms | {}",
+                    watchTicks, yashimaStage, yashimaShot, state.phase, eva.blockPosition().toShortString(), free,
+                    gun == null ? "none" : "y " + String.format(Locale.ROOT, "%.1f", gun.getY()) + " ready " + gun.readyR52() + " loaded " + gun.loadedR52(),
+                    eva.fixedCannonOperatingR52(), eva.isPilotProne(), eva.getWeapon(), eva.getCannonCharge(), eva.getCannonCooldown(),
+                    state.charge, state.exposed, state.beam, state.health,
+                    java.util.stream.StreamSupport.stream(mc.level.entitiesForRendering().spliterator(), false).filter(com.projectseele.entity.RamielEntity.class::isInstance).count(), state.service, state.slowest,
+                    state.notice.length() > 110 ? state.notice.substring(0, 110) : state.notice);
+        if (site == null) return false;
+        if (yashimaDense > 0) yashimaDense--;
+        switch (yashimaStage)
+        {
+            case 0 ->
+            {
+                // Free on the ground at the exit for a second: the walk begins. The switches are closed now; they are far from the gun.
+                if (!free) { yashimaSince = 0; return false; }
+                if (yashimaSince < 20) return false;
+                server.execute(() ->
+                {
+                    var level = server.getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
+                    for (var at : site.grid())
+                    {
+                        var block = level.getBlockState(at);
+                        boolean lever = block.getBlock() instanceof net.minecraft.world.level.block.LeverBlock;
+                        if (lever && !block.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED))
+                            level.setBlock(at, block.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED, true), 3);
+                        ProjectSeele.LOGGER.info("Plug watch: Yashima grid switch at {} lever {} closed", at.toShortString(), lever);
+                    }
+                });
+                ProjectSeele.LOGGER.info("Plug watch: Yashima walk begins at tick {} from {} ({} blocks from the gun's place)", watchTicks, eva.position(),
+                        Math.round(eva.position().subtract(site.prone()).horizontalDistance()));
+                yashimaStage = 1; yashimaSince = 0;
+            }
+            case 1 ->
+            {
+                Vec3 at = eva.position();
+                double left = at.subtract(site.prone()).horizontalDistance();
+                if (left < 10 || gun != null && gun.readyR52() && left < 30)
+                {
+                    walk(mc, false); mc.options.keySprint.setDown(false);
+                    ProjectSeele.LOGGER.info("Plug watch: Yashima at the emplacement at tick {} ({} blocks from the gun's place, carried {})", watchTicks, Math.round(left), yashimaCarried);
+                    yashimaStage = 2; yashimaSince = 0;
+                    return false;
+                }
+                var route = site.approach();
+                // The point of the approach nearest the Unit (never back along it), and the one a dozen blocks further
+                // on: the Unit makes for that one, at a walk, and turns on the spot before it steps off.
+                for (int i = yashimaCursor; i < Math.min(route.size(), yashimaCursor + 40); i++)
+                    if (at.subtract(route.get(i)).horizontalDistance() < at.subtract(route.get(yashimaCursor)).horizontalDistance()) yashimaCursor = i;
+                Vec3 goal = route.get(Math.min(route.size() - 1, yashimaCursor + 18));
+                float wanted = yawTo(at, goal);
+                turn(mc, wanted, 0, 6);
+                walk(mc, Math.abs(Mth.wrapDegrees(wanted - eva.getYRot())) < 25);
+                mc.options.keySprint.setDown(false);
+                // No nearer after ten seconds: the ground between is not the question here. The Unit is set down at the point it was making for.
+                if (yashimaSince % 200 == 0)
+                {
+                    if (yashimaProgress - left < 4)
+                    {
+                        yashimaCarried = true;
+                        mc.player.connection.sendCommand(String.format(Locale.ROOT, "tp %s %.2f %.2f %.2f", eva.getStringUUID(), goal.x, goal.y + .1, goal.z));
+                        ProjectSeele.LOGGER.info("Plug watch: Yashima walk held at {} ({} blocks left); the Unit is set down at approach point {} {}", at, Math.round(left), yashimaCursor, goal);
+                    }
+                    yashimaProgress = left;
+                }
+            }
+            case 2 ->
+            {
+                // The gun rises by itself once the Unit is near. Then it is taken as a right click on it does.
+                if (state.core != null) turn(mc, yawTo(mc.player.getEyePosition(), state.core), pitchTo(mc.player.getEyePosition(), state.core), 3);
+                if (eva.fixedCannonOperatingR52())
+                {
+                    ProjectSeele.LOGGER.info("Plug watch: Yashima gun taken at tick {}", watchTicks);
+                    yashimaStage = 3; yashimaSince = 0;
+                }
+                else if (gun != null && gun.readyR52() && gun.loadedR52() && yashimaSince % 40 == 0)
+                    SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_FIXED_CANNON_R52, gun.getId()));
+                if (yashimaSince > 6000) { finish(mc, "yashima_gun_timeout"); return true; }
+            }
+            default ->
+            {
+                if (state.core == null || !state.alive)
+                {
+                    hold(mc, false);
+                    if (yashimaShotAt < 0) yashimaShotAt = watchTicks;
+                    if (watchTicks - yashimaShotAt > 300) { finish(mc, "yashima_target_gone"); return true; }
+                    return false;
+                }
+                Vec3 eye = mc.gameRenderer.getMainCamera().getPosition();
+                float yaw = yawTo(eye, state.core), pitch = pitchTo(eye, state.core);
+                boolean combat = state.phase.equals("combat");
+                boolean window = state.exposed && (state.beam > 4 || state.charge > 0);
+                // Shots 0 and 2: charged over the last of Ramiel's own charge and let go into the open core.
+                // Shot 1, between them: aimed off beyond the barrel's sector, charged short of full, swung back and let go without a shot.
+                if (yashimaShot == 1)
+                {
+                    // Let go at 54 of the 60 ticks of charge, as the client has it: no shot leaves.
+                    int since = watchTicks - yashimaShotAt, charge = eva.getCannonCharge();
+                    if (since < 260) yashimaOff = 0;
+                    else if (since < 300) yashimaOff = 20;
+                    else if (charge >= 54 || since > 460) { hold(mc, false); yashimaOff = 0; yashimaShot = 2; }
+                    else { yashimaOff = charge >= 40 ? 0 : 20; hold(mc, combat); yashimaDense = 100; }
+                    turn(mc, yaw + yashimaOff, pitch, charge >= 40 ? 4 : 2);
+                    return false;
+                }
+                turn(mc, yaw, pitch, 2);
+                if (!yashimaHolding)
+                {
+                    if (yashimaShot < 3 && combat && eva.getCannonCooldown() <= 0 && state.charge > 0 && state.charge <= 78) { hold(mc, true); yashimaDense = 400; }
+                }
+                else
+                {
+                    yashimaDense = Math.max(yashimaDense, 100);
+                    if (eva.chargeProgress() >= 1 && window)
+                    {
+                        hold(mc, false);
+                        ProjectSeele.LOGGER.info("Plug watch: Yashima shot {} let go at tick {} (ramiel charge {} beam {} health {})", yashimaShot, watchTicks, state.charge, state.beam, state.health);
+                        yashimaShotAt = watchTicks; yashimaDense = 100;
+                        if (yashimaShot == 2) yashimaShot = 3; else yashimaShot = 1;
+                    }
+                    // Ramiel's window closed on a held charge: let it stand, the next window takes it.
+                }
+                if (yashimaShot == 3 && watchTicks - yashimaShotAt > 400) { finish(mc, "yashima_complete"); return true; }
+                if (yashimaSince > 9000) { hold(mc, false); finish(mc, "yashima_combat_timeout"); return true; }
+            }
+        }
+        return false;
     }
 
     private static void finish(Minecraft mc, String reason)
@@ -634,6 +1024,14 @@ public final class PilotCockpitReviewR64
         try
         {
             if (rows != null) rows.close();
+            if (yashimaVideo != null) yashimaVideo.close();
+            // The frames still on their way to the disk: the writers finish them (they stop on their own once the queue is empty).
+            tapFlush();
+            if (tappers != null)
+            {
+                for (Thread writer : tappers) writer.join(30000);
+                ProjectSeele.LOGGER.info("Cockpit review: every-frame stretches kept {} frames, wrote {}, let {} go", yashimaVideoFrames, TAP_WRITTEN.get(), tapDropped);
+            }
         }
         catch (Exception exception)
         {

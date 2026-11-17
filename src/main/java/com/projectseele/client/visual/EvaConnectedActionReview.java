@@ -84,6 +84,14 @@ public final class EvaConnectedActionReview
     private static final boolean LAUNCH_REAL=Boolean.getBoolean("projectseele.launchReal");
     private static final String LAUNCH_EXIT=System.getProperty("projectseele.launchExit","surface");
     /**
+     * -Dprojectseele.launchMissionR64=ramiel: the real mode asks for no preparation of its own. It selects that
+     * operation and joins it as the toured unit's own pilot (/seele sortie select, /seele sortie support), and the
+     * operation prepares and launches the unit by the exit its site names.
+     * -Dprojectseele.launchTimeoutR64=<ticks>: how long after the launch began the review gives up (9000).
+     */
+    private static final String LAUNCH_MISSION=System.getProperty("projectseele.launchMissionR64");
+    private static final int LAUNCH_TIMEOUT=Integer.getInteger("projectseele.launchTimeoutR64",9000);
+    /**
      * -Dprojectseele.launchWatch=<ticks>: the real mode sends no sortie command and only logs where the toured unit is,
      * for so many ticks (what a unit left deployed does when its world is loaded again).
      * -Dprojectseele.launchWatchReset=<unit> also asks for that unit's reset at the start, as a sortie run does.
@@ -455,14 +463,21 @@ public final class EvaConnectedActionReview
                 boolean idle=route.equals("none")||route.startsWith("PARKED")||route.startsWith("CANCELLED");
                 // Put off the plug with nothing registered yet: board again.
                 if(idle&&since>40&&!aboardR63(mc,eva)){realStage(1,step);return;}
-                if(since%100==10&&idle)
+                if(LAUNCH_MISSION!=null)
+                {
+                    // Asked again every ten seconds while nothing is registered: the operation refuses while its site still loads.
+                    if(idle&&since%200==10)link.sendCommand("seele sortie select "+LAUNCH_MISSION);
+                    if(idle&&since%200==30)link.sendCommand("seele sortie support "+UNIT_VARIANT+" player");
+                    if(since%200==60)link.sendCommand("seele sortie status");
+                }
+                else if(since%100==10&&idle)
                 {
                     if(geo!=null)mc.getSingleplayerServer().execute(()->ProjectSeele.LOGGER.info("Real launch review: prepare asked at step {}; held by: {}",step,
                             com.projectseele.world.NervRouteRuntimeR52.reviewPrepareR63(geo,UNIT_VARIANT,LAUNCH_EXIT)));
                     link.sendCommand("seele eva prepare "+UNIT+" "+LAUNCH_EXIT);
                 }
                 // The director refuses a launch until the unit stands ready in its silo: ask until it goes.
-                if(since>200&&since%60==0)
+                if(LAUNCH_MISSION==null&&since>200&&since%60==0)
                 {
                     link.sendCommand("seele eva status "+UNIT);
                     link.sendCommand("seele eva launch "+UNIT);
@@ -497,7 +512,7 @@ public final class EvaConnectedActionReview
                 }
                 previousTick=tick;
                 if(launchIdleAt>=0&&tick>=launchIdleAt+LAUNCH_AFTER)finish(mc,"complete");
-                else if(tick>9000)finish(mc,"launch_timeout");
+                else if(tick>LAUNCH_TIMEOUT)finish(mc,"launch_timeout");
             }
         }
     }
