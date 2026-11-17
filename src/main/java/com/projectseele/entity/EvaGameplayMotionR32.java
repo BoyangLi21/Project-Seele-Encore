@@ -237,6 +237,8 @@ public final class EvaGameplayMotionR32
         var p=profile(variant(e));return p!=null
                 &&p.has("hand_pose_revision")&&p.get("hand_pose_revision").getAsInt()>=2&&sharedBody(e,partial);
     }
+    /** Seconds of a clip as it was captured. */
+    static float clipSecondsR64(EvaUnit01Entity e,String name){return clip(e,name).get("duration_seconds").getAsFloat();}
     public static boolean hasClip(EvaUnit01Entity e,String name)
     {var p=profile(variant(e));return p!=null&&p.getAsJsonObject("clips").has("r32_"+name);}
     public static boolean knifeReady(EvaUnit01Entity e)
@@ -749,7 +751,16 @@ public final class EvaGameplayMotionR32
         String resolved=resolve(e,name);float phase=phase(e,name,progress);
         var pose=EvaBodyPose.gameplayClip(e,resolved,phase);
         float entryEnd=actionEntryEndR51(e,name);
-        if(progress<entryEnd&&!e.getEntityData().get(ACTION_FROM).isEmpty())
+        var fadeR64=e.rowFadeR64();
+        if(fadeR64!=null&&hasClip(e,fadeR64.clip()))
+        {
+            // R64 (flow): a blow begun out of another. The other runs on along its own clip while this one takes
+            // its place: there is no pose to start from that stands still. (Up to here the blend began at the pose
+            // the server had captured, the other blow frozen at its hit: measured, the chest turned 27 to 60
+            // degrees in the first frame of the next punch.)
+            pose=EvaBodyPose.blend(EvaBodyPose.gameplayClip(e,resolve(e,fadeR64.clip()),phase(e,fadeR64.clip(),fadeR64.phase())),pose,fadeR64.weight());
+        }
+        else if(!e.rowBeganOutOfBlowR64()&&progress<entryEnd&&!e.getEntityData().get(ACTION_FROM).isEmpty())
         {
             var from=EvaBodyPose.neutralForTransportR32(e);
             EvaShutdownR30.decode(e.getEntityData().get(ACTION_FROM),from);

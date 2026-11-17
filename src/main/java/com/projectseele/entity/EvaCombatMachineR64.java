@@ -44,6 +44,8 @@ public final class EvaCombatMachineR64
     private int startup,active,recovery,serial;
     private float open,close,rate=1;
     private boolean hit,whiffed;
+    /** R64 (flow): this row's stages lie on its clip along the smooth curve (the switch as it stood when the row began). */
+    private boolean curve;
     private int button=-1,held,sinceEnd=1000,sinceEvade=1000;
     private boolean evading;
     private LivingEntity target;
@@ -92,7 +94,7 @@ public final class EvaCombatMachineR64
             if(DIAG)ProjectSeele.LOGGER.info("R64MOVE tick {} press {} dropped: nothing took it in {} ticks",e.level().getGameTime(),button==HEAVY?"heavy":"light",BUFFER);
             button=-1;
         }
-        if(!EvaCombatModelR64.frames(e)){button=-1;if(row!=null){row=null;last=null;}return;}
+        if(!EvaCombatModelR64.frames(e)){button=-1;if(row!=null){row=null;last=null;EvaRowClockR64.end(e);}return;}
         if(pilot==null||e.isPilotControlLocked()||CombatFeelR31.restrained(e))return;
         if(row==null)
         {
@@ -121,17 +123,25 @@ public final class EvaCombatMachineR64
     {
         rate=Math.min(1.12F,EvaPilotCapability.attackSpeedMultiplier(e.getPilotSynchronization()));
         startup=n(next.startup());active=Math.max(2,n(next.active()));recovery=n(next.recovery());
+        float contact=e.rowContactPhaseR64(next);
+        open=Mth.clamp(contact-next.lead(),.02F,.9F);close=Mth.clamp(contact+next.tail(),open+.02F,.97F);
+        // R64 (flow): the recovery is as long as its part of the clip takes at RECOVERY_PACE (the punches' was played
+        // at 1.5 times its own pace: the arm was snatched back). The ticks a row may be left from stay where they are.
+        curve=EvaCombatModelR64.flowCurve(e);
+        float seconds=curve?e.rowClipSecondsR64(next):0;
+        if(seconds>0)recovery=Math.max(recovery,(int)Math.ceil((1-close)*seconds*20/(EvaMoveTableR64.RECOVERY_PACE*rate)));
         row=next;last=null;hit=false;whiffed=false;serial++;target=lock();
         e.beginRowR64(next,startup+active+recovery);
+        // R64 (flow): the row's clock, for the clients that play it themselves (nothing is told where they do not).
+        if(EvaCombatModelR64.flowClock(e))EvaRowClockR64.begin(e,serial,next.name(),EvaUnit01Entity.rowClipR64(next),startup,active,recovery,open,close,curve);
+        else EvaRowClockR64.end(e);
         // The Unit's turn for this tick has been made (the ridden body turns before the blows are looked at):
         // without this the first of a row's wind-up ticks was lost to the turn onto its target.
         if(target!=null&&pilotView!=NO_VIEW)e.faceR64(yaw(e.getYRot(),e.getYRot(),pilotView,true));
-        float contact=e.rowContactPhaseR64(next);
-        open=Mth.clamp(contact-next.lead(),.02F,.9F);close=Mth.clamp(contact+next.tail(),open+.02F,.97F);
         if(next.cooldown()>0)readyAt.put(next.name(),e.level().getGameTime()+n(next.cooldown()));
-        if(DIAG)ProjectSeele.LOGGER.info("R64MOVE tick {} {} begun from {}: press held {} ticks, {}+{}+{} ticks, clip {}..{}, target {}",
+        if(DIAG)ProjectSeele.LOGGER.info("R64MOVE tick {} {} begun from {}: press held {} ticks, {}+{}+{} ticks, clip {}..{}{}, target {}",
                 e.level().getGameTime(),next.name(),from,held,startup,active,recovery,String.format(java.util.Locale.ROOT,"%.3f",open),
-                String.format(java.util.Locale.ROOT,"%.3f",close),target==null?"none":target.getType().toShortString());
+                String.format(java.util.Locale.ROOT,"%.3f",close),curve?" along the curve":"",target==null?"none":target.getType().toShortString());
         button=-1;
     }
 
@@ -140,12 +150,14 @@ public final class EvaCombatMachineR64
         if(DIAG)ProjectSeele.LOGGER.info("R64MOVE tick {} {} over ({}) after {} ticks",e.level().getGameTime(),row.name(),how,e.rowElapsedR64(row));
         // A row that played out, or was left, may be followed for a few ticks; one taken from the Unit may not.
         last="taken".equals(how)?null:row;row=null;sinceEnd=0;target=null;
+        EvaRowClockR64.end(e);
     }
 
     /** Where in its clip the row is after this many ticks: the wind-up to the opening of the live part, the live ticks across it, the recovery to the end. */
     float phase(int elapsed,float linear)
     {
-        return row==null?linear:EvaMoveTableR64.phase(elapsed,startup,active,recovery,open,close);
+        return row==null?linear:curve?EvaRowClockR64.phase(elapsed,startup,active,recovery,open,close,true)
+                :EvaMoveTableR64.phase(elapsed,startup,active,recovery,open,close);
     }
 
     /** Server, the same tick, after the old core has moved the body to this tick's place in the clip: does it land? */
@@ -157,8 +169,13 @@ public final class EvaCombatMachineR64
         if(now>startup&&now<=startup+active&&!hit&&e.rowContactR64(row,pilot,now==startup+1))
         {
             hit=true;
+            // R64 (flow): the clients are told where the limb met its mark and how long both bodies are held (the
+            // hold is the Unit's own beat of this tick, if the blow gave it one).
+            var beat=CombatFeelR31.beat(e);
+            EvaRowClockR64.hit(e,now,e.combatPhaseR31(),beat!=null&&beat.kind()==CombatFeelR31.CONTACT&&beat.start()==e.level().getGameTime()?Math.max(0,beat.stopTicks()-1):0);
             if(DIAG)ProjectSeele.LOGGER.info("R64MOVE tick {} {} landed at tick {} (live {}..{})",e.level().getGameTime(),row.name(),now,startup+1,startup+active);
         }
+        else if(!hit&&now>=startup&&now<startup+active&&EvaCombatModelR64.flowClock(e))expect(pilot,now);
         // R64 (M5): a finisher's weight comes down, landed or not.
         if(now==startup+active&&row.level()==EvaMoveTableR64.FINISHER)e.rowGroundR64(hit);
         if(now==startup+active&&!hit&&!whiffed)
@@ -166,6 +183,28 @@ public final class EvaCombatMachineR64
             whiffed=true;e.rowWhiffR64(row);
             if(DIAG)ProjectSeele.LOGGER.info("R64MOVE tick {} {} missed (live {}..{})",e.level().getGameTime(),row.name(),startup+1,startup+active);
         }
+    }
+
+    /**
+     * R64 (flow): will the limb meet a body in the tick to come? Its sweep from where it is to where the next tick
+     * puts it is tried against the bodies as they stand, and nothing is struck. If it meets one, the clients are
+     * told at what phase: they slow the limb into its mark in time, where without this they drew it a tick's
+     * travel into the body before they heard of the hit. The hit itself is still made by the next tick's test.
+     */
+    private void expect(LivingEntity pilot,int now)
+    {
+        float here=e.combatPhaseR31(),next=phase(now+1,0);
+        Vec3 from=e.blowLimbR64();
+        if(from==null||next<=here)return;
+        e.rowPhaseR64(next);Vec3 to=e.blowLimbR64();e.rowPhaseR64(here);
+        if(to==null)return;
+        Vec3 met=e.rowProbeR64(row,pilot,from,to);
+        if(met==null)return;
+        Vec3 along=to.subtract(from);double length=along.lengthSqr();
+        double part=length<1.0e-6?0:Mth.clamp(met.subtract(from).dot(along)/length,0,1);
+        EvaRowClockR64.due(e,now+1,(float)(here+(next-here)*part));
+        if(DIAG)ProjectSeele.LOGGER.info("R64MOVE tick {} {} expected to land in tick {} at phase {}",e.level().getGameTime(),row.name(),now+1,
+                String.format(java.util.Locale.ROOT,"%.3f",here+(next-here)*part));
     }
 
     private boolean sweeping;

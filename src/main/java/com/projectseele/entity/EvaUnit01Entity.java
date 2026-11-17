@@ -95,7 +95,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  */
 public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBattleSignals.Actor, com.projectseele.world.TvEncounterEquipmentControlR45.CannonAccess
 {
-    private static final boolean DORSAL_SIGNALS_READY=EvaDorsalMechanism.bootstrap() && EvaTerrainSupport.bootstrap() && EvaShutdownR30.bootstrap() && EvaAirTransportR31.bootstrap() && EvaMechanicalFrameR52.bootstrap() && EvaCombatR31.bootstrap() && EvaGameplayMotionR32.bootstrap() && EvaCombatSupportR33.bootstrap() && EvaBayRepairR33.bootstrap() && EvaBerserkMotionR34.bootstrap() && EvaCapturedLocomotionR44.bootstrap() && EvaWeaponHandlingR45.bootstrap() && EvaSprintR50.bootstrap() && EvaMotionModelR64.bootstrap() && EvaCombatModelR64.bootstrap();
+    private static final boolean DORSAL_SIGNALS_READY=EvaDorsalMechanism.bootstrap() && EvaTerrainSupport.bootstrap() && EvaShutdownR30.bootstrap() && EvaAirTransportR31.bootstrap() && EvaMechanicalFrameR52.bootstrap() && EvaCombatR31.bootstrap() && EvaGameplayMotionR32.bootstrap() && EvaCombatSupportR33.bootstrap() && EvaBayRepairR33.bootstrap() && EvaBerserkMotionR34.bootstrap() && EvaCapturedLocomotionR44.bootstrap() && EvaWeaponHandlingR45.bootstrap() && EvaSprintR50.bootstrap() && EvaMotionModelR64.bootstrap() && EvaCombatModelR64.bootstrap() && EvaRowClockR64.bootstrap();
     private static final EntityDataAccessor<Integer> MECHANICAL_REVISION_R30=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.INT);
     private static final FirstBattleSignals.SignalSet FIRST_BATTLE=new FirstBattleSignals.SignalSet(EvaUnit01Entity.class);
     @Override public FirstBattleSignals.SignalSet firstBattleSignals(){return FIRST_BATTLE;}
@@ -799,6 +799,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaSprintR50.define(this.entityData);
         EvaMotionModelR64.define(this.entityData);
         EvaCombatModelR64.define(this.entityData);
+        EvaRowClockR64.define(this.entityData);
         EvaWeaponHandlingR45.define(this.entityData);
         EvaCombatSupportR33.define(this.entityData);
         EvaBerserkMotionR34.define(this.entityData);
@@ -3107,8 +3108,34 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public float liveActionPhaseSentR63(){return this.entityData.get(DATA_LIVE_ACTION_PHASE);}
     public float liveActionPhaseDrawnR63(float partialTick){return this.liveActionProgress(partialTick);}
 
+    /** R64 (flow), client: the row in hand as this client plays it. Created when first asked for (a check builds a Unit bare). */
+    private EvaRowClockR64.View rowViewR64;
+    private float rowPhaseDrawnR64()
+    {
+        if(!EvaCombatModelR64.flowClock(this))return -1;
+        if(this.rowViewR64==null)this.rowViewR64=new EvaRowClockR64.View();
+        return this.rowViewR64.frame(this,FirstBattleSignals.clientFrameTime()/5.0e7D);
+    }
+    /** Client: this Unit's blow is drawn by the row's own clock, which a hit slows down and does not freeze. */
+    public boolean rowDrawnByClockR64()
+    {return this.level().isClientSide&&this.rowViewR64!=null&&EvaCombatModelR64.flowClock(this)&&this.rowViewR64.playing();}
+    /** Client: the blow in hand is taking another's place in the pose, or null. */
+    public EvaRowClockR64.Fade rowFadeR64()
+    {
+        return !this.level().isClientSide||this.rowViewR64==null||!EvaCombatModelR64.flowFade(this)||!this.rowViewR64.playing()?null
+                :this.rowViewR64.fade(FirstBattleSignals.clientFrameTime()/5.0e7D);
+    }
+    /** Client: the blow in hand began out of another (it is brought in by the fade, not from the pose the server captured). */
+    public boolean rowBeganOutOfBlowR64()
+    {return this.level().isClientSide&&this.rowViewR64!=null&&EvaCombatModelR64.flowFade(this)&&this.rowViewR64.playing()&&this.rowViewR64.outOfAnother();}
+
     private float liveActionProgress(float partialTick)
     {
+        if(this.level().isClientSide)
+        {
+            float drawn=this.rowPhaseDrawnR64();
+            if(drawn>=0)return drawn;
+        }
         if(CombatFeelR31.hitPaused(this))return CombatFeelR31.frozenPhase(this);
         if (!this.level().isClientSide) return this.entityData.get(DATA_LIVE_ACTION_PHASE);
         return actionSignalClock.sample(FirstBattleSignals.clientFrameTime());
@@ -4038,7 +4065,33 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             }
         }
     }
-    private static String rowClipR64(EvaMoveTableR64.Row row)
+    /** Seconds of the row's clip as it was captured, or 0 where the bundle has none for it. */
+    float rowClipSecondsR64(EvaMoveTableR64.Row row)
+    {
+        String clip=rowClipR64(row);
+        return EvaGameplayMotionR32.ready(this)&&EvaGameplayMotionR32.hasClip(this,clip)?EvaGameplayMotionR32.clipSecondsR64(this,clip):0;
+    }
+    /**
+     * R64 (flow): where a sweep of the row's limb would first meet a body, with nothing struck and nothing told.
+     * The bodies are found and met the way the contact test does it; walls are not looked at.
+     */
+    @Nullable
+    Vec3 rowProbeR64(EvaMoveTableR64.Row row,LivingEntity pilot,Vec3 from,Vec3 to)
+    {
+        if(!(this.level() instanceof ServerLevel level))return null;
+        double radius=row.radius(),least=Double.MAX_VALUE;Vec3 first=null;
+        for(Entity target:com.projectseele.physics.CombatDamageTargetsR44.candidates(level,new AABB(from,to).inflate(radius),this,pilot))
+        {
+            if(pilot instanceof TrainingPilotEntity&&(target instanceof EvaUnit01Entity||target instanceof TrainingPilotEntity||target instanceof NervStaffEntity))continue;
+            if(row.kind()==EvaMoveTableR64.KICK&&!(target instanceof Angel)&&target instanceof EvaUnit01Entity)continue;
+            var met=com.projectseele.physics.CombatDamageTargetsR44.clip(target,from,to,radius);
+            if(met.isEmpty())continue;
+            double d=met.get().distanceToSqr(from);
+            if(d<least){least=d;first=met.get();}
+        }
+        return first;
+    }
+    static String rowClipR64(EvaMoveTableR64.Row row)
     {
         return switch(row.kind())
         {
@@ -8352,6 +8405,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             // including positive first phases and either callback ordering.
             boolean phaseUpdated=values.stream().anyMatch(value->value.id()==DATA_LIVE_ACTION_PHASE.getId());
             actionSignalClock.acceptAction(this.recoveryInputStampR51(),this.entityData.get(DATA_LIVE_ACTION_PHASE),phaseUpdated);
+            // R64 (flow): the row's own clock is set by the same packet (a new row's clock is told with its first phase).
+            if(phaseUpdated&&this.rowViewR64!=null&&values.stream().noneMatch(EvaRowClockR64::told))
+                this.rowViewR64.heard(this.entityData.get(DATA_LIVE_ACTION_PHASE),System.nanoTime()/5.0e7D);
         }
     }
 

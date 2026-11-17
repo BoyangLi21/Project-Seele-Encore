@@ -116,7 +116,10 @@ public final class CombatFeelR31
         int stop=guard?1:crushing?2:1;
         // R64 (M4), hit-stop "tiered": both bodies are held by how hard the blow is. The tick of the blow is already
         // under way, so a stop of n+1 holds them n ticks. An Angel's blow on a Unit of the frames core: 3, a crushing one 5.
-        if(rowR64!=null&&EvaCombatModelR64.tiered((EvaUnit01Entity)source))stop=rowR64.stop()+1;
+        // R64 (flow): under "stop" by the blow's level alone, 1 to 4 ticks: the blow is no longer frozen for them
+        // (EvaRowClockR64), so they need only be long enough to be felt.
+        if(rowR64!=null&&EvaCombatModelR64.tiered((EvaUnit01Entity)source))
+            stop=(EvaCombatModelR64.flowStop((EvaUnit01Entity)source)?EvaMoveTableR64.pause(rowR64.level()):rowR64.stop())+1;
         else if(source instanceof Angel&&target instanceof EvaUnit01Entity struckR64&&EvaCombatModelR64.tiered(struckR64))stop=(crushing?5:3)+1;
         if(knockR64)strength=Math.min(1.5F,strength*1.25F);
         send(target,kind,direction,strength,(kind==DOWN?64:kind==STAGGER?knockR64?KNOCK_TICKS:16:10)+lead(stop),stop);
@@ -139,7 +142,9 @@ public final class CombatFeelR31
             if(e instanceof SachielEntity&&CombatReactionsR36.enabled(e)&&!e.level().isClientSide)
             {
                 float age=age(e,0);
-                if(age>=b.stopTicks&&age<6+lead(b))
+                // R64 (flow): a light blow under "stop" holds one tick (stopTicks 2, which no other flinch has). Its
+                // skid stays five ticks long, as it was after the two- and three-tick holds.
+                if(age>=b.stopTicks&&age<(b.stopTicks==2?7:6+lead(b)))
                 {
                     boolean grounded=e.onGround();double speed=1.15*b.strength*Math.exp(-(age-b.stopTicks)/3);
                     Vec3 force=b.direction.multiply(1,0,1).normalize().scale(speed);e.move(MoverType.SELF,CombatSpacingR32.clip(e,force));

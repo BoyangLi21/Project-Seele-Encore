@@ -27,15 +27,44 @@ public final class EvaCombatCommandsR64
         {
             stop.then(Commands.literal(name).executes(context -> set(context.getSource(), null, name)));
         }
-        return combat.then(stop);
+        var flow = Commands.literal("flow");
+        for (String name : new String[] {"on", "off", "clock", "stop", "curve", "fade"})
+        {
+            flow.then(Commands.literal(name).executes(context -> flow(context.getSource(), name)));
+        }
+        return combat.then(stop).then(flow);
     }
 
     private static int status(CommandSourceStack source)
     {
         source.sendSuccess(() -> Component.literal("EVA combat: " + SeeleConfig.EVA_COMBAT_MODEL.get()
                 + ", hit-stop " + SeeleConfig.EVA_HIT_STOP.get()
-                + " (frames is Unit-01 with bare hands or the knife for now; /seele combat legacy|frames, /seele combat hitstop tiered|flat)"), false);
+                + ", flow " + SeeleConfig.EVA_COMBAT_FLOW.get()
+                + " (frames is Unit-01 with bare hands or the knife for now; /seele combat legacy|frames, /seele combat hitstop tiered|flat,"
+                + " /seele combat flow on|off, or clock|stop|curve|fade to turn one part)"), false);
         return 1;
+    }
+
+    /** on, off, or one part by name: that part is turned, the others stay. */
+    private static int flow(CommandSourceStack source, String name)
+    {
+        if (name.equals("on") || name.equals("off"))
+        {
+            SeeleConfig.EVA_COMBAT_FLOW.set(name);
+            return status(source);
+        }
+        var parts = new java.util.LinkedHashSet<String>();
+        byte now = com.projectseele.entity.EvaCombatModelR64.flowParts(SeeleConfig.EVA_COMBAT_FLOW.get());
+        for (String part : new String[] {"clock", "stop", "curve", "fade"})
+        {
+            boolean has = (now & com.projectseele.entity.EvaCombatModelR64.flowParts(part)) != 0;
+            if (has != part.equals(name))
+            {
+                parts.add(part);
+            }
+        }
+        SeeleConfig.EVA_COMBAT_FLOW.set(parts.isEmpty() ? "off" : parts.size() == 4 ? "on" : String.join(",", parts));
+        return status(source);
     }
 
     private static int set(CommandSourceStack source, String model, String stop)

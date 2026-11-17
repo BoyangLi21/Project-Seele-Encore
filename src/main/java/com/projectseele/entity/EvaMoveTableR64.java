@@ -103,6 +103,11 @@ public final class EvaMoveTableR64
         return Math.min(1F,close+(1-close)*(elapsed-startup-active)/Math.max(1,recovery));
     }
 
+    /** R64 (flow): the ticks both bodies are held when a blow of this level lands, under "stop" (the rows' own stop is 2 to 8). */
+    public static int pause(int level){return level<=LIGHT?1:level==MEDIUM?2:level==HEAVY?3:4;}
+    /** R64 (flow): under "curve" no recovery plays faster than this many times its clip's own pace. */
+    public static final float RECOVERY_PACE=1.15F;
+
     public static Row get(String name){return name==null?null:ROWS.get(name);}
     public static Iterable<Row> rows(){return ROWS.values();}
 

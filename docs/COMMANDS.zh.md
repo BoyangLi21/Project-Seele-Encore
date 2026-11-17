@@ -61,6 +61,8 @@
 | `/seele combat` | 查看 EVA 的战斗核心和顿帧方式 |
 | `/seele combat legacy\|frames` | 切换战斗核心：`legacy` 是 R63 及以前的，`frames` 是 R64 的帧表核心（每一招一条帧数据，输入有缓冲；暂时只有初号机徒手和持刀）。写进服务器的 `[eva_combat] model`，对全服生效。使徒跟着这个开关：`frames` 下萨基尔缓步走向机体、站定凝视、然后突然出光枪和掌击，会抓住打空的招；拉米尔开火前光聚在朝向目标的一面；身体撞墙砸地有烟尘和声音（不改方块） |
 | `/seele combat hitstop tiered\|flat` | 帧表核心下命中时的停顿：`tiered` 按招的轻重分档，`flat` 同 R63 |
+| `/seele combat flow on\|off` | 帧表核心下出招的时序和画法：`off` 同原来（客户端追服务器每刻发来的进度，命中时姿态整体定住）；`on` 打开下面四项。写进服务器的 `[eva_combat] flow` |
+| `/seele combat flow clock\|stop\|curve\|fade` | 单独开关其中一项：`clock` 客户端按自己的帧时间播招（起手不晚、任何帧率都匀）；`stop` 命中时改成短暂慢放、不丢动作，定格缩短为轻 1、中 2、重 3、终结 4 刻；`curve` 起手、判定、收招之间速度连续，收招不快过采集速度的 1.15 倍；`fade` 招接招时上一招继续走、几刻内淡入下一招（要先开 `clock`） |
 | `/seele armament deploy\|recall [rifle\|sword\|shield]` | 升起或收回武器井；不写类型时操作 128 格内最近的一座。有备用武器楼的世界里，`rifle` 是离下令的人最近的一栋楼；城市正在升降时请求会记下，停稳后展开（见 `docs/ARMAMENT_TOWERS_R64.zh.md`） |
 | `/seele armament status` | 最近兵装升降站或备用武器楼的状态 |
 | `/seele city status` | 第三新东京市升降状态 |

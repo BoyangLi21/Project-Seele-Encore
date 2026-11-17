@@ -58,6 +58,7 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.DoubleValue EVA_JUMP_HEIGHT;
     public static final ForgeConfigSpec.ConfigValue<String> EVA_COMBAT_MODEL;
     public static final ForgeConfigSpec.ConfigValue<String> EVA_HIT_STOP;
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_COMBAT_FLOW;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_RANGE;
     public static final ForgeConfigSpec.IntValue EVA_RIFLE_INTERVAL_TICKS;
@@ -294,6 +295,15 @@ public final class SeeleConfig
                 .comment("Under the frames core, the pause at a hit. tiered: by how hard the blow is (light 2 to 3 ticks, heavy 4",
                         "to 6, a finisher 8), both bodies held. flat: as up to R63. In game: /seele combat hitstop.")
                 .defineInList("hitStop", "tiered", java.util.List.of("tiered", "flat"));
+        EVA_COMBAT_FLOW = common
+                .comment("Under the frames core, how a blow is timed and drawn. off: as first built (the server sends the clip's",
+                        "place every tick and a client chases it; a hit freezes the pose). on: the four parts below. Or any of",
+                        "them by name, with commas: clock (a client plays the blow by its own frame time: no late start, an even",
+                        "pace at any frame rate), stop (a hit slows the blow for a moment and drops none of it; both bodies are",
+                        "held 1 tick for a light blow, 2 medium, 3 heavy, 4 a finisher, where tiered holds 2 to 8), curve (the",
+                        "pace does not break between wind-up, blow and recovery; no recovery faster than 1.15 times as captured),",
+                        "fade (a blow begun out of another takes its place over a few ticks). In game: /seele combat flow.")
+                .define("flow", "off", value -> value instanceof String);
         common.pop();
 
         common.push("eva_pallet_smg");
