@@ -14,8 +14,9 @@ import java.util.Set;
  * Nothing on the server marks its messages by source, and there are some three hundred places that send one. They
  * are written in a handful of shapes, though, and the shape tells the source: 「name · channel」 text for the staff
  * and the pilots, [post] text for the control rooms, a few name：text lines, and everything else is the system's
- * (command replies, a Unit's own notices, the game's messages). A player's chat arrives as such and is never
- * guessed at, whatever the player wrote: nobody types their way into the command post's voice.
+ * (command replies, a Unit's own notices, the game's messages). A name is known in Chinese and in English, however
+ * a line writes it, so that a line sent in either language is the same person's. A player's chat arrives as such
+ * and is never guessed at, whatever the player wrote: nobody types their way into the command post's voice.
  * Pure text in, pure text out: PlugChatSourceR64Test holds a line of each shape.
  */
 public final class PlugChatSourceR64
@@ -30,8 +31,8 @@ public final class PlugChatSourceR64
             KEY_PLAYER = "hud.projectseele.chat.player", KEY_HEADER = "hud.projectseele.chat.header", KEY_NAME = "hud.projectseele.chat.name.";
 
     /**
-     * Who speaks in the mod's lines: an id (the language key's end), the full name the tag shows, the name as an
-     * English reader has it (for the names a player may not pass for), and the other ways the lines write it.
+     * Who speaks in the mod's lines: an id (the language key's end), the full name the tag stands for, the name as
+     * an English line or reader has it, and the other ways the lines write it.
      */
     private record Person(String id, String name, String english, String... also) {}
 
@@ -49,11 +50,12 @@ public final class PlugChatSourceR64
             new Person("asuka", "惣流·明日香·兰格雷", "Asuka Langley Soryu", "明日香", "惣流明日香", "惣流"),
             new Person("kaworu", "渚薰", "Kaworu Nagisa", "薰"),
     };
-    /** Every way a line writes a name, to the full name; the full name to its id; what a player may not be taken for. */
+    /** Every way a line writes a name (the English ones in lower case), to the full name; the full name to its id. */
     private static final Map<String, String> FULL = new HashMap<>(), ID = new HashMap<>();
+    /** What a player's name may not be taken for. */
     private static final Set<String> TAKEN = new HashSet<>();
     /** What marks a post or a control room, not a person, in a speaker's place. */
-    private static final String[] POSTS = {"NERV", "UN", "管制", "联络", "机库", "休息室"};
+    private static final String[] POSTS = {"NERV", "MAGI", "管制", "联络", "机库", "休息室"};
 
     static
     {
@@ -64,11 +66,16 @@ public final class PlugChatSourceR64
             ID.put(person.name, person.id);
             TAKEN.add(person.name);
             for (String other : person.also) { FULL.put(other, person.name); TAKEN.add(other); }
-            // An English reader's tag is the English name; its parts alone would pass for it as well.
+            // In English: the name whole, either way round, and the given name alone (the first word, as a line
+            // says "Ritsuko: ..."). A family name alone is two people's (Ikari).
             String english = person.english.toLowerCase(Locale.ROOT);
+            String[] parts = english.split(" ");
+            FULL.put(english, person.name);
+            FULL.put(parts[parts.length - 1] + " " + english.substring(0, english.lastIndexOf(' ')), person.name);
+            FULL.put(parts[0], person.name);
             TAKEN.add(english);
             TAKEN.add(english.replace(" ", ""));
-            for (String part : english.split(" ")) TAKEN.add(part);
+            for (String part : parts) TAKEN.add(part);
         }
     }
 
@@ -120,14 +127,30 @@ public final class PlugChatSourceR64
         // [post] text for the control rooms, [name] text for a guard or a technician answering.
         spoken = bracketed(line, '[', ']', false);
         if (spoken != null) return spoken;
-        int colon = line.indexOf('：');
+        // name：text, in either language's colon, for a name on the list; 作战命令：text is the command post's order.
+        int colon = line.indexOf('：'), plain = line.indexOf(':');
+        if (colon < 0 || plain >= 0 && plain < colon) colon = plain;
         if (colon > 0 && colon + 1 < line.length())
         {
-            String head = line.substring(0, colon), rest = line.substring(colon + 1).strip();
-            if (FULL.containsKey(head)) return new Line(Kind.PERSON, FULL.get(head), rest);
-            if (head.equals("作战命令")) return new Line(Kind.COMMAND, COMMAND, rest);
+            String head = line.substring(0, colon).strip(), rest = line.substring(colon + 1).strip(), who = known(head);
+            if (who != null && !rest.isEmpty()) return new Line(Kind.PERSON, who, rest);
+            if (head.equals("作战命令") && !rest.isEmpty()) return new Line(Kind.COMMAND, COMMAND, rest);
         }
         return new Line(Kind.SYSTEM, SYSTEM, line);
+    }
+
+    /** The full name of somebody on the list, however the name is written, or null. */
+    private static String known(String name)
+    {
+        String full = FULL.get(name);
+        return full != null ? full : FULL.get(name.toLowerCase(Locale.ROOT).replaceAll("\\s+", " "));
+    }
+
+    /** A post or a control room in a speaker's place. UN counts as a word of its own, not as letters of another. */
+    private static boolean post(String name)
+    {
+        for (String post : POSTS) if (name.contains(post)) return true;
+        return name.equals("UN") || name.startsWith("UN ") || name.endsWith(" UN") || name.contains(" UN ");
     }
 
     private static Line bracketed(String line, char open, char close, boolean always)
@@ -140,9 +163,11 @@ public final class PlugChatSourceR64
         int dot = speaker.indexOf(" · ");
         String name = (dot > 0 ? speaker.substring(0, dot) : speaker).strip();
         if (body.isEmpty() || name.isEmpty()) return null;
-        for (String post : POSTS) if (name.contains(post)) return new Line(Kind.COMMAND, COMMAND, body);
+        String who = known(name);
+        if (who != null) return new Line(Kind.PERSON, who, body);
+        if (post(name)) return new Line(Kind.COMMAND, COMMAND, body);
         // Square brackets are everybody's: only a short single word between them is taken for a name.
         if (!always && (name.length() > 16 || name.indexOf(' ') >= 0)) return null;
-        return new Line(Kind.PERSON, FULL.getOrDefault(name, name), body);
+        return new Line(Kind.PERSON, name, body);
     }
 }

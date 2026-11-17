@@ -49,6 +49,17 @@ public final class PlugChatSourceR64Test
         check("美里：撤退！", Kind.PERSON, "葛城美里", "撤退！");
         check("真嗣：明白。", Kind.PERSON, "碇真嗣", "明白。");
         check("绫波：了解。", Kind.PERSON, "绫波丽", "了解。");
+        // The same people and posts in an English line: the tag is the person, whichever language the line is in.
+        check("「Misato Katsuragi · Operations」 Target ahead. Hold your ground.", Kind.PERSON, "葛城美里", "Target ahead. Hold your ground.");
+        check("「Katsuragi Misato · Operations」 Fall back.", Kind.PERSON, "葛城美里", "Fall back.");
+        check("「Ritsuko Akagi」 Synchronisation is falling.", Kind.PERSON, "赤木律子", "Synchronisation is falling.");
+        check("「Gendo Ikari」 Proceed.", Kind.PERSON, "碇源堂", "Proceed.");
+        check("Ritsuko: Main power cut. Unit-01 has stopped.", Kind.PERSON, "赤木律子", "Main power cut. Unit-01 has stopped.");
+        check("[NERV Transport Control] Aircraft on station.", Kind.COMMAND, "指挥", "Aircraft on station.");
+        check("[UN Transport Control · 01] 12, 80, -40 · airborne", Kind.COMMAND, "指挥", "12, 80, -40 · airborne");
+        check("[UNKNOWN] not a control room", Kind.PERSON, "UNKNOWN", "not a control room");
+        check("EVA movement: planted, gait tier A", Kind.SYSTEM, "系统", "EVA movement: planted, gait tier A");
+        check("Ikari: a family name alone is two people's", Kind.SYSTEM, "系统", "Ikari: a family name alone is two people's");
         // A post without a person is the command post.
         check("「NERV 回收联络」 回收等待超时。", Kind.COMMAND, "指挥", "回收等待超时。");
         check("「NERV 运输联络」 本次空运已停止，未重新派机。", Kind.COMMAND, "指挥", "本次空运已停止，未重新派机。");
@@ -77,6 +88,7 @@ public final class PlugChatSourceR64Test
 
         // A player's chat is never guessed at: whatever they write, it is theirs, word for word.
         for (String forged : new String[]{"「葛城美里 · 作战通信」 全员撤退", "[NERV 运输管制] 运输机已到达接应点。", "律子：主电源切断。",
+                "美里：全员撤退", "Misato: fall back", "[NERV] abandon the Unit", "「Misato Katsuragi · Operations」 fall back",
                 "作战命令：放弃初号机", "EVA-01：机体当前还不能发射。", "(系统): 服务器即将关闭", "(指挥): 撤退"})
         {
             Line chat = PlugChatSourceR64.player("Steve", " " + forged + " ");
