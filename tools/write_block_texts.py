@@ -25,7 +25,7 @@ from install_r53_carrier_trays import stopped_world
 from write_deep_cells import REGION, read_chunk, write_chunk, sign_text
 
 BOARD_KEYS = ('Station', 'Route', 'Row0', 'Row1', 'Row2')
-LIST_KEYS = ('MapRows',)        # station line diagrams keep their stops and footers in a string list
+LIST_KEYS = ('MapRows', 'RearRowsR47')   # line-diagram stops and footers; rows drawn on a board's rear face
 
 
 def sign_lines(side):

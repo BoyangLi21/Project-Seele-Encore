@@ -223,7 +223,25 @@ def boarding_sign(lines):
         return [ja, second, lines[1], 'のりば →']
     return None
 
-def plan(world, positions, nerv_extra=frozenset()):
+def fix_arrow(text, old, new):
+    """Swap the first `old` arrow in the Japanese part of a line (leading "↑ …" or trailing "… →")."""
+    head, sep, rest = text.partition('|')
+    i = head.find(old)
+    return text if i < 0 else head[:i] + new + head[i + 1:] + sep + rest
+
+
+def load_arrows(path):
+    """plan_nerv_arrows.py output -> {(pos, side, row): (old, new)} for the rows whose arrow changes."""
+    out = {}
+    if path:
+        for r in json.loads(Path(path).read_text('utf8')):
+            if r['status'] == 'changed' and r['old_arrow'] and r['new_arrow']:
+                out[tuple(r['pos']), r['side'], r['row']] = (r['old_arrow'], r['new_arrow'])
+    return out
+
+
+def plan(world, positions, nerv_extra=frozenset(), arrows=None):
+    arrows = arrows or {}
     """nerv_extra: positions outside the pyramid box that still take the NERV rules (GeoFront)."""
     edits = []
     cache = {}
@@ -255,6 +273,14 @@ def plan(world, positions, nerv_extra=frozenset()):
                     back = new          # the back held only a generator label: it shows the plate's name instead
                 if back != cur['back']:
                     after['back'] = back
+            for side in ('front', 'back'):
+                fixes = {row: v for (p, sd, row), v in arrows.items() if p == (x, y, z) and sd == side}
+                if fixes:
+                    text = list(after.get(side, cur[side]))
+                    for row, (old, new_arrow) in fixes.items():
+                        text[row] = fix_arrow(text[row], old, new_arrow)
+                    if text != cur[side]:
+                        after[side] = text
             if after:
                 edits.append(dict(pos=[x, y, z], type='sign', before=cur, after=after,
                                   batch='S-4' if boarding else 'P' if nerv else 'S'))
@@ -267,6 +293,23 @@ def plan(world, positions, nerv_extra=frozenset()):
                 after = station_board(cur, compact, maps)
             else:
                 after = board(cur, compact) if in_nerv(x, y, z) or (x, y, z) in nerv_extra else {}
+            if not station and (in_nerv(x, y, z) or (x, y, z) in nerv_extra) and cur.get('RearRowsR47'):
+                rear = [nerv_line(r, board=True) for r in cur['RearRowsR47']]
+                if rear != cur['RearRowsR47']:
+                    after['RearRowsR47'] = rear
+            for (p, sd, row), (old, new_arrow) in arrows.items():
+                if p != (x, y, z):
+                    continue
+                if sd == 'front' and row < 3:
+                    k = f'Row{row}'
+                    fixed = fix_arrow(after.get(k, cur[k]), old, new_arrow)
+                    if fixed != cur[k]:
+                        after[k] = fixed
+                elif sd == 'rear' and cur.get('RearRowsR47') and row < len(cur['RearRowsR47']):
+                    rear = list(after.get('RearRowsR47', cur['RearRowsR47']))
+                    rear[row] = fix_arrow(rear[row], old, new_arrow)
+                    if rear != cur['RearRowsR47']:
+                        after['RearRowsR47'] = rear
             if after:
                 edits.append(dict(pos=[x, y, z], type='board', before={k: cur[k] for k in after}, after=after,
                                   batch='S-4' if station else 'P'))
@@ -280,6 +323,7 @@ def main():
     p.add_argument('--signs', type=Path)
     p.add_argument('--kinds', nargs='*', default=['sign', 'wayfinding'])
     p.add_argument('--areas', nargs='*')
+    p.add_argument('--arrows', type=Path, help='plan_nerv_arrows.py output: rows whose arrow changes')
     p.add_argument('--out', type=Path, required=True)
     a = p.parse_args()
     positions = [tuple(map(int, s.split(','))) for s in a.at]
@@ -290,7 +334,7 @@ def main():
                 positions.append((s['x'], s['y'], s['z']))
                 if s['area'] in ('pyramid', 'geofront'):
                     nerv_extra.add((s['x'], s['y'], s['z']))
-    edits = plan(a.world, positions, nerv_extra)
+    edits = plan(a.world, positions, nerv_extra, load_arrows(a.arrows))
     a.out.write_text(json.dumps(edits, ensure_ascii=False, indent=1), 'utf8')
     print(json.dumps(dict(positions=len(positions), edits=len(edits))))
 
