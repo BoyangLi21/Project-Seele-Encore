@@ -220,6 +220,22 @@ public final class EvaMotionModelR64
      */
     public record Gait(double cadence,double duty,double land,double lift,double sink,double bounce,double width){}
 
+    /**
+     * The run (2026-11-17). The owner, after his second play: the run looks crouched at the waist and furtive.
+     * Measured against the run up to R63: the hips were carried at 94% of their standing height where R63 had
+     * them at 104%, a foot was on the ground for all but 11% of the time where R63 was in the air for 59%, and the
+     * swinging foot was carried 5 blocks high where R63's went 26. A foot stood for 0.40 of the cycle while the
+     * body went 26 blocks over it, on a leg 30 long: the pelvis had to be let down to reach both ends of that, the
+     * knees bent to carry it there, and nothing was left for the body to rise on.
+     * <p>
+     * Now a foot stands for RUN_DUTY of the cycle (the body goes 15 blocks over it and is in the air for half
+     * the time), is set down RUN_LAND of that ahead of the hip, and its heel is carried RUN_LIFT high; the pelvis
+     * is carried RUN_SINK under its straight-legged height (over it: the body is off the ground between footfalls)
+     * and rises and falls RUN_BOUNCE about that. Where the foot goes while it is off the ground is the capture's
+     * own run again: EvaPlantedGaitR64.RUN_TRAIL.
+     */
+    public static final double RUN_DUTY=.23,RUN_LAND=.32,RUN_LIFT=16,RUN_SINK=-.6,RUN_BOUNCE=2.3;
+
     /** @param speed blocks a second over the ground, with the pilot's synchronisation bonus taken out */
     public static Gait gait(Tier t,double speed)
     {
@@ -234,12 +250,12 @@ public final class EvaMotionModelR64
         if(v<=t.run())
         {
             double r=(v-t.walk())/(t.run()-t.walk()),s=r*r*(3-2*r);
-            return new Gait(Mth.lerp(r,t.walkCadence(),t.runCadence()),Mth.lerp(s,.62,.40),Mth.lerp(s,.45,.40),
-                    Mth.lerp(s,3.4,5.5),Mth.lerp(s,1.0,2.6),Mth.lerp(s,0,1.3),Mth.lerp(s,.8,.55));
+            return new Gait(Mth.lerp(r,t.walkCadence(),t.runCadence()),Mth.lerp(s,.62,RUN_DUTY),Mth.lerp(s,.45,RUN_LAND),
+                    Mth.lerp(s,3.4,RUN_LIFT),Mth.lerp(s,1.0,RUN_SINK),Mth.lerp(s,0,RUN_BOUNCE),Mth.lerp(s,.8,.55));
         }
         double d=Math.min(1,(v-t.run())/(SPRINT-t.run()));
-        return new Gait(Mth.lerp(d,t.runCadence(),SPRINT_CADENCE),Mth.lerp(d,.40,.30),Mth.lerp(d,.40,.32),
-                Mth.lerp(d,5.5,10),Mth.lerp(d,2.6,3.6),Mth.lerp(d,1.3,1.8),Mth.lerp(d,.55,.4));
+        return new Gait(Mth.lerp(d,t.runCadence(),SPRINT_CADENCE),Mth.lerp(d,RUN_DUTY,.30),Mth.lerp(d,RUN_LAND,.32),
+                Mth.lerp(d,RUN_LIFT,10),Mth.lerp(d,RUN_SINK,3.6),Mth.lerp(d,RUN_BOUNCE,1.8),Mth.lerp(d,.55,.4));
     }
 
     private EvaMotionModelR64(){}

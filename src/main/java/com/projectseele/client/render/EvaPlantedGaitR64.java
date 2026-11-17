@@ -761,6 +761,26 @@ public final class EvaPlantedGaitR64
         f.clear+=(need-f.clear)*(1-Math.exp(-s.dt/(need>f.clear?.05:.2)));
     }
 
+    /**
+     * The run's swing, read off the capture's own run (the run up to R63, tools/fr_swing.py): the toes stay where
+     * they pushed off while the body flies on, so the leg trails out behind the hips (the ankle 13 behind as it
+     * leaves the ground, 20 behind two tenths of the swing later) and the heel comes up there, 16 blocks at four
+     * tenths of the swing with the ankle still 15 behind; then the foot comes through quickly and low, is ahead of
+     * the hips from two thirds of the swing and waits there for the ground. The thigh is never raised more than 48
+     * degrees. Lifted evenly and carried forward from the first frame, as a walk's foot is, the foot was under the
+     * hips at three tenths of the swing and 15 high there: the thigh went up to 104 degrees, over level, and the
+     * leg behind was never seen. The Unit ran on the spot with its knees up.
+     * RUN_TRAIL: how late the foot starts over the ground (the power its eased way is raised to). RUN_KICK_AT and
+     * RUN_KICK_SHARP: where in the swing the heel is highest (0.72: at four tenths) and how narrow that is.
+     */
+    private static final double RUN_TRAIL=1.7,RUN_KICK_AT=.72,RUN_KICK_SHARP=2.2;
+
+    /** How much of the run's own swing a foot has: all of it at a run, none at a walk or at the fast run's full speed. */
+    private static double running(State s)
+    {
+        return Mth.clamp((.62-s.duty)/(.62-EvaMotionModelR64.RUN_DUTY),0,1)*(1-Mth.clamp((s.speed-FAST_FROM)/(EvaMotionModelR64.SPRINT-FAST_FROM),0,1));
+    }
+
     /** How far along its way over the ground a swinging foot is (0 to 1). */
     private static double along(State s,Foot f,float swing,double distance)
     {
@@ -771,7 +791,8 @@ public final class EvaPlantedGaitR64
         // end it was within a quarter block of the ground with 0.8 blocks still to go.
         float over=Math.min(1,swing/OVER_BY);
         double carried=Mth.clamp(s.speed*f.swingTime*OVER_BY/Math.max(distance,1e-3),0,1.2);
-        return (over*over*over-2*over*over+over)*carried+(3-2*over)*over*over;
+        double eased=(3-2*over)*over*over,walked=(over*over*over-2*over*over+over)*carried+eased,running=running(s);
+        return running<=0?walked:Mth.lerp(running,walked,Math.pow(eased,RUN_TRAIL));
     }
 
     /** How high a swinging foot's ankle is, before what it adds to clear the ground on its way. */
@@ -785,7 +806,10 @@ public final class EvaPlantedGaitR64
         double height=Mth.lerp(along(s,f,swing,distance),f.fromY,toY);
         // A fast run folds the leg up behind it at once: the lift comes early.
         double fast=Mth.clamp((s.speed-FAST_FROM)/(EvaMotionModelR64.SPRINT-FAST_FROM),0,1);
-        return height+s.lift*Mth.clamp(distance/4,.35,1)*Math.sin(Math.PI*Math.pow(swing,Mth.lerp(fast,1,.62)));
+        double even=Math.sin(Math.PI*Math.pow(swing,Mth.lerp(fast,1,.62))),running=running(s);
+        // A run's heel comes up behind the body and is down again as the foot comes through.
+        if(running>0)even=Mth.lerp(running,even,Math.pow(Math.sin(Math.PI*Math.pow(swing,RUN_KICK_AT)),RUN_KICK_SHARP));
+        return height+s.lift*Mth.clamp(distance/4,.35,1)*even;
     }
 
     private static void land(State s,EvaUnit01Entity eva,Foot f)
