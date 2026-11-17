@@ -48,7 +48,11 @@ public final class ArmamentStationCommands
     private static int changePayload(CommandContext<CommandSourceStack> context,boolean deploy,int payload)
     {
         ServerLevel level=context.getSource().getServer().getLevel(GeoFrontCommands.GEOFRONT);
-        NervArmamentStationEntity station=level==null?null:payload==4?NervArmamentStationEntity.commandStation(level)
+        // With spare-weapon towers armed, "rifle" is the tower nearest to whoever gives the order.
+        NervArmamentStationEntity station=level==null?null:payload==4
+                ?com.projectseele.world.ArmamentTowersR64.active(level)
+                        ?com.projectseele.world.ArmamentTowersR64.nearest(level,context.getSource().getPosition())
+                        :NervArmamentStationEntity.commandStation(level)
                 :com.projectseele.world.EquipmentVaultsR47.recordedStationR47(level,payload);
         if(station==null||!(deploy?station.deploy():station.recall()))
         {
@@ -123,7 +127,8 @@ public final class ArmamentStationCommands
             return 0;
         }
         context.getSource().sendSuccess(() -> Component.literal(
-                "最近的兵装升降站：" + stateName(station.stateName())
+                (station.towerR64() >= 0 ? "最近的备用武器楼（" + station.towerR64() + " 号楼）：" : "最近的兵装升降站：")
+                        + stateName(station.stateName())
                         + "，" + (station.isStocked() ? "已装填" : "空载")
                         + "，位置 " + station.blockPosition().toShortString()),
                 false);
@@ -154,6 +159,12 @@ public final class ArmamentStationCommands
                 context.getSource().getPlayerOrException());
         if (station == null)
         {
+            return 0;
+        }
+        if (station.towerR64() >= 0)
+        {
+            // A tower's station is recorded by the world and never made twice: it is not removed by hand.
+            context.getSource().sendFailure(Component.literal("这是备用武器楼的站，不能用这个指令删除。"));
             return 0;
         }
         station.discard();

@@ -510,6 +510,8 @@ public final class CityCreateDistrictR45
                 if (state.queued < 0 || state.queued == state.depth || !state.queueFault.isBlank()) return;
                 level.resetEmptyTime(); claim(true); if (!resident()) return;
                 occupied = occupied(); if (occupied) return;
+                // A spare-weapon tower that is out has its door or its lot's hatch open: the trip begins once all are in.
+                if (!ArmamentTowersR64.stowedForCityTrip(level)) return;
                 try { begin(state.queued); }
                 catch (Exception failure)
                 {
@@ -1013,7 +1015,8 @@ public final class CityCreateDistrictR45
             for (var spec : towers)
             {
                 AABB volume = route(spec).inflate(.01);
-                if (!level.getEntities((Entity) null, volume, actor -> !ownsActor(actor)).isEmpty()) return true;
+                if (!level.getEntities((Entity) null, volume, actor -> !ownsActor(actor)
+                        && !(actor instanceof com.projectseele.entity.NervArmamentStationEntity station && station.towerR64() >= 0)).isEmpty()) return true;
             }
             return false;
         }

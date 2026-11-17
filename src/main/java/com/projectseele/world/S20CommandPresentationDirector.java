@@ -636,7 +636,9 @@ public final class S20CommandPresentationDirector
         Tokyo3RetractionDirector.Status city =
                 Tokyo3RetractionDirector.status(level,
                         IntegratedNervMapBuilder.tokyo3Origin(level));
-        NervArmamentStationEntity armament =
+        // With spare-weapon towers armed the wall shows them together instead of the one lift station.
+        ArmamentTowersR64.Display towers = ArmamentTowersR64.active(level) ? ArmamentTowersR64.display(level) : null;
+        NervArmamentStationEntity armament = towers != null ? null :
                 NervArmamentStationEntity.commandStation(level);
         SeeleNetwork.CHANNEL.send(
                 PacketDistributor.DIMENSION.with(level::dimension),
@@ -644,9 +646,9 @@ public final class S20CommandPresentationDirector
                         String.valueOf(city.phase()), city.depth(),
                         city.targetDepth(), city.maximumDepth(),
                         city.physicalRetractionFraction(),
-                        armament == null ? "OFFLINE" : armament.stateName(),
-                        armament != null && armament.isStocked(),
-                        armament == null ? 0 : armament.getLiftPercent()));
+                        towers != null ? towers.state() : armament == null ? "OFFLINE" : armament.stateName(),
+                        towers != null ? towers.stocked() : armament != null && armament.isStocked(),
+                        towers != null ? towers.percent() : armament == null ? 0 : armament.getLiftPercent()));
     }
 
     /**
