@@ -61,8 +61,8 @@
 | `/seele combat` | 查看 EVA 的战斗核心和顿帧方式 |
 | `/seele combat legacy\|frames` | 切换战斗核心：`legacy` 是 R63 及以前的，`frames` 是 R64 的帧表核心（每一招一条帧数据，输入有缓冲；暂时只有初号机徒手和持刀）。写进服务器的 `[eva_combat] model`，对全服生效。使徒跟着这个开关：`frames` 下萨基尔缓步走向机体、站定凝视、然后突然出光枪和掌击，会抓住打空的招；拉米尔开火前光聚在朝向目标的一面；身体撞墙砸地有烟尘和声音（不改方块） |
 | `/seele combat hitstop tiered\|flat` | 帧表核心下命中时的停顿：`tiered` 按招的轻重分档，`flat` 同 R63 |
-| `/seele armament deploy\|recall [rifle\|sword\|shield]` | 升起或收回武器井；不写类型时操作 128 格内最近的一座 |
-| `/seele armament status` | 最近兵装升降站的状态 |
+| `/seele armament deploy\|recall [rifle\|sword\|shield]` | 升起或收回武器井；不写类型时操作 128 格内最近的一座。有备用武器楼的世界里，`rifle` 是离下令的人最近的一栋楼；城市正在升降时请求会记下，停稳后展开（见 `docs/ARMAMENT_TOWERS_R64.zh.md`） |
+| `/seele armament status` | 最近兵装升降站或备用武器楼的状态 |
 | `/seele city status` | 第三新东京市升降状态 |
 | `/seele city raise` | 楼群升回地表（原 `tokyo3 restore`） |
 | `/seele city lower` | 楼群降入地下（原 `tokyo3 retract`） |
@@ -96,7 +96,7 @@
 | `/seele dev silo setup\|board\|status\|audit` | 发射井测试场 |
 | `/seele dev motionlab setup\|reset\|enter\|weapon\|demo\|camera` | 动作实验室 |
 | `/seele dev firstbattle begin\|cancel\|status` | 初战的独立回放（正式流程已由作战系统接管） |
-| `/seele dev armament spawn_here\|remove` | 放置或删除兵装升降站 |
+| `/seele dev armament spawn_here\|remove` | 放置或删除兵装升降站；备用武器楼的站由世界记录，不能用它删 |
 | `/seele dev visit <地点>` | port、un_base、un0_hangar、un0_gantry、un1_control、un1_gantry；随 UN 基地和港口的存档偏移移动 |
 | `/seele dev seedscout <数量>\|seed <种子>\|fine <种子>\|anchor <种子>` | 海岸种子扫描（原 `/seele_coastal_seed_scout`） |
 
