@@ -52,6 +52,24 @@ public final class SurfaceAngelAssaultR52
         ProjectSeele.LOGGER.info("R52 accepted surface Angel deployed: chapter={} uuid={} spawn={} generation={}",data.active,boss.getUUID(),boss.position(),data.generationR43);
         return boss;
     }
+    /** Below a walker's march step each tick: as much as gravity takes in a tick. */
+    private static final double MARCH_PRESS=.08;
+    /**
+     * One tick of the route march (AI off): turn toward the point and take one step; null when there is no step to
+     * take. A walker presses down with its step, so that it stands on the ground and steps up as walking does.
+     * Moving only sideways left it never on the ground, and a road kerb one eighth of a block high stopped it.
+     */
+    public static Vec3 marchStep(Mob boss,Vec3 point,double speed)
+    {
+        Vec3 delta=point.subtract(boss.position());Vec3 horizontal=delta.multiply(1,0,1);
+        float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z));boss.setYRot(net.minecraft.util.Mth.approachDegrees(boss.getYRot(),yaw,3));boss.yBodyRot=boss.yHeadRot=boss.getYRot();
+        boolean flies=boss instanceof ShamshelEntity;
+        Vec3 step=flies?delta:horizontal;
+        if(step.lengthSqr()<=1e-8)return null;
+        Vec3 move=step.normalize().scale(Math.min(speed,step.length()));
+        Vec3 before=boss.position();boss.move(MoverType.SELF,flies?move:move.add(0,-MARCH_PRESS,0));
+        return boss.position().subtract(before);
+    }
     private static void hold(Mob boss)
     {boss.setNoAi(true);boss.setTarget(null);boss.getNavigation().stop();boss.setDeltaMovement(0,boss instanceof ShamshelEntity?0:boss.getDeltaMovement().y,0);if(boss instanceof SachielEntity s)SachielTacticsR34.recordMotion(s,Vec3.ZERO);}
     public static Mob tick(ServerLevel level,TvCampaignSavedData data)
@@ -102,14 +120,11 @@ public final class SurfaceAngelAssaultR52
         {
             Vec3 point=site.route().get(cursor);retain(level,point);
             if(!level.isPositionEntityTicking(BlockPos.containing(point)))return boss;
-            Vec3 delta=point.subtract(boss.position());Vec3 horizontal=delta.multiply(1,0,1);
-            float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z));boss.setYRot(net.minecraft.util.Mth.approachDegrees(boss.getYRot(),yaw,3));boss.yBodyRot=boss.yHeadRot=boss.getYRot();
-            Vec3 step=boss instanceof ShamshelEntity?delta:horizontal;
-            if(step.lengthSqr()>1e-8)
+            Vec3 moved=marchStep(boss,point,site.speed());
+            if(moved!=null)
             {
-                Vec3 before=boss.position();boss.move(MoverType.SELF,step.normalize().scale(Math.min(site.speed(),step.length())));
-                if(boss instanceof SachielEntity s)SachielTacticsR34.recordMotion(s,boss.position().subtract(before));
-                if(before.distanceToSqr(boss.position())<1e-8&&level.getGameTime()%100==0)
+                if(boss instanceof SachielEntity s)SachielTacticsR34.recordMotion(s,moved);
+                if(moved.lengthSqr()<1e-8&&level.getGameTime()%100==0)
                     ProjectSeele.LOGGER.warn("R52 surface Angel blocked by real world: actor={} route={} cursor={} point={}",boss.getUUID(),data.encounterSiteR45,cursor,point);
             }
             return boss;
