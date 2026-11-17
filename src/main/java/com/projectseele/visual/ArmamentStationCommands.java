@@ -58,6 +58,13 @@ public final class ArmamentStationCommands
         {
             context.getSource().sendFailure(Component.translatable("msg.projectseele.armament_command_rejected"));return 0;
         }
+        if(station.towerR64()>=0)
+        {
+            // A tower called while the city moves does not start: the call is kept until the city rests.
+            boolean kept=deploy&&station.getStationState()==NervArmamentStationEntity.STOWED;
+            context.getSource().sendSuccess(()->Component.literal("备用武器楼（"+station.towerR64()+" 号楼）"
+                    +(kept?"已记下请求，城市停稳后展开":deploy?"正在展开":"正在收回")+"："+station.blockPosition().toShortString()),false);return 1;
+        }
         String cargo=payload==7?"零号机专用盾牌":payload==6?"二号机专用长剑":"步枪";
         context.getSource().sendSuccess(()->Component.literal(cargo+"武器井"+(deploy?"正在升起":"正在收回")+"："
                 +station.blockPosition().toShortString()),false);return 1;
