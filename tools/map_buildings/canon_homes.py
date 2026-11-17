@@ -25,8 +25,9 @@ def h(*a):
 
 
 def door(kind, facing, hinge='left'):
-    p = f'facing={facing},hinge={hinge},open=false,powered=false'
-    return M(f'{kind}[half=lower,{p}]'), M(f'{kind}[half=upper,{p}]')
+    # properties in sorted order: the writer's readback compares state strings exactly
+    return (M(f'{kind}[facing={facing},half=lower,hinge={hinge},open=false,powered=false]'),
+            M(f'{kind}[facing={facing},half=upper,hinge={hinge},open=false,powered=false]'))
 
 
 def stair(kind, facing, half='bottom'):
@@ -229,10 +230,11 @@ def rei_room(b, x0, y, z0, u0, u1, dwx, dz):
     b.put(X(near + 2 * inside), y + 2, north + 2, lever(False))
     # buttons each side of the steel door, the stuffed letterbox and the name card on the landing side
     out = dwx - inside
-    b.put(X(out), y + 2, dz + 1, button('west' if inside > 0 else 'east'))          # on the landing, beside the door
+    # (the slab of the floor above is at y + 3, so everything on the landing stays at y + 1 and y + 2)
+    b.put(X(out), y + 2, dz - 1, button('west' if inside > 0 else 'east'))          # on the landing, stair side of the door
     b.put(X(dwx + inside), y + 2, dz + 1, button('east' if inside > 0 else 'west'))  # inside, beside the door
-    b.put(X(dwx), y + 1, dz + 1, M(f'barrel[facing={"west" if inside > 0 else "east"},open=false]'))
-    b.sign(X(out), y + 3, dz + 1, wall_sign('west' if inside > 0 else 'east'), ['402', '綾波', '信箱塞满了传单', ''])
+    b.put(X(dwx), y + 1, dz + 1, M(f'barrel[facing={"west" if inside > 0 else "east"},open=false]'))   # letterbox in the wall
+    b.sign(X(out), y + 2, dz + 1, wall_sign('west' if inside > 0 else 'east'), ['402', '綾波', '信箱塞满了传单', ''])
 
 
 # ---------------------------------------------------------------- Comfort 17 (50 x 14, 14 floors)
@@ -557,6 +559,15 @@ def plan(site, out):
                 n += 1
             report[f'old_{ox}_{oz}'] = dict(box=obox, ground_y=gy, old_top=top)
     b.finish()
+    for st in set(b.c.values()):                        # every state with sorted properties, as the readback expects
+        if '[' in st:
+            props = st[st.index('[') + 1:-1].split(',')
+            if props != sorted(props):
+                raise SystemExit(f'unsorted properties in {st}')
+    for sg in b.signs:                                   # a later slab or wall must not have covered a planned sign
+        st = b.c.get(tuple(sg['pos']), '')
+        if not st.split('[')[0].endswith('sign'):
+            raise SystemExit(f"sign at {sg['pos']} was overwritten by {st}")
     rows, refused, refused_at = [], Counter(), []
     def in_demolition(x, z):
         return any(a <= x <= c and bz <= z <= d for a, bz, c, d in demolish_boxes)
