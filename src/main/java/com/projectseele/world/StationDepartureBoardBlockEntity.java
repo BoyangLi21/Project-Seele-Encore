@@ -26,7 +26,8 @@ public final class StationDepartureBoardBlockEntity extends BlockEntity
     private long preferredPlatformId = -1;
     private List<Long> departures = List.of();
     public StationDepartureBoardBlockEntity(BlockPos pos, BlockState state) { super(ModBlockEntities.STATION_DEPARTURE_BOARD.get(),pos,state); }
-    public String title() { return wayfinding ? route : route + (airService?"  航班动态 · 北京时间":"  发车信息 · 北京时间"); }
+    // the story is set in Japan: Japanese labels, no time zone on the board (the clock is Japan time)
+    public String title() { return wayfinding ? route : route + (airService?"  フライト案内":"  発車案内"); }
     public String station() { return station; }
     public boolean roomPlaqueR52() { return roomPlaqueR52; }
     public List<String> rows() { return rows; }

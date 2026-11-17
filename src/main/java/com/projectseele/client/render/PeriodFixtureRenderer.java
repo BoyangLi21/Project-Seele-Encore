@@ -79,7 +79,7 @@ public final class PeriodFixtureRenderer implements BlockEntityRenderer<PeriodFi
         }
         else if(kind==PeriodFixtureBlock.Kind.WALL_CLOCK)
         {
-            var time=Instant.ofEpochMilli(entity.clockMillis()).atZone(ZoneId.of("Asia/Shanghai"));
+            var time=Instant.ofEpochMilli(entity.clockMillis()).atZone(ZoneId.of("Asia/Tokyo"));
             double minute=time.getMinute()+time.getSecond()/60D,hour=time.getHour()%12+minute/60D;
             pose.pushPose();pose.translate(.5,.5,.192);pose.mulPose(Axis.ZP.rotationDegrees((float)(-hour*30)));mesh("clock_hour",pose,light,1);pose.popPose();
             pose.pushPose();pose.translate(.5,.5,.204);pose.mulPose(Axis.ZP.rotationDegrees((float)(-minute*6)));mesh("clock_minute",pose,light,1);pose.popPose();

@@ -11,6 +11,8 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 
 public final class StationDepartureBoardRenderer implements BlockEntityRenderer<StationDepartureBoardBlockEntity>
 {
+    private static final char SPLIT='|';
+    private static final float SUB_OFFSET=8.4F,SUB_SCALE=.56F;
     private final Font font;
     public StationDepartureBoardRenderer(BlockEntityRendererProvider.Context context) { font=context.getFont(); }
     @Override public void render(StationDepartureBoardBlockEntity board,float partial,PoseStack poses,MultiBufferSource buffers,int light,int overlay)
@@ -38,16 +40,19 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
                 poses.popPose();return;
             }
             boolean lift=!board.rows().isEmpty()&&board.rows().stream().allMatch(s->s.endsWith(" · 直梯"));
-            line(lift?"乘电梯换层":board.station(),0,0xffedbd55,width,poses,buffers);
+            line(lift?"エレベーター乗換|乘电梯换层|Change by lift":board.station(),0,0xffedbd55,width,poses,buffers);
             for(int i=0;i<Math.min(3,board.rows().size());i++)line(compactDestination(board.rows().get(i),lift),18+i*16,
                     i==0?0xffe9efde:0xffa9d9ae,width,poses,buffers);
         }
         else
         {
-            line(board.title(),0,0xffedbd55,width,poses,buffers);
-            line(board.station(),11,0xffabbec5,width,poses,buffers);
-            for(int i=0;i<board.rows().size();i++) line(board.rows().get(i),25+i*(board.routeMap()?11:13),
-                    board.rows().get(i).contains("本站")?0xffffd572:i==0?0xffe9efde:0xffa9d9ae,width,poses,buffers);
+            // rows with a small "Chinese · English" line under them need more room: shrink the group so it keeps its height
+            boolean split=!board.routeMap()&&board.rows().stream().anyMatch(s->s.indexOf(SPLIT)>0);
+            float group=split?.87F:1F;poses.scale(group,group,1);
+            line(board.title(),0,0xffedbd55,width/group,poses,buffers);
+            line(board.station(),11,0xffabbec5,width/group,poses,buffers);
+            for(int i=0;i<board.rows().size();i++) line(board.rows().get(i),25+i*(board.routeMap()?11:split?15:13),
+                    board.rows().get(i).contains("本站")?0xffffd572:i==0?0xffe9efde:0xffa9d9ae,width/group,poses,buffers);
         }
         poses.popPose();
         if(!compact)
@@ -58,12 +63,14 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
             poses.pushPose();poses.translate(.5,direction?1.82:1.16,.5);
             poses.mulPose(Axis.YP.rotationDegrees(180-board.getBlockState().getValue(StationDepartureBoardBlock.FACING).toYRot()));
             poses.translate(0,0,.145);poses.scale(rearScale,-rearScale,rearScale);
-            float rearWidth=2.64F/rearScale;
+            var rearRows=board.rearGuideBound()?board.rearRows():board.rows().stream().map(StationDepartureBoardRenderer::reverseArrow).toList();
+            boolean split=direction&&!board.routeMap()&&rearRows.stream().anyMatch(s->s.indexOf(SPLIT)>0);
+            float group=split?.87F:1F;poses.scale(group,group,1);
+            float rearWidth=2.64F/rearScale/group;
             line(board.title(),0,0xffedbd55,rearWidth,poses,buffers);
             line(board.station(),11,0xffdbe4e6,rearWidth,poses,buffers);
-            var rearRows=board.rearGuideBound()?board.rearRows():board.rows().stream().map(StationDepartureBoardRenderer::reverseArrow).toList();
             if(direction)for(int i=0;i<Math.min(3,rearRows.size());i++)
-                line(board.routeMap()?board.rows().get(i):rearRows.get(i),25+i*13,
+                line(board.routeMap()?board.rows().get(i):rearRows.get(i),25+i*(split?15:13),
                         i==0?0xffe9efde:0xffa9d9ae,rearWidth,poses,buffers);
             poses.popPose();
         }
@@ -76,8 +83,8 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
         poses.translate(0,0,rear?.145:.205);
         String service=board.title().strip().split("\\s+",2)[0];
         int routeColor=routeColor(service);
-        physicalLine(service+"  路线图",0,0,.021F,2.60F,routeColor,poses,buffers);
-        physicalLine(board.station()+" · 本站",0,.22F,.017F,2.60F,0xffe9efde,poses,buffers);
+        physicalLine(service+"  路線図",0,0,.021F,2.60F,routeColor,poses,buffers);
+        physicalLine(currentStation(board.station()),0,.22F,.017F,2.60F,0xffe9efde,poses,buffers);
         if(stops.size()<=4)
         {
             float gap=1.76F/Math.max(1,stops.size()-1);
@@ -109,7 +116,7 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
             // Order follows the real service, while the physical departure
             // arrow below changes on the rear. Do not invent station numbers
             // that would change when the opposite service reverses its list.
-            physicalLine("续 →",0,1.015F,.008F,.24F,routeColor,poses,buffers);
+            physicalLine("続く →",0,1.015F,.008F,.24F,routeColor,poses,buffers);
         }
         var footer=board.rows().stream().filter(s->!s.startsWith("│")&&!s.startsWith("●")).toList();
         if(!footer.isEmpty())physicalLine(rear?reversePhysicalDirection(footer.get(0)):footer.get(0),0,1.12F,.014F,2.60F,0xffa9d9ae,poses,buffers);
@@ -118,7 +125,15 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
     }
     private static String stopName(String source)
     {
-        return source.substring(1).replace("本站","").strip();
+        // stops on a diagram show the Japanese name only; the multilingual name is on the station's own boards
+        String name=source.substring(1).replace("本站","").strip();
+        int split=name.indexOf(SPLIT);
+        return split>0?name.substring(0,split).strip():name;
+    }
+    private static String currentStation(String station)
+    {
+        int split=station.indexOf(SPLIT);
+        return split>0?station.substring(0,split)+"  当駅"+station.substring(split):station+"  当駅";
     }
     private static int routeColor(String service)
     {
@@ -166,11 +181,28 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
                 .replace("金字塔接驳站","金字塔站").replace("发射区车站","发射区站")
                 .replace(" · 直梯",sharedLiftHeader?"":" · 梯");
     }
+    /** "日本語|中文|English": the Japanese part on the line, the rest in small type under it. */
     private void line(String text,int y,int color,float width,PoseStack poses,MultiBufferSource buffers)
     {
-        poses.pushPose();float fit=Math.min(1,width/Math.max(1,font.width(text)));poses.translate(0,y,0);poses.scale(fit,1,1);
+        int split=text.indexOf(SPLIT);
+        if(split>0)
+        {
+            String sub=String.join(" · ",java.util.Arrays.stream(text.substring(split+1).split("\\|")).map(String::strip)
+                    .filter(s->!s.isEmpty()).toList());
+            text=text.substring(0,split).strip();
+            if(!sub.isEmpty())
+            {
+                poses.pushPose();poses.translate(0,y+SUB_OFFSET,0);poses.scale(SUB_SCALE,SUB_SCALE,1);
+                draw(sub,(color&0xff000000)|((color&0x00fefefe)>>1)+0x00303030,width/SUB_SCALE,poses,buffers);
+                poses.popPose();
+            }
+        }
+        poses.pushPose();poses.translate(0,y,0);draw(text,color,width,poses,buffers);poses.popPose();
+    }
+    private void draw(String text,int color,float width,PoseStack poses,MultiBufferSource buffers)
+    {
+        float fit=Math.min(1,width/Math.max(1,font.width(text)));poses.scale(fit,1,1);
         font.drawInBatch(text,-font.width(text)/2F,0,color,false,poses.last().pose(),buffers,Font.DisplayMode.NORMAL,0,15728880);
-        poses.popPose();
     }
     @Override public int getViewDistance() { return 96; }
 }
