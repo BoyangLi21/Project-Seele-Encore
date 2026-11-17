@@ -53,6 +53,9 @@ def _street_sign(lines, x, z):
         return [pick(R.APARTMENT_JA, x, z), '', '', '']
     out = [R.to_ja(l) for l in kept]
     for i, l in enumerate(out):
+        if l in ('住居', '民宿'):        # a bare use label: give the house a name like its neighbours
+            out[i] = pick(R.APARTMENT_JA if l == '住居' else R.MINSHUKU_JA, x, z)
+            continue
         m = re.match(R.GENERIC_USE, l)
         if m:
             out[i] = pick(R.APARTMENT_JA if m.group(1) == '住居' else R.USE_NAMES[m.group(1)], x, z)
