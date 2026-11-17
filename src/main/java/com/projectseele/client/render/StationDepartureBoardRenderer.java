@@ -41,7 +41,9 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
             }
             boolean lift=!board.rows().isEmpty()&&board.rows().stream().allMatch(s->s.endsWith(" · 直梯"));
             line(lift?"エレベーター乗換|乘电梯换层|Change by lift":board.station(),0,0xffedbd55,width,poses,buffers);
-            for(int i=0;i<Math.min(3,board.rows().size());i++)line(compactDestination(board.rows().get(i),lift),18+i*16,
+            // a small "Chinese · English" line under each row needs the rows a little higher to clear the panel's lower edge
+            boolean split=board.rows().stream().anyMatch(s->s.indexOf(SPLIT)>0);
+            for(int i=0;i<Math.min(3,board.rows().size());i++)line(compactDestination(board.rows().get(i),lift),split?17+i*15:18+i*16,
                     i==0?0xffe9efde:0xffa9d9ae,width,poses,buffers);
         }
         else
