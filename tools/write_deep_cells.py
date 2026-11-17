@@ -148,6 +148,14 @@ def sign_entity(sign, state):
                             'is_waxed': nbtlib.Byte(1), 'front_text': side('front'), 'back_text': side('back')})
 
 
+def campfire_entity(x, y, z):
+    """An empty lit campfire's block entity; without it the client never runs the campfire's particle tick, so no smoke."""
+    zero = nbtlib.IntArray([0, 0, 0, 0])
+    return nbtlib.Compound({'id': nbtlib.String('minecraft:campfire'), 'x': nbtlib.Int(x), 'y': nbtlib.Int(y), 'z': nbtlib.Int(z),
+                            'keepPacked': nbtlib.Byte(0), 'Items': nbtlib.List[nbtlib.Compound](), 'CookingTimes': zero,
+                            'CookingTotalTimes': nbtlib.IntArray([0, 0, 0, 0])})
+
+
 def block_at(root, x, y, z):
     for s in root['sections']:
         if int(s['Y']) == y >> 4 and 'block_states' in s:
@@ -284,6 +292,17 @@ def apply(a):
                                 raise ValueError(f'{x},{y},{z} holds a {e["id"]} block entity')
                             entities.remove(e)
                     entities.append(sign_entity(sign, state))
+                if a.campfire_entities:
+                    for x, y, z, _, after in cells:
+                        if not after.split('[')[0].endswith('campfire'):
+                            continue
+                        entities = root.get('block_entities')
+                        if entities is None or not len(entities):
+                            root['block_entities'] = entities = nbtlib.List[nbtlib.Compound]()
+                        for e in list(entities):
+                            if (int(e['x']), int(e['y']), int(e['z'])) == (x, y, z):
+                                entities.remove(e)
+                        entities.append(campfire_entity(x, y, z))
                 clear_light(root)
                 if a.refresh_heightmaps and 'Heightmaps' in root:
                     # The game rebuilds missing heightmaps on load; stale ones keep rain and spawning at the old ground.
@@ -306,8 +325,13 @@ def apply(a):
                 new_entities = {(int(e['x']), int(e['y']), int(e['z'])): e for e in read_chunk(buf, cx, cz)[3].get('block_entities', [])}
                 old_entities = {(int(e['x']), int(e['y']), int(e['z'])): e for e in read_chunk(old, cx, cz)[3].get('block_entities', [])}
                 wanted = {tuple(sign['pos']): sign for sign in sign_chunks.get((cx, cz), ())}
+                fires = {(x, y, z) for x, y, z, _, after in cells if a.campfire_entities and after.split('[')[0].endswith('campfire')}
                 for pos in set(new_entities) | set(old_entities):
-                    if pos in wanted:
+                    if pos in fires:
+                        e = new_entities.get(pos)
+                        if e is None or str(e['id']) != 'minecraft:campfire':
+                            wrong += 1
+                    elif pos in wanted:
                         e = new_entities.get(pos)
                         if e is None or [json.loads(str(m))['text'] for m in e['front_text']['messages']] != (list(wanted[pos].get('front', [])) + [''] * 4)[:4]:
                             wrong += 1
@@ -353,5 +377,6 @@ if __name__ == '__main__':
                         help='only to clear the travel space of the remote air shaft itself or to rebuild its surface door')
     parser.add_argument('--allow-block-entities', action='store_true',
                         help='let rows replace blocks that carry a block entity (chests, signs, machines) and drop that entity; off by default')
+    parser.add_argument('--campfire-entities', action='store_true', help='give every campfire a row places its (empty) block entity, so it smokes')
     parser.add_argument('--refresh-heightmaps', action='store_true', help='drop the stored heightmaps of touched chunks, for terrain cut or raised')
     apply(parser.parse_args())
