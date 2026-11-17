@@ -304,7 +304,8 @@ public final class ArmamentTowersR64
             int empty = 0;
             var bay = ArmamentTowerLogicR64.bayCells(lot, station.towerFacingR64(), table.door(), table.bayDepth());
             for (int[] cell : bay) if (level.getBlockState(pos.set(cell[0], cell[1], cell[2])).isAir()) empty++;
-            if (solid * 2 < cells.size() || empty * 20 < bay.size() * 19)
+            // An ordinary tower of the city is about nine tenths hollow where the bay would be; a bay is all of it.
+            if (solid * 2 < cells.size() || empty * 100 < bay.size() * 99)
             {
                 refuse(level, index, "the building has no weapon door and bay (door " + solid + " of " + cells.size() + " cells, bay " + empty + " of " + bay.size() + " empty)");
                 state.wanted.remove(index); state.setDirty();
