@@ -178,47 +178,101 @@ def cedar(A, z, x, h, rng):
     return True
 
 
+def broadleaf_tree(A, z, x, rng, kinds=('oak', 'dark_oak', 'oak', 'birch')):
+    """A full broadleaf crown: trunk 4-7, leaf ball radius 2.5-3.2 centred near the top."""
+    j = int(A.ground[z, x]) - A.by
+    h = 4 + int(rng.integers(0, 4))
+    r = 2.5 + rng.random() * .7
+    kind = kinds[int(rng.integers(len(kinds)))]
+    if not A.free_above(z, x, j, h + 3):
+        return False
+    log, leaf = A.S(f'minecraft:{kind}_log[axis=y]'), A.S(LEAF.format(kind))
+    for dy in range(1, h + 1):
+        A.ids[j + dy, z, x] = log
+    cy = j + h
+    ri = int(np.ceil(r))
+    for dy in range(-2, ri + 1):
+        for dz in range(-ri, ri + 1):
+            for dx in range(-ri, ri + 1):
+                if dz * dz + dx * dx + (dy * 1.3) ** 2 > r * r + rng.random() * .6:
+                    continue
+                y, zz, xx = cy + dy, z + dz, x + dx
+                if not (0 <= y < A.ids.shape[0] and 0 <= zz < A.ids.shape[1] and 0 <= xx < A.ids.shape[2]):
+                    continue
+                s_ = A.ids[y, zz, xx]
+                if A.box.kinds[s_] in (tr.AIRK, tr.SOFT) and not A.box.palette[s_].split('[')[0].endswith(('_log', '_leaves')):
+                    A.ids[y, zz, xx] = leaf
+    return True
+
+
 def cmd_plantation(a):
     X, Z = a.at
-    R = 260
+    R = 340
     A = Area(a, X - R, X + R, Z - R, Z + R)
     forest = ndimage.uniform_filter(A.canopy.astype(np.float32), 15) > .4
-    mid = forest & (np.abs(A.tpi) < 5) & (A.slope > .25) & (A.slope < 1.6) & ~A.keepout
+    # the stand stays well inside the planning box behind a wavy limit, so no edge comes out ruler-straight
+    H_, W_ = A.ground.shape
+    zz_, xx_ = np.mgrid[0:H_, 0:W_]
+    d_box = np.minimum(np.minimum(zz_, H_ - 1 - zz_), np.minimum(xx_, W_ - 1 - xx_))
+    inner = d_box > 60 + 45 * vnoise(A.wx, A.wz, 22, 9)
+    mid = forest & (np.abs(A.tpi) < a.tpi_band) & (A.slope > .2) & (A.slope < 1.8) & ~A.keepout & inner
     mid = ndimage.binary_opening(mid, iterations=3)
     zone = pick_zone(A, mid, (X, Z), a.cells)
-    zone = ndimage.binary_closing(zone, iterations=2) & ~A.keepout
+    zone = ndimage.binary_closing(zone, iterations=3) & ~A.keepout
+    zone = ndimage.binary_opening(zone, iterations=2)
     # ridges and valleys next to the stand become broadleaf
     near = ndimage.binary_dilation(zone, iterations=40) & ~zone
-    edge = near & forest & ((A.tpi >= 5) | (A.tpi <= -5)) & ~A.keepout
+    edge = near & forest & ((A.tpi >= a.tpi_band) | (A.tpi <= -a.tpi_band)) & ~A.keepout
+    canopy_before = float(A.canopy[edge].mean()) if edge.any() else 0
+    spruce_trunks = edge & A.trunk & np.isin(A.above, ['minecraft:spruce_log'])
+    old_spruce = np.argwhere(spruce_trunks)
     n_cut = A.clear_trees(zone)
-    n_cut_edge = A.clear_trees(edge & A.trunk & np.isin(A.above, ['minecraft:spruce_log']))
+    n_cut_edge = A.clear_trees(spruce_trunks)
     A.clear_plants(zone)
     rng = np.random.default_rng(a.seed)
+    # the stand: an exact 3-block grid, one height per row band, so it reads as one even-aged planting
     planted = 0
     for z, x in zip(*np.nonzero(zone & (A.wx % 3 == 0) & (A.wz % 3 == 0))):
-        jz = z + (1 if hash01(A.wx[z, x], A.wz[z, x], 3) < .2 else 0)
-        jx = x + (1 if hash01(A.wx[z, x], A.wz[z, x], 4) < .2 else 0)
-        if not zone[jz, jx] or A.top[jz, jx] not in ('minecraft:grass_block', 'minecraft:dirt', 'minecraft:podzol', 'minecraft:coarse_dirt', 'minecraft:moss_block'):
+        if A.top[z, x] not in ('minecraft:grass_block', 'minecraft:dirt', 'minecraft:podzol', 'minecraft:coarse_dirt', 'minecraft:moss_block'):
             continue
-        h = 14 + int(hash01(A.wx[z, x], A.wz[z, x], 5) * 3) - 1
-        planted += cedar(A, jz, jx, h, rng)
-    # dark plantation floor: podzol and coarse dirt patches, a few ferns
+        h = 14 + (1 if hash01(A.wx[z, x] // 24, A.wz[z, x] // 24, 5) < .5 else 0)
+        planted += cedar(A, z, x, h, rng)
+    # dark floor: mostly podzol and coarse dirt, very few plants
     floor = vnoise(A.wx, A.wz, 6, 7)
     for z, x in zip(*np.nonzero(zone)):
         j = int(A.ground[z, x]) - A.by
-        if A.top[z, x] != 'minecraft:grass_block':
+        if A.top[z, x] not in ('minecraft:grass_block', 'minecraft:dirt'):
             continue
-        if floor[z, x] > .62:
+        if floor[z, x] > .32:
             A.ids[j, z, x] = A.S('minecraft:podzol[snowy=false]')
-        elif floor[z, x] < .15:
+        elif floor[z, x] < .2:
             A.ids[j, z, x] = A.S('minecraft:coarse_dirt')
-        elif hash01(A.wx[z, x], A.wz[z, x], 8) < .12 and A.ids[j + 1, z, x] == A.S(tr.AIR_STATE):
+        if hash01(A.wx[z, x], A.wz[z, x], 8) < .04 and A.ids[j + 1, z, x] == A.S(tr.AIR_STATE):
             A.ids[j + 1, z, x] = A.S('minecraft:fern')
-    # broadleaf on the ridges and in the valleys where spruce stood
-    import random
-    tr.replant(A.box, A.ids, A.ground, edge, A.keepout | zone, random.Random(a.seed), chance=(np.zeros(zone.shape), np.full(zone.shape, .9)))
+    # broadleaf on the ridges and in the valleys: one broad crown where each spruce stood, then fill any gap left
+    # until the canopy is at least what it was
+    keep = A.keepout | zone
+    bl = 0
+    for z, x in old_spruce:
+        if not keep[z, x]:
+            bl += broadleaf_tree(A, z, x, rng)
+    is_leaf = np.array([q.split('[')[0].endswith('_leaves') for q in A.box.palette])
+    cover = is_leaf[A.ids].any(0)
+    gaps = edge & ~ndimage.binary_dilation(cover, iterations=1) & ~keep
+    pts = np.argwhere(gaps)
+    rng.shuffle(pts)
+    filled = np.zeros(gaps.shape, bool)
+    for z, x in pts:
+        if filled[z, x] or A.top[z, x] not in ('minecraft:grass_block', 'minecraft:dirt', 'minecraft:podzol', 'minecraft:coarse_dirt', 'minecraft:moss_block'):
+            continue
+        if broadleaf_tree(A, z, x, rng):
+            bl += 1
+            filled[max(0, z - 3):z + 4, max(0, x - 3):x + 4] = True
+    is_leaf = np.array([q.split('[')[0].endswith('_leaves') for q in A.box.palette])
+    canopy_after = float(is_leaf[A.ids].any(0)[edge].mean()) if edge.any() else 0
     rows = A.rows(X - R, X + R, Z - R, Z + R)
-    rep = dict(zone_columns=int(zone.sum()), broadleaf_edge_columns=int(edge.sum()), trees_removed=n_cut + n_cut_edge, cedars=planted, cells=len(rows))
+    rep = dict(zone_columns=int(zone.sum()), broadleaf_edge_columns=int(edge.sum()), trees_removed=n_cut + n_cut_edge, cedars=planted, broadleaf_planted=bl,
+               edge_canopy_before=round(canopy_before, 3), edge_canopy_after=round(canopy_after, 3), cells=len(rows))
     return rows, rep, zone, A
 
 
@@ -226,8 +280,8 @@ def cmd_pampas(a):
     X, Z = a.at
     R = 220
     A = Area(a, X - R, X + R, Z - R, Z + R)
-    cand = ~A.keepout & (A.slope > .03) & (A.slope < .5) & np.isin(A.top, ['minecraft:grass_block', 'minecraft:dirt', 'minecraft:coarse_dirt']) \
-        & (A.tpi > -6) & ~ndimage.binary_dilation(A.built, iterations=8)
+    cand = ~A.keepout & (A.slope > .03) & (A.slope < a.max_slope) & np.isin(A.top, ['minecraft:grass_block', 'minecraft:dirt', 'minecraft:coarse_dirt', 'minecraft:podzol']) \
+        & (A.tpi > a.min_tpi) & ~ndimage.binary_dilation(A.built, iterations=8)
     cand = ndimage.binary_closing(cand, iterations=3) & ~A.keepout
     zone = pick_zone(A, cand, (X, Z), a.cells)
     # keep a handful of lone trees, at least 40 blocks apart
@@ -245,6 +299,11 @@ def cmd_pampas(a):
     tall = (A.S('minecraft:tall_grass[half=lower]'), A.S('minecraft:tall_grass[half=upper]'))
     air = A.S(tr.AIR_STATE)
     dens = vnoise(A.wx, A.wz, 11, 12) * .6 + vnoise(A.wx, A.wz, 3, 13) * .4
+    # colour patches that read from a distance: dark large-fern drifts and pale drifts where tall grass thins and
+    # white flowers (oxeye daisy, lily of the valley) show between the tufts, like the silver of the plumes
+    patch = vnoise(A.wx, A.wz, 17, 15)
+    large_fern = (A.S('minecraft:large_fern[half=lower]'), A.S('minecraft:large_fern[half=upper]'))
+    pale = [A.S('minecraft:oxeye_daisy'), A.S('minecraft:lily_of_the_valley'), A.S('minecraft:azure_bluet')]
     for z, x in zip(*np.nonzero(zone)):
         j = int(A.ground[z, x]) - A.by
         if A.ids[j + 1, z, x] != air or j + 2 >= A.ids.shape[0]:
@@ -252,8 +311,21 @@ def cmd_pampas(a):
         if A.top[z, x] in ('minecraft:dirt', 'minecraft:coarse_dirt'):
             A.ids[j, z, x] = A.S(tr.GRASS)
         u = float(hash01(A.wx[z, x], A.wz[z, x], 14))
+        free2 = A.ids[j + 2, z, x] == air
+        if a.patches and patch[z, x] < .28:
+            if u < .55 and free2:
+                A.ids[j + 1, z, x], A.ids[j + 2, z, x] = large_fern
+            elif u < .8 and free2:
+                A.ids[j + 1, z, x], A.ids[j + 2, z, x] = tall
+            continue
+        if a.patches and patch[z, x] > .7:
+            if u < .45 and free2:
+                A.ids[j + 1, z, x], A.ids[j + 2, z, x] = tall
+            elif u < .85:
+                A.ids[j + 1, z, x] = pale[int(u * 1000) % 3]
+            continue
         p = .55 + .4 * dens[z, x]
-        if u < p and A.ids[j + 2, z, x] == air:
+        if u < p and free2:
             A.ids[j + 1, z, x], A.ids[j + 2, z, x] = tall
         elif u < p + .12:
             A.ids[j + 1, z, x] = A.S('minecraft:grass')
@@ -592,14 +664,23 @@ def cmd_owaku(a):
             vents.append((z, x))
         if len(vents) >= a.vents:
             break
-    for z, x in vents:
+    fire = 'minecraft:campfire[facing=north,lit=true,signal_fire=true,waterlogged=false]'
+    for vi, (z, x) in enumerate(vents):
         j = int(A.ground[z, x]) - A.by
-        A.ids[j - 2, z, x] = A.S('minecraft:hay_block[axis=y]')
-        A.ids[j - 1, z, x] = A.S('minecraft:campfire[facing=north,lit=true,signal_fire=true,waterlogged=false]')
-        A.ids[j, z, x] = A.S('minecraft:iron_bars[east=false,north=false,south=false,waterlogged=false,west=false]')
+        open_vent = a.vent_style == 'open' or (a.vent_style == 'mixed' and vi % 2 == 1)
+        if open_vent:
+            # open shaft: the fire two blocks down, nothing over it
+            A.ids[j - 3, z, x] = A.S('minecraft:hay_block[axis=y]')
+            A.ids[j - 2, z, x] = A.S(fire)
+            A.ids[j - 1, z, x] = A.S(tr.AIR_STATE)
+            A.ids[j, z, x] = A.S(tr.AIR_STATE)
+        else:
+            A.ids[j - 2, z, x] = A.S('minecraft:hay_block[axis=y]')
+            A.ids[j - 1, z, x] = A.S(fire)
+            A.ids[j, z, x] = A.S('minecraft:iron_bars[east=false,north=false,south=false,waterlogged=false,west=false]')
         for dz in range(-2, 3):
             for dx in range(-2, 3):
-                if (dz or dx) and dz * dz + dx * dx <= 5 and hash01(A.wx[z, x] + dx, A.wz[z, x] + dz, 47) < .8:
+                if (dz or dx) and dz * dz + dx * dx <= 4 and hash01(A.wx[z, x] + dx, A.wz[z, x] + dz, 47) < .75:
                     zz_, xx_ = z + dz, x + dx
                     jj = int(A.ground[zz_, xx_]) - A.by
                     if core[zz_, xx_] and replace[A.box.ids[jj, zz_, xx_]]:
@@ -638,12 +719,17 @@ def main():
     p.add_argument('--area', type=int, nargs=4)
     p.add_argument('--cells', type=int, default=30000)
     p.add_argument('--lone', type=int, default=7)
+    p.add_argument('--max-slope', type=float, default=.5)
+    p.add_argument('--tpi-band', type=float, default=5, help='plantation: |TPI| below this is mid-slope')
+    p.add_argument('--min-tpi', type=float, default=-6)
+    p.add_argument('--patches', action='store_true', help='pampas: dark fern and pale flower drifts')
     p.add_argument('--step', type=int, default=2, help='terrace2: bench height')
     p.add_argument('--zone', type=Path)
     p.add_argument('--core', type=int, nargs=2, default=[230, 960])
     p.add_argument('--cable-z', type=int, default=840)
     p.add_argument('--vents', type=int, default=26)
     p.add_argument('--vent-gap', type=int, default=11)
+    p.add_argument('--vent-style', choices=['grate', 'open', 'mixed'], default='grate')
     p.add_argument('--reach', type=int, default=4, help='roadcut: faces up to this far from the road')
     p.add_argument('--min-h', type=int, default=3, help='roadcut: least height above the road')
     p.add_argument('--lip-thick', type=int, default=3, help='roadcut: thickest soil cleared off a road')
