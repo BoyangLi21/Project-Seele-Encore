@@ -68,7 +68,11 @@ public final class EvaContactShadowsR24
         pose.pushPose();pose.translate(-camera.x,-camera.y,-camera.z);
         for(var entry:List.copyOf(CONTACTS.entrySet()))
         {
-            var actor=entry.getKey();if(actor==null||actor.level()!=mc.level||!actor.isFirstBattleActive())continue;
+            var actor=entry.getKey();if(actor==null)continue;
+            // The table keeps the first object it saw for a network id. One that has left the level would answer
+            // for its successor here, with the state it had when it left: drop it and let the successor start anew.
+            if(actor.isRemoved()||actor.level()!=mc.level){CONTACTS.remove(actor);continue;}
+            if(!actor.isFirstBattleActive())continue;
             for(var sample:entry.getValue().entrySet())
             {
                 var contact=sample.getValue();

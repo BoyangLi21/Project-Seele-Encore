@@ -63,7 +63,9 @@ public final class EvaMotionEngineV2
     private static final ResourceLocation CONNECTED_LOCOMOTION_DATABASE =
             new ResourceLocation(ProjectSeele.MODID,
                     "motion/eva_connected_locomotion_v1.json");
-    private static final Map<EvaUnit01Entity, GameplayState> GAMEPLAY = new WeakHashMap<>();
+    // By object, not by network id: a Unit back in range restarts its tick count, and a stance start left by its
+    // predecessor held the stance clip on its first frame until the new count caught up.
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity, GameplayState> GAMEPLAY = new com.projectseele.util.WeakIdentityMap<>();
     private static volatile MotionDatabase connectedLocomotion = MotionDatabase.empty();
     private static final double WALK_STRIDE_BLOCKS = 25.8334D;
     private static final double RUN_STRIDE_BLOCKS = 31.3944D;

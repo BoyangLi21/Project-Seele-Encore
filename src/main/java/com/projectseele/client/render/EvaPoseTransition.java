@@ -20,7 +20,7 @@ import software.bernie.geckolib.cache.object.GeoBone;
 public final class EvaPoseTransition
 {
     public static final String OWNER = "POSE_GRAPH_TRANSITION";
-    private static final Map<EvaUnit01Entity, State> STATES = new WeakHashMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity, State> STATES = new com.projectseele.util.WeakIdentityMap<>();
     private static final Map<BakedGeoModel, Map<String, RawPose>> GECKO_POSES = new WeakHashMap<>();
 
     private EvaPoseTransition() {}

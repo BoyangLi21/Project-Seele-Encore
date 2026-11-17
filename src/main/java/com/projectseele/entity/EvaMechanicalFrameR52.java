@@ -70,7 +70,7 @@ public final class EvaMechanicalFrameR52
     }
     public static boolean bootstrap(){return true;}
     public static void define(SynchedEntityData data){data.define(SAMPLE,new CompoundTag());}
-    public static void resetOriginalMaintenanceR53(EvaUnit01Entity eva){var old=eva.getEntityData().get(SAMPLE);var next=new CompoundTag();for(String key:List.of("PlantCarrierR52","OriginalCarrierUUIDR52","OriginalCarrierEntityR52"))if(old.contains(key))next.put(key,old.get(key).copy());eva.getEntityData().set(SAMPLE,next);GEOMETRY.remove(eva);HELD_GEOMETRY.remove(eva);}
+    public static void resetOriginalMaintenanceR53(EvaUnit01Entity eva){var old=eva.getEntityData().get(SAMPLE);var next=new CompoundTag();for(String key:List.of("PlantCarrierR52","OriginalCarrierUUIDR52","OriginalCarrierEntityR52"))if(old.contains(key))next.put(key,old.get(key).copy());eva.getEntityData().set(SAMPLE,next);synchronized(GEOMETRY){GEOMETRY.remove(eva);}synchronized(HELD_GEOMETRY){HELD_GEOMETRY.remove(eva);}}
     public static boolean active(EvaUnit01Entity eva){return eva.getEntityData().get(SAMPLE).getBoolean("Active");}
     public static RigidTransform carriedPlugTransformR53(EvaUnit01Entity eva,float partial)
     {if(!active(eva))throw new IllegalStateException("Actual carried capsule frame required");return frame(eva,partial).compose(decode(eva.getEntityData().get(SAMPLE).getCompound("PlugLocal")));}
@@ -323,11 +323,14 @@ public final class EvaMechanicalFrameR52
         return new RigidTransform(point,x,y,z,w);
     }
     private record ClientContinuousWindowR52(long sequence,CompoundTag encoded,com.projectseele.world.DirectoryTrajectoryR52.PortableWindowR52 path,com.projectseele.world.NervMechanicalTravelR52.ContinuousProfile profile,long ticks){}
-    private static final Map<EvaUnit01Entity,ClientContinuousWindowR52> CLIENT_CONTINUOUS_R52=new WeakHashMap<>();
+    // The four client tables below are kept by object, not by network id: a Unit that left a player's range and
+    // came back is a new object with the old id, and must not be played forward from the frame its predecessor
+    // was last drawn at.
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ClientContinuousWindowR52> CLIENT_CONTINUOUS_R52=new com.projectseele.util.WeakIdentityMap<>();
     private record ClientContinuousReceiptR52(long sequence,long receivedNanos,boolean initialSnapshot){}
-    private static final Map<EvaUnit01Entity,ClientContinuousReceiptR52> CLIENT_CONTINUOUS_RECEIPTS_R52=new WeakHashMap<>();
-    private static final Map<EvaUnit01Entity,ClientFrameR54> CLIENT_FRAMES_R54=new WeakHashMap<>();
-    private static final Map<EvaUnit01Entity,ClientRecoveryPoseR54> CLIENT_RECOVERY_POSES_R54=new WeakHashMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ClientContinuousReceiptR52> CLIENT_CONTINUOUS_RECEIPTS_R52=new com.projectseele.util.WeakIdentityMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ClientFrameR54> CLIENT_FRAMES_R54=new com.projectseele.util.WeakIdentityMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ClientRecoveryPoseR54> CLIENT_RECOVERY_POSES_R54=new com.projectseele.util.WeakIdentityMap<>();
     private static final class ClientRecoveryPoseR54
     {
         final MechanicalVisualClockR54 clock=new MechanicalVisualClockR54();
@@ -381,7 +384,7 @@ public final class EvaMechanicalFrameR52
         synchronized(CLIENT_CONTINUOUS_R52)
         {
             long now=System.nanoTime();
-            boolean initialSnapshot=!CLIENT_FRAMES_R54.containsKey(eva);
+            boolean initialSnapshot=CLIENT_FRAMES_R54.get(eva)==null;
             if(tag.getBoolean("Active")&&tag.contains("Current",net.minecraft.nbt.Tag.TAG_COMPOUND))
                 CLIENT_FRAMES_R54.computeIfAbsent(eva,ignored->new ClientFrameR54()).receive(decode(tag.getCompound("Current")),tag.getLong("AcceptedAt"),now);
             else CLIENT_FRAMES_R54.remove(eva);
