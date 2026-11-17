@@ -29,6 +29,7 @@ def main():
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--run', type=float, default=1.5)
     p.add_argument('--reach', type=int, default=10)
+    p.add_argument('--max-cut', type=int, default=1000, help='deepest cut per column')
     p.add_argument('--one-side', action='store_true', help='lay back only one bank of each channel (east or south)')
     p.add_argument('--keep-file', type=Path)
     p.add_argument('--seed', type=int, default=41)
@@ -69,6 +70,8 @@ def main():
         dh, (hz, hx) = ndimage.distance_transform_edt(~hard, return_indices=True)
         target = np.maximum(target, ground[hz, hx] - dh)
     target = np.minimum(target, ground)
+    # where laying back would take more than --max-cut, leave the column: no new step is carved into the hill behind
+    target = np.where(ground - target > a.max_cut, ground, target)
     target = np.where(frozen, ground, target)
     names = np.array([q.split('[')[0] for q in box.palette]).astype(str)
     wooded = ndimage.binary_dilation(np.char.endswith(names, '_leaves')[box.ids].any(0), iterations=2) & ~built
@@ -101,7 +104,7 @@ def main():
             new_ids[j + 1, z, x], new_ids[j + 2, z, x] = tall
         elif r < .44:
             new_ids[j + 1, z, x] = fern
-        elif r < .52:
+        elif r < .48:  # bank stones: half as many as the first pilot
             new_ids[j, z, x] = stones[int(rng.random() < .4)]
             n_stone += 1
     rows = tr.rows_between(box, new_ids)
