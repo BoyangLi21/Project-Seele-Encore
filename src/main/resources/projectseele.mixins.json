@@ -69,6 +69,7 @@
     "client.GameRendererFeedProjectionMixin",
     "client.LargeStructureRenderMixin",
     "client.PlayerModelGendoPoseMixin",
+    "client.PlugPilotHeldItemR64Mixin",
     "client.MovingElevatorDisplayMixin",
     "client.CreateVirtualLightStarlightGuardMixin",
     "client.CatnipBlockQuadsMixin",

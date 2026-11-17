@@ -633,7 +633,11 @@ public final class ClientForgeEvents
             return;
         }
         EvaUnit01Entity eva = ridden(minecraft.player);
-        if (eva == null || !minecraft.options.getCameraType().isFirstPerson())
+        // R64: from the moment the pilot sits in the capsule their hands are on the yokes. Up to now the
+        // hand and whatever it held (the NERV phone) were still drawn until the capsule had locked into its Unit.
+        boolean inCapsule = com.projectseele.client.cockpit.PilotCockpitR64.ON && minecraft.player != null
+                && minecraft.player.getVehicle() instanceof EntryPlugCarrierEntity;
+        if (eva == null && !inCapsule || !minecraft.options.getCameraType().isFirstPerson())
         {
             return;
         }
