@@ -20,6 +20,8 @@ import sys
 import numpy as np
 
 PARTS = ['walk', 'run', 'strike', 'jump', 'look']
+# Parts of a drive that are not measured: standing, leaving and boarding, looking down at the seat.
+SKIP = {'idle', 'stand', 'leave', 'board', 'exit', 'down', 'rise'}
 
 
 def read(path):
@@ -59,7 +61,11 @@ def quick(t, v):
 
 def report(name, rows):
     print(name)
-    for part in PARTS:
+    # Whatever parts the drive had (the stances script names its own), in the order they came.
+    parts = []
+    for r in rows:
+        if r[2] not in SKIP and r[2] not in parts: parts.append(r[2])
+    for part in parts:
         sel = [r for r in rows if r[2] == part and r[4] == 1]
         if len(sel) < 20:
             print('  %-7s no frames' % part); continue

@@ -51,8 +51,32 @@ public final class PilotCockpitReviewR64
     private static final boolean DRIVE = Boolean.getBoolean("projectseele.cockpitReviewR64");
     private static final String PLUG = System.getProperty("projectseele.plugWatchR64");
     private static final int PLUG_END = Integer.getInteger("projectseele.plugWatchEndR64", 160);
+    /**
+     * -Dprojectseele.plugWatchRecoverR64=<ticks of free control on the ground>: the Unit's recovery is asked then
+     * ("/seele eva recover"); the watch runs through the way back and ends once the crane has drawn the capsule out
+     * and set it at its dock. Calling a sortie off in the cage does not draw the capsule out, and the pilot's own
+     * exit is refused there: the crane's extraction is the last part of a recovery and of nothing else.
+     */
+    private static final int PLUG_RECOVER = Integer.getInteger("projectseele.plugWatchRecoverR64", -1);
+    /** -Dprojectseele.plugWatchExitR64=<ticks of free control on the ground>: the pilot's exit is asked then, and the watch ends 13 seconds later. */
+    private static final int PLUG_EXIT = Integer.getInteger("projectseele.plugWatchExitR64", -1);
+    /** -Dprojectseele.plugWatchAfterDockR64=<ticks>: how long the recovered capsule is watched at its dock before the pilot climbs out (ten more seconds are watched after that). */
+    private static final int PLUG_AFTER_DOCK = Integer.getInteger("projectseele.plugWatchAfterDockR64", 60);
+    private static boolean recoverSent, exitSent, leaveAsked;
+    private static int freeTicks, afterTicks, offTicks, lastStage = -1;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-    private static final int END = 1070;
+    /**
+     * -Dprojectseele.cockpitReviewScriptR64: "drive" (the default, described above), "stances" (crouched and at a
+     * crouched walk, prone and crawling, the rifle carried, sighted and fired, the positron cannon charged and fired,
+     * the knife), or "look" (a short one for the other Units: stand, look down at the seat, walk, strike).
+     */
+    private static final String SCRIPT = System.getProperty("projectseele.cockpitReviewScriptR64", "drive");
+    /** -Dprojectseele.cockpitReviewUnitR64: unit00, unit01 (the default), unit02, un0 or un1. */
+    private static final String UNIT = System.getProperty("projectseele.cockpitReviewUnitR64", "unit01");
+    private static final boolean UN = UNIT.startsWith("un") && !UNIT.startsWith("unit");
+    private static final int VARIANT = UNIT.endsWith("00") ? EvaUnit01Entity.UNIT_00 : UNIT.endsWith("02") ? EvaUnit01Entity.UNIT_02 : EvaUnit01Entity.UNIT_01;
+    private static final String ARM = UN ? "seele dev motionlab un " + (UNIT.endsWith("1") ? 1 : 0) + " " : "seele dev motionlab weapon " + UNIT + " ";
+    private static final int END = SCRIPT.equals("stances") ? 900 : SCRIPT.equals("look") ? 300 : 1070;
 
     private static int wait, tick = -1, serverStart = -1, settledTicks, missing, frame, capturedTick = -1, lockedTicks, watchTicks;
     private static Vec3 settledAt;
@@ -89,9 +113,13 @@ public final class PilotCockpitReviewR64
             link.sendCommand("seele motion planted");
             link.sendCommand("seele combat frames");
             link.sendCommand("seele dev motionlab reset");
-            link.sendCommand("seele dev motionlab demo unit01 stop");
-            link.sendCommand("seele dev motionlab enter unit01");
-            link.sendCommand("seele dev motionlab weapon unit01 fists");
+            if (UN) link.sendCommand("seele dev motionlab un " + (UNIT.endsWith("1") ? 1 : 0));
+            else
+            {
+                link.sendCommand("seele dev motionlab demo " + UNIT + " stop");
+                link.sendCommand("seele dev motionlab enter " + UNIT);
+                link.sendCommand(ARM + "fists");
+            }
             link.sendCommand("time set 6000");
             link.sendCommand("weather clear");
             return;
@@ -99,7 +127,8 @@ public final class PilotCockpitReviewR64
         EvaUnit01Entity eva = EvaPilotResolver.controlTarget(mc.player);
         if (serverStart < 0)
         {
-            if (eva == null || eva.getActivationTicks() > 0 || !eva.isPoweredOn() || eva.isExperimentalUnit() || eva.getUnitVariant() != EvaUnit01Entity.UNIT_01)
+            if (eva == null || eva.getActivationTicks() > 0 || !eva.isPoweredOn()
+                    || (UN ? !eva.isExperimentalUnit() : eva.isExperimentalUnit() || eva.getUnitVariant() != VARIANT))
             {
                 if (++missing > 400) finish(mc, "pilot_setup_timeout");
                 return;
@@ -111,15 +140,65 @@ public final class PilotCockpitReviewR64
             if (wait < 330) return;
             serverStart = mc.getSingleplayerServer().getTickCount();
             open(mc);
-            ProjectSeele.LOGGER.info("Cockpit review started: batch={} cockpit={}", BATCH, com.projectseele.client.cockpit.PilotCockpitR64.ON);
+            ProjectSeele.LOGGER.info("Cockpit review started: batch={} script={} unit={} cockpit={}", BATCH, SCRIPT, UNIT, com.projectseele.client.cockpit.PilotCockpitR64.ON);
         }
         int previous = tick;
         tick = mc.getSingleplayerServer().getTickCount() - serverStart;
         mc.options.hideGui = false;
         mc.options.setCameraType(CameraType.FIRST_PERSON);
         if (mc.getCameraEntity() != mc.player) mc.setCameraEntity(mc.player);
-        drive(mc, eva, previous);
+        if (SCRIPT.equals("stances")) stances(mc, eva, previous);
+        else if (SCRIPT.equals("look")) look(mc, eva, previous);
+        else drive(mc, eva, previous);
         if (tick >= END) finish(mc, "complete");
+    }
+
+    private static void walk(Minecraft mc, boolean move)
+    {
+        mc.options.keyUp.setDown(move);
+        mc.player.input.up = move; mc.player.input.forwardImpulse = move ? 1 : 0; mc.player.zza = move ? 1 : 0; mc.player.xxa = 0;
+    }
+
+    /** The stances and the weapons, each long enough to be measured and seen. */
+    private static void stances(Minecraft mc, EvaUnit01Entity eva, int previous)
+    {
+        int t = tick;
+        if (eva == null) return;
+        var link = mc.player.connection;
+        walk(mc, t >= 40 && t < 100 || t >= 200 && t < 290 || t >= 430 && t < 490);
+        mc.player.setYRot(t >= 180 && t < 420 ? 180 : 0); mc.player.setXRot(0);
+        if (at(previous, 20)) send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
+        if (at(previous, 110)) send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
+        if (at(previous, 140) || at(previous, 300)) send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
+        if (at(previous, 400)) link.sendCommand(ARM + "rifle");
+        // The sight is the use key held, the shots the attack key: as a pilot's own hands do it.
+        boolean sight = t >= 500 && t < 570, charge = t >= 640 && t < 730;
+        mc.options.keyUse.setDown(sight || charge || t >= 830 && t < 836);
+        if (t >= 520 && t < 550 && previous / 4 != t / 4) send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
+        mc.options.keyAttack.setDown(t >= 520 && t < 550 || t >= 790 && t < 794 || t >= 805 && t < 809);
+        if (at(previous, 600)) link.sendCommand(ARM + "cannon");
+        if (at(previous, 640)) send(ServerboundEvaControlPacket.ACTION_CHARGE_START);
+        if (at(previous, 730)) send(ServerboundEvaControlPacket.ACTION_CHARGE_STOP);
+        if (at(previous, 760)) link.sendCommand(ARM + "knife");
+        if (at(previous, 790) || at(previous, 805)) send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if (at(previous, 830)) send(ServerboundEvaControlPacket.ACTION_SMASH);
+        if (previous / 20 != t / 20)
+            ProjectSeele.LOGGER.info("Cockpit review: tick {} {} weapon {} crouching {} prone {} sight {} scope {}", t, part(t), eva.getWeapon(), eva.isPilotCrouching(), eva.isPilotProne(),
+                    com.projectseele.client.ClientForgeEvents.isRifleSightActive(eva), com.projectseele.client.ClientForgeEvents.isCannonScopeActive(eva));
+    }
+
+    /** The other Units' seats: a stand, a look down at the yokes and knees, a walk, two blows. */
+    private static void look(Minecraft mc, EvaUnit01Entity eva, int previous)
+    {
+        int t = tick;
+        if (eva == null) return;
+        walk(mc, t >= 110 && t < 190);
+        mc.player.setYRot(0);
+        mc.player.setXRot(t >= 30 && t < 100 ? 55 * Mth.clamp(Math.min(t - 30, 100 - t) / 14F, 0, 1) : 0);
+        if (at(previous, 210) || at(previous, 226)) send(ServerboundEvaControlPacket.ACTION_MELEE);
+        mc.options.keyAttack.setDown(t >= 210 && t < 214 || t >= 226 && t < 230);
+        if (at(previous, 250)) send(ServerboundEvaControlPacket.ACTION_SMASH);
+        mc.options.keyUse.setDown(t >= 250 && t < 256);
     }
 
     private static boolean at(int previous, int wanted)
@@ -130,6 +209,11 @@ public final class PilotCockpitReviewR64
     /** The part of the drive a tick belongs to: view.csv carries it, the metrics are taken part by part. */
     private static String part(int t)
     {
+        if (SCRIPT.equals("stances"))
+            return t < 40 ? "crouch" : t < 100 ? "crouchwalk" : t < 140 ? "stand" : t < 200 ? "prone" : t < 290 ? "crawl" : t < 400 ? "rise"
+                    : t < 430 ? "stand" : t < 490 ? "riflewalk" : t < 500 ? "stand" : t < 570 ? "sight" : t < 640 ? "stand" : t < 730 ? "cannon"
+                    : t < 790 ? "stand" : "knife";
+        if (SCRIPT.equals("look")) return t < 30 ? "idle" : t < 100 ? "down" : t < 110 ? "stand" : t < 190 ? "walk" : "strike";
         return t < 40 ? "idle" : t < 110 ? "leave" : t < 250 ? "board" : t < 260 ? "stand" : t < 390 ? "walk" : t < 430 ? "stand"
                 : t < 540 ? "run" : t < 585 ? "stand" : t < 700 ? "strike" : t < 705 ? "stand" : t < 795 ? "jump" : t < 800 ? "stand"
                 : t < 865 ? "look" : t < 945 ? "down" : t < 950 ? "stand" : "exit";
@@ -257,8 +341,9 @@ public final class PilotCockpitReviewR64
         }
         else
         {
-            // The plug watch: a picture every fourth tick while the pilot rides the capsule.
-            if (watchTicks == capturedTick || watchTicks % 4 != 0 || !(mc.player != null && mc.player.getVehicle() instanceof EntryPlugCarrierEntity)) return;
+            // The plug watch: a picture every fourth tick while the pilot rides the capsule, and for ten seconds after leaving it.
+            if (watchTicks == capturedTick || watchTicks % 4 != 0 || mc.player == null
+                    || !(mc.player.getVehicle() instanceof EntryPlugCarrierEntity) && (offTicks <= 0 || offTicks >= 200)) return;
             capturedTick = watchTicks;
         }
         frame++;
@@ -270,8 +355,14 @@ public final class PilotCockpitReviewR64
         if (!(mc.player.getVehicle() instanceof EntryPlugCarrierEntity plug))
         {
             if (camera != null && mc.getCameraEntity() == camera) mc.setCameraEntity(mc.player);
+            // Out of the capsule (thrown clear and left, or climbed out): the watch runs on for ten seconds, for
+            // the LCL's going from the pilot's own view.
+            if (directory != null && offTicks < 200) { offTicks++; watchTicks++; mc.options.hideGui = false; mc.options.setCameraType(CameraType.FIRST_PERSON); }
+            if (exitSent && ++afterTicks >= 260) finish(mc, "capsule_thrown_clear");
+            if (leaveAsked) { mc.options.keyShift.setDown(false); if (offTicks >= 200) finish(mc, "pilot_left_capsule"); }
             return;
         }
+        offTicks = 0;
         if (directory == null) { open(mc); ProjectSeele.LOGGER.info("Plug watch started: batch={} view={} cockpit={}", BATCH, PLUG, com.projectseele.client.cockpit.PilotCockpitR64.ON); }
         watchTicks++;
         boolean locked = plug.isLockedToEva();
@@ -317,15 +408,51 @@ public final class PilotCockpitReviewR64
             if (mc.getCameraEntity() != mc.player) mc.setCameraEntity(mc.player);
             mc.options.hideGui = false;
         }
+        EvaUnit01Entity eva = plug.getLinkedEva();
+        boolean free = locked && eva != null && !eva.isNervLogisticsLocked() && !eva.isLaunchSequenceActive() && eva.getActivationTicks() == 0 && eva.onGround();
+        // On the ground with control back: the recovery asked for; the Unit is taken back down and the crane draws the capsule out.
+        if (PLUG_RECOVER >= 0 && !recoverSent)
+        {
+            freeTicks = free ? freeTicks + 1 : 0;
+            if (freeTicks >= PLUG_RECOVER)
+            {
+                recoverSent = true;
+                mc.player.connection.sendCommand("seele eva recover unit0" + Mth.clamp(plug.getAssignedVariant(), 0, 2));
+                ProjectSeele.LOGGER.info("Plug watch: recovery asked at tick {}", watchTicks);
+            }
+        }
+        if (recoverSent)
+        {
+            int stage = plug.getInsertionStage();
+            if (stage != lastStage) ProjectSeele.LOGGER.info("Plug watch: capsule stage {} at tick {}", stage, watchTicks);
+            lastStage = stage;
+            boolean docked = !locked && (stage == EntryPlugCarrierEntity.STAGE_SUSPENDED || stage == EntryPlugCarrierEntity.STAGE_OCCUPIED || stage == EntryPlugCarrierEntity.STAGE_ABORT_DOCKED);
+            afterTicks = docked ? afterTicks + 1 : 0;
+            // Docked for long enough (the cage refills and the bridge comes back in that time): the pilot climbs out.
+            if (afterTicks >= PLUG_AFTER_DOCK) { leaveAsked = true; mc.options.keyShift.setDown(true); }
+            if (afterTicks >= PLUG_AFTER_DOCK + 200) { finish(mc, "capsule_drawn_out"); return; }
+        }
+        // On the ground with control back: the pilot's own exit, which throws the capsule clear in the field.
+        if (PLUG_EXIT >= 0 && !exitSent)
+        {
+            freeTicks = free ? freeTicks + 1 : 0;
+            if (freeTicks >= PLUG_EXIT)
+            {
+                exitSent = true;
+                SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_EXIT));
+                ProjectSeele.LOGGER.info("Plug watch: exit asked at tick {}", watchTicks);
+            }
+        }
+        else if (exitSent && ++afterTicks >= 260) { finish(mc, "capsule_thrown_clear"); return; }
         if (lockedTicks >= PLUG_END) finish(mc, "plug_locked");
-        else if (watchTicks > 6000) finish(mc, "plug_watch_timeout");
+        else if (watchTicks > 12000) finish(mc, "plug_watch_timeout");
     }
 
     private static void finish(Minecraft mc, String reason)
     {
         finished = true;
         mc.options.keyUp.setDown(false); mc.options.keySprint.setDown(false); mc.options.keyJump.setDown(false);
-        mc.options.keyAttack.setDown(false); mc.options.keyUse.setDown(false);
+        mc.options.keyAttack.setDown(false); mc.options.keyUse.setDown(false); mc.options.keyShift.setDown(false);
         mc.setCameraEntity(mc.player);
         try
         {
