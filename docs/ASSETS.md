@@ -536,4 +536,5 @@ GeoFront 倒挂城市的楼群布局，以及后续的湖面和螺旋路线，�
 
 - R63 起（`package_r60.py` 的 `SHADER_PATCHES`）：`shaders/lib/uniforms.glsl`（GeoFront 不算干旱生物群系）、`shaders/lib/seele/cavern.glsl`、`shaders/program/dh_terrain.glsl`、`shaders/program/dh_water.glsl`（附近区块还没建好网格时，远景不提前淡出）。
 - R64 起（V2，perf 的修正，主会话批准）：`shaders/program/gbuffers_entities.glsl`、`shaders/program/gbuffers_spidereyes.glsl` 在片元程序开头加一段远景深度测试（`tools/shader_dh_entity_depth_v2.py`，可单独运行，打印前后 SHA-256），实体比同一像素上的远景地形远 1 格以上就丢掉，远处建筑里的机体、发射井里的门不再隔着远景透出来。没有改别的文件，没有加入外来素材。
+- R64 起（竖井地面舱门，perf）：`shaders/block.properties` 里草方块那一条（`block.10132=grass_block:snowy=false`）末尾加上 `projectseele:nerv_ground_hatch`（`tools/shader_ground_hatch_material.py`，可单独运行）。舱门关着时那一层是这种盖板方块，顶面画的是草；光影包不认识的方块按默认材质渲染，贴地看会比周围草地暗一块。只改这一行。
 - 对 R63r 包的结果：源 sha256 `2d8fe9400ede85903ffe5eaba53caae7911f500b8ff2ff8976a9948c49e811a3`，输出 `c084ade40c989f261ce9e07cda791b290e98fc83d69b36e90d95bc4530188072`；两个着色器文件和 perf 实测用的包逐字节相同。

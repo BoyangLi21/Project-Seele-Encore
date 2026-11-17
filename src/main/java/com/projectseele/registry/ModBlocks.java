@@ -60,7 +60,7 @@ public final class ModBlocks
     public static final RegistryObject<Block> NERV_GROUND_HATCH=BLOCKS.register("nerv_ground_hatch",
             ()->new com.projectseele.world.GroundHatchBlockR64(BlockBehaviour.Properties.of()
                     .mapColor(net.minecraft.world.level.material.MapColor.GRASS).strength(-1.0F,3600000.0F)
-                    .sound(net.minecraft.world.level.block.SoundType.GRASS).noLootTable().noOcclusion()
+                    .sound(net.minecraft.world.level.block.SoundType.GRASS).noLootTable()
                     .isValidSpawn((state,level,position,type)->false)
                     .pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK)));
     public static final RegistryObject<Block> NERV_LAUNCH_ARMOR=BLOCKS.register("nerv_launch_armor",

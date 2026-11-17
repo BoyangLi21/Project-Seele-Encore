@@ -74,15 +74,19 @@ public final class GroundHatchTurfR64
         COVERS.clear();
     }
 
+    /** Whether the hatch's cover blocks are in place: then they are the ground, and its leaves lie inside them. */
+    static boolean covered(NervSiloDoorEntity door, SiloHatchMechanism.Spec spec)
+    {
+        return door.level().getBlockState(cover(door, spec).cell).is(ModBlocks.NERV_GROUND_HATCH.get());
+    }
+
     static void draw(PoseStack poses, MultiBufferSource buffers, NervSiloDoorEntity door,
             SiloHatchMechanism.Spec spec, float open, int light)
     {
-        if (buffers instanceof OutlineBufferSource) return;
+        if (buffers instanceof OutlineBufferSource || covered(door, spec)) return;
         ResourceLocation texture = texture();
         if (texture == null) return;
         Cover cover = cover(door, spec);
-        // The cover blocks are there: they are the ground, and the leaves lie inside them.
-        if (door.level().getBlockState(cover.cell).is(ModBlocks.NERV_GROUND_HATCH.get())) return;
         if (!ShaderShadowPassR44.active() && RigidMachineryPartR44.outsideClipR60(cover.layout.bounds(),
                 RenderSystem.getProjectionMatrix(), RenderSystem.getModelViewMatrix(), poses.last().pose())) return;
         // One buffer for all of it: asking for another type in between would end this batch.
