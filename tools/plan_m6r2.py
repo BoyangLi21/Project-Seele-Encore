@@ -284,6 +284,8 @@ def cmd_pampas(a):
         & (A.tpi > a.min_tpi) & ~ndimage.binary_dilation(A.built, iterations=8)
     cand = ndimage.binary_closing(cand, iterations=3) & ~A.keepout
     zone = pick_zone(A, cand, (X, Z), a.cells)
+    # one open field: holes left by steep bits or old tree clumps are filled, so no copse stands inside it
+    zone = ndimage.binary_fill_holes(ndimage.binary_closing(zone, iterations=6)) & ~A.keepout & ~A.wet
     # keep a handful of lone trees, at least 40 blocks apart
     trunks = np.argwhere(A.trunk & zone)
     keep = np.zeros(zone.shape, bool)
