@@ -257,18 +257,18 @@ public final class PilotCockpitReviewR64
         int t = tick;
         if (eva == null) return;
         if (at(previous, 5)) mc.player.connection.sendCommand(ARM + "cannon");
-        // -Dprojectseele.cockpitReviewCannonTargetR64=true: a Ramiel that does nothing hangs 180 blocks to the east (its
-        // core shut), and each charge begins seven degrees to the side of the core and comes onto it. To the east and
-        // in the air: every shot digs a crater where it lands, the shots of earlier runs have dug theirs ahead, and a
-        // Ramiel left by one of them lies there. (Those do not die of /kill, their field takes it: their health is
-        // taken instead, asked three times while the lab loads round the Unit.)
+        // -Dprojectseele.cockpitReviewCannonTargetR64=true: a Ramiel that does nothing stands 180 blocks ahead (its core
+        // shut), and each charge begins seven degrees to the side of the core and comes onto it. Every shot digs a
+        // crater where it lands and the target sinks into it (it falls whatever it is told about gravity), so this
+        // wants a fresh copy of the lab's world each time: a Ramiel left by an earlier run does not die of /kill (its
+        // field takes it), nor always of having its health taken (asked three times while the lab loads).
         boolean targeted = Boolean.getBoolean("projectseele.cockpitReviewCannonTargetR64");
         if (targeted && (at(previous, 2) || at(previous, 14) || at(previous, 26)))
             mc.player.connection.sendCommand("execute as @e[type=projectseele:ramiel,tag=!cockpit_review] run data merge entity @s {Health:0f}");
         if (targeted && at(previous, 6))
         {
-            cannonTarget = new Vec3(eva.getX() + 180, eva.getY() + 24, eva.getZ());
-            mc.player.connection.sendCommand(String.format(Locale.ROOT, "summon projectseele:ramiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,NoGravity:1b,Tags:[\"cockpit_review\"]}",
+            cannonTarget = new Vec3(eva.getX(), eva.getY() + 1, eva.getZ() + 180);
+            mc.player.connection.sendCommand(String.format(Locale.ROOT, "summon projectseele:ramiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,Tags:[\"cockpit_review\"]}",
                     cannonTarget.x, cannonTarget.y, cannonTarget.z));
         }
         if (targeted && at(previous, END - 30)) mc.player.connection.sendCommand("execute as @e[type=projectseele:ramiel] run data merge entity @s {Health:0f}");
