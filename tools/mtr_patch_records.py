@@ -1,4 +1,7 @@
-"""Apply a reviewed patch to MTR 4 record files in an ISOLATED world copy (never the formal world).
+"""Apply a reviewed patch to MTR 4 record files of a stopped world.
+
+Map sessions try a patch on their own isolated copy first. On the formal world it is run only by the
+writer session, with the server stopped and after a backup of the whole mtr directory.
 
 Records live at <world>/mtr/<ns>/<dim>/<kind>/<last two hex digits>/<16 hex digits of the id> as
 MessagePack maps. Operations (JSON list), each checked against what is on disk first:
