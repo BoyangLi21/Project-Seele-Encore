@@ -438,11 +438,16 @@ def lowrise(m, H):
     roof_plant(m, H + 1, 1, 5)
 
 
-# Armament buildings of the fortress city (canon round, 2026-11-17): looks only; the armament stations, weapons and
+# Armament buildings of the fortress city (canon round, 2026-11-17): A2 and A3 are looks only; the armament stations, weapons and
 # launch logic are untouched. A1 spare-weapon rack (episode 3: roof lock pins, warning lights, four cylindrical guides,
 # one large front door), A2 missile building, A3 power-supply building with the umbilical socket.
+# A1 hands out weapons from R64 (perf's entities, agreed 2026-11-17): the door is the 15 x 38 block on the north wall
+# (local x 2..16, y 1..38, z 1), opened by swapping it to air, so it holds plain blocks only; behind it a 15 x 5 x 40
+# bay (z 2..6, y 1..40) stays empty for the standing rifle; the roof lock pins are entities, so their cells stay air (the
+# centre one sits over the roof-centre redstone lamp, an old builder marker that tower_rows always keeps).
 ARMAMENT = {22: 'A1', 28: 'A1', 40: 'A1', 45: 'A1', 19: 'A2', 23: 'A2', 44: 'A2', 51: 'A2', 20: 'A3', 29: 'A3', 38: 'A3', 46: 'A3'}
 WARN = M('shroomlight')
+A1_DOOR_H, A1_BAY_D = 38, 5
 
 
 def hazard(m, y, k):
@@ -458,7 +463,7 @@ def armament(m, H, kind):
         wall, seam = M('gray_concrete'), M('deepslate_tiles')
     else:
         wall, seam = M('light_gray_concrete'), M('gray_concrete')
-    m.fill(1, 0, M('polished_andesite'))
+    m.fill(0, 0, M('polished_andesite'))                                   # full plate: raised, layer 0 is the street (y 80)
     for y in range(1, H + 1):
         for x, z, u, c in m.ring(1):
             if c:
@@ -474,19 +479,26 @@ def armament(m, H, kind):
             floor_ring(m, y, 1, 2, M('smooth_stone'))
     core(m, 1, H, M('gray_concrete'))
     m.fill(1, H, M('gray_concrete'))
-    hazard(m, 9, 1)
-    front = D - 2                                                          # the south face carries the door or the socket
+    front = D - 2                                                          # A2/A3: the south face carries the door or the socket
     if kind == 'A1':
-        for x in range(3, W - 3):                                          # one large slatted shutter door
-            for y in range(1, 9):
-                m.put(x, y, front, M('iron_block') if x in (3, W - 4) or y == 8 else (M('polished_deepslate') if y % 2 else M('deepslate_tiles')))
+        hazard(m, A1_DOOR_H + 2, 1)                                        # warning band above the door
+        for x in range(2, W - 2):                                          # the weapon bay behind the door: no floor rings
+            for z in range(2, 2 + A1_BAY_D):
+                for y in range(1, A1_DOOR_H + 3):
+                    m.v.pop((x, y, z), None)
+        for y in range(1, A1_DOOR_H + 2):                                  # jambs and lintel around the door
+            m.put(1, y, 1, M('iron_block')); m.put(W - 2, y, 1, M('iron_block'))
+        for x in range(1, W - 1):
+            m.put(x, A1_DOOR_H + 1, 1, M('iron_block'))
+        for x in range(2, W - 2):                                          # the closed shutter: horizontal slats
+            for y in range(1, A1_DOOR_H + 1):
+                m.put(x, y, 1, M('polished_deepslate') if y % 2 else M('deepslate_tiles'))
         for x, z in ((3, 3), (W - 4, 3), (3, D - 4), (W - 4, D - 4)):     # four cylindrical guides on the roof
             m.put(x, H + 1, z, M('quartz_pillar[axis=y]')); m.put(x, H + 2, z, M('quartz_pillar[axis=y]'))
-        for x in range(W // 2 - 2, W // 2 + 3, 2):                         # lock pins raised along the roof seam
-            m.put(x, H + 1, D // 2, M('iron_bars[east=false,north=false,south=false,waterlogged=false,west=false]'))
         for x, z in ((1, 1), (W - 2, 1), (1, D - 2), (W - 2, D - 2)):
             m.put(x, H + 1, z, WARN)
     elif kind == 'A2':
+        hazard(m, 9, 1)
         for x in range(2, W - 2):                                          # a roof of missile hatches in a grid
             for z in range(2, D - 2):
                 frame = (x - 2) % 3 == 0 or (z - 2) % 3 == 0
@@ -497,6 +509,7 @@ def armament(m, H, kind):
             for y in (1, 2):
                 m.put(x, y, front, M('iron_block') if x in (W // 2 - 2, W // 2 + 2) else M('gray_concrete'))
     else:
+        hazard(m, 9, 1)
         cy = max(12, H // 2)                                               # the umbilical socket panel at mid height
         for x in range(W // 2 - 4, W // 2 + 5):
             for y in range(cy - 4, cy + 5):
@@ -595,7 +608,7 @@ def main_towers(ids, out):
         raised = any('air' not in (w.get(x0 + dx, cy + 1 + dy, z0 + dz) or 'minecraft:air')
                      for dx in (0, 4, 8) for dz in (0, 4, 8) for dy in (0, 3, 6))
         lowered = not raised
-        base = t['ret'] if lowered else cy + 1
+        base = t['ret'] if lowered else cy                                 # raised: layer 0 replaces the street plate at y 80
         rows, rep = tower_rows(w, t, base)
         rep['state'] = 'lowered' if lowered else 'raised'
         allrows += rows
@@ -608,7 +621,7 @@ def main_towers(ids, out):
 
 
 def preview_raised(ids, out):
-    """The designs standing at street level (base = street + 1), for city_preview only."""
+    """The designs standing raised (base = topology centre y, as the lift places them), for city_preview only."""
     T = {t['id']: t for t in topology()}
     rows = []
     for i in ids:
@@ -617,7 +630,7 @@ def preview_raised(ids, out):
         cx, cy, cz = t['centre']
         for (lx, ly, lz), st in m.v.items():
             if ly <= t['H'] + 3:
-                rows.append([cx + t['fp'][0] + lx, cy + 1 + ly, cz + t['fp'][2] + lz, '', st])
+                rows.append([cx + t['fp'][0] + lx, cy + ly, cz + t['fp'][2] + lz, '', st])
     Path(out).write_text(json.dumps(rows), 'utf8')
 
 
