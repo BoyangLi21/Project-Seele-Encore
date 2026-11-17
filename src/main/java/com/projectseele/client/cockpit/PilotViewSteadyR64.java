@@ -32,6 +32,14 @@ public final class PilotViewSteadyR64
     /** A blow's swing and rattle of the view is this share of what it was. */
     public static final float BLOW_SHAKE = .70F;
 
+    /**
+     * While a blow is thrown the eye keeps this share of its lag behind the head. A hook turns the trunk under the
+     * head: an eye left four or five blocks behind stood where the shoulder came round to, and the shoulder and
+     * the upper arm filled a third of the picture (2026-11-17, the drive's second punch: 5.3 blocks from the head).
+     * Nearer the head the arm crosses the picture as a blow does and the shoulder stays out of it.
+     */
+    public static final float BLOW_STEADY = .45F;
+
     private static final ViewSteadyMathR64 MATH = new ViewSteadyMathR64();
     private static java.util.UUID actor;
     private static long frame;
@@ -93,11 +101,18 @@ public final class PilotViewSteadyR64
             airTicks = eva.onGround() && !eva.isVisuallyAirborneForRender() ? 0 : airTicks + 1;
         }
         boolean sighted = ClientForgeEvents.isRifleSightActive(eva) || ClientForgeEvents.isCannonScopeActive(eva);
-        MATH.step(lx, ly, lz, dt, airTicks >= 3, sighted ? 0 : amount);
+        MATH.step(lx, ly, lz, dt, airTicks >= 3, sighted ? 0 : striking(eva, partial) ? amount * BLOW_STEADY : amount);
         double ox = MATH.offsetX, oy = MATH.offsetY, oz = MATH.offsetZ;
         removed = new Vec3(-ox, -oy, -oz);
         out = eye.add(-ox * cos - oz * sin, oy, -ox * sin + oz * cos);
         return out;
+    }
+
+    /** A blow is being thrown (a punch, a kick, the knife, the smash): the arms swing through where a lagging eye would be. */
+    private static boolean striking(EvaUnit01Entity eva, float partial)
+    {
+        return eva.getOrdinaryAttackStage() >= 0 || eva.isHeavyMotionActive() || eva.getCockpitAttackAnim(partial) > 0
+                || eva.getCockpitSmashAnim(partial) > 0 || eva.getKnifeMotionType(partial) >= 0;
     }
 
     /** Carried by the facility, an aircraft or a scripted scene, or down: the head is not walking, nothing to steady. */
