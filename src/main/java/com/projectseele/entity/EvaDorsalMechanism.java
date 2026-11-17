@@ -5,7 +5,7 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.nbt.CompoundTag;
 import java.util.Map;
-import java.util.WeakHashMap;
+import com.projectseele.util.WeakIdentityMap;
 
 /** The socket is driven by the physical plug director, including reverse and recovery travel. */
 public final class EvaDorsalMechanism
@@ -13,7 +13,9 @@ public final class EvaDorsalMechanism
     private static final EntityDataAccessor<Float> OPEN = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> BOW = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> OPTICS_DORMANT = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.BOOLEAN);
-    private static final Map<EvaUnit01Entity, View> VIEWS = new WeakHashMap<>();
+    // By object, not by network id: a Unit that comes back into range must not blend from the open hatch its
+    // predecessor was last drawn with. A capture requires the hatch closed and would fail on that blend.
+    private static final WeakIdentityMap<EvaUnit01Entity, View> VIEWS = new WeakIdentityMap<>();
     public static boolean bootstrap() { return true; }
     public static void clearViewR30(EvaUnit01Entity eva){VIEWS.remove(eva);}
     private static final class View

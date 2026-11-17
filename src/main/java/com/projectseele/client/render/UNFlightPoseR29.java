@@ -21,7 +21,7 @@ public final class UNFlightPoseR29
 {
     private record Pose(long frame,float weight,float gimbal){}
     private record Jets(Vec3 left,Vec3 right,Vec3 leftAxis,Vec3 rightAxis,long frame){}
-    private static final Map<EvaPrototypeEntity,Pose> POSES=new WeakHashMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaPrototypeEntity,Pose> POSES=new com.projectseele.util.WeakIdentityMap<>();
     private static final Map<EvaPrototypeEntity,Jets> JETS=new WeakHashMap<>();
     private static final Map<String,Vector3f> SOLES=new HashMap<>();
     public static void resetEntityR31(EvaUnit01Entity eva)
@@ -95,9 +95,13 @@ public final class UNFlightPoseR29
         if(event.getStage()!=RenderLevelStageEvent.Stage.AFTER_PARTICLES)return;var mc=Minecraft.getInstance();if(mc.level==null)return;
         var buffers=mc.renderBuffers().bufferSource();VertexConsumer out=buffers.getBuffer(EnergyGlowR24.CROSS);var poses=event.getPoseStack();var camera=event.getCamera().getPosition();
         poses.pushPose();poses.translate(-camera.x,-camera.y,-camera.z);Matrix4f m=poses.last().pose();
-        for(var entry:JETS.entrySet())
+        for(var entries=JETS.entrySet().iterator();entries.hasNext();)
         {
-            var un=entry.getKey();var jet=entry.getValue();if(un.level()!=mc.level||!un.isUNFlying()||System.nanoTime()-jet.frame>250_000_000L)continue;
+            var entry=entries.next();var un=entry.getKey();var jet=entry.getValue();
+            // The table keeps the first object it saw for a network id; one that has left the level would answer
+            // for its successor here, with the flight state it had when it left.
+            if(un==null||un.isRemoved()||un.level()!=mc.level){entries.remove();continue;}
+            if(!un.isUNFlying()||System.nanoTime()-jet.frame>250_000_000L)continue;
             float length=6+(float)Math.min(1.5,Math.abs(un.getDeltaMovement().y))*5;
             for(int side=0;side<2;side++)
             {

@@ -17,7 +17,7 @@ public final class NervAircraftFrameR52
     // An aircraft that flew out of a player's range with its cradle out and returns empty must start from its
     // new sample: blended with the old one, the cradle reaches for a payload left a kilometre away and its
     // stroke check stops the client.
-    private static final ClientEntityStateR64<UNTransportEntity,ClientFrameR54> CLIENT_FRAMES=new ClientEntityStateR64<>();
+    private static final com.projectseele.util.WeakIdentityMap<UNTransportEntity,ClientFrameR54> CLIENT_FRAMES=new com.projectseele.util.WeakIdentityMap<>();
     private static final class ClientFrameR54
     {
         final com.projectseele.entity.MechanicalVisualClockR54 clock=new com.projectseele.entity.MechanicalVisualClockR54();
@@ -90,7 +90,7 @@ public final class NervAircraftFrameR52
     }
     private static ClientFrameR54 clientFrame(UNTransportEntity p,long now)
     {
-        var visual=CLIENT_FRAMES.of(p,ClientFrameR54::new);
+        var visual=CLIENT_FRAMES.computeIfAbsent(p,ignored->new ClientFrameR54());
         visual.receive(p.getEntityData().get(DATA),now);return visual;
     }
     public static Frame frame(UNTransportEntity p,float partial)

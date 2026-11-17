@@ -10,7 +10,7 @@ import java.util.*;
 public final class EvaTerrainSupport
 {
     private static final EntityDataAccessor<Vector3f> PLANE=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.VECTOR3);
-    private static final Map<EvaUnit01Entity,View> VIEWS=new WeakHashMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,View> VIEWS=new com.projectseele.util.WeakIdentityMap<>();
     private static final class View{final EvaPoseSignalClock[] clocks={new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock()};Vector3f last;}
     public static boolean bootstrap(){return true;}
     public static void define(SynchedEntityData data){data.define(PLANE,new Vector3f());}
