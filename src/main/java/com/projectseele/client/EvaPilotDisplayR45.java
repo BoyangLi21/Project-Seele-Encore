@@ -63,7 +63,7 @@ public final class EvaPilotDisplayR45
         // The unit: which one, how well the pilot is synchronised with it, what is left of the body and the field.
         int ly = Math.max(py + 46, height * 2 / 5 - 20);
         // R64: with the cannon's sight down over the pilot's face the wall's side windows are behind its shell.
-        if (sight > com.projectseele.client.cockpit.PlugCannonSightR64.SETTLING)
+        if (sight > com.projectseele.client.cockpit.PlugCannonSightR64.COVERING)
         {
             alerts(g, font, eva, partial, width, height, py + 18, hull, stopped);
             return;

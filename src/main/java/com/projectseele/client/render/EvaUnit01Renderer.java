@@ -415,7 +415,12 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
             // the clean first-person pass lets visual regression captures
             // inspect the same arms and weapon that third person renders;
             // holding RMB switches to the entry-plug fire-control picture.
-            if (ClientForgeEvents.isCannonScopeActive(animatable)
+            // R64: the plug's own cannon sight magnifies only once its housing is down, and stays down a
+            // few seconds after a shot: the arms and the cannon are left out for as long as it magnifies
+            // (they came back into the magnified picture when the trigger was let go), and are still
+            // seen while the housing swings down over them.
+            boolean plugSight = com.projectseele.client.cockpit.PlugCannonSightR64.enabled() && animatable.getWeapon() == EvaUnit01Entity.WEAPON_CANNON;
+            if ((plugSight ? com.projectseele.client.cockpit.PlugCannonSightR64.magnifying() : ClientForgeEvents.isCannonScopeActive(animatable))
                     || ClientForgeEvents.isRifleSightActive(animatable))
             {
                 model.getBone("aim_pitch").ifPresent(EvaUnit01Renderer::hideSubtree);

@@ -36,6 +36,10 @@ public final class YashimaCannonRendererR52 extends EntityRenderer<YashimaCannon
         var minecraft=net.minecraft.client.Minecraft.getInstance();var camera=minecraft.getCameraEntity();
         if(camera==null||!minecraft.options.getCameraType().isFirstPerson()||ShaderShadowPassR44.active())return false;
         var eva=com.projectseele.world.EvaPilotResolver.controlTarget(camera);
-        return eva!=null&&eva.fixedCannonOperatingR52()&&eva.fixedCannonBodyR52()==gun&&com.projectseele.client.ClientForgeEvents.isCannonScopeActive(eva);
+        if(eva==null||!eva.fixedCannonOperatingR52()||eva.fixedCannonBodyR52()!=gun)return false;
+        // R64: the plug's own sight magnifies only once its housing is down, and stays down a few seconds after a
+        // shot; the gun is left out for exactly as long as the picture is magnified.
+        return com.projectseele.client.cockpit.PlugCannonSightR64.enabled()?com.projectseele.client.cockpit.PlugCannonSightR64.magnifying()
+                :com.projectseele.client.ClientForgeEvents.isCannonScopeActive(eva);
     }
 }

@@ -65,6 +65,10 @@ public final class PlugCannonSightR64
     private static final float TRAVEL = .6F, STAY = 2.6F;
     /** From this much of its way down the housing is before the eyes: the wall's windows are behind it from here on. */
     public static final float SETTLING = .8F;
+    /** From this much of its way down the housing's shell is passing before the plug's wall: the wall's side windows are behind it. */
+    public static final float COVERING = .35F;
+    /** From this far down the lens takes the picture and the field of view begins to narrow. */
+    private static final float LENS = .55F;
 
     /** What the sight shows this frame: where each mark is on the picture, and the figures beside it. */
     private static final class Solve
@@ -104,7 +108,13 @@ public final class PlugCannonSightR64
     public static float field(EvaUnit01Entity eva)
     {
         // The lens takes the picture as the housing settles before the eyes, not while it is still swinging down.
-        return CannonSightMathR64.field(Mth.clamp((down - .55F) / .45F, 0, 1), eva == null ? 0 : eva.chargeProgress());
+        return CannonSightMathR64.field(Mth.clamp((down - LENS) / (1 - LENS), 0, 1), eva == null ? 0 : eva.chargeProgress());
+    }
+
+    /** The lens has the picture: the gun itself, which lies beside the pilot's eye, is left out of the magnified view. */
+    public static boolean magnifying()
+    {
+        return enabled() && down > LENS;
     }
 
     public static void receive(ClientboundCannonServiceR64 packet)
@@ -231,7 +241,7 @@ public final class PlugCannonSightR64
     /** How much of the sight's own display is lit: it comes on as the housing settles before the eyes. */
     private static float lit()
     {
-        return smooth(Mth.clamp((down - .62F) / .38F, 0, 1));
+        return smooth(Mth.clamp((down - SETTLING) / (1 - SETTLING), 0, 1));
     }
 
     /**
@@ -244,11 +254,15 @@ public final class PlugCannonSightR64
         if (!enabled() || see <= .02F) return;
         int[] w = window(width, height);
         int left = w[0], top = w[1], right = w[2], bottom = w[3];
-        g.fill(left, top, right, bottom, Math.round(18 * see) << 24 | 0x203A30);
-        for (int y = top; y < bottom; y += 3) g.fill(left, y, right, y + 1, Math.round(12 * see) << 24);
-        for (int ring = 0; ring < 5; ring++)
+        // What is seen through the sight is the sight's own picture: its phosphor's colour over the whole of it, the
+        // lines of its screen, one brighter line that runs down it every few seconds, and its corners and edges dark.
+        g.fill(left, top, right, bottom, Math.round(44 * see) << 24 | 0x5A7A30);
+        for (int y = top; y < bottom; y += 2) g.fill(left, y, right, y + 1, Math.round(26 * see) << 24);
+        int run = top + (int) (frame / 12_000_000L % Math.max(1, (bottom - top) * 2));
+        if (run < bottom - 3) g.fill(left, run, right, run + 3, Math.round(14 * see) << 24 | 0xD8FFC0);
+        for (int ring = 0; ring < 9; ring++)
         {
-            int inset = ring * 3, shade = Math.round((5 - ring) * 9 * see) << 24;
+            int inset = ring * 3, shade = Math.round((9 - ring) * (9 - ring) * 1.5F * see) << 24;
             g.fill(left + inset, top + inset, right - inset, top + inset + 3, shade);
             g.fill(left + inset, bottom - inset - 3, right - inset, bottom - inset, shade);
             g.fill(left + inset, top + inset + 3, left + inset + 3, bottom - inset - 3, shade);
@@ -666,57 +680,72 @@ public final class PlugCannonSightR64
         }
 
         figures(font, g, eva, s, told, width, height, w, see);
-        boolean beside = w[2] + 6 + 78 <= width - 4;
-        bars(font, g, eva, told, beside ? w[2] + 8 : w[2] - 78 - 8, w[3] - 2, true, !beside, see);
+        boolean beside = w[2] + 6 + COLUMN <= width - 2;
+        bars(font, g, eva, told, beside ? w[2] + 6 : w[2] - COLUMN - 8, w[3] - 2, true, !beside, see);
         return true;
     }
 
-    /** The shot's figures, on the shell beside the window's left edge (inside it where the shell has no room). */
+    /** The width of a column of figures beside the window. */
+    private static final int COLUMN = 88;
+
+    /**
+     * The shot's figures, in a column at each side of the window (on the housing; inside the window's edge where
+     * the housing has no room): the gun's own at the left (range, elevation, bearing), at the right how far the
+     * barrel is from the pilot's look and the charge, and at Yashima under those the power that reaches the gun
+     * and the target's own charge. Every one is read from the game.
+     */
     private static void figures(Font font, GuiGraphics g, EvaUnit01Entity eva, Solve s, ClientboundCannonServiceR64 told, int width, int height, int[] w, float see)
     {
-        int wide = 78, x = w[0] - wide - 6 >= 4 ? w[0] - wide - 6 : w[0] + 6, y = w[1] + Math.max(4, w[4]);
-        boolean inside = x > w[0];
-        int label = fade(MUTED, see), value = fade(PALE, see);
-        String[][] rows = {
-                {"range", s.range < 0 ? "----" : String.format(Locale.ROOT, "%.0f m", s.range)},
-                {"elevation", String.format(Locale.ROOT, "%+.1f°", s.elevation)},
-                {"bearing", String.format(Locale.ROOT, "%05.1f°", s.bearing)},
-                {"off", String.format(Locale.ROOT, "%.1f°", s.wishOff)},
-                {"charge", String.format(Locale.ROOT, "%d%%", Math.round(s.charge * 100))}};
-        if (!inside) g.fill(x - 3, y - 3, x + wide + 1, y + rows.length * 10 + 1, fade(0xFF0B0D0F, see));
-        for (String[] row : rows)
-        {
-            String name = I18n.get("hud.projectseele.sight." + row[0]);
-            g.drawString(font, name, x, y, label, inside);
-            g.drawString(font, row[1], x + wide - 2 - font.width(row[1]), y, row[0].equals("off") && s.wishOff > CannonSightMathR64.SETTLED ? fade(AMBER, see) : value, inside);
-            y += 10;
-        }
+        boolean roomLeft = w[0] - COLUMN - 6 >= 2, roomRight = w[2] + 6 + COLUMN <= width - 2;
+        int lx = roomLeft ? w[0] - COLUMN - 6 : w[0] + 44, rx = roomRight ? w[2] + 6 : w[2] - COLUMN - 8, top = w[1] + 4;
+        int value = fade(PALE, see), plate = fade(0xFF0B0D0F, see);
+        if (roomLeft) g.fill(lx - 3, top - 3, lx + COLUMN + 2, top + 3 * 22 - 1, plate);
+        int y = top;
+        y = cell(font, g, "range", s.range < 0 ? "----" : String.format(Locale.ROOT, "%.0f m", s.range), value, lx, y, see, !roomLeft);
+        y = cell(font, g, "elevation", String.format(Locale.ROOT, "%+.1f°", s.elevation), value, lx, y, see, !roomLeft);
+        cell(font, g, "bearing", String.format(Locale.ROOT, "%05.1f°", s.bearing), value, lx, y, see, !roomLeft);
+
+        if (roomRight) g.fill(rx - 3, top - 3, rx + COLUMN + 2, top + (told == null ? 2 * 22 : 3 * 22 + 3 * 11 + 2) - 1, plate);
+        y = top;
+        y = cell(font, g, "off", String.format(Locale.ROOT, "%.1f°", s.wishOff), s.wishOff > CannonSightMathR64.SETTLED ? fade(AMBER, see) : value, rx, y, see, !roomRight);
+        y = cell(font, g, "charge", String.format(Locale.ROOT, "%d%%", Math.round(s.charge * 100)), s.charge >= 1 ? fade(GREEN, see) : value, rx, y, see, !roomRight);
         if (told == null) return;
         // Yashima: the power that reaches the gun, lit as each part of it is there, and the target's own charge.
-        y += 6;
-        if (!inside) g.fill(x - 3, y - 3, x + wide + 1, y + 4 * 10 + 1, fade(0xFF0B0D0F, see));
-        String grid = I18n.get("hud.projectseele.sight.grid");
-        g.drawString(font, grid, x, y, label, inside);
-        for (int i = 0; i < 3; i++) g.fill(x + wide - 26 + i * 8, y + 1, x + wide - 20 + i * 8, y + 7, fade(i < told.grid() ? GREEN : 0xFF4A3A2A, see));
-        y += 10;
-        lamp(font, g, I18n.get("hud.projectseele.sight.pylon"), told.pylons(), x, y, wide, see, inside); y += 10;
-        lamp(font, g, I18n.get("hud.projectseele.sight.cable"), told.umbilical(), x, y, wide, see, inside); y += 10;
+        String grid = I18n.get("hud.projectseele.sight.grid"), code = I18n.get("hud.projectseele.sight.code_grid");
+        g.drawString(font, grid, rx + 4, y, fade(MUTED, see), !roomRight);
+        if (!code.isEmpty()) g.drawString(font, code, rx + 4 + font.width(grid) + 4, y, fade(AMBER, see * .55F), !roomRight);
+        for (int i = 0; i < 3; i++) g.fill(rx + COLUMN - 24 + i * 8, y + 1, rx + COLUMN - 18 + i * 8, y + 7, fade(i < told.grid() ? GREEN : 0xFF4A3A2A, see));
+        g.fill(rx, y, rx + 1, y + 3 * 11 - 2, fade(AMBER, see * .7F));
+        y += 11;
+        lamp(font, g, "pylon", told.pylons(), rx, y, see, !roomRight); y += 11;
+        lamp(font, g, "cable", told.umbilical(), rx, y, see, !roomRight); y += 13;
         int age = serviceAge();
-        String foe; int colour = value;
-        if (told.beam() - age > 0) { foe = I18n.get("hud.projectseele.sight.foe_open", String.format(Locale.ROOT, "%.1f", (told.beam() - age) / 20F)); colour = fade(GREEN, see); }
+        if (told.beam() - age > 0) cell(font, g, "foe_open", String.format(Locale.ROOT, "%.1f s", (told.beam() - age) / 20F), fade(GREEN, see), rx, y, see, !roomRight);
         else if (told.targetCharge() - age > 0)
-        {
-            foe = I18n.get("hud.projectseele.sight.foe_charge", String.format(Locale.ROOT, "%.1f", (told.targetCharge() - age) / 20F));
-            colour = fade(told.targetCharge() - age <= 20 ? GREEN : AMBER, see);
-        }
-        else { foe = I18n.get("hud.projectseele.sight.foe_idle"); colour = label; }
-        g.drawString(font, foe, x, y, colour, inside);
+            cell(font, g, "foe_charge", String.format(Locale.ROOT, "%.1f s", (told.targetCharge() - age) / 20F), fade(told.targetCharge() - age <= 20 ? GREEN : AMBER, see), rx, y, see, !roomRight);
+        else cell(font, g, "foe_idle", "--", fade(MUTED, see), rx, y, see, !roomRight);
     }
 
-    private static void lamp(Font font, GuiGraphics g, String name, boolean lit, int x, int y, int wide, float see, boolean shadow)
+    /**
+     * One figure: a rule at its left, its name (and, where the language is not English, its code in English, as
+     * the plug's other windows write theirs) over its value. Returns where the next one goes.
+     */
+    private static int cell(Font font, GuiGraphics g, String key, String value, int colour, int x, int y, float see, boolean shadow)
     {
-        g.drawString(font, name, x, y, fade(MUTED, see), shadow);
-        g.fill(x + wide - 10, y + 1, x + wide - 4, y + 7, fade(lit ? GREEN : 0xFF4A3A2A, see));
+        String name = I18n.get("hud.projectseele.sight." + key), code = I18n.get("hud.projectseele.sight.code_" + key);
+        g.fill(x, y, x + 1, y + 19, fade(AMBER, see * .7F));
+        g.drawString(font, name, x + 4, y, fade(MUTED, see), shadow);
+        if (!code.isEmpty()) g.drawString(font, code, x + COLUMN - font.width(code), y, fade(AMBER, see * .55F), shadow);
+        g.drawString(font, value, x + COLUMN - font.width(value), y + 10, colour, shadow);
+        return y + 22;
+    }
+
+    private static void lamp(Font font, GuiGraphics g, String key, boolean lit, int x, int y, float see, boolean shadow)
+    {
+        String name = I18n.get("hud.projectseele.sight." + key), code = I18n.get("hud.projectseele.sight.code_" + key);
+        g.drawString(font, name, x + 4, y, fade(MUTED, see), shadow);
+        if (!code.isEmpty()) g.drawString(font, code, x + 4 + font.width(name) + 4, y, fade(AMBER, see * .55F), shadow);
+        g.fill(x + COLUMN - 8, y + 1, x + COLUMN - 2, y + 7, fade(lit ? GREEN : 0xFF4A3A2A, see));
     }
 
     /**
@@ -738,7 +767,7 @@ public final class PlugCannonSightR64
         float recharge = Mth.clamp((most - cooldown + eva.getCannonCharge()) / (float) (most + charge), 0, 1);
         boolean busy = cooldown > 0 || fuse < 1 || barrel < 1;
         if (!busy && shotAge > STAY) return;
-        int wide = 78, tall = served ? 30 : 10;
+        int wide = COLUMN, tall = served ? 30 : 10;
         if (upwards) y -= tall;
         if (!inside) g.fill(x - 3, y - 3, x + wide + 1, y + tall + 1, fade(0xFF0B0D0F, see));
         if (served)
@@ -755,8 +784,8 @@ public final class PlugCannonSightR64
      */
     public static void serviceBelow(Font font, GuiGraphics g, EvaUnit01Entity eva, int x, int y)
     {
-        if (!enabled() || eva.getWeapon() != EvaUnit01Entity.WEAPON_CANNON || down > SETTLING) return;
-        bars(font, g, eva, service(eva), x, y, false, true, 1 - down / SETTLING);
+        if (!enabled() || eva.getWeapon() != EvaUnit01Entity.WEAPON_CANNON || down > COVERING) return;
+        bars(font, g, eva, service(eva), x, y, false, true, 1 - down / COVERING);
     }
 
     private static void bar(Font font, GuiGraphics g, String name, float value, int x, int y, int wide, float see, boolean shadow)

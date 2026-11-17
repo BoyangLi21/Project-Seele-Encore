@@ -28,11 +28,20 @@ public final class CannonSightTextsR64Test
         String sight = Files.readString(Path.of("src/main/java/com/projectseele/client/cockpit/PlugCannonSightR64.java"), StandardCharsets.UTF_8);
         var keys = new TreeSet<String>();
         Matcher whole = Pattern.compile("\"(hud\\.projectseele\\.sight\\.[a-z_]+)\"").matcher(sight);
-        while (whole.find()) keys.add(whole.group(1));
-        // The figures' rows are named in a table and their keys put together from the names.
-        that(sight.contains("\"hud.projectseele.sight.\" + row[0]"), "the figures' rows are no longer keyed by their names: this check must follow");
-        Matcher row = Pattern.compile("\\{\"([a-z]+)\", ").matcher(sight);
-        while (row.find()) keys.add("hud.projectseele.sight." + row.group(1));
+        // (A literal that ends in an underscore is the beginning of a key put together from a name, not a key.)
+        while (whole.find()) if (!whole.group(1).endsWith("_")) keys.add(whole.group(1));
+        // The figures beside the window are drawn by name: each has its name's key and its code's.
+        that(sight.contains("\"hud.projectseele.sight.\" + key") && sight.contains("\"hud.projectseele.sight.code_\" + key"),
+                "the figures are no longer keyed by their names: this check must follow");
+        Matcher figure = Pattern.compile("(?:cell|lamp)\\(font, g, \"([a-z_]+)\"").matcher(sight);
+        int figures = 0;
+        while (figure.find())
+        {
+            keys.add("hud.projectseele.sight." + figure.group(1));
+            keys.add("hud.projectseele.sight.code_" + figure.group(1));
+            figures++;
+        }
+        that(figures >= 9, "the figures' names were not found in the sight's source: " + figures);
         that(keys.size() >= 25, "the sight's keys were not found in its source: " + keys.size());
         String[] sounds = {"cannon_visor", "cannon_sight_tick", "cannon_sight_lock", "cannon_vent", "cannon_fuse"};
         for (String language : new String[]{"zh_cn", "en_us"})
