@@ -63,7 +63,8 @@ public final class RegionalFacilityLayout
         if(viewers)
         {
             for(int variant=0;variant<3;variant++)EvaLogisticsDirector.loadControlTarget(level,variant);
-            if(FacilityLayoutR21.active(level))com.projectseele.entity.NervArmamentStationEntity.keepCommandStationLoaded(level,FacilityLayoutR21.ARMAMENT);
+            // The old rifle lift is driven from the command room only where no spare-weapon towers are armed.
+            if(FacilityLayoutR21.active(level)&&!ArmamentTowersR64.active(level))com.projectseele.entity.NervArmamentStationEntity.keepCommandStationLoaded(level,FacilityLayoutR21.ARMAMENT);
         }
     }
 }
