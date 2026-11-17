@@ -234,6 +234,9 @@ def _load_r4():
 
 
 STATIONS, ROUTES = _load_r4()
+# the two through lines' full names are too long for a station front board; map-roads agreed these short forms
+SHORT_ROUTES = {'雾里—箱根—第三新东京—湾岸机场贯通线': ('直通線', '贯通线', 'Through Line'),
+                '新箱根机场—NERV—湾岸港口贯通线': ('直通線', '贯通线', 'Through Line')}
 TRACK_SIDE = {'北侧轨道': ('北側のりば', '北侧轨道', 'North Track'), '南侧轨道': ('南側のりば', '南侧轨道', 'South Track'),
               '东侧轨道': ('東側のりば', '东侧轨道', 'East Track'), '西侧轨道': ('西側のりば', '西侧轨道', 'West Track')}
 # station board rows: Chinese -> (ja, zh[, en]); "每分钟一班" rows stay as they are (owner's decision)
