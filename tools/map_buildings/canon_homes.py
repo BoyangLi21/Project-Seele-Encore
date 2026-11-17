@@ -191,9 +191,11 @@ def danchi(b, x0, y0, z0, number, rei=False, seed=0):
             for cidx, ch in enumerate(line):
                 if ch != '#':
                     continue
-                for gx in (x0, x0 + SLAB_L - 1):
+                col = i * 4 + cidx
+                # read from outside: on the west gable north is on the left, on the east gable south is on the left
+                for gx, z in ((x0, zs + col), (x0 + SLAB_L - 1, zs + width - 1 - col)):
                     for dy in (0, 1):
-                        b.put(gx, y0 + 12 - 2 * r - dy + 1, zs + i * 4 + cidx, M('black_concrete'))
+                        b.put(gx, y0 + 12 - 2 * r - dy + 1, z, M('black_concrete'))
     # foundation under the slab and its balcony row
     return (x0, z0, x0 + SLAB_L - 1, z0 + 8)
 
