@@ -713,10 +713,21 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     @Override
     public EntityDimensions getDimensions(Pose pose)
     {
-        float height = 1.0F + this.podTravelR47() * this.entityData.get(DATA_LIFT);
+        float height = 1.0F + this.presentedHeightR64();
         return EntityDimensions.fixed(this.rackHalfWidthR47()*2+3, height);
     }
 
+    /**
+     * How high the offered weapon stands above the station: the pod's lift, or for a tower in the standing building
+     * the opened part of its door. The hand-over asks that the EVA's hull be within four blocks of this box, so with
+     * the door up an EVA standing on a kerb, a wreck or a low roof still reaches the weapon behind it.
+     */
+    private float presentedHeightR64()
+    {
+        if(this.towerR64()>=0&&this.towerRunR64()==com.projectseele.world.ArmamentTowerLogicR64.RAISED)
+        {var door=this.towerDoorR64();return this.entityData.get(DATA_DOOR)*(door.bottom()+door.height());}
+        return this.podTravelR47()*this.entityData.get(DATA_LIFT);
+    }
     public int payloadR47(){return this.entityData.get(DATA_PAYLOAD_R47);}
     public int rackHalfWidthR47(){return this.towerR64()>=0?com.projectseele.world.ArmamentTowerLogicR64.HALF-1:this.payloadR47()==7?14:4;}
     /** Full-size SMG depth is 12.952 m; its original 7 m interior is retired. */
@@ -727,7 +738,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     {
         if(this.entityData==null||this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE)return super.makeBoundingBox();
         double width=this.rackHalfWidthR47()+1.5D,depth=this.rackHalfDepthR54()+1.5D;
-        double height=1.0D+this.podTravelR47()*this.entityData.get(DATA_LIFT);
+        double height=1.0D+this.presentedHeightR64();
         return new AABB(this.getX()-width,this.getY(),this.getZ()-depth,
                 this.getX()+width,this.getY()+height,this.getZ()+depth);
     }
@@ -755,7 +766,8 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key)
     {
         super.onSyncedDataUpdated(key);
-        if(DATA_LIFT.equals(key)||DATA_PAYLOAD_R47.equals(key)||DATA_TOWER_R64.equals(key))this.refreshDimensions();
+        if(DATA_LIFT.equals(key)||DATA_PAYLOAD_R47.equals(key)||DATA_TOWER_R64.equals(key)
+                ||this.towerR64()>=0&&(DATA_DOOR.equals(key)||DATA_TOWER_RUN_R64.equals(key)))this.refreshDimensions();
     }
     public void returnStoredPayloadR47()
     {
@@ -809,6 +821,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     private void setDoor(float progress)
     {
         this.entityData.set(DATA_DOOR, Mth.clamp(progress, 0.0F, 1.0F));
+        if(this.towerR64()>=0)this.refreshDimensions();
     }
 
     private static float ease(float value)
