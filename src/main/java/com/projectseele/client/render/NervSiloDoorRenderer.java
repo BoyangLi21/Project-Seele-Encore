@@ -46,6 +46,10 @@ public final class NervSiloDoorRenderer
         if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&declared!=null
                 &&declared.serviceColumnPorts()&&declared.separationSign()<0&&!door.declaredGeometryR52().retiredServiceLeavesR53())return;
         float open = door.getOpenProgress(partialTick);
+        // Closed, a ground hatch is its cover blocks. Its steel lies inside them, a few centimetres under their
+        // tops, and at a distance would fight them for depth. Seen from above there is nothing else of it.
+        if(declared!=null&&declared.groundFlush()&&GroundHatchTurfR64.covered(door,declared)
+                &&this.entityRenderDispatcher.camera.getPosition().y>door.getY()+1)return;
         poses.pushPose();
         var spec=door.declaredSpecR52();if(spec!=null)poses.mulPose(door.actualFrameR52().rotation());
         TvFacilityMeshes.withBuffers(buffers,()->{if(spec==null)TvFacilityMeshes.shaftHatch(poses,packedLight,open);else TvFacilityMeshes.shaftHatchDeclared(poses,packedLight,open,spec,door.declaredGeometryR52());});

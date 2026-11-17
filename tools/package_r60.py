@@ -237,6 +237,11 @@ def shader_payload(path):
             text = patched.get(member, source.read(member).decode('utf8'))
             if depth.patch_text(text, margin) != text:
                 patched[member] = depth.patch_text(text, margin)
+        # R64: the ground hatch cover of the remote air shaft is lit as the grass it shows.
+        cover = tool_module('shader_ground_hatch_material')
+        text = patched.get(cover.MEMBER, source.read(cover.MEMBER).decode('utf8'))
+        if cover.patch_text(text) != text:
+            patched[cover.MEMBER] = cover.patch_text(text)
         if not patched:
             return path
         output = io.BytesIO()
