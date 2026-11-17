@@ -23,7 +23,8 @@ fields from the thrust the cuts stand beside.
 
 The blade is given by its angle to the forearm, not as a direction in the world: a fist round a handle holds the
 blade square to the forearm and a wrist gives some 40 degrees either way. A first version that pointed the blade
-where the cut should reach asked 80 degrees of the wrist.
+where the cut should reach asked 80 degrees of the wrist. And round the forearm the blade goes no further than a
+forearm turns (TWIST_MOST): the report prints the wrist the way the capture meter has it.
 """
 import json
 import math
@@ -60,6 +61,32 @@ def ease_out(t):
 def ease_in(t):
     t = min(1.0, max(0.0, t))
     return t ** 2.2
+
+
+LENGTH = np.array([0.0, -1.0, 0.0])    # a hand's own length, in the hand (and a forearm's in the forearm)
+# The most the knife hand is turned about its own length against its forearm, either way (degrees). In a body the
+# forearm does this turn, some 85 either way from a thumb that points ahead as the arm hangs; on this model all of
+# it shows between the forearm's armour and the hand. The keys as first handed in turned it 97 in the game (108
+# here) for a tick at the top of the cut's wind-up, to lay the blade back over the shoulder.
+TWIST_MOST = 75.0
+
+
+def swing_twist(rel):
+    """A hand's rotation against its forearm as the swing that carries its length to where it points, and the turn
+    about that length (degrees, signed: thumb outward +)."""
+    swing = R.q_between(LENGTH, R.qrot(rel, LENGTH))
+    turn = R.qmul(R.qconj(swing), rel)
+    angle = math.degrees(2 * math.atan2(float(np.dot(turn[1:4], LENGTH)), float(turn[0])))
+    return swing, (angle + 180.0) % 360.0 - 180.0
+
+
+def wrist_of(forearm, hand):
+    """The right hand against its forearm (rotations in the world) the way the capture meter has it (fr_wrist.py):
+    degrees bent back (+) or forward into the palm (-), bent sideways to the little finger (+) or the thumb (-),
+    and turned about its own length."""
+    rel = R.qnorm(R.qmul(R.qconj(forearm), hand))
+    a = R.qrot(R.qconj(rel), LENGTH)    # the forearm's length as the hand has it; the right palm faces -X
+    return (math.degrees(math.atan2(-a[0], -a[1])), math.degrees(math.asin(max(-1.0, min(1.0, float(a[2]))))), swing_twist(rel)[1])
 
 
 # Keys: time (seconds), then what the body does at it. Places and directions are in the world (x to the Unit's
@@ -230,6 +257,13 @@ def main():
         lean_to = c['blade'] - fore * np.dot(c['blade'], fore)
         blade = unit(math.cos(D(c['angle'])) * fore + math.sin(D(c['angle'])) * unit(lean_to))
         hand_w = R.matq(B.frame(blade, fore) @ B.frame(blade_local, fore_local).T)
+        # The hand turns about its own length as far as putting the blade there takes, but no further than a forearm
+        # turns: past TWIST_MOST the blade leans off where the key has it instead.
+        lower = wq(m, 'forearm_r')
+        swing, turn = swing_twist(R.qnorm(R.qmul(R.qconj(lower), hand_w)))
+        info['twist_asked'] = turn
+        if abs(turn) > TWIST_MOST:
+            hand_w = R.qnorm(R.qmul(lower, R.qmul(swing, R.qaxis(LENGTH, D(math.copysign(TWIST_MOST, turn))))))
         rot['hand_r'] = R.qnorm(R.qmul(R.qconj(wq(m, 'wrist_r')), hand_w))
         info['elbow_r'], info['arm_err_r'] = ang, err
         info['wrist_bend'] = c['angle'] - angle0
@@ -261,11 +295,19 @@ def main():
     print('%d frames (%.2f s); fastest joint %.1f deg a frame (%s)' % (count, last, fastest, worst))
     print('tip furthest ahead %.1f at frame %d (height %.1f, %.1f to the left); tip speed at most %.1f a frame' % (
         tips[reach, 2], reach, tips[reach, 1], tips[reach, 0], np.linalg.norm(np.diff(tips, axis=0), axis=1).max()))
-    print('arm error at most %.2f, leg error %.2f; elbow %.0f..%.0f, knees %.0f..%.0f / %.0f..%.0f; wrist bent from the guard %.0f..%.0f' % (
+    print('arm error at most %.2f, leg error %.2f; elbow %.0f..%.0f, knees %.0f..%.0f / %.0f..%.0f; blade tilted from the guard %.0f..%.0f' % (
         max(p[3]['arm_err_r'] for p in posed), max(max(p[3]['leg_err_l'], p[3]['leg_err_r']) for p in posed),
         min(p[3]['elbow_r'] for p in posed), max(p[3]['elbow_r'] for p in posed),
         min(p[3]['knee_l'] for p in posed), max(p[3]['knee_l'] for p in posed), min(p[3]['knee_r'] for p in posed), max(p[3]['knee_r'] for p in posed),
         min(p[3]['wrist_bend'] for p in posed), max(p[3]['wrist_bend'] for p in posed)))
+    met = np.array([wrist_of(wq(p[2], 'forearm_r'), wq(p[2], 'hand_r')) for p in posed])
+    asked = [p[3]['twist_asked'] for p in posed]
+    print('wrist: bent back %.0f..%.0f, sideways %.0f..%.0f, turned %.0f..%.0f (the keys asked %.0f..%.0f; held on %d frames); the guard %.0f, %.0f, %.0f' % (
+        met[:, 0].min(), met[:, 0].max(), met[:, 1].min(), met[:, 1].max(), met[:, 2].min(), met[:, 2].max(), min(asked), max(asked),
+        sum(1 for v in asked if abs(v) > TWIST_MOST), met[0, 0], met[0, 1], met[0, 2]))
+    head = [pt(p[2], 'head') for p in posed]
+    near = min((float(np.linalg.norm(tips[i] - head[i] - np.array([0, 4.0, 0]))), i) for i in range(count))
+    print('the tip is never nearer the middle of the head than %.1f (frame %d)' % near)
     for t, _ in keys:
         f = int(round(t * FPS))
         m = posed[f][2]
