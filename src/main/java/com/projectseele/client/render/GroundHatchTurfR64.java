@@ -8,7 +8,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.NervSiloDoorEntity;
 import com.projectseele.entity.SiloHatchMechanism;
-import com.projectseele.registry.ModBlocks;
 import com.projectseele.world.NervSiloHatchGeometryR52;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BiomeColors;
@@ -58,7 +57,7 @@ public final class GroundHatchTurfR64
         Level level;SiloHatchMechanism.Spec spec;Vec3 at;float yaw;long built;
         Layout layout;float[][] leaves;
         /** The top of the hatch's layer of cells, in its own frame: where the cover blocks' tops are. */
-        double ground;BlockPos cell;
+        double ground;
     }
 
     private static final Map<SiloHatchMechanism.Spec, Layout> LAYOUTS = new HashMap<>();
@@ -74,16 +73,20 @@ public final class GroundHatchTurfR64
         COVERS.clear();
     }
 
-    /** Whether the hatch's cover blocks are in place: then they are the ground, and its leaves lie inside them. */
-    static boolean covered(NervSiloDoorEntity door, SiloHatchMechanism.Spec spec)
+    /**
+     * Whether the hatch's cover blocks are in place: then they are the ground, and its leaves lie inside them.
+     * The gate keeps the cover exactly while the door is fully closed. The door's own progress says so at any
+     * distance; the blocks themselves are not there to ask on a client that sees the door from beyond its chunks.
+     */
+    static boolean covered(float open)
     {
-        return door.level().getBlockState(cover(door, spec).cell).is(ModBlocks.NERV_GROUND_HATCH.get());
+        return open <= 0F;
     }
 
     static void draw(PoseStack poses, MultiBufferSource buffers, NervSiloDoorEntity door,
             SiloHatchMechanism.Spec spec, float open, int light)
     {
-        if (buffers instanceof OutlineBufferSource || covered(door, spec)) return;
+        if (buffers instanceof OutlineBufferSource || covered(open)) return;
         ResourceLocation texture = texture();
         if (texture == null) return;
         Cover cover = cover(door, spec);
@@ -121,9 +124,7 @@ public final class GroundHatchTurfR64
         cover.level = level;cover.spec = spec;cover.at = door.position();cover.yaw = door.getYRot();cover.built = now;
         cover.layout = LAYOUTS.computeIfAbsent(spec, key -> layout(door.declaredGeometryR52()));
         var frame = door.actualFrameR52();
-        int layer = (int)Math.floor(cover.at.y + cover.layout.leafTop() - .5);
-        cover.cell = BlockPos.containing(cover.at.x, layer, cover.at.z);
-        cover.ground = layer + 1 - cover.at.y;
+        cover.ground = Math.floor(cover.at.y + cover.layout.leafTop() - .5) + 1 - cover.at.y;
         // Texture coordinates stay small numbers wherever the hatch stands.
         double originX = Math.floor(cover.at.x / BLOCKS) * BLOCKS, originZ = Math.floor(cover.at.z / BLOCKS) * BLOCKS;
         cover.leaves = new float[cover.layout.leaves().size()][];
