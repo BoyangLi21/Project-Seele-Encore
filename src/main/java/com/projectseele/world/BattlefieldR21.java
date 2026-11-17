@@ -68,6 +68,14 @@ public final class BattlefieldR21
         {
             var city=Tokyo3RetractionSavedData.get(level).get(origin).orElse(null);
             if(s.hidden||city==null||city.depth()!=ThirdTokyoSurfaceBuilder.maximumRetractionDepth(origin)||city.targetDepth()!=city.depth()||city.cursor()!=0||city.voxelCursor()!=0)return;
+            // The rigid city keeps its own state: a raise asked for right after a restore waits there (queued) for a
+            // few ticks or more, while the record above still says the city rests lowered. Covering then hid the
+            // fixtures again before the city rose without them (R64).
+            if(CityCreateDistrictR45.owns(level,origin))
+            {
+                var status=CityCreateDistrictR45.status(level,origin);
+                if(status==null||ArmamentTowerLogicR64.cityMode(status.phase(),status.depth(),status.maximumDepth())!=ArmamentTowerLogicR64.LOWERED)return;
+            }
             // A player standing on a pavilion roof must first reach street level.
             if(!level.getEntitiesOfClass(Player.class,p.bounds,q->!q.isSpectator()&&q.getY()>82).isEmpty())return;
             s.job="cover";s.cursor=0;s.conflicts=0;s.setDirty();
