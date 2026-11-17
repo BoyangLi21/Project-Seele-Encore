@@ -238,6 +238,10 @@ public final class EvaHud
         int cLen = 34;
         int m = 6;
         int frame = 0xB0FF7A00;
+        // R64: the Unit's name and its reactor stood in the upper left corner, under the minimap. They stand at the
+        // top in the middle now, and the launch and emergency lines that were there stand under them.
+        boolean centred = com.projectseele.client.cockpit.PilotCockpitR64.ON;
+        int ux = centred ? width / 2 - 50 : m + 6, uy = centred ? 30 : 0;
         guiGraphics.fill(m, m, m + cLen, m + 2, frame);
         guiGraphics.fill(m, m, m + 2, m + cLen, frame);
         guiGraphics.fill(width - m - cLen, m, width - m, m + 2, frame);
@@ -265,7 +269,7 @@ public final class EvaHud
         Component role = eva instanceof com.projectseele.entity.EvaPrototypeEntity un
                 ? Component.literal(com.projectseele.entity.Unit03SourceRigR53.displayName(un.getUNSerial())) : Component.translatable(roleKey);
         guiGraphics.drawString(gui.getFont(), role.copy().withStyle(ChatFormatting.DARK_GRAY),
-                m + 6, m + 6, 0xFFB8A48D);
+                ux, m + 6, 0xFFB8A48D);
 
         int powerTicks = eva.getPowerTicks();
         int powerSeconds = Math.max(0, powerTicks / 20);
@@ -286,12 +290,12 @@ public final class EvaHud
                         .withStyle(powerSeconds <= 60
                                 ? ChatFormatting.RED : ChatFormatting.GOLD);
         guiGraphics.drawString(gui.getFont(), powerStatus,
-                m + 6, m + 18, 0xFFFFFFFF);
+                ux, m + 18, 0xFFFFFFFF);
         float powerFraction = Mth.clamp(powerTicks
                 / (float) eva.getPowerCapacityTicks(), 0.0F, 1.0F);
-        guiGraphics.fill(m + 6, m + 29, m + 106, m + 33, 0xA0202020);
-        guiGraphics.fill(m + 6, m + 29,
-                m + 6 + Math.round(100.0F * powerFraction), m + 33,
+        guiGraphics.fill(ux, m + 29, ux + 100, m + 33, 0xA0202020);
+        guiGraphics.fill(ux, m + 29,
+                ux + Math.round(100.0F * powerFraction), m + 33,
                 eva.isExperimentalUnit()||eva.isUmbilicalConnected() ? 0xFF43E874
                         : powerSeconds <= 60 ? 0xFFE03535 : 0xFFE89A22);
 
@@ -311,14 +315,14 @@ public final class EvaHud
             };
             guiGraphics.drawCenteredString(gui.getFont(),
                     Component.translatable(launchKey).withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
-                    width / 2, m + 30, 0xFFFF3030);
+                    width / 2, m + 30 + uy, 0xFFFF3030);
             if (eva.getLaunchPhase() == EvaUnit01Entity.LAUNCH_LOCKED)
             {
                 guiGraphics.drawCenteredString(gui.getFont(),
                         Component.translatable("hud.projectseele.self_launch_hint",
                                         Keybinds.SELF_LAUNCH.getTranslatedKeyMessage())
                                 .withStyle(ChatFormatting.GOLD),
-                        width / 2, m + 42, NERV_ORANGE);
+                        width / 2, m + 42 + uy, NERV_ORANGE);
             }
         }
 
@@ -343,7 +347,7 @@ public final class EvaHud
                 guiGraphics.drawCenteredString(gui.getFont(),
                         Component.translatable("hud.projectseele.emergency")
                                 .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD),
-                        width / 2, m + 18, 0xFFFF2020);
+                        width / 2, m + 18 + uy, 0xFFFF2020);
             }
         }
 
