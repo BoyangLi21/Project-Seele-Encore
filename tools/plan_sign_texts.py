@@ -36,6 +36,14 @@ def in_nerv(x, y, z):
 
 
 def street_sign(lines, x, z):
+    out = _street_sign(lines, x, z)
+    # a single name sits on the second line, near the middle of the board (owner's choice)
+    if out[0] and not any(out[1:]):
+        out = ['', out[0], '', '']
+    return out
+
+
+def _street_sign(lines, x, z):
     lines = [' / '.join(p for p in l.split(' / ') if not re.match(R.DROP_PATTERN, p)) for l in lines]
     kept = [l for l in lines if l and l not in R.DROP_LINES and not NUMBER.match(l)]
     head = lines[0] if lines else ''
