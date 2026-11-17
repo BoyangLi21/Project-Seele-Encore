@@ -623,6 +623,7 @@ public final class EvaConnectedActionReview
         if(ARMS!=null){armsR63(mc);positionCamera(mc,eva);return;}
         if(EVADE){evadeR63(mc,eva);positionCamera(mc,eva);return;}
         if(COMBAT_R64){combatR64(mc,eva);positionCamera(mc,eva);return;}
+        if(KNIFE_R64){knifeR64(mc,eva);positionCamera(mc,eva);return;}
         if(IMPACT_R64){impactR64(mc,eva);positionCamera(mc,eva);return;}
         if(BEAM_R64){beamR64(mc,eva);positionCamera(mc,eva);return;}
         if(HITS){hitsR63(mc,eva);positionCamera(mc,eva);return;}
@@ -1333,6 +1334,29 @@ public final class EvaConnectedActionReview
                     String.format(java.util.Locale.ROOT,"%.2f",eva.getX()),String.format(java.util.Locale.ROOT,"%.2f",eva.getZ()),
                     String.format(java.util.Locale.ROOT,"%.1f",eva.getYRot()));
         }
+    }
+
+    /**
+     * -Dprojectseele.tourKnifeR64=true (tourEnd=600): the knife's presses on a still Sachiel with its field down,
+     * the same for any jar, to be read with -Dprojectseele.combatDiagR64=true. A light press (60); two light
+     * presses ten ticks apart (150, 160); two light presses and a heavy one (260, 270, 282); a heavy press (370);
+     * two heavy presses 32 ticks apart (470, 502). A fresh target before each.
+     */
+    private static final boolean KNIFE_R64=Boolean.getBoolean("projectseele.tourKnifeR64");
+    private static void knifeR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        if(at(6))mc.player.connection.sendCommand(ARM+"knife");
+        if(at(20)||at(120)||at(230)||at(340)||at(440))dummyR64(mc,eva,20,0);
+        if(at(60))lightR64();
+        if(at(150)||at(160))lightR64();
+        if(at(260)||at(270))lightR64();
+        if(at(282))heavyR64();
+        if(at(370))heavyR64();
+        if(at(470)||at(502))heavyR64();
+        if(at(TOUR_END-14))removeTargetR63(mc,"sachiel");
+        if(at(TOUR_END-10))mc.player.connection.sendCommand(ARM+"fists");
     }
 
     /**
