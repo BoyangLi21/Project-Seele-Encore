@@ -48,6 +48,8 @@ public final class EvaHud
         // The first frames are near-white; the quadratic fade leaves a warm
         // retinal afterimage instead of a hard on/off rectangle.
         int colour = (alpha << 24) | 0x00FFF1CE;
+        // R64: under the cannon's sight the overexposure is what the sight shows, not the plug's wall.
+        if (com.projectseele.client.cockpit.PlugCannonSightR64.glass(graphics, width, height, colour)) return;
         graphics.fill(0, 0, width, height, colour);
     };
 
@@ -435,6 +437,11 @@ public final class EvaHud
         if (ClientForgeEvents.isRifleSightActive(eva))
         {
             renderRifleSight(guiGraphics, gui.getFont(), player, eva, width, height);
+            return;
+        }
+        // R64: in the plug the cannon is aimed through its own sight (PlugCannonSightR64).
+        if (com.projectseele.client.cockpit.PlugCannonSightR64.sight(gui.getFont(), guiGraphics, player, eva, partialTick, width, height))
+        {
             return;
         }
         if (!ClientForgeEvents.isCannonScopeActive(eva))

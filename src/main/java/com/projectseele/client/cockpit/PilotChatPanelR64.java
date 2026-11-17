@@ -156,12 +156,20 @@ public final class PilotChatPanelR64
         int side = Math.min(132, width / 2 - margin * 2), below = Math.max(top + 46, height * 2 / 5 - 20);
         int room = width - margin - ((width + 104) / 2 + 6), line = Math.max(26, height / 5);
         int x, y, w, most;
-        if (eva != null && eva.isExperimentalUnit())
+        int[] sight = PlugCannonSightR64.down() > PlugCannonSightR64.SETTLING ? PlugCannonSightR64.window(width, height) : null;
+        if (sight != null && width - margin - 104 - 6 - (sight[0] + (sight[2] - sight[0]) / 20 + 6) >= 90)
+        {
+            // Under the cannon's sight the wall's windows are behind its shell: what is said stands on the shell
+            // above the picture, between the sight's two arms and left of the countdown.
+            x = sight[0] + (sight[2] - sight[0]) / 20 + 6; w = Math.min(190, width - margin - 104 - 6 - x); y = top;
+            most = Mth.clamp((sight[1] - top - 15) / 10, 1, ROWS - 2);
+        }
+        else if (eva != null && eva.isExperimentalUnit())
         {
             // A UN unit writes its own readouts in the corner: under them (and under the sequence's line).
             w = Mth.clamp(width / 3, 96, 172); x = width - margin - w; y = sequence ? line + 30 : top + 46; most = ROWS - 1;
         }
-        else if (room < 110 || eva != null && ClientForgeEvents.isCannonScopeActive(eva))
+        else if (room < 110 || eva != null && (ClientForgeEvents.isCannonScopeActive(eva) || PlugCannonSightR64.down() > 0))
         {
             // No room beside the countdown in a narrow window, and the cannon's scope moves the countdown into
             // the corner: under the weapon's window.

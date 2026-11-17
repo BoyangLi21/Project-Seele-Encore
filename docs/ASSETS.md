@@ -39,8 +39,15 @@ R10 负责人授权下载的九份 Battle Orchestra 模型与纹理仅放在 `ex
 | `sounds/ramiel_hum.ogg` | 拉米尔环境音 | 同上（110/164.6Hz 拍频） |
 | `sounds/ropeway_ride.ogg` | 坐箱根缆车时的车厢声（16 秒循环） | 原创：`tools/build_ropeway_audio_r63.py` 数学合成（电机嗡鸣、钢缆低频、窗外风声、过支架滑轮的咔哒声），无采样 |
 | `sounds/rifle_fire.ogg` | EVA 帕雷特步枪 | 原创合成：机械枪机、爆音噪声与低频尾响，不含影视或现实枪械采样 |
+| `sounds/cannon_visor.ogg` | 阳电子炮瞄准器落下、升起（只在驾驶员耳边） | 原创：`tools/build_cannon_sight_audio_r64.py` 固定种子数学合成（小伺服电机的升速和齿轮噪声，末尾一声卡锁），无采样 |
+| `sounds/cannon_sight_tick.ogg` | 瞄准标记收拢时的滴答，越接近重合越快越高 | 原创：`tools/build_cannon_sight_audio_r64.py` 固定种子数学合成（1320 Hz 短音加一点起音噪声），无采样 |
+| `sounds/cannon_sight_lock.ogg` | 三个瞄准标记重合的确认音 | 原创：`tools/build_cannon_sight_audio_r64.py` 固定种子数学合成（1568 Hz 和 2093 Hz 的四度双音，带慢颤），无采样、无原作旋律 |
+| `sounds/cannon_vent.ogg` | 开火后炮身冷却排气 | 原创：`tools/build_cannon_sight_audio_r64.py` 固定种子数学合成（阀门低频一响，随后是音高和响度一起下降的高频噪声），无采样 |
+| `sounds/cannon_fuse.ogg` | 熔断器弹出、推入 | 原创：`tools/build_cannon_sight_audio_r64.py` 固定种子数学合成（相隔 0.09 秒的两下低频撞击，各带一小段金属泛音），无采样 |
 
 全部由脚本以固定随机种子生成，可复现；无采样、无原作旋律。许可随仓库 MIT。`tools/gen_sounds.ps1` 已在 c0ffbb9e 清理时移出工作树，取用见 git 历史；上表其余未标 R61 的文件仍由它生成。
+
+R64（2026-11-18）阳电子炮瞄准器的五个提示音（上表 `cannon_*`）：`tools/build_cannon_sight_audio_r64.py` 只用正弦、带通噪声和包络，以固定种子生成，不读取任何录音，不使用原作的音效和旋律。响度按测量调过（各段电平、频谱重心），**听感尚未验收**。
 
 R61（2026-11-09）拉米尔攻击音重做：`tools/build_ramiel_audio_r61.py` 以固定种子生成全部候选（只用加法合成的带限正弦和 FFT 整形噪声），不读取任何录音或官方音频。旧文件和全部候选保留在本机，供负责人试听后选择，默认值按测量（响度对齐现有战斗音、无硬切、窄带尖峰和粗糙度）选出，**听感尚未验收**。同轮把此前无声的 EVA 动作（闪避、翻滚、攀爬、拔收刀、抓取、冲刺起停、侧踢与持刀的挥空、匍匐、阳电子炮蓄力）和部分使徒招式接上了已有音效事件，没有新增音频文件。
 

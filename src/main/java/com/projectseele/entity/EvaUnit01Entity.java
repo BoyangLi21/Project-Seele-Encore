@@ -3125,6 +3125,27 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         return !this.level().isClientSide||this.rowViewR64==null||!EvaCombatModelR64.flowFade(this)||!this.rowViewR64.playing()?null
                 :this.rowViewR64.fade(FirstBattleSignals.clientFrameTime()/5.0e7D);
     }
+    private net.minecraft.nbt.CompoundTag rowToldTagR64;
+    private EvaRowClockR64.Clock rowToldR64;
+    /**
+     * Either side, STAND: the clock of the row in hand where this clip is the row's and the row has a share of the
+     * pose (it comes out of the stand and goes back into it), or null.
+     */
+    public EvaRowClockR64.Clock rowStandR64(String clip)
+    {
+        if(!EvaCombatModelR64.flowStand(this)||!EvaCombatModelR64.flowClock(this))return null;
+        var tag=EvaRowClockR64.tag(this);
+        if(tag!=this.rowToldTagR64){this.rowToldTagR64=tag;this.rowToldR64=EvaRowClockR64.read(tag);}
+        return this.rowToldR64!=null&&this.rowToldR64.clip().equals(clip)?this.rowToldR64:null;
+    }
+    /** Client, STAND: a row that was left before it had played out is giving its place to what follows it, or null. */
+    public EvaRowClockR64.Fade rowLeaveR64()
+    {
+        if(!this.level().isClientSide||this.rowViewR64==null||!EvaCombatModelR64.flowStand(this)||!EvaCombatModelR64.flowClock(this))return null;
+        double time=FirstBattleSignals.clientFrameTime()/5.0e7D;
+        this.rowViewR64.frame(this,time);
+        return this.rowViewR64.leave(time);
+    }
     /** Client: the blow in hand began out of another (it is brought in by the fade, not from the pose the server captured). */
     public boolean rowBeganOutOfBlowR64()
     {return this.level().isClientSide&&this.rowViewR64!=null&&EvaCombatModelR64.flowFade(this)&&this.rowViewR64.playing()&&this.rowViewR64.outOfAnother();}
@@ -4134,7 +4155,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
     /** The swing is heard as the blow goes out. */
     void rowSwingR64(EvaMoveTableR64.Row row)
-    {EvaMovementSounds.swing(this,row.kind()==EvaMoveTableR64.SLAM?2.8F:row.kind()==EvaMoveTableR64.KICK?2.4F:2.1F);}
+    {
+        EvaMovementSounds.swing(this,row.kind()==EvaMoveTableR64.SLAM?2.8F:row.kind()==EvaMoveTableR64.KICK?2.4F:2.1F);
+        // R64 (flow, "kick"): where the foot is as the live ticks begin, so that the first of them has a sweep.
+        if(row.kind()==EvaMoveTableR64.KICK&&EvaCombatModelR64.flowKick(this)&&EvaGameplayMotionR32.kickReady(this))
+            this.kickPreviousFootR60=this.kickFootR64();
+    }
     /**
      * One live tick of a row: the limb's sweep since the last tick against every body in reach, quietly when it
      * meets none. The kick tests the whole leg against Angels (its longer reach must not catch a friendly Unit
@@ -4148,9 +4174,20 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             Vec3[] leg=EvaGameplayMotionR32.kickingLeg(this,EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.side(this,"kick"):"l",1);
             Vec3 hip=leg[0],foot=this.kickFootR64(),previous=this.kickPreviousFootR60==null?foot:this.kickPreviousFootR60;
             this.kickPreviousFootR60=foot;
+            // R64 (flow, "kick"): the foot's sweep first. It says where in the tick the sole met the body, and the
+            // blow is held there and pushed on from there. The leg's length, tried first, landed at the tick's
+            // end: against a body twenty blocks off the leg was out at its full thirty through it, and stood so
+            // for the hold (measured: 3.5 ticks all but still at its length, the "踢过去卡一下" again).
+            if(EvaCombatModelR64.flowKick(this))
+            {
+                this.combatR64().sweeps(true);
+                try{if(this.strikeZoneR32(pilot,new AABB(previous,foot).inflate(radius),damage,row.knock(),foot,previous,radius,true))return true;}
+                finally{this.combatR64().sweeps(false);}
+            }
             this.strikeAngelsOnlyR60=true;
             try{if(this.strikeZoneR32(pilot,new AABB(hip,foot).inflate(radius),damage,row.knock(),foot,hip,radius,true))return true;}
             finally{this.strikeAngelsOnlyR60=false;}
+            if(EvaCombatModelR64.flowKick(this))return false;
             this.combatR64().sweeps(true);
             try{return this.strikeZoneR32(pilot,new AABB(previous,foot).inflate(radius),damage,row.knock(),foot,previous,radius,true);}
             finally{this.combatR64().sweeps(false);}

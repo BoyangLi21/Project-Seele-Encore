@@ -228,6 +228,19 @@ public final class TvYashimaDirectorR50
         state.serviceTicksR53=0;state.serviceLastTickR53=level.getGameTime();
         state.coolantPressed=pressed(level,plan.coolant(),false);state.reloadPressed=pressed(level,plan.reload(),false);state.setDirty();
     }
+    /**
+     * R64: the power that reaches the gun, read for the shooter's sight (CannonSightSyncR64): how many of the three
+     * grid switches are closed, whether the sockets are all there (1 or 0), whether the Unit's cable is on one of
+     * them (1 or 0). Null where the position has no fixtures. Nothing is decided here.
+     */
+    public static int[] powerR64(ServerLevel level,EvaUnit01Entity eva)
+    {
+        var plan=controls(level);if(plan==null)return null;
+        int grid=(int)plan.grid().stream().filter(p->pressed(level,p,true)).count();
+        boolean pylons=plan.pylons().stream().allMatch(p->level.hasChunkAt(p)&&level.getBlockEntity(p) instanceof UmbilicalPylonBlockEntity);
+        boolean cable=eva.isUmbilicalConnected()&&eva.getUmbilicalAnchor()!=null&&plan.pylons().contains(eva.getUmbilicalAnchor());
+        return new int[]{grid,pylons?1:0,cable?1:0};
+    }
     /** The actual fixed emplacement requires both original units and their real equipment. */
     private static String firstFireLockBlocker(ServerLevel level,TvCampaignSavedData data,TvEncounterSitesR45.Site site,EvaUnit01Entity shooter)
     {

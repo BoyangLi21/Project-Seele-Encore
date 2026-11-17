@@ -391,7 +391,11 @@ public final class EvaCombatSupportR33
         }
         if(!t.isEmpty()&&!strike(e))
         {
-            if(!t.contains("release")&&Math.abs(Mth.wrapDegrees(e.getYRot()-t.getFloat("yaw")))>35)
+            // R64 (flow, "stand"): no stance is held on the feet a strike left planted. They are brought back under
+            // the body, one after the other, as soon as no blow is in hand. (Measured: after three punches the
+            // Unit stood on with its right foot 16.5 blocks behind it and its hips four blocks low until it was
+            // next moved, seventy ticks and more; under the guard's crouch that had passed for a stance.)
+            if(!t.contains("release")&&(Math.abs(Mth.wrapDegrees(e.getYRot()-t.getFloat("yaw")))>35||EvaCombatModelR64.flowStand(e)))
             {t=t.copy();t.putLong("release",e.level().getGameTime());e.getEntityData().set(CONTACTS,t);}
             if(t.contains("release")&&e.level().getGameTime()-t.getLong("release")>=8)e.getEntityData().set(CONTACTS,new CompoundTag());
         }

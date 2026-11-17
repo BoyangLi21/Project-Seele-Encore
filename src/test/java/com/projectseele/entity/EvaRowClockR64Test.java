@@ -74,7 +74,9 @@ public final class EvaRowClockR64Test
                 play(clock(jab,.225F,false,-1,0,0,-1,0),fps,seed,jab.startup()+1,.6,jab.stop(),false);
             }
         fades();
-        System.out.println("EvaRowClockR64Test: "+rows+" rows' curves, a view at 24 to 144 frames a second with and without a hit, and a blow out of another");
+        leaves();
+        kick();
+        System.out.println("EvaRowClockR64Test: "+rows+" rows' curves, a view at 24 to 144 frames a second with and without a hit, a blow out of another, a row left, and the kick's clip against its row");
     }
 
     /**
@@ -187,6 +189,88 @@ public final class EvaRowClockR64Test
         check(view.fade(time)==null,"the jab is let go when the cross has taken its place");
         check(weight>.6F,"the cross had most of the pose before the jab was let go ("+weight+")");
         check(view.frame((Clock)null,time)==-1&&!view.playing(),"no row, nothing drawn");
+    }
+
+    /** STAND: a row's share of the pose, and a row left before it had played out giving its place to what follows. */
+    private static void leaves()
+    {
+        float last=0;
+        for(float phase=0;phase<=.159F;phase+=.004F)
+        {
+            float share=EvaRowClockR64.share(.159F,.318F,phase);
+            check(share>=last&&share<=1,"a blow's share of the pose only grows through its start-up");last=share;
+        }
+        check(EvaRowClockR64.share(.159F,.318F,0)==0,"a blow begins where the Unit stands");
+        for(float phase=.159F;phase<=.318F;phase+=.004F)check(EvaRowClockR64.share(.159F,.318F,phase)==1,"through its live part the pose is the clip's alone");
+        last=1;
+        for(float phase=.318F;phase<=1;phase+=.004F)
+        {
+            float share=EvaRowClockR64.share(.159F,.318F,phase);
+            check(share<=last&&share>=0,"a blow's share of the pose only falls through its recovery");last=share;
+        }
+        check(EvaRowClockR64.share(.159F,.318F,1)==0,"a blow ends where the Unit stands");
+        check(EvaRowClockR64.share(0,.318F,0)==1&&EvaRowClockR64.share(.159F,1,1)==1,"a row without a start-up or a recovery on its clip keeps the whole pose there");
+
+        Row jab=EvaMoveTableR64.get("jab");
+        Clock row=clock(jab,.225F,true,-1,0,0,-1,0);
+        var view=new View();
+        double time=80;
+        for(;time<89;time+=.33)view.frame(row,time);
+        check(view.leave(time)==null,"a row in hand has not been left");
+        double from=time;float weight=0,phase=-1;
+        view.frame((Clock)null,time);
+        for(;time<from+EvaRowClockR64.LEAVE-.34;time+=.33)
+        {
+            view.frame((Clock)null,time);
+            var leave=view.leave(time);
+            check(leave!=null&&leave.clip().equals("jab"),"the jab left at its ninth tick is still in the pose "+(time-from)+" ticks on");
+            check(leave.weight()>=weight&&leave.weight()<=1,"what follows only gains of the pose");
+            check(leave.phase()>=phase&&leave.phase()<=1,"the row left runs on along its clip");
+            check(leave.share()>=0&&leave.share()<1,"it was on its way back into the stand");
+            weight=leave.weight();phase=leave.phase();
+        }
+        check(weight>.8F,"what follows had most of the pose before the row was let go ("+weight+")");
+        check(view.leave(from+EvaRowClockR64.LEAVE+.01)==null,"the row is let go after its ticks");
+
+        var whole=new View();
+        for(time=120;time<120+row.total()+2;time+=.33)whole.frame(row,time);
+        whole.frame((Clock)null,time);
+        check(whole.leave(time)==null,"a row that played out leaves nothing behind");
+    }
+
+    /**
+     * KICK: the kick's clip (tools/finale/kick.py) is laid on its frames for the row that plays it. A row whose
+     * ticks or live part have been changed plays it at other paces than it was written with: write it again.
+     */
+    private static void kick()
+    {
+        Row row=EvaMoveTableR64.get("kick");
+        try(var stream=EvaRowClockR64Test.class.getResourceAsStream("/assets/projectseele/motion/eva_kick_r64.json"))
+        {
+            check(stream!=null,"the kick's clip comes with the mod");
+            var doc=com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            var made=doc.getAsJsonObject("row");
+            check(made.get("startup").getAsInt()==row.startup()&&made.get("live").getAsInt()==row.active()&&made.get("recovery").getAsInt()==row.recovery()
+                    &&Math.abs(made.get("lead").getAsFloat()-row.lead())<1.0e-4F&&Math.abs(made.get("tail").getAsFloat()-row.tail())<1.0e-4F,
+                    "the kick's clip was written for the kick's row as the table has it (run tools/finale/kick.py again)");
+            var clip=doc.getAsJsonObject("clips").getAsJsonObject("r32_kick_r64");
+            float contact=clip.get("contact_phase").getAsFloat();
+            check(contact-row.lead()>.02F&&contact+row.tail()<.98F,"the row's live part lies inside the kick's clip");
+            var frames=clip.getAsJsonArray("frames");int bones=clip.getAsJsonArray("bones").size(),air=0;
+            check(frames.size()>=40&&clip.getAsJsonArray("trajectory_m").size()==frames.size(),"the kick has its frames and a place for each");
+            for(int i=0;i<frames.size();i++)
+            {
+                var frame=frames.get(i).getAsJsonObject();var feet=frame.getAsJsonArray("foot_contact");
+                check(frame.getAsJsonArray("rotation_delta_wxyz").size()==bones,"every frame turns every bone the clip names");
+                check(feet.get(1).getAsBoolean(),"the standing foot is on the ground at every frame");
+                if(!feet.get(0).getAsBoolean())air++;
+                else check(air==0||i>frames.size()/2,"the kicking foot leaves the ground once");
+            }
+            check(frames.get(0).getAsJsonObject().getAsJsonArray("foot_contact").get(0).getAsBoolean()
+                    &&frames.get(frames.size()-1).getAsJsonObject().getAsJsonArray("foot_contact").get(0).getAsBoolean()&&air>frames.size()/3,
+                    "the kick begins and ends on both feet, and is off one of them for a good part between");
+        }
+        catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}
     }
 
     private EvaRowClockR64Test(){}

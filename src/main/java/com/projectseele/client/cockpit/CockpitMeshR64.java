@@ -37,6 +37,15 @@ public final class CockpitMeshR64
         public boolean parts = true;
         /** How far the cockpit has sunk out of the view (blocks): behind a sight the hands are not in the picture. */
         public float drop;
+        /**
+         * The positron cannon's sight: how far it has swung down before the pilot's face (0 up out of the view, 1
+         * down), the half width and half height of its window as tangents of the angle from the view's axis, and
+         * the kick a shot gives it (radians).
+         */
+        public float visor, visorWide, visorHigh, visorJolt;
+        /** The cannon's charge, 0..1, and whether the shot is on: the sight's housing shows both as a row of lamps. */
+        public float visorCharge;
+        public boolean visorLock;
     }
 
     /** Opaque and see-through vertices, seven floats each (x y z r g b a), four to a quad. */
@@ -77,6 +86,7 @@ public final class CockpitMeshR64
                 leg(u, side);
             }
         }
+        if (s.visor > 0) visor(s);
         if (s.lclAlpha > 0 && s.lclLevel > -1.2F)
         {
             // The liquid is level in the plug whether or not the hands have sunk out of the picture.
@@ -104,6 +114,69 @@ public final class CockpitMeshR64
             box(side * -.02F, .062F, -.05F, .05F, .006F, .30F, METAL, 1);
             box(side * -.02F, .070F, -.33F, .035F, .003F, .010F, AMBER, 3);
             box(side * .05F, .068F, -.02F, .012F, .004F, .26F, TRIM[u], 1);
+        }
+    }
+
+    private static final float[] SHELL = {.27F, .29F, .32F}, BEZEL = {.34F, .36F, .40F}, LENS = {.10F, .34F, .30F}, READY = {.49F, .94F, .54F};
+
+    /**
+     * The positron cannon's sight: a housing on two arms hinged above the pilot's head, which swings down before
+     * the eyes. It is fixed to the pilot's head, not to the seat: it neither sways nor tips with the view. Nearest
+     * the eye is the bezel round its window, deep enough for its inner faces to be seen; behind the yokes (so that
+     * the hands stay in the picture, on the trigger) is the shell that shuts out everything but the window.
+     */
+    private void visor(State s)
+    {
+        float t = s.visor * s.visor * (3 - 2 * s.visor);
+        // Up, it stands a little over a right angle back from its place; it settles with the least over-travel.
+        float swing = (1 - t) * 1.9F - (s.visor > .82F ? (float) Math.sin((s.visor - .82F) / .18F * Math.PI) * .018F : 0) + s.visorJolt;
+        float hingeY = .62F, hingeZ = .14F, far = .40F, near = .30F, plate = 1.25F;
+        float wide = s.visorWide * far, high = s.visorHigh * far, rim = .036F, mid = -(near + far) * .5F - hingeZ, deep = (far - near) * .5F;
+        Matrix4f hinge = new Matrix4f().translate(0, hingeY, hingeZ).rotateX(swing);
+        // The bezel: a deep brow and two deep cheeks round the window, and a slim lip under it (a deep one so near
+        // the eye would hide the pilot's hands). Its far inner edges are the window's edges on the picture.
+        part.set(hinge);
+        float lip = .012F, shallow = .02F, back = -far - hingeZ + shallow;
+        box(0, -hingeY + high + rim, mid, wide + 2 * rim, rim, deep, BEZEL, 1);
+        box(0, -hingeY - high - lip, back, wide + 2 * rim, lip, shallow, BEZEL, 1);
+        box(-wide - rim, -hingeY, mid, rim, high, deep, BEZEL, 1);
+        box(wide + rim, -hingeY, mid, rim, high, deep, BEZEL, 1);
+        // On the bezel's face: a strip of light along the brow, a lamp at each lower corner, the lens housings at its sides.
+        float face = mid + deep + .001F;
+        box(0, -hingeY + high + rim, face, wide * .46F, .0035F, .0015F, AMBER, 3);
+        for (int side = -1; side <= 1; side += 2)
+        {
+            box(side * (wide - .02F), -hingeY - high - lip, back + shallow + .001F, .005F, .004F, .0015F, TRIGGER, 3);
+            box(side * (wide + 2 * rim + .028F), -hingeY + high * .25F, mid - .01F, .028F, high * .42F, deep * 1.25F, METAL, 1);
+            box(side * (wide + 2 * rim + .028F), -hingeY + high * .25F, mid + deep * 1.25F - .009F, .017F, high * .30F, .0015F, LENS, 2);
+            box(side * (wide + 2 * rim + .028F), -hingeY - high * .55F, mid, .020F, high * .16F, deep, PALE, 1);
+        }
+        // The lip carries the charge as a row of seven lamps: one more for each seventh, all green when the shot is on.
+        int lamps = Math.round(Math.max(0, Math.min(1, s.visorCharge)) * 7);
+        for (int lamp = 0; lamp < 7; lamp++)
+            box((lamp - 3) * wide * .105F, -hingeY - high - lip, back + shallow + .001F, wide * .036F, .0045F, .0015F,
+                    lamp < lamps ? s.visorLock ? READY : AMBER : DARK, lamp < lamps ? 3 : 1);
+        // The shell behind the hands: four plates that leave the window open.
+        float px = s.visorWide * plate * 1.07F, py = s.visorHigh * plate * 1.09F, pz = -plate - hingeZ;
+        box(0, -hingeY + py + 1.2F, pz, 3.2F, 1.2F, .01F, SHELL, 1);
+        box(0, -hingeY - py - 1.2F, pz, 3.2F, 1.2F, .01F, SHELL, 1);
+        box(-px - 1.4F, -hingeY, pz, 1.4F, py, .01F, SHELL, 1);
+        box(px + 1.4F, -hingeY, pz, 1.4F, py, .01F, SHELL, 1);
+        // Seams and a darker band on the shell, so that it reads as plates and not as a hole in the picture.
+        for (int side = -1; side <= 1; side += 2)
+        {
+            box(side * (px + .62F), -hingeY, pz + .012F, .012F, py + 1.1F, .002F, DARK, 1);
+            box(side * (px + 1.5F), -hingeY + py * .45F, pz + .012F, .86F, .010F, .002F, DARK, 1);
+            box(side * (px + 1.5F), -hingeY - py * .45F, pz + .012F, .86F, .010F, .002F, DARK, 1);
+        }
+        box(0, -hingeY + py + .22F, pz + .012F, px + .5F, .012F, .002F, DARK, 1);
+        box(0, -hingeY - py - .22F, pz + .012F, px + .5F, .012F, .002F, DARK, 1);
+        // The two arms, from the bezel's upper corners to the hinge.
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Vector3f foot = hinge.transformPosition(new Vector3f(side * (wide + rim), -hingeY + high + 2 * rim, mid));
+            Vector3f top = hinge.transformPosition(new Vector3f(side * (wide + rim), 0, 0));
+            limb(foot, top, .020F, .026F, METAL, PALE, .18F);
         }
     }
 
