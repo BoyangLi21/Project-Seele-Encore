@@ -34,12 +34,16 @@ def plan(out, box=None):
     w = World(REGION)
     gs = guards()
     towers = [s['centre'] for s in topology(WORLD).values()]
+    # cells the street-fixture table (battlefield_r21.json) puts back before a raise count as taken: after the first
+    # raise in play those fixtures stand there for good
+    fixtures = {tuple(c[:3]) for c in json.load(open(Path(WORLD) / 'battlefield_r21.json', encoding='utf8'))['cells']
+                if not str(c[3]).endswith(':air')}
     rows, signs, rep = [], [], Counter()
     taken = set()
 
     def free(cells):
         for (x, y, z) in cells:
-            if (x, y, z) in taken or (w.get(x, y, z) or '') != 'minecraft:air':
+            if (x, y, z) in taken or (x, y, z) in fixtures or (w.get(x, y, z) or '') != 'minecraft:air':
                 return False
         try:
             for g in gs:
