@@ -28,8 +28,12 @@ public final class YashimaCannonRendererR52 extends EntityRenderer<YashimaCannon
             poses.pushPose();var f=part.frame();var at=f.translation().subtract(origin);poses.translate(at.x,at.y,at.z);poses.mulPose(new org.joml.Quaternionf(f.qx(),f.qy(),f.qz(),f.qw()));mesh.draw(poses,buffers,light);
             poses.popPose();
         }
+        YashimaCarriageR64.draw(gun,g,spec,aim,partial,poses,buffers,light);
         super.render(gun,yaw,partial,poses,buffers,light);
     }
+    /** The field carriage stands out beyond the gun's own box (its outriggers, its cabinet at the well's edge). */
+    @Override public boolean shouldRender(YashimaCannonEntityR52 gun,net.minecraft.client.renderer.culling.Frustum frustum,double x,double y,double z)
+    {return gun.shouldRender(x,y,z)&&(gun.noCulling||frustum.isVisible(gun.getBoundingBoxForCulling().inflate(16,2,16)));}
     @Override public ResourceLocation getTextureLocation(YashimaCannonEntityR52 gun){return TEXTURE;}
     private static boolean scopedByLocalOperatorR55(YashimaCannonEntityR52 gun)
     {
