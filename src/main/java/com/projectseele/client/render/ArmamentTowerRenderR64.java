@@ -7,6 +7,7 @@ import com.projectseele.entity.EvaScale;
 import com.projectseele.entity.NervArmamentStationEntity;
 import com.projectseele.world.ArmamentTowerLogicR64;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
@@ -84,14 +85,16 @@ final class ArmamentTowerRenderR64
             }
         }
 
+        // The bay has work lights: what stands in it does not go dark in the building's own shade.
+        int bayLight = LightTexture.pack(Math.max(13, LightTexture.block(light)), LightTexture.sky(light));
         poses.pushPose();
         // From here +z is the side the door is on.
         poses.mulPose(Axis.YP.rotationDegrees(facing == 1 ? -90F : facing == 2 ? 180F : facing == 3 ? 90F : 0F));
         if (run == ArmamentTowerLogicR64.LOWERED)
         {
             double base = -ArmamentTowerLogicR64.POD_TRAVEL * (1.0D - lift);
-            pod(poses, buffers, light, base, door, open, lit);
-            if (station.isStocked()) rifle(poses, buffers, light, base + 1.0D);
+            pod(poses, buffers, light, bayLight, base, door, open, lit);
+            if (station.isStocked()) rifle(poses, buffers, bayLight, base + 1.0D);
             roof(poses, buffers, light, base + ArmamentTowerLogicR64.POD_HEIGHT, open, lit, true);
         }
         else
@@ -99,7 +102,7 @@ final class ArmamentTowerRenderR64
             if (doorOut)
             {
                 if (seen == null && open < .999F) slats(poses, buffers, light, door.bottom(), door, open);
-                if (station.isStocked()) rifle(poses, buffers, light, door.bottom());
+                if (station.isStocked()) rifle(poses, buffers, bayLight, door.bottom());
             }
             // On the standing building only what moves is drawn: the locks, and the lamps while they are dark.
             roof(poses, buffers, light, station.towerHeightR64() + 1.0D, hatch, lit, false);
@@ -108,7 +111,7 @@ final class ArmamentTowerRenderR64
     }
 
     /** The pod of the lowered run: floor, armour walls with seams, the door side open below its lintel, roof slab. */
-    private static void pod(PoseStack poses, MultiBufferSource buffers, int light, double base,
+    private static void pod(PoseStack poses, MultiBufferSource buffers, int light, int bayLight, double base,
             ArmamentTowerLogicR64.Door door, float open, boolean lit)
     {
         double edge = OUT + .5D, inner = OUT - .5D;
@@ -141,7 +144,7 @@ final class ArmamentTowerRenderR64
                 block(poses, buffers, light, (across & 1) == 0 ? YELLOW : BLACK, across, base + doorTop, OUT);
         panel(poses, buffers, light, ROOF, -edge, base + WALL_ROWS + 1, -edge, 2 * OUT + 1, 1, 2 * OUT + 1);
         // Behind the bay the pod is closed off, as the building's core closes the bay.
-        panel(poses, buffers, light, ROOF, -inner, base + 1, OUT - 6.5D, 2 * OUT - 1, WALL_ROWS, 1);
+        panel(poses, buffers, bayLight, WALL, -inner, base + 1, OUT - 6.5D, 2 * OUT - 1, WALL_ROWS, 1);
         if (open < .999F) slats(poses, buffers, light, base + door.bottom(), door, open);
     }
 
