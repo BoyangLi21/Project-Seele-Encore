@@ -88,7 +88,9 @@ public final class ClientFxManager
         // The shooter feels the shot: view thrown up and back, field of view punched out.
         var mc = Minecraft.getInstance();
         var eva = mc.player == null ? null : com.projectseele.world.EvaPilotResolver.controlTarget(mc.player);
-        if (eva != null && eva.position().distanceToSqr(packet.x1, packet.y1, packet.z1) < 70 * 70)
+        // R64: the emplaced gun's muzzle is further than that from the Unit lying behind it; its sight knows its own shot.
+        boolean own = com.projectseele.client.cockpit.PlugCannonSightR64.fired(packet);
+        if (eva != null && (own || eva.position().distanceToSqr(packet.x1, packet.y1, packet.z1) < 70 * 70))
             com.projectseele.client.CameraKickR58.kick(-1.6F, .7F, .08F, 7F);
     }
 

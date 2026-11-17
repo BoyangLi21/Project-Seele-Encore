@@ -16,7 +16,8 @@ public final class SeeleNetwork
     // state. Older clients must reject the changed synchronized accessor layout.
     // 78 is the R63r release (R63 plus the R64 audio); main adds synchronized entity
     // data beyond it (planted model, gait keys), so it must not accept an R63r peer.
-    private static final String PROTOCOL_VERSION = "80";
+    // 81 adds the Yashima gunnery told to the shooter's sight (ClientboundCannonServiceR64).
+    private static final String PROTOCOL_VERSION = "81";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),
@@ -182,6 +183,9 @@ public final class SeeleNetwork
         CHANNEL.messageBuilder(ClientboundLaunchFeedbackR54.class,id++,NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(ClientboundLaunchFeedbackR54::encode).decoder(ClientboundLaunchFeedbackR54::new)
                 .consumerMainThread(ClientboundLaunchFeedbackR54::handle).add();
+        CHANNEL.messageBuilder(ClientboundCannonServiceR64.class,id++,NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundCannonServiceR64::encode).decoder(ClientboundCannonServiceR64::new)
+                .consumerMainThread(ClientboundCannonServiceR64::handle).add();
         com.projectseele.world.DeadSeaReadingR45.installBridge((player,challenge)->CHANNEL.send(
                 net.minecraftforge.network.PacketDistributor.PLAYER.with(()->player),new ClientboundDeadSeaReadChallengeR45(
                         challenge.nonce(),challenge.revision(),challenge.pages())));

@@ -49,6 +49,12 @@ public class ModSounds
     public static final RegistryObject<SoundEvent> SURFACE_BULKHEAD_STOP_R48=registerFixed("surface_bulkhead_stop_r48",64);
     public static final RegistryObject<SoundEvent> EVA_COCKPIT_CONFIRM=register("eva_cockpit_confirm");
     public static final RegistryObject<SoundEvent> EVA_COCKPIT_WARNING=register("eva_cockpit_warning");
+    // R64: the positron cannon's sight, heard in the pilot's own ears (tools/build_cannon_sight_audio_r64.py).
+    public static final RegistryObject<SoundEvent> CANNON_VISOR=register("cannon_visor");
+    public static final RegistryObject<SoundEvent> CANNON_SIGHT_TICK=register("cannon_sight_tick");
+    public static final RegistryObject<SoundEvent> CANNON_SIGHT_LOCK=register("cannon_sight_lock");
+    public static final RegistryObject<SoundEvent> CANNON_VENT=register("cannon_vent");
+    public static final RegistryObject<SoundEvent> CANNON_FUSE=register("cannon_fuse");
     public static final RegistryObject<SoundEvent> EVA_DRIVE_LOOP=register("eva_drive_loop");
     public static final RegistryObject<SoundEvent> EVA_RIFLE_FIRE=register("eva_rifle_fire");
     public static final RegistryObject<SoundEvent> SHAMSHEL_WHIP_CHARGE=register("shamshel_whip_charge");

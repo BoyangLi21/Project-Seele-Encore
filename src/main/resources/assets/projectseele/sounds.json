@@ -1023,5 +1023,55 @@
         "attenuation_distance": 128
       }
     ]
+  },
+  "cannon_visor": {
+    "subtitle": "subtitles.projectseele.cannon_visor",
+    "sounds": [
+      {
+        "name": "projectseele:cannon_visor",
+        "attenuation_distance": 16,
+        "stream": false
+      }
+    ]
+  },
+  "cannon_sight_tick": {
+    "subtitle": "subtitles.projectseele.cannon_sight_tick",
+    "sounds": [
+      {
+        "name": "projectseele:cannon_sight_tick",
+        "attenuation_distance": 16,
+        "stream": false
+      }
+    ]
+  },
+  "cannon_sight_lock": {
+    "subtitle": "subtitles.projectseele.cannon_sight_lock",
+    "sounds": [
+      {
+        "name": "projectseele:cannon_sight_lock",
+        "attenuation_distance": 16,
+        "stream": false
+      }
+    ]
+  },
+  "cannon_vent": {
+    "subtitle": "subtitles.projectseele.cannon_vent",
+    "sounds": [
+      {
+        "name": "projectseele:cannon_vent",
+        "attenuation_distance": 16,
+        "stream": false
+      }
+    ]
+  },
+  "cannon_fuse": {
+    "subtitle": "subtitles.projectseele.cannon_fuse",
+    "sounds": [
+      {
+        "name": "projectseele:cannon_fuse",
+        "attenuation_distance": 16,
+        "stream": false
+      }
+    ]
   }
 }

@@ -928,7 +928,12 @@ public final class ClientForgeEvents
         if (event.getPlayer() instanceof LocalPlayer player)
         {
             EvaUnit01Entity eva = ridden(player);
-            if (isCannonScopeActive(eva))
+            if (eva != null && eva.getWeapon() == EvaUnit01Entity.WEAPON_CANNON && com.projectseele.client.cockpit.PlugCannonSightR64.down() > 0)
+            {
+                // R64: the sight's own lens as it comes down (.35 of the field), narrowing to .16 with the charge.
+                event.setNewFovModifier(com.projectseele.client.cockpit.PlugCannonSightR64.field(eva));
+            }
+            else if (isCannonScopeActive(eva) && !com.projectseele.client.cockpit.PlugCannonSightR64.enabled())
             {
                 event.setNewFovModifier(Mth.lerp(eva.chargeProgress(), 1.0F, 0.16F));
             }

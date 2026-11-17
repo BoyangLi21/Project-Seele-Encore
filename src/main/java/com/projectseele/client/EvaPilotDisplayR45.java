@@ -40,7 +40,8 @@ public final class EvaPilotDisplayR45
         // Power: the five minutes the original counts down once the cable is gone, to the hundredth of a second.
         // At the top of the view, in the middle: the corners are the minimap's and other mods'.
         // The cannon's scope writes its range at the top of the view, in the middle: the countdown stands aside for it.
-        int px = ClientForgeEvents.isCannonScopeActive(eva) ? width - margin - 104 : (width - 104) / 2, py = Math.max(4, margin - 4);
+        float sight = com.projectseele.client.cockpit.PlugCannonSightR64.down();
+        int px = ClientForgeEvents.isCannonScopeActive(eva) || sight > 0 ? width - margin - 104 : (width - 104) / 2, py = Math.max(4, margin - 4);
         window(g, px, py, 104, 40, powerColour);
         line(g, font, stopped ? "电源停止  OFFLINE" : external ? "外部电源  EXTERNAL" : "内部电源  INTERNAL", px + 5, py + 4, 96, powerColour);
         if (stopped) figures(g, px + 6, py + 15, -1, -1, -1, RED);
@@ -61,6 +62,12 @@ public final class EvaPilotDisplayR45
 
         // The unit: which one, how well the pilot is synchronised with it, what is left of the body and the field.
         int ly = Math.max(py + 46, height * 2 / 5 - 20);
+        // R64: with the cannon's sight down over the pilot's face the wall's side windows are behind its shell.
+        if (sight > com.projectseele.client.cockpit.PlugCannonSightR64.SETTLING)
+        {
+            alerts(g, font, eva, partial, width, height, py + 18, hull, stopped);
+            return;
+        }
         window(g, margin, ly, panel, 50, AMBER);
         float synchro = eva.getSynchronizationRatio(partial);
         line(g, font, String.format(Locale.ROOT, "EVA-%02d", eva.getUnitVariant()), margin + 5, ly + 4, 40, WHITE);
@@ -81,6 +88,7 @@ public final class EvaPilotDisplayR45
         String radio = Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString() + " 指挥通信";
         line(g, font, stance + "  /  " + radio, rx + 5, ly + 16, panel - 10, MUTED);
         // What is said to the pilot has its own window in the corner above (PilotChatPanelR64).
+        com.projectseele.client.cockpit.PlugCannonSightR64.serviceBelow(font, g, eva, rx + 5, ly + 34);
 
         alerts(g, font, eva, partial, width, height, py + 18, hull, stopped);
     }

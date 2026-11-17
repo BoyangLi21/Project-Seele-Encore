@@ -167,7 +167,18 @@ public final class PilotCockpitR64
         if (strength > 0 && under > 0) graphics.fill(0, 0, width, height, colour(CockpitMeshR64.LCL, under * strength * .66F));
         boolean parts = seated && interior() && shown > .01F;
         if (parts && light > .5F) panorama(graphics, width, height, (light - .5F) * 2 * shown);
-        if (parts || strength > 0 && PilotLclR64.level() > PilotLclR64.FLOOR)
+        // The cannon's sight is part of the plug's inside: its housing swings down in the same picture as the yokes,
+        // round the window the sight's own display is laid in. Its glass is drawn first, under it.
+        int[] sight = PlugCannonSightR64.window(width, height);
+        float tangent = (float) Math.tan(FOV * Mth.DEG_TO_RAD / 2);
+        STATE.visor = seated ? PlugCannonSightR64.down() : 0;
+        STATE.visorWide = tangent * (sight[2] - sight[0]) / height;
+        STATE.visorHigh = tangent * (sight[3] - sight[1]) / height;
+        STATE.visorJolt = PlugCannonSightR64.jolt();
+        STATE.visorCharge = PlugCannonSightR64.charge();
+        STATE.visorLock = PlugCannonSightR64.locked();
+        if (seated) PlugCannonSightR64.hood(graphics, width, height);
+        if (parts || STATE.visor > 0 || strength > 0 && PilotLclR64.level() > PilotLclR64.FLOOR)
         {
             STATE.parts = parts;
             MESH.build(STATE);
@@ -235,7 +246,9 @@ public final class PilotCockpitR64
 
         // Behind a sight the pilot's hands are out of the picture: the cockpit sinks away while one is up.
         boolean sighted = driving && (ClientForgeEvents.isRifleSightActive(eva) || ClientForgeEvents.isCannonScopeActive(eva));
-        shown += ((sighted ? 0 : 1) - shown) * ease(dt, .12F);
+        // Under the cannon's sight the yokes stay at the picture's lower edge, in front of its shell: the trigger is on them.
+        float under = driving ? PlugCannonSightR64.down() : 0;
+        shown += ((under > 0 ? .8F : sighted ? 0 : 1) - shown) * ease(dt, .12F);
         // The wall carries the picture once the Unit is synchronised; before that the plug has only its own lamps.
         float wantedLight = driving && (progress < 0 || progress > STEP_SYNC) ? 1 : progress > STEP_NERVE ? .55F : .30F;
         light += (wantedLight - light) * ease(dt, .35F);

@@ -129,6 +129,7 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.BooleanValue COCKPIT_LCL;
     public static final ForgeConfigSpec.DoubleValue COCKPIT_LCL_TINT;
     public static final ForgeConfigSpec.BooleanValue COCKPIT_CHAT_PANEL;
+    public static final ForgeConfigSpec.BooleanValue COCKPIT_CANNON_SIGHT;
 
     static
     {
@@ -520,6 +521,9 @@ public final class SeeleConfig
         COCKPIT_CHAT_PANEL = client
                 .comment("First person in the plug: show the chat as a small window in the upper right corner, each line tagged with its source, instead of the game's chat (which stays as it is with the chat opened, outside the plug and in third person).")
                 .define("chatPanel", true);
+        COCKPIT_CANNON_SIGHT = client
+                .comment("First person in the plug: the positron cannon is aimed through the sight that comes down over the pilot (marks for the barrel, the charge and the target's core, the shot's figures, the gun's service). Off: the scope of R63.")
+                .define("cannonSight", true);
         client.pop();
         CLIENT_SPEC = client.build();
     }
