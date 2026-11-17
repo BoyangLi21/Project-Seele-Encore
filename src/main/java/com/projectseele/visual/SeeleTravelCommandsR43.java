@@ -34,8 +34,8 @@ public final class SeeleTravelCommandsR43
         new Destination("geofront_airport","地下运输机场控制区",new Vec3(-353.5,-475,-299.5),90),
         new Destination("un","联合国军事基地",new Vec3(6560.5,75,-5968.5),180),
         new Destination("un_hangar","联合国试验机库人员走廊",new Vec3(6394.5,77,-6192.5),90),
-        new Destination("rei","绫波丽公寓门外",new Vec3(-2848.5,86,-1108.5),0),
-        new Destination("misato","美里家公寓入口",new Vec3(196.5,81,527.5),0),
+        new Destination("rei","绫波丽公寓门外",new Vec3(-193.5,103,519.5),-90),
+        new Destination("misato","美里家公寓入口",new Vec3(-44.0,133,765.5),0),
         new Destination("school","第三新东京第一中学校门外",new Vec3(253.5,73,-679.5),180));
 
     public static LiteralArgumentBuilder<CommandSourceStack> enterCommand()
