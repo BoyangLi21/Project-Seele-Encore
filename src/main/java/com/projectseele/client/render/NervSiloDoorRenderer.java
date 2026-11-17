@@ -48,7 +48,7 @@ public final class NervSiloDoorRenderer
         float open = door.getOpenProgress(partialTick);
         // Closed, a ground hatch is its cover blocks. Its steel lies inside them, a few centimetres under their
         // tops, and at a distance would fight them for depth. Seen from above there is nothing else of it.
-        if(declared!=null&&declared.groundFlush()&&GroundHatchTurfR64.covered(door,declared)
+        if(declared!=null&&declared.groundFlush()&&GroundHatchTurfR64.covered(open)
                 &&this.entityRenderDispatcher.camera.getPosition().y>door.getY()+1)return;
         poses.pushPose();
         var spec=door.declaredSpecR52();if(spec!=null)poses.mulPose(door.actualFrameR52().rotation());
