@@ -17,7 +17,7 @@ sign bands and vertical signboards; warm lit windows on staggered floors. Interi
 perimeter floor rings and a core so the block count stays near today's. Only full blocks, slabs
 and blocks whose shape does not depend on neighbours are used.
 """
-import json, sys, zlib
+import json, os, sys, zlib
 from collections import Counter
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -45,6 +45,19 @@ PALETTES = (
 )
 
 
+# The canon look of Tokyo-3 (2026-11-17): one family of pale towers, white to light grey with pale blue-grey glass.
+# CITY_STYLE=m5 rebuilds the earlier realistic look exactly.
+STYLE = os.environ.get('CITY_STYLE', 'canon')
+CANON_PALETTES = (
+    ('canon_white', 3, dict(wall='white_concrete', trim='smooth_quartz', mull='white_concrete', glass='light_blue_stained_glass', band='white_concrete')),
+    ('canon_grey', 3, dict(wall='light_gray_concrete', trim='white_concrete', mull='white_concrete', glass='light_gray_stained_glass', band='light_gray_concrete')),
+    ('canon_blue', 2, dict(wall='white_concrete', trim='light_gray_concrete', mull='smooth_quartz', glass='light_blue_stained_glass', band='light_gray_concrete')),
+)
+if STYLE == 'canon':
+    PALETTES = CANON_PALETTES
+    SIGN_FACES_CANON = ('white_concrete', 'light_gray_concrete', 'light_blue_terracotta', 'cyan_terracotta')
+
+
 def palette(seed):
     total = sum(w for _, w, _ in PALETTES)
     r = h(seed, 'palette') % total
@@ -61,7 +74,8 @@ SIGN_LIGHTS = (M('ochre_froglight[axis=y]'), M('pearlescent_froglight[axis=y]'),
 
 
 def vsign(m, x, z, y0, y1, seed):
-    face = M(SIGN_FACES[h(seed, 'face') % len(SIGN_FACES)])
+    faces = SIGN_FACES_CANON if STYLE == 'canon' else SIGN_FACES
+    face = M(faces[h(seed, 'face') % len(faces)])
     glow = SIGN_LIGHTS[h(seed, 'glow') % len(SIGN_LIGHTS)]
     for y in range(y0, y1 + 1):
         m.put(x, y, z, glow if y in (y0, y1) or (y - y0) % 3 == 0 else face)
@@ -175,8 +189,26 @@ def terrace(m, y, k_in, k_out):
                 m.put(x, y + 1, z, M('azalea_leaves[distance=1,persistent=true,waterlogged=false]'))
 
 
+def canon_roof(m, H, k):
+    """Flat roof with a plant room, an antenna mast and red aircraft lights on the four corners (redstone torches on
+    corner blocks stay lit with no input). Everything stays within the tower box, which ends at H + 3."""
+    w = min(m.W, m.D) - 2 * k
+    roof_plant(m, H + 1, k, max(3, min(7, w - 6)))
+    x0, z0, x1, z1 = k, k, m.W - 1 - k, m.D - 1 - k
+    for x, z in ((x0, z0), (x1, z0), (x0, z1), (x1, z1)):
+        m.put(x, H + 1, z, m.pal['trim'])
+        m.put(x, H + 2, z, M('redstone_torch[lit=true]'))
+    mx, mz = x0 + 2, z0 + 2
+    m.put(mx, H + 1, mz, M('iron_bars[east=false,north=false,south=false,waterlogged=false,west=false]'))
+    m.put(mx, H + 2, mz, M('iron_bars[east=false,north=false,south=false,waterlogged=false,west=false]'))
+    m.put(mx, H + 3, mz, M('lightning_rod[facing=up,powered=false,waterlogged=false]'))
+
+
 def roof(m, H, k):
     """Varied roof lines: plant room of some size, a stepped crown, a helipad or a sign frame."""
+    if STYLE == 'canon':
+        canon_roof(m, H, k)
+        return
     r = h(m.seed, 'roof') % 20                     # plant room 10, crown 4, sign frame 4, helipad 2 (tall only)
     kind = 0 if r < 10 else 1 if r < 14 else 3 if r < 18 else (2 if H >= 56 else 0)
     w = min(m.W, m.D) - 2 * k
@@ -203,6 +235,16 @@ def roof(m, H, k):
         roof_plant(m, H + 1, k, max(3, min(7, w - 4)))
 
 
+def canon_skin(style, c, u, y, glass, mull, band, wall):
+    """T-A: ribbon windows (three glass rows) between white spandrels on the floor line, a fin every fourth cell.
+    T-B: alternating glass and white piers, a light band on each floor line."""
+    if c:
+        return mull
+    if style == 'B':
+        return band if y % 4 == 0 else (mull if u % 2 == 0 else glass)
+    return band if y % 4 == 0 else (mull if u % 4 == 0 else glass)
+
+
 def skin(style, c, u, y, glass, mull, band, wall):
     """One facade cell of an office floor band. Grid: curtain wall with a mullion every third cell and
     a spandrel every fourth row. Ribbon: two rows of glass between two-row spandrels, few mullions.
@@ -216,7 +258,54 @@ def skin(style, c, u, y, glass, mull, band, wall):
     return mull if u % 3 == 0 else band if y % 4 == 0 else glass
 
 
+def canon_office(m, H, landmark=False):
+    """Slender canon tower: a dark two-storey podium on the full footprint, then a shaft set in two cells (one more for
+    the top floors of a landmark), T-A or T-B facade, canon roof."""
+    W = m.W
+    glass, mull, band, wall = m.pal['glass'], m.pal['mull'], m.pal['band'], m.pal['wall']
+    style = 'B' if h(m.seed, 'canon_skin') % 3 == 0 else 'A'
+    lobby(m, 7, 1, M('gray_stained_glass'), M('gray_concrete'), M('polished_andesite'))
+    for x, z, u, c in m.ring(0):
+        m.put(x, 8, z, M('light_gray_concrete'))          # podium cornice
+    k0 = 2 if W >= 13 else 1
+    ks = [(9, H, k0)]
+    if landmark:
+        s2 = int(H * 0.8)
+        ks = [(9, s2, k0), (s2, H, k0 + 1)]
+    for a, b, k in ks:
+        if a > 9:
+            for x, z, u, c in m.ring(k - 1):
+                m.put(x, a, z, M('smooth_stone'))
+                m.put(x, a + 1, z, SLAB('smooth_quartz'))
+        else:
+            for x, z, u, c in m.ring(k - 1):
+                m.put(x, 9, z, SLAB('smooth_quartz'))    # the podium roof edge round the set-in shaft
+        for y in range(a + (1 if a > 9 else 0), b + 1):
+            for x, z, u, c in m.ring(k):
+                m.put(x, y, z, canon_skin(style, c, u, y, glass, mull, band, wall))
+            if y % 4 == 0:
+                floor_ring(m, y, k, 2, M('smooth_stone'))
+            elif y % 4 == 2:
+                lit(m, y, k, 40)
+        core(m, a, b, M('light_gray_concrete'))
+    k = ks[-1][2]
+    m.fill(k, H, M('smooth_stone'))
+    if landmark:                                         # the M5 stepped crown stays, now in the pale palette
+        for y in range(H + 1, H + 4):
+            for x, z, u, c in m.ring(k + 1 + (y - H)):
+                m.put(x, y, z, mull if c or u % 2 == 0 else glass)
+        m.put(W // 2, H + 3, m.D // 2, M('lightning_rod[facing=up,powered=false,waterlogged=false]'))
+        x0, z0, x1, z1 = k, k, m.W - 1 - k, m.D - 1 - k
+        for x, z in ((x0, z0), (x1, z0), (x0, z1), (x1, z1)):
+            m.put(x, H + 1, z, m.pal['trim'])
+            m.put(x, H + 2, z, M('redstone_torch[lit=true]'))
+    else:
+        canon_roof(m, H, k)
+
+
 def office(m, H, landmark=False):
+    if STYLE == 'canon':
+        return canon_office(m, H, landmark)
     W = m.W
     glass, mull, band, wall = m.pal['glass'], m.pal['mull'], m.pal['band'], m.pal['wall']
     style = 0 if landmark else (0, 0, 1, 2)[h(m.seed, 'skin') % 4]   # grid, ribbon windows, punched
@@ -296,6 +385,8 @@ def apartments(m, H):
 
 
 SIGNS = ('white_concrete', 'light_gray_concrete', 'red_terracotta', 'cyan_terracotta', 'white_terracotta', 'blue_terracotta', 'black_concrete')   # muted: saturated wool reads as a toy at EVA scale
+if STYLE == 'canon':
+    SIGNS = ('white_concrete', 'light_gray_concrete', 'cyan_terracotta', 'light_blue_terracotta', 'gray_concrete')
 
 
 def mixed(m, H):
@@ -308,7 +399,8 @@ def mixed(m, H):
             floor_ring(m, y, 1, 1, M('smooth_stone'))
     for x, z, u, c in m.ring(0):
         shop = u // 5
-        m.put(x, 6, z, M('white_terracotta') if (u + shop) % 2 else M(('red_terracotta', 'green_terracotta', 'blue_terracotta', 'brown_terracotta')[h(m.seed, shop) % 4]))
+        awnings = ('light_gray_concrete', 'cyan_terracotta', 'light_blue_terracotta', 'gray_concrete') if STYLE == 'canon' else ('red_terracotta', 'green_terracotta', 'blue_terracotta', 'brown_terracotta')
+        m.put(x, 6, z, M('white_concrete' if STYLE == 'canon' else 'white_terracotta') if (u + shop) % 2 else M(awnings[h(m.seed, shop) % 4]))
     for y in (7, 8):
         for x, z, u, c in m.ring(0):
             m.put(x, y, z, M(SIGNS[h(m.seed, x // 5, z // 5) % len(SIGNS)]) if not c else M('black_concrete'))
@@ -346,10 +438,89 @@ def lowrise(m, H):
     roof_plant(m, H + 1, 1, 5)
 
 
+# Armament buildings of the fortress city (canon round, 2026-11-17): looks only; the armament stations, weapons and
+# launch logic are untouched. A1 spare-weapon rack (episode 3: roof lock pins, warning lights, four cylindrical guides,
+# one large front door), A2 missile building, A3 power-supply building with the umbilical socket.
+ARMAMENT = {22: 'A1', 28: 'A1', 40: 'A1', 45: 'A1', 19: 'A2', 23: 'A2', 44: 'A2', 51: 'A2', 20: 'A3', 29: 'A3', 38: 'A3', 46: 'A3'}
+WARN = M('shroomlight')
+
+
+def hazard(m, y, k):
+    for x, z, u, c in m.ring(k):
+        m.put(x, y, z, M('yellow_concrete') if (x + z) % 2 else M('black_concrete'))
+
+
+def armament(m, H, kind):
+    W, D = m.W, m.D
+    if kind == 'A1':
+        wall, seam = M('light_gray_terracotta'), M('gray_terracotta')
+    elif kind == 'A2':
+        wall, seam = M('gray_concrete'), M('deepslate_tiles')
+    else:
+        wall, seam = M('light_gray_concrete'), M('gray_concrete')
+    m.fill(1, 0, M('polished_andesite'))
+    for y in range(1, H + 1):
+        for x, z, u, c in m.ring(1):
+            if c:
+                st = seam
+            elif kind == 'A1':
+                st = seam if (u % 6 == 0 or y % 8 == 0) else wall          # armour plates with seams
+            elif kind == 'A2':
+                st = seam if y % 2 else wall                               # louvres
+            else:
+                st = seam if y % 6 == 0 else wall
+            m.put(x, y, z, st)
+        if y % 4 == 0:
+            floor_ring(m, y, 1, 2, M('smooth_stone'))
+    core(m, 1, H, M('gray_concrete'))
+    m.fill(1, H, M('gray_concrete'))
+    hazard(m, 9, 1)
+    front = D - 2                                                          # the south face carries the door or the socket
+    if kind == 'A1':
+        for x in range(3, W - 3):                                          # one large slatted shutter door
+            for y in range(1, 9):
+                m.put(x, y, front, M('iron_block') if x in (3, W - 4) or y == 8 else (M('polished_deepslate') if y % 2 else M('deepslate_tiles')))
+        for x, z in ((3, 3), (W - 4, 3), (3, D - 4), (W - 4, D - 4)):     # four cylindrical guides on the roof
+            m.put(x, H + 1, z, M('quartz_pillar[axis=y]')); m.put(x, H + 2, z, M('quartz_pillar[axis=y]'))
+        for x in range(W // 2 - 2, W // 2 + 3, 2):                         # lock pins raised along the roof seam
+            m.put(x, H + 1, D // 2, M('iron_bars[east=false,north=false,south=false,waterlogged=false,west=false]'))
+        for x, z in ((1, 1), (W - 2, 1), (1, D - 2), (W - 2, D - 2)):
+            m.put(x, H + 1, z, WARN)
+    elif kind == 'A2':
+        for x in range(2, W - 2):                                          # a roof of missile hatches in a grid
+            for z in range(2, D - 2):
+                frame = (x - 2) % 3 == 0 or (z - 2) % 3 == 0
+                m.put(x, H + 1, z, M('gray_concrete') if frame else M('iron_trapdoor[facing=north,half=bottom,open=false,powered=false,waterlogged=false]'))
+        for x, z in ((1, 1), (W - 2, 1), (1, D - 2), (W - 2, D - 2)):
+            m.put(x, H + 1, z, WARN)
+        for x in range(W // 2 - 2, W // 2 + 3):                            # service door
+            for y in (1, 2):
+                m.put(x, y, front, M('iron_block') if x in (W // 2 - 2, W // 2 + 2) else M('gray_concrete'))
+    else:
+        cy = max(12, H // 2)                                               # the umbilical socket panel at mid height
+        for x in range(W // 2 - 4, W // 2 + 5):
+            for y in range(cy - 4, cy + 5):
+                edge = x in (W // 2 - 4, W // 2 + 4) or y in (cy - 4, cy + 4)
+                m.put(x, y, front, M('yellow_concrete') if edge else M('black_concrete'))
+        for x in range(W // 2 - 1, W // 2 + 2):
+            for y in range(cy - 1, cy + 2):
+                m.put(x, y, front, M('iron_block'))
+        for x, z in ((3, 3), (W - 4, 3), (3, D - 4), (W - 4, D - 4)):     # rooftop transformers and insulators
+            m.put(x, H + 1, z, M('gray_concrete')); m.put(x, H + 2, z, M('end_rod[facing=up]'))
+        m.put(W // 2, H + 1, D // 2, M('iron_bars[east=false,north=false,south=false,waterlogged=false,west=false]'))
+        m.put(W // 2, H + 2, D // 2, M('iron_bars[east=false,north=false,south=false,waterlogged=false,west=false]'))
+        m.put(W // 2, H + 3, D // 2, M('lightning_rod[facing=up,powered=false,waterlogged=false]'))
+        for x, z in ((1, 1), (W - 2, 1), (1, D - 2), (W - 2, D - 2)):
+            m.put(x, H + 1, z, WARN)
+
+
 def design(t):
     W, D = t['fp'][1] - t['fp'][0] + 1, t['fp'][3] - t['fp'][2] + 1
     m = Model(W, D, h('tower', t['id']))
     H = t['H']
+    if STYLE == 'canon' and t['id'] in ARMAMENT:
+        armament(m, H, ARMAMENT[t['id']])
+        return m, 'armament_' + ARMAMENT[t['id']]
     if H >= 90:
         office(m, H, landmark=True)
         kind = 'landmark'
