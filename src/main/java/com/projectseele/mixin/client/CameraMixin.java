@@ -237,6 +237,8 @@ public abstract class CameraMixin
             Vec3 optical=controlled.getPilotCameraSeatPosition(subject,partialTick).add(0,subject.getEyeHeight()+com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick),0);
             optical=com.projectseele.client.render.EvaRackReleaseR63.seat(controlled,partialTick,optical);
             optical=com.projectseele.client.PilotOpticsContinuity.apply(controlled,partialTick,optical);
+            // R64: the pilot sits in the plug, not in the head; the eye takes a share of the head's bob and sway.
+            optical=com.projectseele.client.cockpit.PilotViewSteadyR64.apply(controlled,partialTick,optical);
             this.setPosition(optical.x,optical.y,optical.z);return;
         }
         if(controlled==null)com.projectseele.client.PilotOpticsContinuity.clear();

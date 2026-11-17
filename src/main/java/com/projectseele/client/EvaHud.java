@@ -64,6 +64,12 @@ public final class EvaHud
         {
             return;
         }
+        if (com.projectseele.client.cockpit.PilotCockpitR64.ON)
+        {
+            // R64: the LCL is the liquid in the plug now (PilotLclR64); this is what the wall says meanwhile.
+            com.projectseele.client.cockpit.PilotSequenceDisplayR64.render(gui.getFont(), guiGraphics, player, partialTick, width, height);
+            return;
+        }
         EvaUnit01Entity eva = EvaPilotResolver.controlTarget(player);
         EntryPlugCarrierEntity plug =
                 player.getVehicle() instanceof EntryPlugCarrierEntity carrier

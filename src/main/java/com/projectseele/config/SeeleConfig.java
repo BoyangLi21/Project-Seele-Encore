@@ -120,6 +120,10 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.IntValue VIDEO_CAPTURE_WIDTH;
     public static final ForgeConfigSpec.DoubleValue VIDEO_JPEG_QUALITY;
     public static final ForgeConfigSpec.IntValue VIDEO_FRAME_BUDGET_KIB;
+    public static final ForgeConfigSpec.BooleanValue COCKPIT_INTERIOR;
+    public static final ForgeConfigSpec.DoubleValue COCKPIT_STEADY_VIEW;
+    public static final ForgeConfigSpec.BooleanValue COCKPIT_LCL;
+    public static final ForgeConfigSpec.DoubleValue COCKPIT_LCL_TINT;
 
     static
     {
@@ -472,6 +476,20 @@ public final class SeeleConfig
                 .defineInRange("quality",.86D,.35D,.94D);
         VIDEO_FRAME_BUDGET_KIB=client.comment("Per-frame budget below the transport ceiling. High-detail frames reduce quality or resolution to fit.")
                 .defineInRange("frameBudgetKiB",384,64,768);
+        client.pop();
+        client.push("cockpit");
+        COCKPIT_INTERIOR = client
+                .comment("First person while piloting: draw the plug's inside (the seat's front, the two control yokes and the pilot's hands).")
+                .define("interior", true);
+        COCKPIT_STEADY_VIEW = client
+                .comment("First person while piloting: how much steadier the view is than the Unit's head (0 rides the head as before, 1 as designed).")
+                .defineInRange("steadyView", 1.0D, 0.0D, 1.0D);
+        COCKPIT_LCL = client
+                .comment("Show the LCL filling the plug on boarding, its trace while piloting, and its running out on leaving.")
+                .define("lcl", true);
+        COCKPIT_LCL_TINT = client
+                .comment("How strongly the settled LCL colours the view while piloting (1 as designed, 0 none).")
+                .defineInRange("lclTint", 1.0D, 0.0D, 2.0D);
         client.pop();
         CLIENT_SPEC = client.build();
     }

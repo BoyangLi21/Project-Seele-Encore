@@ -27,6 +27,26 @@ public abstract class PlayerModelGendoPoseMixin
                 &&(!plug.isLockedToEva()||plug.usesPhysicalPilotSeatR52()))
         {
             PlayerModel<?> model=(PlayerModel<?>)(Object)this;
+            if(com.projectseele.client.cockpit.PilotCockpitR64.ON)
+            {
+                // R64: seated along the plug (EntryPlugPilotPoseR47 lays the trunk back): legs carried forward on
+                // the seat, arms forward to the yokes, the head brought down to look along the plug.
+                float legs=com.projectseele.client.cockpit.PilotSeatPoseR64.legPitch(),arms=com.projectseele.client.cockpit.PilotSeatPoseR64.armPitch();
+                float out=com.projectseele.client.cockpit.PilotSeatPoseR64.ARM_OUT;
+                model.body.xRot=model.body.yRot=model.body.zRot=0;
+                model.rightLeg.xRot=model.leftLeg.xRot=legs;
+                model.rightLeg.yRot=model.leftLeg.yRot=0;model.rightLeg.zRot=model.leftLeg.zRot=0;
+                model.rightArm.xRot=model.leftArm.xRot=arms;
+                model.rightArm.yRot=model.leftArm.yRot=0;
+                model.rightArm.zRot=out;model.leftArm.zRot=-out;
+                model.head.yRot=net.minecraft.util.Mth.clamp(model.head.yRot,-.45F,.45F);
+                model.head.xRot=com.projectseele.client.cockpit.PilotSeatPoseR64.headPitch()+net.minecraft.util.Mth.clamp(model.head.xRot,-.25F,.25F)*.5F;
+                model.head.zRot=0;
+                model.rightSleeve.copyFrom(model.rightArm);model.leftSleeve.copyFrom(model.leftArm);
+                model.rightPants.copyFrom(model.rightLeg);model.leftPants.copyFrom(model.leftLeg);
+                model.jacket.copyFrom(model.body);model.hat.copyFrom(model.head);
+                return;
+            }
             model.body.xRot=model.body.yRot=model.body.zRot=0;
             model.rightLeg.xRot=model.leftLeg.xRot=-.08F;
             model.rightLeg.yRot=model.leftLeg.yRot=0;

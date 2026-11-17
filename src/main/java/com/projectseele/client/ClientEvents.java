@@ -140,6 +140,8 @@ public class ClientEvents
     public static void onRegisterGuiOverlays(RegisterGuiOverlaysEvent event)
     {
         event.registerAboveAll("angel_alarm", AlarmOverlay.INSTANCE);
+        // The plug's inside and the LCL lie over the picture and under every readout.
+        event.registerAboveAll("eva_plug_interior_r64",com.projectseele.client.cockpit.PilotCockpitR64.OVERLAY);
         event.registerAboveAll("eva_cockpit",(gui,g,p,w,h)->{if(!FirstBattleClient.active())EvaHud.COCKPIT.render(gui,g,p,w,h);});
         event.registerAboveAll("eva_combat_r31",EvaCombatHudR31.OVERLAY);
         event.registerAboveAll("sniper_scope", EvaHud.SCOPE);

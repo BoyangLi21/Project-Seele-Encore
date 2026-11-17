@@ -130,7 +130,12 @@ public final class CameraKickR58
         }
         if (!ownView || eva.isFirstBattleActive() || dx * dx + dz * dz > 30 * 30) return;
         if (land) kick(1.6F, 0, .012F, 5);
-        else kick(.32F, (float) Math.signum(dx * eva.getForward().z - dz * eva.getForward().x) * .12F, 0, 3.2F);
+        else
+        {
+            // R64: in first person a footfall turns the view by a share of this (the landing keeps its whole dip).
+            float share = mc.options.getCameraType().isFirstPerson() ? com.projectseele.client.cockpit.PilotViewSteadyR64.stepKick() : 1F;
+            kick(.32F * share, (float) Math.signum(dx * eva.getForward().z - dz * eva.getForward().x) * .12F * share, 0, 3.2F);
+        }
     }
 
     @SubscribeEvent

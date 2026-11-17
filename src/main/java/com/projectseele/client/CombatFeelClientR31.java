@@ -60,6 +60,8 @@ public final class CombatFeelClientR31
             // Roll preserves the firing ray. A post-camera pitch kick does
             // not, so sighted optics never receive that second aim offset.
             if(ClientForgeEvents.isRifleSightActive(eva)||ClientForgeEvents.isCannonScopeActive(eva))pitch=0;
+            // R64: the plug's picture swings and rattles by a share of what the head does.
+            float share=com.projectseele.client.cockpit.PilotViewSteadyR64.blowShake();pitch*=share;roll*=share;
         }
         float scale=com.projectseele.config.SeeleConfig.FX_INTENSITY.get().floatValue();
         e.setPitch(e.getPitch()+pitch*scale);e.setRoll(e.getRoll()+roll*scale);

@@ -1,0 +1,341 @@
+package com.projectseele.client.visual;
+
+import com.projectseele.ProjectSeele;
+import com.projectseele.client.cockpit.PilotViewSteadyR64;
+import com.projectseele.entity.EntryPlugCarrierEntity;
+import com.projectseele.entity.EvaUnit01Entity;
+import com.projectseele.network.SeeleNetwork;
+import com.projectseele.network.ServerboundEvaControlPacket;
+import com.projectseele.world.EntryPlugKinematics;
+import com.projectseele.world.EvaPilotResolver;
+import net.minecraft.client.CameraType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Screenshot;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.ViewportEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+
+import java.io.BufferedWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
+
+/**
+ * R64 review of the pilot's first person, in disposable saves only.
+ * <p>
+ * -Dprojectseele.cockpitReviewR64=true (a SEELE_EVA_CONNECTED_REVIEW save): Unit-01 is boarded in the motion lab,
+ * left, boarded again with the whole cabin sequence, walked, run, struck with, jumped, looked about from and left,
+ * always the same way. Every drawn frame's camera goes to view.csv (tools/cockpit_review/view_metrics.py reads it)
+ * and every tick's picture to a frame, under screenshots/projectseele_cockpit/. Run it with
+ * -Dprojectseele.cockpitR64=false for the same drive as up to R63.
+ * <p>
+ * -Dprojectseele.plugWatchR64=outside|cabin|inside (with the launch review's real sortie, a SEELE_LAUNCH_REVIEW
+ * save): while the pilot rides the capsule outside its Unit, pictures of the capsule from beside it, of the pilot
+ * from inside the cabin, or from the pilot's seat, and the client is stopped a few seconds after the capsule has
+ * locked.
+ */
+@Mod.EventBusSubscriber(modid = ProjectSeele.MODID, value = Dist.CLIENT)
+public final class PilotCockpitReviewR64
+{
+    private static final boolean DRIVE = Boolean.getBoolean("projectseele.cockpitReviewR64");
+    private static final String PLUG = System.getProperty("projectseele.plugWatchR64");
+    private static final int PLUG_END = Integer.getInteger("projectseele.plugWatchEndR64", 160);
+    private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+    private static final int END = 1070;
+
+    private static int wait, tick = -1, serverStart = -1, settledTicks, missing, frame, capturedTick = -1, lockedTicks, watchTicks;
+    private static Vec3 settledAt;
+    private static boolean finished, sprinting;
+    private static BufferedWriter rows;
+    private static Path directory;
+    private static Entity camera;
+
+    private PilotCockpitReviewR64() {}
+
+    @SubscribeEvent
+    public static void tick(TickEvent.ClientTickEvent event)
+    {
+        Minecraft mc = Minecraft.getInstance();
+        if (!DRIVE && PLUG == null || finished || event.phase != TickEvent.Phase.END
+                || mc.player == null || mc.level == null || mc.getSingleplayerServer() == null) return;
+        String save = mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize().getFileName().toString();
+        if (PLUG != null)
+        {
+            if (!save.startsWith("SEELE_LAUNCH_REVIEW")) { finished = true; ProjectSeele.LOGGER.error("Plug watch requires a disposable SEELE_LAUNCH_REVIEW save"); return; }
+            plugWatch(mc);
+            return;
+        }
+        if (!save.startsWith("SEELE_EVA_CONNECTED_REVIEW")) { finished = true; ProjectSeele.LOGGER.error("Cockpit review requires a disposable SEELE_EVA_CONNECTED_REVIEW save"); return; }
+        mc.options.pauseOnLostFocus = false;
+        if (++wait < 100) return;
+        var link = mc.player.connection;
+        if (wait == 100)
+        {
+            // As the connected review does: every unit into the arena, the lab reset, Unit-01 boarded with bare hands;
+            // and the movement and combat R64 ships with.
+            for (String type : new String[]{"eva_unit00", "eva_unit01", "eva_unit02", "eva_prototype"})
+                link.sendCommand("execute as @e[type=projectseele:" + type + "] run tp @s 0 -40 0");
+            link.sendCommand("seele motion planted");
+            link.sendCommand("seele combat frames");
+            link.sendCommand("seele dev motionlab reset");
+            link.sendCommand("seele dev motionlab demo unit01 stop");
+            link.sendCommand("seele dev motionlab enter unit01");
+            link.sendCommand("seele dev motionlab weapon unit01 fists");
+            link.sendCommand("time set 6000");
+            link.sendCommand("weather clear");
+            return;
+        }
+        EvaUnit01Entity eva = EvaPilotResolver.controlTarget(mc.player);
+        if (serverStart < 0)
+        {
+            if (eva == null || eva.getActivationTicks() > 0 || !eva.isPoweredOn() || eva.isExperimentalUnit() || eva.getUnitVariant() != EvaUnit01Entity.UNIT_01)
+            {
+                if (++missing > 400) finish(mc, "pilot_setup_timeout");
+                return;
+            }
+            // The lab reset carries the unit back to its pad over a second or two.
+            if (settledAt == null || eva.position().distanceToSqr(settledAt) > .0001) { settledAt = eva.position(); settledTicks = 0; return; }
+            if (++settledTicks < 20) return;
+            // The setup's own lines of chat are gone after ten seconds: the drive starts on a clear picture.
+            if (wait < 330) return;
+            serverStart = mc.getSingleplayerServer().getTickCount();
+            open(mc);
+            ProjectSeele.LOGGER.info("Cockpit review started: batch={} cockpit={}", BATCH, com.projectseele.client.cockpit.PilotCockpitR64.ON);
+        }
+        int previous = tick;
+        tick = mc.getSingleplayerServer().getTickCount() - serverStart;
+        mc.options.hideGui = false;
+        mc.options.setCameraType(CameraType.FIRST_PERSON);
+        if (mc.getCameraEntity() != mc.player) mc.setCameraEntity(mc.player);
+        drive(mc, eva, previous);
+        if (tick >= END) finish(mc, "complete");
+    }
+
+    private static boolean at(int previous, int wanted)
+    {
+        return previous < wanted && tick >= wanted;
+    }
+
+    /** The part of the drive a tick belongs to: view.csv carries it, the metrics are taken part by part. */
+    private static String part(int t)
+    {
+        return t < 40 ? "idle" : t < 110 ? "leave" : t < 250 ? "board" : t < 260 ? "stand" : t < 390 ? "walk" : t < 430 ? "stand"
+                : t < 540 ? "run" : t < 585 ? "stand" : t < 700 ? "strike" : t < 705 ? "stand" : t < 795 ? "jump" : t < 800 ? "stand"
+                : t < 865 ? "look" : t < 945 ? "down" : t < 950 ? "stand" : "exit";
+    }
+
+    private static void drive(Minecraft mc, EvaUnit01Entity eva, int previous)
+    {
+        int t = tick;
+        var server = mc.getSingleplayerServer();
+        var id = mc.player.getUUID();
+        // Out of the seat, and in again with the whole cabin sequence (the lab's own boarding skips it).
+        if (at(previous, 40)) server.execute(() ->
+        {
+            var pilot = server.getPlayerList().getPlayer(id);
+            if (pilot != null) pilot.stopRiding();
+        });
+        if (at(previous, 110) && eva == null)
+        {
+            server.execute(() ->
+            {
+                var pilot = server.getPlayerList().getPlayer(id);
+                if (pilot == null) return;
+                var units = pilot.serverLevel().getEntitiesOfClass(EvaUnit01Entity.class, pilot.getBoundingBox().inflate(160),
+                        unit -> !unit.isExperimentalUnit() && unit.getUnitVariant() == EvaUnit01Entity.UNIT_01);
+                boolean boarded = !units.isEmpty() && units.get(0).boardFromExternalPlug(pilot, 0);
+                ProjectSeele.LOGGER.info("Cockpit review: boarded with the whole sequence: {}", boarded);
+            });
+        }
+        boolean walk = t >= 260 && t < 390 || t >= 800 && t < 860, run = t >= 430 && t < 540, move = (walk || run) && eva != null;
+        mc.options.keyUp.setDown(move);
+        mc.player.input.up = move; mc.player.input.forwardImpulse = move ? 1 : 0; mc.player.zza = move ? 1 : 0; mc.player.xxa = 0;
+        mc.options.keySprint.setDown(run);
+        if (run && !sprinting && eva != null) { send(ServerboundEvaControlPacket.ACTION_SPRINT_START); sprinting = true; }
+        if (!run && sprinting) { send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP); sprinting = false; }
+        // Back the way it came for the run, so that the drive stays on the lab's lane; a look to the side and down
+        // at a walk; a look at the seat standing.
+        float yaw = t >= 400 && t < 560 ? 180 : 0, pitch = 0;
+        if (t >= 800 && t < 860) { float sweep = Mth.sin((t - 800) / 60F * Mth.PI); yaw = 50 * sweep; pitch = 25 * sweep; }
+        if (t >= 870 && t < 940) pitch = 55 * Mth.clamp(Math.min(t - 870, 940 - t) / 14F, 0, 1);
+        mc.player.setYRot(yaw); mc.player.setXRot(pitch);
+        if (eva != null)
+        {
+            if (at(previous, 590) || at(previous, 604) || at(previous, 618)) send(ServerboundEvaControlPacket.ACTION_MELEE);
+            if (at(previous, 650)) send(ServerboundEvaControlPacket.ACTION_SMASH);
+            // The keys the hands follow are held as a pilot holds them.
+            mc.options.keyAttack.setDown(t >= 590 && t < 594 || t >= 604 && t < 608 || t >= 618 && t < 622);
+            mc.options.keyUse.setDown(t >= 650 && t < 656);
+            mc.options.keyJump.setDown(t >= 710 && t < 714);
+            if (at(previous, 950)) send(ServerboundEvaControlPacket.ACTION_EXIT);
+        }
+        // Whatever the exit did (a capsule thrown clear in the field, or refused in the lab): out of the seat by the end.
+        if (at(previous, 1010) && mc.player.isPassenger()) server.execute(() ->
+        {
+            var pilot = server.getPlayerList().getPlayer(id);
+            if (pilot != null) pilot.stopRiding();
+        });
+        if (previous / 20 != t / 20)
+            ProjectSeele.LOGGER.info("Cockpit review: tick {} {} riding {} lcl {} level {}", t, part(t),
+                    mc.player.getVehicle() == null ? "nothing" : mc.player.getVehicle().getType().toShortString(),
+                    String.format(Locale.ROOT, "%.2f", com.projectseele.client.cockpit.PilotLclR64.fill()),
+                    String.format(Locale.ROOT, "%.2f", com.projectseele.client.cockpit.PilotLclR64.level()));
+    }
+
+    private static void send(int action)
+    {
+        SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(action));
+    }
+
+    private static void open(Minecraft mc)
+    {
+        try
+        {
+            directory = mc.gameDirectory.toPath().resolve("screenshots/projectseele_cockpit/" + BATCH);
+            Files.createDirectories(directory);
+            if (DRIVE)
+            {
+                rows = Files.newBufferedWriter(directory.resolve("view.csv"), StandardCharsets.UTF_8);
+                rows.write("nanos,tick,partial,part,cam_x,cam_y,cam_z,head_x,head_y,head_z,unit_x,unit_y,unit_z,body_yaw,yaw,pitch,roll,piloting\n");
+            }
+        }
+        catch (Exception exception)
+        {
+            throw new IllegalStateException("cockpit review output", exception);
+        }
+    }
+
+    /** Last of all the handlers: the angles are what the frame is drawn with. */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void camera(ViewportEvent.ComputeCameraAngles event)
+    {
+        if (!DRIVE || rows == null || finished || tick < 0) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        float partial = (float) event.getPartialTick();
+        EvaUnit01Entity eva = EvaPilotResolver.controlTarget(mc.player);
+        Vec3 cam = event.getCamera().getPosition();
+        // The head's optical point as the camera was given it this frame; on foot, the camera itself.
+        Vec3 head = eva == null ? cam : PilotViewSteadyR64.raw(), unit = eva == null ? mc.player.getPosition(partial) : eva.getPosition(partial);
+        float bodyYaw = eva == null ? 0 : Mth.rotLerp(partial, eva.yBodyRotO, eva.yBodyRot);
+        try
+        {
+            rows.write(String.format(Locale.ROOT, "%d,%d,%.3f,%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.3f,%.4f,%.4f,%.4f,%d%n",
+                    System.nanoTime(), tick, partial, part(tick), cam.x, cam.y, cam.z, head.x, head.y, head.z, unit.x, unit.y, unit.z,
+                    bodyYaw, event.getYaw(), event.getPitch(), event.getRoll(), eva == null ? 0 : 1));
+        }
+        catch (Exception exception)
+        {
+            throw new IllegalStateException("cockpit review row", exception);
+        }
+    }
+
+    @SubscribeEvent
+    public static void render(TickEvent.RenderTickEvent event)
+    {
+        if (finished || directory == null || event.phase != TickEvent.Phase.END) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (DRIVE)
+        {
+            if (tick < 0 || tick == capturedTick || "false".equals(System.getProperty("projectseele.cockpitCaptureR64"))) return;
+            capturedTick = tick;
+            // Named by its tick: two drives are laid side by side tick for tick, whatever frames either dropped.
+            frame++;
+            Screenshot.grab(mc.gameDirectory, "projectseele_cockpit/" + BATCH + String.format("/frame_%04d.png", tick), mc.getMainRenderTarget(), ignored -> {});
+            return;
+        }
+        else
+        {
+            // The plug watch: a picture every fourth tick while the pilot rides the capsule.
+            if (watchTicks == capturedTick || watchTicks % 4 != 0 || !(mc.player != null && mc.player.getVehicle() instanceof EntryPlugCarrierEntity)) return;
+            capturedTick = watchTicks;
+        }
+        frame++;
+        Screenshot.grab(mc.gameDirectory, "projectseele_cockpit/" + BATCH + String.format("/frame_%04d.png", frame), mc.getMainRenderTarget(), ignored -> {});
+    }
+
+    private static void plugWatch(Minecraft mc)
+    {
+        if (!(mc.player.getVehicle() instanceof EntryPlugCarrierEntity plug))
+        {
+            if (camera != null && mc.getCameraEntity() == camera) mc.setCameraEntity(mc.player);
+            return;
+        }
+        if (directory == null) { open(mc); ProjectSeele.LOGGER.info("Plug watch started: batch={} view={} cockpit={}", BATCH, PLUG, com.projectseele.client.cockpit.PilotCockpitR64.ON); }
+        watchTicks++;
+        boolean locked = plug.isLockedToEva();
+        lockedTicks = locked ? lockedTicks + 1 : 0;
+        if (watchTicks % 20 == 0)
+            ProjectSeele.LOGGER.info("Plug watch: tick {} stage {} cabin {} progress {} locked {} lcl {}", watchTicks, plug.getInsertionStage(), plug.getCabinStage(),
+                    plug.getCabinProgress(), locked, String.format(Locale.ROOT, "%.2f", com.projectseele.client.cockpit.PilotLclR64.fill()));
+        mc.options.setCameraType(CameraType.FIRST_PERSON);
+        if (("outside".equals(PLUG) || "cabin".equals(PLUG)) && !locked && plug.hasCanonicalPose())
+        {
+            // Beside and below the capsule for two seconds, beside and above it for two: whatever of the pilot
+            // came through the shell showed from below (the feet) or from above (the head).
+            if (camera == null)
+            {
+                camera = EntityType.ARMOR_STAND.create(mc.level);
+                if (camera == null) throw new IllegalStateException("plug watch camera");
+                camera.setInvisible(true); camera.setNoGravity(true);
+            }
+            var pose = plug.getInterpolatedCanonicalTransform(1);
+            boolean below = watchTicks / 40 % 2 == 0;
+            Vec3 seat = EntryPlugKinematics.PILOT_SEAT_P;
+            Vec3 target = pose.transformPoint(seat.add(0, 0, -.5));
+            Vec3 position = pose.transformPoint(seat.add(below ? -3.6 : 3.6, below ? -2.4 : 2.6, -1.6));
+            if ("cabin".equals(PLUG))
+            {
+                // Inside the cabin, before the pilot's feet, looking back along the seat: how the pilot lies in it.
+                Vec3 eye = EntryPlugKinematics.PILOT_EYE_P;
+                target = pose.transformPoint(eye.add(0, -.25, -.55));
+                position = pose.transformPoint(eye.add(below ? .42 : -.42, .30, -2.75));
+            }
+            Vec3 delta = target.subtract(position);
+            camera.setPos(position.x, position.y - camera.getEyeHeight(), position.z);
+            camera.setYRot((float) (Mth.atan2(delta.z, delta.x) * Mth.RAD_TO_DEG) - 90F);
+            camera.setXRot((float) (-Mth.atan2(delta.y, delta.horizontalDistance()) * Mth.RAD_TO_DEG));
+            camera.setYHeadRot(camera.getYRot());
+            camera.xo = camera.xOld = camera.getX(); camera.yo = camera.yOld = camera.getY(); camera.zo = camera.zOld = camera.getZ();
+            camera.yRotO = camera.getYRot(); camera.xRotO = camera.getXRot();
+            mc.options.hideGui = true;
+            mc.setCameraEntity(camera);
+        }
+        else
+        {
+            if (mc.getCameraEntity() != mc.player) mc.setCameraEntity(mc.player);
+            mc.options.hideGui = false;
+        }
+        if (lockedTicks >= PLUG_END) finish(mc, "plug_locked");
+        else if (watchTicks > 6000) finish(mc, "plug_watch_timeout");
+    }
+
+    private static void finish(Minecraft mc, String reason)
+    {
+        finished = true;
+        mc.options.keyUp.setDown(false); mc.options.keySprint.setDown(false); mc.options.keyJump.setDown(false);
+        mc.options.keyAttack.setDown(false); mc.options.keyUse.setDown(false);
+        mc.setCameraEntity(mc.player);
+        try
+        {
+            if (rows != null) rows.close();
+        }
+        catch (Exception exception)
+        {
+            ProjectSeele.LOGGER.error("Closing cockpit review", exception);
+        }
+        ProjectSeele.LOGGER.info("Cockpit review finished: batch={} reason={} ticks={} frames={}", BATCH, reason, Math.max(tick, watchTicks), frame);
+        mc.stop();
+    }
+}
