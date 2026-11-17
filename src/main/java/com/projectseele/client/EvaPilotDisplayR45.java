@@ -80,8 +80,7 @@ public final class EvaPilotDisplayR45
         String stance = eva.isPilotProne() ? "趴伏" : eva.isPilotCrouching() ? "下蹲" : eva.isPilotSprinting() ? "冲刺" : "常规操纵";
         String radio = Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString() + " 指挥通信";
         line(g, font, stance + "  /  " + radio, rx + 5, ly + 16, panel - 10, MUTED);
-        // What the command post says: a sound-only window under the weapon's, while a line is up.
-        com.projectseele.client.cockpit.PilotCommWindowR64.render(g, font, rx, ly + 34, panel);
+        // What is said to the pilot has its own window in the corner above (PilotChatPanelR64).
 
         alerts(g, font, eva, partial, width, height, py + 18, hull, stopped);
     }

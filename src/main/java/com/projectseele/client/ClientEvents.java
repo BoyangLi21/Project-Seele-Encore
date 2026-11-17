@@ -148,6 +148,8 @@ public class ClientEvents
         event.registerAboveAll("eva_combat_r31",EvaCombatHudR31.OVERLAY);
         event.registerAboveAll("sniper_scope", EvaHud.SCOPE);
         event.registerAboveAll("plug_insertion", EvaHud.INSERTION);
+        // The pilot's chat: in the plug it is a window on the wall, not the game's chat.
+        event.registerAboveAll("eva_plug_chat_r64",com.projectseele.client.cockpit.PilotChatPanelR64.OVERLAY);
         event.registerAboveAll("nuclear_flash", EvaHud.NUCLEAR_FLASH);
         event.registerAboveAll("eva_command_feed_capture", EvaCommandFeedClient.CAPTURE_OVERLAY);
         event.registerAboveAll("first_battle",FirstBattleClient.OVERLAY);

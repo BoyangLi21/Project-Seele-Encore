@@ -124,6 +124,7 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.DoubleValue COCKPIT_STEADY_VIEW;
     public static final ForgeConfigSpec.BooleanValue COCKPIT_LCL;
     public static final ForgeConfigSpec.DoubleValue COCKPIT_LCL_TINT;
+    public static final ForgeConfigSpec.BooleanValue COCKPIT_CHAT_PANEL;
 
     static
     {
@@ -490,6 +491,9 @@ public final class SeeleConfig
         COCKPIT_LCL_TINT = client
                 .comment("How strongly the settled LCL colours the view while piloting (1 as designed, 0 none).")
                 .defineInRange("lclTint", 1.0D, 0.0D, 2.0D);
+        COCKPIT_CHAT_PANEL = client
+                .comment("First person in the plug: show the chat as a small window in the upper right corner, each line tagged with its source, instead of the game's chat (which stays as it is with the chat opened, outside the plug and in third person).")
+                .define("chatPanel", true);
         client.pop();
         CLIENT_SPEC = client.build();
     }
