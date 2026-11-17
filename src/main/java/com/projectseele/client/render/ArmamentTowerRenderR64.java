@@ -197,8 +197,11 @@ final class ArmamentTowerRenderR64
     {
         for (int across = -2; across <= 2; across += 2)
         {
-            block(poses, buffers, light, PIN, across, top - 2.0D + 2.0D * lock, 0);
-            block(poses, buffers, light, PIN, across, top - 1.0D + 2.0D * lock, 0);
+            // The building keeps a lamp block at the centre of its roof, an old builder's mark: the middle lock
+            // stands on it, one block higher than its neighbours, and drops into it when the locks go down.
+            double step = !pod && across == 0 ? 1.0D : 0.0D;
+            block(poses, buffers, light, PIN, across, top - 2.0D + 2.0D * lock + step, 0);
+            block(poses, buffers, light, PIN, across, top - 1.0D + 2.0D * lock + step, 0);
         }
         for (int x : new int[]{-OUT, OUT})
             for (int z : new int[]{-OUT, OUT})
