@@ -26,9 +26,9 @@ final class ArmamentTowerRenderR64
 {
     private static final ResourceLocation RIFLE_MESH = new ResourceLocation(ProjectSeele.MODID, "mesh/eva_pallet_smg.mesh.json");
     private static final ResourceLocation RIFLE_TEXTURE = new ResourceLocation(ProjectSeele.MODID, "textures/entity/eva_pallet_smg.png");
-    // The colours of an A-1 building as tools/map_buildings/city_restyle.py draws it.
-    private static final BlockState WALL = Blocks.LIGHT_GRAY_TERRACOTTA.defaultBlockState();
-    private static final BlockState SEAM = Blocks.GRAY_TERRACOTTA.defaultBlockState();
+    // The colours of an A-1 building as tools/map_buildings/city_restyle.py draws it: grey-green armour, grey seams.
+    private static final BlockState WALL = Blocks.CYAN_TERRACOTTA.defaultBlockState();
+    private static final BlockState SEAM = Blocks.GRAY_CONCRETE.defaultBlockState();
     private static final BlockState FLOOR = Blocks.POLISHED_ANDESITE.defaultBlockState();
     private static final BlockState ROOF = Blocks.GRAY_CONCRETE.defaultBlockState();
     private static final BlockState SLAT_A = Blocks.POLISHED_DEEPSLATE.defaultBlockState();
