@@ -15,6 +15,7 @@ from pathlib import Path
 from mca import REGION, World
 from float_fix import guards
 from city_body_sync import topology
+from city_restyle import ARMAMENT
 from mca import WORLD
 
 Y = 80
@@ -33,7 +34,11 @@ def lots():
 def plan(out, box=None):
     w = World(REGION)
     gs = guards()
-    towers = [s['centre'] for s in topology(WORLD).values()]
+    topo = topology(WORLD)
+    towers = [s['centre'] for s in topo.values()]
+    # A-1 spare-weapon towers open a 15-wide door on their north face (city_restyle A1); the EVA walks up to it, so the
+    # lot's north sidewalk keeps no mid pole and no wire
+    a1_doors = [topo[i]['centre'] for i, k in ARMAMENT.items() if k == 'A1']
     # cells the street-fixture table (battlefield_r21.json) puts back before a raise count as taken: after the first
     # raise in play those fixtures stand there for good
     fixtures = {tuple(c[:3]) for c in json.load(open(Path(WORLD) / 'battlefield_r21.json', encoding='utf8'))['cells']
@@ -79,6 +84,9 @@ def plan(out, box=None):
         dense = not tower                                       # infill and housing lots get poles closer together
         us = (1, 11, 21, 31) if dense else (1, 16, 31)
         poles = {(u, 1) for u in us} | {(u, 31) for u in us} | {(1, u) for u in us} | {(31, u) for u in us}
+        door_side = any(abs(tx - cx) <= 16 and abs(tz - cz) <= 16 for tx, ty, tz in a1_doors)
+        if door_side:
+            poles -= {(u, 1) for u in us if u not in (1, 31)}
         siren = ix % 2 == 0 and iz % 2 == 0
         # utility poles
         placed = set()
@@ -108,6 +116,9 @@ def plan(out, box=None):
                 rep[kind + ' skipped'] += 1
         # wires between neighbouring poles (a span only between two poles that both stand, so no wire end hangs) along each side, at street + 8
         for a, b in ((0, 1), (0, 31), (1, 0), (31, 0)):
+            if door_side and (a, b) == (0, 1):
+                rep['A-1 door side kept clear'] += 1
+                continue
             if a == 0:
                 line = [(u, b) for u in range(1, 32)]; axis = 'x'
             else:
