@@ -60,6 +60,16 @@ public final class PilotCockpitReviewR64
     private static final int PLUG_RECOVER = Integer.getInteger("projectseele.plugWatchRecoverR64", -1);
     /** -Dprojectseele.plugWatchExitR64=<ticks of free control on the ground>: the pilot's exit is asked then, and the watch ends 13 seconds later. */
     private static final int PLUG_EXIT = Integer.getInteger("projectseele.plugWatchExitR64", -1);
+    /**
+     * -Dprojectseele.plugWatchCancelR64=<ticks after the lock>: the operator calls the sortie off then (/seele eva
+     * cancel: the Unit stops where it stands, its capsule in). -Dprojectseele.plugWatchAfterCancelR64=exit|abort|none
+     * is what the pilot does forty ticks later: asks to leave (the exit key), aborts (the abort key), or nothing
+     * (the launch review asks for the preparation again by itself, every five seconds). With exit or abort the watch
+     * runs until the capsule is back at its dock and the pilot has climbed out.
+     */
+    private static final int PLUG_CANCEL = Integer.getInteger("projectseele.plugWatchCancelR64", -1);
+    private static final String PLUG_AFTER_CANCEL = System.getProperty("projectseele.plugWatchAfterCancelR64", "none");
+    private static boolean cancelSent;
     /** -Dprojectseele.plugWatchAfterDockR64=<ticks>: how long the recovered capsule is watched at its dock before the pilot climbs out (ten more seconds are watched after that). */
     private static final int PLUG_AFTER_DOCK = Integer.getInteger("projectseele.plugWatchAfterDockR64", 60);
     /** -Dprojectseele.plugWatchChatR64=true: lines of every source are sent to the pilot after the lock and after leaving the capsule, for the chat panel's pictures. */
@@ -204,6 +214,9 @@ public final class PilotCockpitReviewR64
         mc.options.keyAttack.setDown(t >= 210 && t < 214 || t >= 226 && t < 230);
         if (at(previous, 250)) send(ServerboundEvaControlPacket.ACTION_SMASH);
         mc.options.keyUse.setDown(t >= 250 && t < 256);
+        // A UN unit has its own display: where the chat panel stands beside it.
+        if (UN && at(previous, 120)) speak(mc.getSingleplayerServer(), mc.player.getUUID(), "葛城美里 · 作战通信", "目标就在前方。先站稳，注意它两侧的手臂。");
+        if (UN && at(previous, 135)) tell(mc.getSingleplayerServer(), mc.player.getUUID(), "[UN 运输管制 · 00] 运输机已到达接应点。");
     }
 
     /**
@@ -277,6 +290,13 @@ public final class PilotCockpitReviewR64
             var pilot = server.getPlayerList().getPlayer(id);
             if (pilot != null) pilot.sendSystemMessage(net.minecraft.network.chat.Component.literal(line));
         });
+    }
+
+    /** What the server answers over the hotbar during a plug watch goes into the log: the pictures are four ticks apart. */
+    @SubscribeEvent
+    public static void answered(net.minecraftforge.client.event.ClientChatReceivedEvent.System event)
+    {
+        if (PLUG != null && !finished && event.isOverlay()) ProjectSeele.LOGGER.info("Plug watch: over the hotbar: {}", event.getMessage().getString());
     }
 
     private static boolean at(int previous, int wanted)
@@ -513,7 +533,20 @@ public final class PilotCockpitReviewR64
                 ProjectSeele.LOGGER.info("Plug watch: recovery asked at tick {}", watchTicks);
             }
         }
-        if (recoverSent)
+        // The sortie called off in the cage, and what the pilot then does about it.
+        if (PLUG_CANCEL >= 0 && locked && !cancelSent && lockedTicks == PLUG_CANCEL)
+        {
+            cancelSent = true;
+            mc.player.connection.sendCommand("seele eva cancel unit0" + Mth.clamp(plug.getAssignedVariant(), 0, 2));
+            ProjectSeele.LOGGER.info("Plug watch: sortie called off at tick {}", watchTicks);
+        }
+        if (cancelSent && locked && lockedTicks == PLUG_CANCEL + 40 && !"none".equals(PLUG_AFTER_CANCEL))
+        {
+            boolean abort = "abort".equals(PLUG_AFTER_CANCEL);
+            SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(abort ? ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH : ServerboundEvaControlPacket.ACTION_EXIT));
+            ProjectSeele.LOGGER.info("Plug watch: {} asked at tick {}", abort ? "abort" : "exit", watchTicks);
+        }
+        if (recoverSent || cancelSent && !"none".equals(PLUG_AFTER_CANCEL))
         {
             int stage = plug.getInsertionStage();
             if (stage != lastStage) ProjectSeele.LOGGER.info("Plug watch: capsule stage {} at tick {}", stage, watchTicks);
