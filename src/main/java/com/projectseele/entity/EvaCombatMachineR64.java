@@ -228,7 +228,10 @@ public final class EvaCombatMachineR64
         // R64 (M5): and it is the moment the limb is nearest the contact that is looked for, not the one it crosses
         // a plane at: a mark that stands inside the Unit's guard is met by the limb where the tick began, and a
         // search that only ran on from there took the opening jab seven blocks back into its wind-up.
-        float lo=phase(Math.max(0,now-3),0),hi=phase(now,0),best=hi;double least=Double.MAX_VALUE;
+        // R64 (flow, "kick"): the kick's own clip is not blended in through its live ticks, and its foot passes
+        // near a body that stands close on its way up: only this tick's sweep is searched.
+        int back=row.kind()==EvaMoveTableR64.KICK&&EvaCombatModelR64.flowKick(e)?1:3;
+        float lo=phase(Math.max(0,now-back),0),hi=phase(now,0),best=hi;double least=Double.MAX_VALUE;
         for(int i=0;i<=8;i++)
         {
             float tried=lo+(hi-lo)*i/8F;e.rowPhaseR64(tried);Vec3 limb=e.blowLimbR64();

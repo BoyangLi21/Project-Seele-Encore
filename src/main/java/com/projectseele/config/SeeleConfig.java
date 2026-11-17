@@ -298,12 +298,16 @@ public final class SeeleConfig
                 .defineInList("hitStop", "tiered", java.util.List.of("tiered", "flat"));
         EVA_COMBAT_FLOW = common
                 .comment("Under the frames core, how a blow is timed and drawn. off: as first built (the server sends the clip's",
-                        "place every tick and a client chases it; a hit freezes the pose). on: the four parts below. Or any of",
+                        "place every tick and a client chases it; a hit freezes the pose). on: the six parts below. Or any of",
                         "them by name, with commas: clock (a client plays the blow by its own frame time: no late start, an even",
                         "pace at any frame rate), stop (a hit slows the blow for a moment and drops none of it; both bodies are",
                         "held 1 tick for a light blow, 2 medium, 3 heavy, 4 a finisher, where tiered holds 2 to 8), curve (the",
                         "pace does not break between wind-up, blow and recovery; no recovery faster than 1.15 times as captured),",
-                        "fade (a blow begun out of another takes its place over a few ticks). In game: /seele combat flow.")
+                        "fade (a blow begun out of another takes its place over a few ticks), stand (with an Angel near the",
+                        "Unit takes no guard: it stands as it always stands, a blow comes out of that and goes back into it,",
+                        "and a blow left for a step or an evade gives way over six ticks), kick (the kick is one motion from a",
+                        "stand and back, the standing foot never moving, in place of the old hop and high kick; with curve).",
+                        "In game: /seele combat flow.")
                 .define("flow", "off", value -> value instanceof String);
         common.pop();
 

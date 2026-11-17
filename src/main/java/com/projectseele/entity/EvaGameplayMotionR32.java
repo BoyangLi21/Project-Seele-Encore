@@ -135,7 +135,7 @@ public final class EvaGameplayMotionR32
                 byte[] bytes=CombatMotionResourcesR44.read(file,"eva-gameplay-"+key);
                 var data=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
                 if(data.get("schema").getAsInt()!=2||data.get("rig_key").getAsInt()!=key)throw new IllegalArgumentException("Gameplay rig contract");
-                if(key==EvaUnit01Entity.UNIT_01)addKnifeCutsR64(data);
+                if(key==EvaUnit01Entity.UNIT_01){addClipsR64(data,"eva_knife_r64.json");addClipsR64(data,"eva_kick_r64.json");}
                 com.projectseele.ProjectSeele.LOGGER.info("EVA gameplay profile resolved: rig={} file={} sha256={}",key,file.toAbsolutePath().normalize(),
                         java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
                 // Kept for the whole session and read in place: share equal numbers instead of holding 88 bytes for each.
@@ -151,12 +151,14 @@ public final class EvaGameplayMotionR32
      * knife's guard, the thrust's first frame: the guard itself is the private profile's and is not published. Here
      * each frame is the guard with that difference put on it; where the blade's tip is in the knife's own space is
      * taken from the thrust. A profile without the thrust, or without a bone the cuts turn, is left as it is.
+     * The kick (tools/finale/kick.py, r32_kick_r64) is written the same way, on the same frame, and strikes with
+     * its own bone: it takes no blade from the thrust.
      */
-    private static void addKnifeCutsR64(JsonObject data)
+    private static void addClipsR64(JsonObject data,String file)
     {
         var clips=data.getAsJsonObject("clips");
         if(!clips.has("r32_knife_forward"))return;
-        try(var stream=EvaGameplayMotionR32.class.getResourceAsStream("/assets/projectseele/motion/eva_knife_r64.json"))
+        try(var stream=EvaGameplayMotionR32.class.getResourceAsStream("/assets/projectseele/motion/"+file))
         {
             if(stream==null)return;
             var added=JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
@@ -183,7 +185,9 @@ public final class EvaGameplayMotionR32
                     frames.add(frame);
                 }
                 clip.remove("bones");clip.add("frames",frames);
-                for(String field:List.of("contact_point_model","mesh","source_playback_speed"))if(beside.has(field))clip.add(field,beside.get(field));
+                boolean blade=clip.has("contact_bone")&&beside.has("contact_bone")&&clip.get("contact_bone").equals(beside.get("contact_bone"));
+                for(String field:List.of("contact_point_model","mesh","source_playback_speed"))
+                    if(beside.has(field)&&(blade||!field.equals("contact_point_model")))clip.add(field,beside.get(field));
                 clips.add(entry.getKey(),clip);
             }
         }
@@ -217,7 +221,14 @@ public final class EvaGameplayMotionR32
                 entry.setValue(Optional.of(com.projectseele.util.JsonClipFrames.without(entry.getValue().get(),"rotation_wxyz","bone_position_xyz")));
     }
     public static int variant(EvaUnit01Entity e){return e instanceof EvaPrototypeEntity un?3+un.getUNSerial():e.getUnitVariant();}
-    public static float guardWeight(EvaUnit01Entity e){return e.getEntityData().get(GUARD);}
+    /**
+     * How much of the guard's pose the Unit takes: the fists at the chin over a deep crouch, with an Angel within
+     * 64 blocks. R64 (flow, "stand"): none. It stands as it does anywhere, with the knife as it holds the knife
+     * anywhere, its hands relaxed; its blows begin from standing and end in it, as their clips were captured
+     * (measured with the guard: the hips rose three to seven blocks into every blow and fell back after it).
+     * What the guard decides besides the pose (who moves the body through an engagement) reads the signal itself.
+     */
+    public static float guardWeight(EvaUnit01Entity e){return EvaCombatModelR64.flowStand(e)?0:e.getEntityData().get(GUARD);}
     public static boolean ready(EvaUnit01Entity e){return profile(variant(e))!=null;}
     private static boolean singleFlight(EvaUnit01Entity e)
     {var p=profile(variant(e));return p!=null&&p.has("airborne_revision")&&p.get("airborne_revision").getAsInt()>=42;}
@@ -240,7 +251,12 @@ public final class EvaGameplayMotionR32
     /** Seconds of a clip as it was captured. */
     static float clipSecondsR64(EvaUnit01Entity e,String name){return clip(e,name).get("duration_seconds").getAsFloat();}
     public static boolean hasClip(EvaUnit01Entity e,String name)
-    {var p=profile(variant(e));return p!=null&&p.getAsJsonObject("clips").has("r32_"+name);}
+    {
+        var p=profile(variant(e));if(p==null)return false;
+        var clips=p.getAsJsonObject("clips");
+        // R64 (flow, "kick"): the kick this project authored stands where the profile has none.
+        return clips.has("r32_"+name)||name.equals("kick")&&clips.has("r32_kick_r64")&&EvaCombatModelR64.flowKick(e);
+    }
     public static boolean knifeReady(EvaUnit01Entity e)
     {return hasClip(e,"knife_forward")&&hasClip(e,"knife_reverse");}
     public static boolean lowAttackReadyR44(EvaUnit01Entity e)
@@ -296,6 +312,7 @@ public final class EvaGameplayMotionR32
     }
     private static String resolve(EvaUnit01Entity e,String name)
     {
+        if(name.equals("kick")&&!profile(variant(e)).getAsJsonObject("clips").has("r32_kick"))return "kick_r64";
         int stance=actionStanceR44(e);
         if(stance>0&&java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(name))return (stance>=3?"prone_":"crouch_")+name;
         if(name.equals("jab")&&e.getOrdinaryAttackStage()==3&&hasClip(e,"jab_loop"))return "jab_loop";
@@ -501,6 +518,21 @@ public final class EvaGameplayMotionR32
     {
         boolean[] movementOwner={false};
         var pose=applyAction(e,base,partial,capturedBase,movementOwner);var tag=e.getEntityData().get(RELEASE_FROM);
+        var leaveR64=e.rowLeaveR64();
+        if(leaveR64!=null&&hasClip(e,leaveR64.clip()))
+        {
+            // R64 (stand): a row left before it had played out, for a step, an evade or a fall. It runs on along
+            // its clip, on its way back into the stand, while what follows takes its place. (Measured before:
+            // a jab left for a step at its ninth tick, thigh and shin went 21 and 16 degrees in the one frame.)
+            // What follows has the pelvis and the legs from its first frame: through the blow the feet stood
+            // where the strike's support held them, not where its clip has them, and the clip's own stance
+            // would only now be seen. A kick's leg is in the air, and is brought down with the rest.
+            var left=EvaBodyPose.gameplayClip(e,resolve(e,leaveR64.clip()),phase(e,leaveR64.clip(),leaveR64.phase()));
+            offArmR64(e,left,base,leaveR64.clip());
+            if(leaveR64.share()<1)left=EvaBodyPose.blend(base,left,leaveR64.share());
+            return new AppliedPoseR44(leaveR64.clip().equals("kick")?EvaBodyPose.blend(left,pose,leaveR64.weight())
+                    :EvaBodyPose.blendUpperKeepingLocomotionR51(pose,left,1-leaveR64.weight()),movementOwner[0]);
+        }
         if(tag.isEmpty()||!owns(e,partial)||e.hasLiveActionForRender(partial)||airAge(e,partial)>=0||CombatReactionsR36.active(e)||EvaCombatR31.action(e)!=0)return new AppliedPoseR44(pose,movementOwner[0]);
         float age=e.level().getGameTime()-tag.getLong("release_at")+partial;
         int releaseTicks=tag.getInt("release_ticks_r51")==12?12:6;
@@ -602,7 +634,7 @@ public final class EvaGameplayMotionR32
     {
         if(e.rifleMoveBlend(partial)==0F&&!e.pilotLocomotionRequestedR45())
         {
-            var inputs=ordinaryIdleInputsR52(e,partial,e.getEntityData().get(GUARD),e.rifleStanceLevel(partial));
+            var inputs=ordinaryIdleInputsR52(e,partial,guardWeight(e),e.rifleStanceLevel(partial));
             if(inputs.ordinaryOwner()&&(inputs.fieldLocomotion()||!capturedBase||!EvaCapturedLocomotionR44.SUPPORT_OWNERSHIP_CANDIDATE))
             {
             if(movementOwner!=null)movementOwner[0]=capturedBase;
@@ -637,7 +669,7 @@ public final class EvaGameplayMotionR32
         // Field travel keeps the accepted locomotion's complete arm swing.
         // The combat advance clips previously replaced it with a cupped guard.
         float low=Mth.clamp(e.rifleStanceLevel(partial),0,1);low=low*low*(3-2*low);
-        float guardBlend=e.getEntityData().get(GUARD)*(1-low);
+        float guardBlend=guardWeight(e)*(1-low);
         boolean fieldLocomotion=Unit03SourceRigR53.sharesGroundActions(e)&&!e.isBerserk()&&EvaBodyPose.runtimeLocomotionR44(e)
                 &&e.rifleStanceLevel(partial)<1F;
         if(fieldLocomotion)
@@ -689,7 +721,7 @@ public final class EvaGameplayMotionR32
             float guardPhase,float shieldPhase,float swordPhase,boolean crouching,
             boolean ordinaryOwner,boolean fieldLocomotion,boolean combatSupport,boolean knifeHolding) {}
     public static OrdinaryIdleInputsR52 ordinaryIdleInputsR52(EvaUnit01Entity e,float partial,float actualStance)
-    {return ordinaryIdleInputsR52(e,partial,e.getEntityData().get(GUARD),actualStance);}
+    {return ordinaryIdleInputsR52(e,partial,guardWeight(e),actualStance);}
     public static OrdinaryIdleInputsR52 ordinaryIdleInputsR52(EvaUnit01Entity e,float partial,float actualGuard,float actualStance)
     {
         if(!Float.isFinite(partial)||!Float.isFinite(actualGuard)||!Float.isFinite(actualStance))
@@ -746,19 +778,53 @@ public final class EvaGameplayMotionR32
         if(inputs.combatSupport())weight*=1-EvaPoseBlendR51.smooth(inputs.run());
         return EvaBodyPose.blend(base,guard,weight);
     }
+    /** R64 (stand): how much of a punch's clip the arm that is not striking keeps. */
+    private static final float OFF_ARM_R64=.3F;
+    /**
+     * R64 (stand): the punches' clips are a boxer's, both fists at the chin before and after every blow, and a
+     * Unit has no guard (the owner, 2026-11-17: "eva本身不该有个拳击抱架"). The arm that strikes is the clip's;
+     * the other stays near where the Unit carries it and comes up a third of the way. What a blow is tested by,
+     * the striking hand, is as its clip has it.
+     */
+    private static void offArmR64(EvaUnit01Entity e,EvaBodyPose.Sample pose,EvaBodyPose.Sample base,String name)
+    {
+        if(!EvaCombatModelR64.flowStand(e)||!name.equals("jab")&&!name.equals("cross")&&!name.equals("hook"))return;
+        String off=side(e,name).equals("l")?"r":"l";
+        for(String part:new String[]{"clavicle_","arm_","forearm_","wrist_","hand_"})
+        {
+            String bone=part+off;
+            if(!pose.rotations.containsKey(bone)||!base.rotations.containsKey(bone))continue;
+            pose.rotations.get(bone).slerp(base.rotations.get(bone),1-OFF_ARM_R64);
+            pose.positions.get(bone).lerp(base.positions.get(bone),1-OFF_ARM_R64);
+        }
+        pose.dirty();
+    }
     private static EvaBodyPose.Sample actionPose(EvaUnit01Entity e,String name,float progress,EvaBodyPose.Sample base,float partial)
     {
         String resolved=resolve(e,name);float phase=phase(e,name,progress);
         var pose=EvaBodyPose.gameplayClip(e,resolved,phase);
         float entryEnd=actionEntryEndR51(e,name);
         var fadeR64=e.rowFadeR64();
+        var standR64=e.rowStandR64(name);
+        if(standR64!=null)offArmR64(e,pose,base,name);
         if(fadeR64!=null&&hasClip(e,fadeR64.clip()))
         {
             // R64 (flow): a blow begun out of another. The other runs on along its own clip while this one takes
             // its place: there is no pose to start from that stands still. (Up to here the blend began at the pose
             // the server had captured, the other blow frozen at its hit: measured, the chest turned 27 to 60
             // degrees in the first frame of the next punch.)
-            pose=EvaBodyPose.blend(EvaBodyPose.gameplayClip(e,resolve(e,fadeR64.clip()),phase(e,fadeR64.clip(),fadeR64.phase())),pose,fadeR64.weight());
+            var other=EvaBodyPose.gameplayClip(e,resolve(e,fadeR64.clip()),phase(e,fadeR64.clip(),fadeR64.phase()));
+            // R64 (stand): the other was on its way back into the stand.
+            if(standR64!=null){offArmR64(e,other,base,fadeR64.clip());if(fadeR64.share()<1)other=EvaBodyPose.blend(base,other,fadeR64.share());}
+            pose=EvaBodyPose.blend(other,pose,fadeR64.weight());
+        }
+        else if(standR64!=null)
+        {
+            // R64 (stand): a blow comes out of the way the Unit stands or walks over its start-up and goes back
+            // into it over its recovery; through its live ticks it is its clip's alone. Its clip begins and ends
+            // in a pose of its own (the punches' in a boxer's), which the Unit is not to stand in.
+            float shareR64=EvaRowClockR64.share(standR64,progress);
+            if(shareR64<1&&(progress>standR64.close()||!e.rowBeganOutOfBlowR64()))pose=EvaBodyPose.blend(base,pose,shareR64);
         }
         else if(!e.rowBeganOutOfBlowR64()&&progress<entryEnd&&!e.getEntityData().get(ACTION_FROM).isEmpty())
         {
@@ -770,7 +836,7 @@ public final class EvaGameplayMotionR32
             float entry=EvaPoseBlendR51.smooth(progress/entryEnd);
             pose=EvaBodyPose.blend(from,pose,entry);
         }
-        if(progress>.86F&&!phrases(e)){var end=e.getEntityData().get(GUARD)>.5F?EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F):base;pose=EvaBodyPose.blend(pose,end,(progress-.86F)/.14F);}
+        if(progress>.86F&&!phrases(e)){var end=guardWeight(e)>.5F?EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F):base;pose=EvaBodyPose.blend(pose,end,(progress-.86F)/.14F);}
         if(Unit03SourceRigR53.sharesGroundActions(e)&&e.rifleStanceLevel(partial)<.01F
                 &&e.rifleMoveBlend(partial)>.001F
                 &&java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(name))

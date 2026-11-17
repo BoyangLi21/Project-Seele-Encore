@@ -30,6 +30,14 @@ import net.minecraft.util.Mth;
  * <p>
  * The stages lie on the clip along one curve whose pace does not break where they meet ({@link #phase}); up to
  * here they were three straight lines (a kick's start-up played 3.5 times as fast as its recovery).
+ * <p>
+ * STAND (the owner, 2026-11-17: a Unit takes no stance; it stands as it always stands, and strikes from that).
+ * A blow's clip begins and ends in a pose of its own (the punches' in a boxer's, the knife's in a crouch), and
+ * the Unit stood in it for as long as the clip's ends lasted. Now a row has a share of the pose ({@link #share}):
+ * it comes out of the way the Unit stands or walks over its start-up, is the clip's alone through its live
+ * ticks, and goes back over its recovery, so that it ends where the Unit stands. And a row that is left before
+ * it has played out (for a step, an evade, a fall) runs on along its clip while what follows takes its place
+ * ({@link View#leave}); up to here the legs went from the blow's stance to the walk's in one frame.
  */
 public final class EvaRowClockR64
 {
@@ -46,6 +54,35 @@ public final class EvaRowClockR64
      * brought the slam's crouch in out of a jab at 4.4 blocks of hip a tick, where it had been 2.8.)
      */
     public static double fade(int startup){return Math.min(startup+.5,Mth.clamp(.8*startup,3,7));}
+    /**
+     * STAND: ticks in which a row that was left before it had played out gives its place to what follows it. As
+     * many as the release the server captures for a row (EvaGameplayMotionR32, six), which it stands in for.
+     */
+    public static final double LEAVE=6;
+    /**
+     * STAND: how much of the pose is the row's at a phase of its clip, by where the row's live part opens and
+     * closes on the clip. Through the live part it is one: the blow is tested by the clip's pose, as it was.
+     */
+    public static float share(float open,float close,float phase)
+    {
+        if(phase<open)return smooth(phase/Math.max(open,1.0e-4F));
+        if(phase>close)return 1-smooth((phase-close)/Math.max(1-close,1.0e-4F));
+        return 1;
+    }
+    private static float smooth(float t){t=Mth.clamp(t,0,1);return t*t*(3-2*t);}
+    /**
+     * STAND: the share of the pose this row has at a phase of its clip. A clip that itself comes out of a stand
+     * and goes back into one (the kick: tools/finale/kick.py) has the pose sooner and keeps it longer; its share
+     * only joins it to the way the Unit happens to be standing. (With the whole start-up given to coming out of
+     * the stand, the kick's shift of weight and lift of the knee were drawn at a third of their size and then
+     * made up in two ticks.)
+     */
+    public static float share(Clock c,float phase)
+    {
+        if(!c.clip().equals("kick"))return share(c.open(),c.close(),phase);
+        float in=.3F*c.open(),out=c.close()+.7F*(1-c.close());
+        return phase<in?smooth(phase/Math.max(in,1.0e-4F)):phase>out?1-smooth((phase-out)/Math.max(1-out,1.0e-4F)):1;
+    }
     /** A contact told ahead that has not come this long after its tick is given up. */
     private static final double DUE_GRACE=.75;
     /** How much of what a packet says the clock is off by is taken, and beyond how many ticks it is taken at once. */
@@ -141,6 +178,8 @@ public final class EvaRowClockR64
         if(e.getEntityData().hasItem(CLOCK)&&!e.getEntityData().get(CLOCK).isEmpty())e.getEntityData().set(CLOCK,new CompoundTag());
     }
     static boolean told(SynchedEntityData.DataValue<?> value){return value.id()==CLOCK.getId();}
+    /** Either side: what the Unit carries of its row's clock (empty: no row), or null on a Unit without one. */
+    static CompoundTag tag(EvaUnit01Entity e){return e.getEntityData().hasItem(CLOCK)?e.getEntityData().get(CLOCK):null;}
 
     static Clock read(CompoundTag tag)
     {
@@ -151,17 +190,20 @@ public final class EvaRowClockR64
 
     // ---- what a client draws -----------------------------------------------------------------------------------
 
-    /** A blow that is taking another's place in the pose: the other's clip, where it has run on to, and how much of the pose is the new blow's. */
-    public record Fade(String clip,float phase,float weight){}
+    /**
+     * What follows a row is taking its place in the pose: the row's clip, where it has run on to, how much of the
+     * pose is the new one's, and (STAND) the share the row itself has of the pose where it has run on to.
+     */
+    public record Fade(String clip,float phase,float weight,float share){}
 
     /** One Unit's row as one client plays it. Times are in ticks of that client's own frame clock. */
     public static final class View
     {
-        private Clock clock,before;
+        private Clock clock,before,gone;
         /** The server's count of the row's ticks is the time less this, were nothing to hold it. */
-        private double base,beforeBase;
+        private double base,beforeBase,goneBase;
         /** The place drawn last, and when. */
-        private double place,at,beforePlace,beforeAt,fadeFrom;
+        private double place,at,beforePlace,beforeAt,fadeFrom,gonePlace,goneAt,goneFrom;
         private int heard;
         private boolean out;
         private CompoundTag seen;
@@ -179,7 +221,12 @@ public final class EvaRowClockR64
         /** The row as told now (null: none) and the time: the phase to draw, or -1. */
         public float frame(Clock told,double time)
         {
-            if(told==null){clock=null;before=null;return -1;}
+            if(told==null)
+            {
+                // The row is over. Left before it had played out, it runs on beside what follows it (leave).
+                if(clock!=null&&place<clock.total()-.5){gone=clock;goneBase=base;gonePlace=place;goneAt=at;goneFrom=time;}
+                clock=null;before=null;return -1;
+            }
             if(clock==null||clock.serial()!=told.serial())
             {
                 // Another row. The one in hand, if it had not played out, runs on beside it for the fade.
@@ -229,7 +276,26 @@ public final class EvaRowClockR64
         {
             if(before==null||clock==null)return null;
             double t=Mth.clamp((time-fadeFrom)/fade(),0,1);
-            return new Fade(before.clip(),before.phase(beforePlace),(float)(t*t*(3-2*t)));
+            float phase=before.phase(beforePlace);
+            return new Fade(before.clip(),phase,(float)(t*t*(3-2*t)),share(before,phase));
+        }
+        /**
+         * STAND: a row was left before it had played out. It runs on along its clip for LEAVE ticks while what
+         * follows takes its place: its clip and phase, the share of the pose that is already what follows, and
+         * the row's own share where it has run on to. Null when there is none.
+         */
+        public Fade leave(double time)
+        {
+            if(gone==null)return null;
+            double t=(time-goneFrom)/LEAVE;
+            if(t>=1){gone=null;return null;}
+            if(time>goneAt)
+            {
+                double to=target(gone,goneBase,time);
+                gonePlace=follow(gonePlace,to,Math.max(0,to-target(gone,goneBase,goneAt)),time-goneAt);goneAt=time;
+            }
+            float phase=gone.phase(gonePlace);t=Math.max(0,t);
+            return new Fade(gone.clip(),phase,(float)(t*t*(3-2*t)),share(gone,phase));
         }
         private double fade(){return clock==null?3:EvaRowClockR64.fade(clock.startup());}
 
