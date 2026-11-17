@@ -16,7 +16,7 @@ public final class SeeleNetwork
     // state. Older clients must reject the changed synchronized accessor layout.
     // 78 is the R63r release (R63 plus the R64 audio); main adds synchronized entity
     // data beyond it (planted model, gait keys), so it must not accept an R63r peer.
-    private static final String PROTOCOL_VERSION = "79";
+    private static final String PROTOCOL_VERSION = "80";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),

@@ -217,7 +217,9 @@ public final class NervPilotCombatR30
         }
         if(sortie.rifle&&(eva.getArmamentMask()&(1<<EvaUnit01Entity.WEAPON_RIFLE))==0&&angel==null)
         {
-            var station=b.station!=null&&l.getEntity(b.station) instanceof NervArmamentStationEntity n?n:NervArmamentStationEntity.commandStation(l);
+            // With spare-weapon towers armed the pilot goes to the nearest one; a tower restocks each time it comes in.
+            var station=b.station!=null&&l.getEntity(b.station) instanceof NervArmamentStationEntity n?n
+                    :ArmamentTowersR64.active(l)?ArmamentTowersR64.nearest(l,eva.position()):NervArmamentStationEntity.commandStation(l);
             if(station!=null)
             {
                 b.station=station.getUUID();retain(l,station.blockPosition());if(!station.isReadyAndStocked())station.deploy();

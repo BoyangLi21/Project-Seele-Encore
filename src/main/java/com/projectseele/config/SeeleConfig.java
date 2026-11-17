@@ -66,6 +66,9 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.IntValue CANNON_CHARGE_TICKS;
     public static final ForgeConfigSpec.DoubleValue CANNON_RANGE;
     public static final ForgeConfigSpec.IntValue CANNON_COOLDOWN_TICKS;
+    public static final ForgeConfigSpec.IntValue ARMAMENT_TOWER_LOCK_TICKS;
+    public static final ForgeConfigSpec.IntValue ARMAMENT_TOWER_DOOR_TICKS;
+    public static final ForgeConfigSpec.IntValue ARMAMENT_TOWER_IDLE_RECALL_SECONDS;
     public static final ForgeConfigSpec.DoubleValue CANNON_MOB_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue CANNON_CORE_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue CANNON_EXPLOSION_RADIUS;
@@ -334,6 +337,19 @@ public final class SeeleConfig
         CANNON_CRATER_DEPTH = common
                 .comment("Depth of the staged cannon crater. N2 uses exactly three times this depth.")
                 .defineInRange("craterDepth", 32, 4, 128);
+        common.pop();
+
+        common.push("armament_tower");
+        ARMAMENT_TOWER_LOCK_TICKS = common
+                .comment("Spare-weapon towers of Tokyo-3, city raised: ticks the roof locks take to lift, and to drop again.")
+                .defineInRange("raisedLockTicks", 24, 1, 400);
+        ARMAMENT_TOWER_DOOR_TICKS = common
+                .comment("Spare-weapon towers, city raised: ticks the door takes to go up, and to come down.")
+                .defineInRange("raisedDoorTicks", 30, 1, 400);
+        ARMAMENT_TOWER_IDLE_RECALL_SECONDS = common
+                .comment("Seconds a tower stands ready with nobody taking the weapon before it comes in by itself.",
+                        "The count does not run during combat and starts again when combat ends. 0: never.")
+                .defineInRange("idleRecallSeconds", 180, 0, 3600);
         common.pop();
 
         common.push("strategic_explosions");

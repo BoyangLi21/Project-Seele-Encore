@@ -703,6 +703,16 @@ public final class NervOperationsConsole
             result = new ActionResult(requested.accepted(),
                     requested.message());
         }
+        else if ((action == S20_ARMAMENT_DEPLOY_ACTION
+                || action == S20_ARMAMENT_RECALL_ACTION) && ArmamentTowersR64.active(level))
+        {
+            // With spare-weapon towers armed the two buttons order all of them out, or all of them in.
+            boolean deploy = action == S20_ARMAMENT_DEPLOY_ACTION;
+            int taken = ArmamentTowersR64.commandAll(level, deploy);
+            result = new ActionResult(taken > 0,
+                    taken > 0 ? (deploy ? "Armament buildings deploying: " : "Armament buildings returning: ") + taken
+                            : "No armament building took the command.");
+        }
         else if (action == S20_ARMAMENT_DEPLOY_ACTION
                 || action == S20_ARMAMENT_RECALL_ACTION)
         {

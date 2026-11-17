@@ -51,6 +51,13 @@ public final class NervArmamentStationRenderer
             float partialTick, PoseStack poses, MultiBufferSource buffers,
             int packedLight)
     {
+        if (station.towerR64() >= 0)
+        {
+            // A spare-weapon tower has no frame of its own on the ground: its lot and its building are real blocks.
+            ArmamentTowerRenderR64.render(station, partialTick, poses, buffers, packedLight);
+            super.render(station, yaw, partialTick, poses, buffers, packedLight);
+            return;
+        }
         poses.pushPose();
         renderSurfaceFrame(poses, buffers, packedLight,station.rackHalfWidthR47(),station.rackHalfDepthR54());
         renderHatch(poses, buffers, packedLight,
