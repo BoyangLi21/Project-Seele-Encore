@@ -680,6 +680,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private int knifeElapsedTicks;
     private float knifeDurationAtStart;
     private boolean knifeReverseMotion;
+    /** R64: which knife blow is in hand (EvaGameplayMotionR32.knifeClip). */
+    private int knifeKindR64;
     private int rifleCooldown;
     private boolean leftSwing;
     private int atRegenDelay;
@@ -3905,12 +3907,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.ordinaryAfterKickBufferTicks = 0;
     }
 
-    private void beginKnifeMotion(boolean reverse)
+    private void beginKnifeMotion(boolean reverse){this.beginKnifeMotion(reverse?1:0);}
+    /** @param kind 0 the thrust in the forward grip, 1 the reverse grip, 2 the cut, 3 the cut back (R64, the frames core's) */
+    private void beginKnifeMotion(int kind)
     {
+        boolean reverse=kind==1;String clip=EvaGameplayMotionR32.knifeClip(kind);
         this.clearLegacyRecoveryR51();
         com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"knife");
         EvaGameplayMotionR32.beginAction(this);
-        this.entityData.set(DATA_KNIFE_TYPE, reverse ? 1 : 0);
+        this.entityData.set(DATA_KNIFE_TYPE, kind);
+        this.knifeKindR64=kind;
         this.entityData.set(DATA_LIVE_ACTION_PHASE, 0.0F);
         this.queuedKnifeInput = -1;
         this.knifeReverseMotion = reverse;
@@ -3928,9 +3934,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                         / EvaPilotCapability.attackSpeedMultiplier(this.getPilotSynchronization()) / MELEE_RATE_R43));
         if(EvaGameplayMotionR32.knifeReady(this))
             this.pendingKnifeContactTicks=Math.max(1,Math.round(this.knifeDurationAtStart
-                    *EvaGameplayMotionR32.contactPhase(this,reverse?"knife_reverse":"knife_forward")));
+                    *EvaGameplayMotionR32.contactPhase(this,clip)));
         this.liveCombatRootPrevious = EvaGameplayMotionR32.knifeReady(this)
-                ?EvaGameplayMotionR32.root(this,reverse?"knife_reverse":"knife_forward",0):EvaLiveCombatMotion.knife(reverse,0);
+                ?EvaGameplayMotionR32.root(this,clip,0):EvaLiveCombatMotion.knife(reverse,0);
     }
 
     private void cancelKnifeMotion()
@@ -4027,7 +4033,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     this.leftSwing=false;this.entityData.set(DATA_MELEE_LEFT,false);
                     this.entityData.set(DATA_MELEE_SEQUENCE,(this.entityData.get(DATA_MELEE_SEQUENCE)+1)&Integer.MAX_VALUE);
                 }
-                this.beginKnifeMotion(reverse);
+                this.beginKnifeMotion(row.stage());
                 this.knifeVisualTicks=ticks;this.knifeDurationAtStart=ticks;this.pendingKnifeContactTicks=0;
             }
         }
@@ -4039,7 +4045,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             case EvaMoveTableR64.PUNCH -> EvaGameplayMotionR32.ordinary(row.stage());
             case EvaMoveTableR64.SLAM -> "heavy";
             case EvaMoveTableR64.KICK -> "kick";
-            default -> row.stage()==1?"knife_reverse":"knife_forward";
+            default -> EvaGameplayMotionR32.knifeClip(row.stage());
         };
     }
     /** The row's blow is still the one the old flags are playing. */
@@ -4172,7 +4178,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(stage>=0)return stage==1?"cross":stage==2?"hook":"jab";
         if(this.entityData.get(DATA_KICK_ACTIVE))return "kick";
         int knife=this.entityData.get(DATA_KNIFE_TYPE);
-        return knife<0?"":knife==1?"knife_reverse":"knife_forward";
+        return knife<0?"":EvaGameplayMotionR32.knifeClip(knife);
     }
     int blowStampR64()
     {return this.entityData.get(DATA_MELEE_SEQUENCE)+this.entityData.get(DATA_SMASH_SEQUENCE)*31+this.entityData.get(DATA_KICK_SEQUENCE)*961;}
@@ -4193,7 +4199,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         float phase=this.combatR64().phase(this.knifeElapsedTicks,Mth.clamp(this.knifeElapsedTicks/this.knifeDurationAtStart,0,1));
         this.entityData.set(DATA_LIVE_ACTION_PHASE, phase);
         Vec3 authored=EvaGameplayMotionR32.knifeReady(this)
-                ?EvaGameplayMotionR32.root(this,this.knifeReverseMotion?"knife_reverse":"knife_forward",phase)
+                ?EvaGameplayMotionR32.root(this,EvaGameplayMotionR32.knifeClip(this.knifeKindR64),phase)
                 :EvaLiveCombatMotion.knife(this.knifeReverseMotion,phase);
         this.applyAuthoredRootDelta(authored,this.knifeElapsedTicks==1);
     }
@@ -4390,6 +4396,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(EvaGameplayMotionR32.ready(this)&&(family>=0&&family<4||family==7))return EvaGameplayMotionR32.root(this,family==7?"heavy":EvaGameplayMotionR32.ordinary(family),phase);
         if(family==4&&EvaGameplayMotionR32.kickReady(this))return EvaGameplayMotionR32.root(this,"kick",phase);
         if((family==5||family==6)&&EvaGameplayMotionR32.knifeReady(this))return EvaGameplayMotionR32.root(this,family==6?"knife_reverse":"knife_forward",phase);
+        // R64: the knife's cuts are families 8 and 9 (7 is the slam).
+        if(family>=8&&EvaGameplayMotionR32.knifeReady(this))return EvaGameplayMotionR32.root(this,EvaGameplayMotionR32.knifeClip(family-6),phase);
         return family == 7 ? EvaLiveCombatMotion.heavy(phase) : family < 4 ? EvaLiveCombatMotion.ordinary(family, phase)
                 : family == 4 ? EvaLiveCombatMotion.kick(phase)
                 : EvaLiveCombatMotion.knife(family == 6, phase);
@@ -4400,7 +4408,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         int stage = this.getOrdinaryAttackStage();
         int knife = this.getKnifeMotionType(0.0F);
         int family = this.isHeavyMotionActive() ? 7 : stage >= 0 ? stage : this.isKickMotionActive(0.0F) ? 4
-                : knife >= 0 ? 5 + knife : -1;
+                : knife >= 2 ? 6 + knife : knife >= 0 ? 5 + knife : -1;
         int sequence = family == 4 ? this.entityData.get(DATA_KICK_SEQUENCE)
                 : family == 6 || family == 7 ? this.entityData.get(DATA_SMASH_SEQUENCE)
                 : this.entityData.get(DATA_MELEE_SEQUENCE);

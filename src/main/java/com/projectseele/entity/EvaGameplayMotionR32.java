@@ -135,6 +135,7 @@ public final class EvaGameplayMotionR32
                 byte[] bytes=CombatMotionResourcesR44.read(file,"eva-gameplay-"+key);
                 var data=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
                 if(data.get("schema").getAsInt()!=2||data.get("rig_key").getAsInt()!=key)throw new IllegalArgumentException("Gameplay rig contract");
+                if(key==EvaUnit01Entity.UNIT_01)addKnifeCutsR64(data);
                 com.projectseele.ProjectSeele.LOGGER.info("EVA gameplay profile resolved: rig={} file={} sha256={}",key,file.toAbsolutePath().normalize(),
                         java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
                 // Kept for the whole session and read in place: share equal numbers instead of holding 88 bytes for each.
@@ -144,6 +145,68 @@ public final class EvaGameplayMotionR32
         }).orElse(null);
     }
     public static synchronized void reload(){PROFILES.clear();}
+    /**
+     * R64: the knife's ordinary cuts stand in Unit-01's profile beside the thrust they start from. They are this
+     * project's own (tools/finale/slash.py) and come with the mod, written as what each frame differs by from the
+     * knife's guard, the thrust's first frame: the guard itself is the private profile's and is not published. Here
+     * each frame is the guard with that difference put on it; where the blade's tip is in the knife's own space is
+     * taken from the thrust. A profile without the thrust, or without a bone the cuts turn, is left as it is.
+     */
+    private static void addKnifeCutsR64(JsonObject data)
+    {
+        var clips=data.getAsJsonObject("clips");
+        if(!clips.has("r32_knife_forward"))return;
+        try(var stream=EvaGameplayMotionR32.class.getResourceAsStream("/assets/projectseele/motion/eva_knife_r64.json"))
+        {
+            if(stream==null)return;
+            var added=JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            var names=new ArrayList<String>();for(var name:data.getAsJsonArray("bones"))names.add(name.getAsString());
+            var beside=clips.getAsJsonObject("r32_knife_forward");
+            var guard=beside.getAsJsonArray("frames").get(0).getAsJsonObject();
+            for(var entry:added.getAsJsonObject("clips").entrySet())
+            {
+                var clip=entry.getValue().getAsJsonObject();
+                int[] at=new int[clip.getAsJsonArray("bones").size()];
+                for(int b=0;b<at.length;b++){at[b]=names.indexOf(clip.getAsJsonArray("bones").get(b).getAsString());if(at[b]<0)return;}
+                var frames=new JsonArray();
+                for(var element:clip.getAsJsonArray("frames"))
+                {
+                    var change=element.getAsJsonObject();var frame=guard.deepCopy();
+                    var rotations=frame.getAsJsonArray("rotation_wxyz");var deltas=change.getAsJsonArray("rotation_delta_wxyz");
+                    for(int b=0;b<at.length;b++)rotations.set(at[b],afterR64(deltas.get(b).getAsJsonArray(),rotations.get(at[b]).getAsJsonArray()));
+                    if(change.has("root_delta_m"))frame.add("root_m",addedR64(frame.getAsJsonArray("root_m"),change.getAsJsonArray("root_delta_m")));
+                    var offsets=frame.has("bone_position_xyz")?frame.getAsJsonObject("bone_position_xyz"):new JsonObject();
+                    for(var offset:change.getAsJsonObject("position_delta_xyz").entrySet())
+                        offsets.add(offset.getKey(),offsets.has(offset.getKey())?addedR64(offsets.getAsJsonArray(offset.getKey()),offset.getValue().getAsJsonArray()):offset.getValue());
+                    frame.add("bone_position_xyz",offsets);
+                    frame.add("foot_contact",change.get("foot_contact"));
+                    frames.add(frame);
+                }
+                clip.remove("bones");clip.add("frames",frames);
+                for(String field:List.of("contact_point_model","mesh","source_playback_speed"))if(beside.has(field))clip.add(field,beside.get(field));
+                clips.add(entry.getKey(),clip);
+            }
+        }
+        catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}
+    }
+    /** A rotation (w, x, y, z) put after another: the product, as the clips keep rotations. */
+    private static JsonArray afterR64(JsonArray a,JsonArray b)
+    {
+        double aw=a.get(0).getAsDouble(),ax=a.get(1).getAsDouble(),ay=a.get(2).getAsDouble(),az=a.get(3).getAsDouble();
+        double bw=b.get(0).getAsDouble(),bx=b.get(1).getAsDouble(),by=b.get(2).getAsDouble(),bz=b.get(3).getAsDouble();
+        var q=new JsonArray();
+        q.add(aw*bw-ax*bx-ay*by-az*bz);q.add(aw*bx+ax*bw+ay*bz-az*by);q.add(aw*by-ax*bz+ay*bw+az*bx);q.add(aw*bz+ax*by-ay*bx+az*bw);
+        return q;
+    }
+    private static JsonArray addedR64(JsonArray a,JsonArray b)
+    {var sum=new JsonArray();for(int i=0;i<3;i++)sum.add(a.get(i).getAsDouble()+b.get(i).getAsDouble());return sum;}
+    /** The clip of a knife blow by its kind: 0 the thrust in the forward grip, 1 the reverse grip, 2 the cut, 3 the cut back (R64). */
+    public static String knifeClip(int kind)
+    {return switch(kind){case 1->"knife_reverse";case 2->"knife_cut_r64";case 3->"knife_back_r64";default->"knife_forward";};}
+    /** Review only: -Dprojectseele.knifeCutsR64=false keeps the knife's presses as they were, to capture the two beside each other. */
+    private static final boolean KNIFE_CUTS_R64=!"false".equals(System.getProperty("projectseele.knifeCutsR64"));
+    /** The Unit has the knife's ordinary cuts (Unit-01 with the private profile). */
+    public static boolean knifeCutsReadyR64(EvaUnit01Entity e){return KNIFE_CUTS_R64&&hasClip(e,"knife_cut_r64")&&hasClip(e,"knife_back_r64");}
     /** Called once EvaBodyPose has built its clips from the profiles loaded so far. Each frame's per-bone rotations
      * and offsets are read only for that, and they are nine tenths of every profile (about 200 MB over the five
      * rigs). The profiles are replaced by ones without them; a reader still holding an old one is not disturbed. */
@@ -205,7 +268,7 @@ public final class EvaGameplayMotionR32
         if(e.getOrdinaryAttackStage()>=0)return ordinary(e.getOrdinaryAttackStage());
         if(e.isKickMotionActive(partial)&&kickReady(e))return "kick";
         int knife=e.getKnifeMotionType(partial);
-        return knife>=0&&knifeReady(e)?knife==1?"knife_reverse":"knife_forward":"";
+        return knife>=0&&knifeReady(e)?knifeClip(knife):"";
     }
     public static float activeGroundPhase(EvaUnit01Entity e,float partial)
     {

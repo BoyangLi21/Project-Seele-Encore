@@ -48,27 +48,43 @@ public final class EvaMoveTableR64Test
             check(Math.abs(EvaMoveTableR64.phase(live,r.startup(),r.active(),r.recovery(),open,close)-close)<1e-5F,n+": and closes with the live ticks");
             check(Math.abs(EvaMoveTableR64.phase(total,r.startup(),r.active(),r.recovery(),open,close)-1F)<1e-5F,n+": the clip ends with the row");
         }
-        check(rows==8,"eight rows");
+        check(rows==10,"ten rows");
 
         // The light string from standing: four blows, 95 points, and it ends.
         Set<String> seen=new HashSet<>();
         float damage=0;int blows=0;
-        for(Row r=EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,false,false);r!=null;r=EvaMoveTableR64.get(r.light()))
+        for(Row r=EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,false,false,true);r!=null;r=EvaMoveTableR64.get(r.light()))
         {
             check(seen.add(r.name()),"the light string does not come back to "+r.name());
             damage+=r.damage();blows++;
             check(r.heavy()==null||r.heavy().equals("kick"),r.name()+": the heavy press out of a punch is the kick");
         }
         check(blows==4&&damage==95F,"jab, cross, jab, slam: 95 points, found "+blows+" blows and "+damage);
-        check(EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,true,false).name().equals("kick"),"the heavy press from standing is the kick");
+        check(EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,true,false,true).name().equals("kick"),"the heavy press from standing is the kick");
         check(EvaMoveTableR64.get("kick").cooldown()==44&&EvaMoveTableR64.get("knife_reverse").cooldown()==53,"the cooldowns of R63 stand");
 
-        // The knife: the cut, the counter after an evade, the reverse cut; one cancel, cut into reverse cut.
-        check(EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_KNIFE,false,false).name().equals("knife_slash"),"knife light");
-        check(EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_KNIFE,false,true).name().equals("knife_counter"),"knife light after an evade");
-        check(EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_KNIFE,true,true).name().equals("knife_reverse"),"knife heavy");
-        check(EvaMoveTableR64.get("knife_slash").light()==null&&"knife_reverse".equals(EvaMoveTableR64.get("knife_slash").heavy()),"a cut is left only for the reverse cut");
-        check(EvaMoveTableR64.get("knife_reverse").cancelHit()<0,"the reverse cut is played out");
+        // The knife (the owner, 2026-11-16): the light press is the cut and then the cut back, 55 points; the heavy
+        // press is the thrust that was the light press, and out of it the reverse grip; a heavy press out of a cut
+        // is the thrust; the counter after an evade stands.
+        int knife=EvaUnit01Entity.WEAPON_KNIFE;
+        check(EvaMoveTableR64.opener(knife,false,false,true).name().equals("knife_cut"),"knife light");
+        check(EvaMoveTableR64.opener(knife,false,true,true).name().equals("knife_counter"),"knife light after an evade");
+        check(EvaMoveTableR64.opener(knife,true,false,true).name().equals("knife_slash")&&EvaMoveTableR64.opener(knife,true,true,true).name().equals("knife_slash"),"knife heavy");
+        seen.clear();damage=0;blows=0;
+        for(Row r=EvaMoveTableR64.opener(knife,false,false,true);r!=null;r=EvaMoveTableR64.get(r.light()))
+        {
+            check(seen.add(r.name()),"the knife's light string does not come back to "+r.name());
+            damage+=r.damage();blows++;
+            check("knife_slash".equals(r.heavy()),r.name()+": the heavy press out of a cut is the thrust");
+        }
+        check(blows==2&&damage==55F,"cut, cut back: 55 points, found "+blows+" blows and "+damage);
+        check(EvaMoveTableR64.get("knife_slash").light()==null&&"knife_reverse".equals(EvaMoveTableR64.get("knife_slash").heavy()),"the thrust is left only for the reverse grip");
+        check(EvaMoveTableR64.get("knife_reverse").cancelHit()<0,"the reverse grip is played out");
+        check(EvaMoveTableR64.get("knife_slash").damage()==60F&&EvaMoveTableR64.get("knife_reverse").damage()==80F,"the thrust and the reverse grip strike as they did");
+        // A Unit without the cuts has the knife as it was.
+        check(EvaMoveTableR64.opener(knife,false,false,false).name().equals("knife_slash"),"knife light without the cuts");
+        check(EvaMoveTableR64.opener(knife,false,true,false).name().equals("knife_counter"),"knife light after an evade without the cuts");
+        check(EvaMoveTableR64.opener(knife,true,false,false).name().equals("knife_reverse"),"knife heavy without the cuts");
         System.out.println("Frames core table: "+rows+" rows, strings end, clips run forward PASS");
     }
 

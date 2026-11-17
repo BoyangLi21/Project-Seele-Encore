@@ -256,7 +256,8 @@ public final class EvaMotionEngineV2
             runtime.liveAttackActive = true;
             runtime.liveAttackRecoveryAge = 0.0D;
             String family = gameplayKick ? "kick"
-                    : gameplayKnife ? gameplayKnifeType == 1
+                    : gameplayKnife ? gameplayKnifeType >= 2
+                            ? com.projectseele.entity.EvaGameplayMotionR32.knifeClip(gameplayKnifeType) : gameplayKnifeType == 1
                             ? "knife_reverse" : "knife_forward"
                     : "ordinary";
             if (!family.equals(runtime.liveActionFamily))
@@ -453,7 +454,8 @@ public final class EvaMotionEngineV2
                         "EVA post-Gecko live pose selected: entity={} family={} "
                                 + "clip={} stage={} bones={}",
                         entity.getId(), gameplayKick ? "kick"
-                                : gameplayKnife ? gameplayKnifeType == 1
+                                : gameplayKnife ? gameplayKnifeType >= 2
+                                        ? com.projectseele.entity.EvaGameplayMotionR32.knifeClip(gameplayKnifeType) : gameplayKnifeType == 1
                                         ? "knife_reverse" : "knife_forward"
                                 : "ordinary",
                         selection.key(), entity.getOrdinaryAttackStage(),

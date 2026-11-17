@@ -98,7 +98,7 @@ public final class EvaCombatMachineR64
         {
             if(button<0||!owns()||e.hasLiveActionForRender(0)||e.leapLockedR64())return;
             Row next=sinceEnd<=LINK&&last!=null?follow(last,button):null;
-            if(next==null)next=EvaMoveTableR64.opener(e.getWeapon(),button==HEAVY,sinceEvade<=AFTER_EVADE);
+            if(next==null)next=EvaMoveTableR64.opener(e.getWeapon(),button==HEAVY,sinceEvade<=AFTER_EVADE,EvaGameplayMotionR32.knifeCutsReadyR64(e));
             if(next!=null&&ready(next))start(next,"standing");
             return;
         }

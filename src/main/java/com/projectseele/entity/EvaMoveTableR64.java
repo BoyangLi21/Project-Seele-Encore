@@ -24,7 +24,8 @@ public final class EvaMoveTableR64
     public static final int LIGHT=0,MEDIUM=1,HEAVY=2,FINISHER=3;
 
     /**
-     * @param stage       PUNCH: 0 jab, 1 cross, 2 hook. KNIFE: 0 forward grip, 1 reverse grip.
+     * @param stage       PUNCH: 0 jab, 1 cross, 2 hook. KNIFE: 0 the thrust in the forward grip, 1 the reverse grip,
+     *                    2 the cut, 3 the cut back (EvaGameplayMotionR32.knifeClip).
      * @param startup     ticks before the blow can land
      * @param active      ticks it can land in (the limb's swept capsule is tested on each until it lands)
      * @param recovery    ticks after that
@@ -71,10 +72,17 @@ public final class EvaMoveTableR64
         row(new Row("jab2",  PUNCH,0,  4, 3, 10, .066F,.093F, 20, 3.2F,1.1, MEDIUM,  4,  .018F, 7,    2,    8,  12, 7,  10, 12,  3,10,   0,  false, "slam",  "kick"));
         row(new Row("slam",  SLAM, 0,  9, 4, 25, .030F,.055F, 35, 4F,  2.0, FINISHER,8,  .030F, 5,    4,    -1, -1, 18, 22, 24,  5,13,   0,  true,  null,    null));
         row(new Row("kick",  KICK, 0,  7, 4, 7,  .078F,.142F, 50, 4F,  2.4, HEAVY,   5,  .022F, 6,    3,    -1, -1, 12, 14, 15,  -1,-1,  44, true,  null,    null));
-        // The knife. Forward grip on the light press, reverse grip on the heavy. A forward cut that has landed may be
-        // left for the reverse cut, late in its recovery; nothing else chains (a cut left early for the next one
-        // made 50 points a second of the old 32: as it is, a cut and a reverse cut make 39, the cut alone 25 of the
-        // old 24). A light press within twelve ticks of an evade is the counter: the forward cut with half its wind-up.
+        // The knife. Up to R63 and in the first frames core the light press was the thrust (wound up from behind
+        // the hip, driven in and held: 44 ticks) and the heavy press the reverse grip. The owner after his second
+        // play (2026-11-16): what the light press does belongs on the heavy one, and the light press is to be an
+        // ordinary knife attack. So: the light press is the cut and, out of it, the cut back (tools/finale/slash.py);
+        // the heavy press is the thrust and, out of it late in its recovery, the reverse grip as before. A heavy
+        // press out of either cut is the thrust. The two cuts make 55 points in 29 ticks, 38 a second, where the
+        // thrust and the reverse grip make 39 and the thrust alone 27: no more than the knife had.
+        // A light press within twelve ticks of an evade is the counter: the thrust with half its wind-up.
+        //      name          kind  st  su ac rec  lead   tail   dmg  rad  knock level    stop push   track feint cH  cW  eH  eW  move armor    cd  slow   light         heavy
+        row(new Row("knife_cut",    KNIFE,2, 5, 3, 10, .100F,.100F, 25, 3.2F,0.8, LIGHT,  2, .012F, 8,  2, 10, 13, 8,  10, 12, -1,-1, 0,  false, "knife_back","knife_slash"));
+        row(new Row("knife_back",   KNIFE,3, 5, 3, 11, .100F,.100F, 30, 3.2F,1.0, MEDIUM, 3, .016F, 7,  2, 11, 14, 8,  11, 13, -1,-1, 0,  false, null,"knife_slash"));
         row(new Row("knife_slash",  KNIFE,0, 11,3, 30, .035F,.025F, 60, 3.2F,1.1, MEDIUM, 4, .018F, 6,  4, 28, 34, 15, 18, 26, -1,-1, 0,  false, null,"knife_reverse"));
         row(new Row("knife_reverse",KNIFE,1, 6, 3, 24, .030F,.051F, 80, 4F,  2.0, HEAVY,  6, .022F, 6,  3, -1, -1, 12, 15, 22, -1,-1, 53, false, null,null));
         row(new Row("knife_counter",KNIFE,0, 6, 3, 26, .035F,.025F, 60, 3.2F,1.1, MEDIUM, 5, .020F, 12, 0, 22, 28, 12, 16, 24, -1,-1, 0,  false, null,"knife_reverse"));
@@ -95,10 +103,15 @@ public final class EvaMoveTableR64
     public static Row get(String name){return name==null?null:ROWS.get(name);}
     public static Iterable<Row> rows(){return ROWS.values();}
 
-    /** The row a press begins with nothing in hand to follow. */
-    public static Row opener(int weapon,boolean heavy,boolean afterEvade)
+    /**
+     * The row a press begins with nothing in hand to follow.
+     * @param cuts the Unit has the knife's cuts (EvaGameplayMotionR32.knifeCutsReadyR64); without them the knife is
+     *             as it was, the thrust on the light press and the reverse grip on the heavy
+     */
+    public static Row opener(int weapon,boolean heavy,boolean afterEvade,boolean cuts)
     {
-        if(weapon==EvaUnit01Entity.WEAPON_KNIFE)return get(heavy?"knife_reverse":afterEvade?"knife_counter":"knife_slash");
+        if(weapon==EvaUnit01Entity.WEAPON_KNIFE)
+            return get(cuts?heavy?"knife_slash":afterEvade?"knife_counter":"knife_cut":heavy?"knife_reverse":afterEvade?"knife_counter":"knife_slash");
         return get(heavy?"kick":"jab");
     }
 
