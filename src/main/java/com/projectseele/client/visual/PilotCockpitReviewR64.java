@@ -90,7 +90,7 @@ public final class PilotCockpitReviewR64
     private static final boolean UN = UNIT.startsWith("un") && !UNIT.startsWith("unit");
     private static final int VARIANT = UNIT.endsWith("00") ? EvaUnit01Entity.UNIT_00 : UNIT.endsWith("02") ? EvaUnit01Entity.UNIT_02 : EvaUnit01Entity.UNIT_01;
     private static final String ARM = UN ? "seele dev motionlab un " + (UNIT.endsWith("1") ? 1 : 0) + " " : "seele dev motionlab weapon " + UNIT + " ";
-    private static final int END = SCRIPT.equals("stances") ? 900 : SCRIPT.equals("look") ? 300 : SCRIPT.equals("chat") ? 660 : 1070;
+    private static final int END = SCRIPT.equals("stances") ? 900 : SCRIPT.equals("look") ? 300 : SCRIPT.equals("chat") ? 660 : SCRIPT.equals("cannon") ? 1100 : 1070;
 
     private static int wait, tick = -1, serverStart = -1, settledTicks, missing, frame, capturedTick = -1, lockedTicks, watchTicks;
     private static Vec3 settledAt;
@@ -164,6 +164,7 @@ public final class PilotCockpitReviewR64
         if (SCRIPT.equals("stances")) stances(mc, eva, previous);
         else if (SCRIPT.equals("look")) look(mc, eva, previous);
         else if (SCRIPT.equals("chat")) chat(mc, eva, previous);
+        else if (SCRIPT.equals("cannon")) cannon(mc, eva, previous);
         else drive(mc, eva, previous);
         if (tick >= END) finish(mc, "complete");
     }
@@ -220,6 +221,32 @@ public final class PilotCockpitReviewR64
         // A UN unit has its own display: where the chat panel stands beside it.
         if (UN && at(previous, 120)) speak(mc.getSingleplayerServer(), mc.player.getUUID(), "葛城美里 · 作战通信", "目标就在前方。先站稳，注意它两侧的手臂。");
         if (UN && at(previous, 135)) tell(mc.getSingleplayerServer(), mc.player.getUUID(), "[UN 运输管制 · 00] 运输机已到达接应点。");
+    }
+
+    /**
+     * The positron cannon as it stands: charged to the full and fired four times, standing and prone, from the seat
+     * and then from behind. (-Dprojectseele.cockpitReviewScriptR64=cannon)
+     */
+    private static void cannon(Minecraft mc, EvaUnit01Entity eva, int previous)
+    {
+        int t = tick;
+        if (eva == null) return;
+        mc.player.setYRot(0); mc.player.setXRot(0);
+        if (at(previous, 5)) mc.player.connection.sendCommand(ARM + "cannon");
+        boolean hold = false;
+        for (int start : new int[]{40, 340, 640, 940})
+        {
+            if (at(previous, start)) send(ServerboundEvaControlPacket.ACTION_CHARGE_START);
+            if (at(previous, start + 90)) send(ServerboundEvaControlPacket.ACTION_CHARGE_STOP);
+            hold |= t >= start && t < start + 90;
+        }
+        mc.options.keyUse.setDown(hold);
+        // Down at 200, up at 500, down again at 800.
+        if (at(previous, 200) || at(previous, 500) || at(previous, 800)) send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
+        if (t >= 600) mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+        if (previous / 20 != t / 20)
+            ProjectSeele.LOGGER.info("Cockpit review: tick {} {} weapon {} charge {} cooldown {} prone {} scope {}", t, part(t), eva.getWeapon(), eva.getCannonCharge(),
+                    eva.getCannonCooldown(), eva.isPilotProne(), com.projectseele.client.ClientForgeEvents.isCannonScopeActive(eva));
     }
 
     /**
@@ -336,6 +363,7 @@ public final class PilotCockpitReviewR64
                     : t < 430 ? "stand" : t < 490 ? "riflewalk" : t < 500 ? "stand" : t < 570 ? "sight" : t < 640 ? "stand" : t < 730 ? "cannon"
                     : t < 790 ? "stand" : "knife";
         if (SCRIPT.equals("look")) return t < 30 ? "idle" : t < 100 ? "down" : t < 110 ? "stand" : t < 190 ? "walk" : "strike";
+        if (SCRIPT.equals("cannon")) return t < 190 ? "stand" : t < 490 ? "prone" : t < 600 ? "stand" : t < 790 ? "stand3" : "prone3";
         if (SCRIPT.equals("chat")) return t < 110 ? "foot" : t < 250 ? "board" : t < 420 ? "seat" : t < 470 ? "third" : t < 530 ? "typing" : t < 550 ? "seat" : "foot";
         return t < 40 ? "idle" : t < 110 ? "leave" : t < 250 ? "board" : t < 260 ? "stand" : t < 390 ? "walk" : t < 430 ? "stand"
                 : t < 540 ? "run" : t < 585 ? "stand" : t < 700 ? "strike" : t < 705 ? "stand" : t < 795 ? "jump" : t < 800 ? "stand"
