@@ -36,14 +36,32 @@ def in_nerv(x, y, z):
 
 
 def street_sign(lines, x, z):
+    lines = [' / '.join(p for p in l.split(' / ') if not re.match(R.DROP_PATTERN, p)) for l in lines]
     kept = [l for l in lines if l and l not in R.DROP_LINES and not NUMBER.match(l)]
     head = lines[0] if lines else ''
     if head == '办公楼入口':
         return [pick(R.OFFICE_JA, x, z), '', '', '']
     if head == '住宅入口' or (not kept and head):
         return [pick(R.APARTMENT_JA, x, z), '', '', '']
-    out = [R.to_ja(l) for l in kept][:4]
-    return (out + [''] * 4)[:4]
+    out = [R.to_ja(l) for l in kept]
+    for i, l in enumerate(out):
+        m = re.match(R.GENERIC_USE, l)
+        if m:
+            out[i] = pick(R.APARTMENT_JA if m.group(1) == '住居' else R.USE_NAMES[m.group(1)], x, z)
+    return (fit_lines(out) + [''] * 4)[:4]
+
+
+def fit_lines(lines):
+    """A line wider than a sign is split at ' / ' (else at its first space) when the sign has free lines for it."""
+    out = []
+    for i, l in enumerate(lines):
+        if R.text_width(l) > R.SIGN_WIDTH:
+            parts = l.split(' / ') if ' / ' in l else [] if any(c.isascii() and c.isalpha() for c in l) else l.split(' ', 1)
+            if len(parts) > 1 and len(out) + len(parts) + len(lines) - i - 1 <= 4:
+                out.extend(p.strip() for p in parts)
+                continue
+        out.append(l)
+    return out[:4]
 
 
 def nerv_line(line):
@@ -74,6 +92,9 @@ def nerv_plate(lines):
 
 def board(cur):
     station, route = cur['Station'], cur['Route']
+    rows = [cur.get(k, '') for k in ('Row0', 'Row1', 'Row2')]
+    if '全线站序' in route or any(r.startswith(('│', '●')) or '本站' in r for r in rows):
+        return {}                       # station line diagrams follow the station names (S-4), not the floor rules
     floor = R.FLOORS.get(station)
     guide = R.GUIDE_TITLE.get(route)
     after = {}
@@ -87,7 +108,8 @@ def board(cur):
     return {k: v for k, v in after.items() if v != cur.get(k)}
 
 
-def plan(world, positions):
+def plan(world, positions, nerv_extra=frozenset()):
+    """nerv_extra: positions outside the pyramid box that still take the NERV rules (GeoFront)."""
     edits = []
     cache = {}
     for (x, y, z) in positions:
@@ -101,12 +123,27 @@ def plan(world, positions):
         if str(ent['id']).endswith('sign'):
             cur = current(ent, 'sign')
             lines = cur['front']
-            new = nerv_plate(lines) if in_nerv(x, y, z) else street_sign(lines, x, z)
-            if new != lines or cur['back'] != new:
-                edits.append(dict(pos=[x, y, z], type='sign', before=cur, after={'front': new, 'back': new}))
+            nerv = in_nerv(x, y, z) or (x, y, z) in nerv_extra
+            new = nerv_plate(lines) if nerv else street_sign(lines, x, z)
+            # the back follows the front where it carried the same text, else it is converted on its own (table only,
+            # so other sessions' prop texts outside the tables stay as they are); a blank back stays blank
+            after = {}
+            if new != lines:
+                after['front'] = new
+            if cur['back'] == lines:
+                if new != lines:
+                    after['back'] = new
+            elif any(cur['back']):
+                back = nerv_plate(cur['back']) if nerv else street_sign(cur['back'], x, z)
+                if not any(back):
+                    back = new          # the back held only a generator label: it shows the plate's name instead
+                if back != cur['back']:
+                    after['back'] = back
+            if after:
+                edits.append(dict(pos=[x, y, z], type='sign', before=cur, after=after))
         elif str(ent['id']) == 'projectseele:station_departure_board' and int(ent.get('Wayfinding', 0)):
             cur = current(ent, 'board')
-            after = board(cur) if in_nerv(x, y, z) else {}
+            after = board(cur) if in_nerv(x, y, z) or (x, y, z) in nerv_extra else {}
             if after:
                 edits.append(dict(pos=[x, y, z], type='board', before={k: cur[k] for k in after}, after=after))
     return edits
@@ -122,11 +159,14 @@ def main():
     p.add_argument('--out', type=Path, required=True)
     a = p.parse_args()
     positions = [tuple(map(int, s.split(','))) for s in a.at]
+    nerv_extra = set()
     if a.signs:
         for s in json.loads(a.signs.read_text('utf8')):
             if s['kind'] in a.kinds and (not a.areas or s['area'] in a.areas) and not s['empty']:
                 positions.append((s['x'], s['y'], s['z']))
-    edits = plan(a.world, positions)
+                if s['area'] in ('pyramid', 'geofront'):
+                    nerv_extra.add((s['x'], s['y'], s['z']))
+    edits = plan(a.world, positions, nerv_extra)
     a.out.write_text(json.dumps(edits, ensure_ascii=False, indent=1), 'utf8')
     print(json.dumps(dict(positions=len(positions), edits=len(edits))))
 
