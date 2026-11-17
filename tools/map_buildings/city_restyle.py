@@ -453,7 +453,7 @@ def hazard(m, y, k):
 def armament(m, H, kind):
     W, D = m.W, m.D
     if kind == 'A1':
-        wall, seam = M('light_gray_terracotta'), M('gray_terracotta')
+        wall, seam = M('cyan_terracotta'), M('gray_concrete')        # grey-green armour (light grey terracotta reads brown)
     elif kind == 'A2':
         wall, seam = M('gray_concrete'), M('deepslate_tiles')
     else:
