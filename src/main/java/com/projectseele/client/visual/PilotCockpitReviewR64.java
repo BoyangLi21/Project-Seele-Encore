@@ -193,6 +193,9 @@ public final class PilotCockpitReviewR64
         mc.options.keyAttack.setDown(t >= 520 && t < 550 || t >= 790 && t < 794 || t >= 805 && t < 809);
         if (at(previous, 600)) link.sendCommand(ARM + "cannon");
         if (at(previous, 640)) send(ServerboundEvaControlPacket.ACTION_CHARGE_START);
+        // With the cannon's scope up the chat panel stands under the weapon's window: two lines to see it there.
+        if (at(previous, 652)) speak(mc.getSingleplayerServer(), mc.player.getUUID(), "葛城美里 · 作战通信", "目标就在前方。先站稳，注意它两侧的手臂。");
+        if (at(previous, 664)) tell(mc.getSingleplayerServer(), mc.player.getUUID(), "[NERV 运输管制] 运输机已到达接应点。");
         if (at(previous, 730)) send(ServerboundEvaControlPacket.ACTION_CHARGE_STOP);
         if (at(previous, 760)) link.sendCommand(ARM + "knife");
         if (at(previous, 790) || at(previous, 805)) send(ServerboundEvaControlPacket.ACTION_MELEE);
@@ -252,6 +255,9 @@ public final class PilotCockpitReviewR64
         if (at(previous, 132)) tell(server, id, "[NERV 运输管制] 运输机已到达接应点。");
         if (at(previous, 142)) speak(server, id, "赤木律子 · 机体监视", "同步率稳定。LCL 电荷正常。");
         if (at(previous, 152)) link.sendChat("收到，准备出击");
+        // Two other players of a shared world speak: one with a name of their own, one whose name reads like a tag of the panel's.
+        if (at(previous, 262)) other(server, id, "Kensuke", "初号机，听得到吗？");
+        if (at(previous, 272)) other(server, id, "Misato", "我只是个名字叫 Misato 的玩家");
         // In the seat: the same reply three times over, a long line, a name written short, a line that is not a name.
         if (at(previous, 290) || at(previous, 300) || at(previous, 310)) link.sendCommand("seele eva launch unit01");
         if (at(previous, 320) || at(previous, 335)) link.sendCommand("seele eva status unit01");
@@ -279,6 +285,24 @@ public final class PilotCockpitReviewR64
         {
             var pilot = server.getPlayerList().getPlayer(id);
             if (pilot != null) com.projectseele.world.NervStaffDialogue.say(pilot, speaker, line);
+        });
+    }
+
+    /**
+     * Another player's chat as a client in a shared world receives it: the player is listed, then their chat packet
+     * comes. (A single-player world has no second player; this is the same packet from a stand-in.)
+     */
+    private static void other(net.minecraft.server.MinecraftServer server, java.util.UUID id, String name, String said)
+    {
+        server.execute(() ->
+        {
+            var pilot = server.getPlayerList().getPlayer(id);
+            if (pilot == null) return;
+            var profile = new com.mojang.authlib.GameProfile(java.util.UUID.nameUUIDFromBytes(("cockpit-review:" + name).getBytes(StandardCharsets.UTF_8)), name);
+            var player = net.minecraftforge.common.util.FakePlayerFactory.get(pilot.serverLevel(), profile);
+            pilot.connection.send(net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(java.util.List.of(player)));
+            pilot.sendChatMessage(net.minecraft.network.chat.OutgoingChatMessage.create(net.minecraft.network.chat.PlayerChatMessage.unsigned(profile.getId(), said)),
+                    false, net.minecraft.network.chat.ChatType.bind(net.minecraft.network.chat.ChatType.CHAT, player));
         });
     }
 
