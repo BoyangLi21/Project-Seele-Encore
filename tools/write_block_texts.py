@@ -5,6 +5,7 @@ Edits: JSON list of
                                         "after":  {"front": [...], "back": [...], "color": "black", "glow": false}}
     {"pos": [x, y, z], "type": "board", "before": {"Station": "...", "Route": "...", "Row0": "...", "Row1": "...", "Row2": "..."},
                                         "after":  {same keys, any subset}}
+    (boards may also carry "MapRows": [strings], the stop list of a station line diagram)
 Every edit is checked before anything is written: the block entity is there, of the right kind, and its current text
 equals "before" exactly. Each touched region file is copied to --out first. After writing, every chunk is read back:
 the edited entities must hold "after", every other block entity and every block state must be unchanged.
@@ -24,6 +25,7 @@ from install_r53_carrier_trays import stopped_world
 from write_deep_cells import REGION, read_chunk, write_chunk, sign_text
 
 BOARD_KEYS = ('Station', 'Route', 'Row0', 'Row1', 'Row2')
+LIST_KEYS = ('MapRows',)        # station line diagrams keep their stops and footers in a string list
 
 
 def sign_lines(side):
@@ -33,7 +35,11 @@ def sign_lines(side):
 def current(entity, kind):
     if kind == 'sign':
         return {'front': sign_lines(entity['front_text']), 'back': sign_lines(entity['back_text'])}
-    return {k: str(entity.get(k, '')) for k in BOARD_KEYS}
+    got = {k: str(entity.get(k, '')) for k in BOARD_KEYS}
+    for k in LIST_KEYS:
+        if k in entity:
+            got[k] = [str(v) for v in entity[k]]
+    return got
 
 
 def apply_edit(entity, edit):
@@ -52,6 +58,11 @@ def apply_edit(entity, edit):
         for k in BOARD_KEYS:
             if k in after:
                 entity[k] = nbtlib.String(after[k])
+        for k in LIST_KEYS:
+            if k in after:
+                if k not in entity:
+                    raise SystemExit(f"{edit['pos']}: has no {k} to rewrite")
+                entity[k] = nbtlib.List[nbtlib.String]([nbtlib.String(v) for v in after[k]])
 
 
 def matches(entity, edit, key):
@@ -59,7 +70,7 @@ def matches(entity, edit, key):
     want = edit[key]
     if edit['type'] == 'sign':
         return all(got[s] == (list(want[s]) + [''] * 4)[:4] for s in ('front', 'back') if s in want)
-    return all(got[k] == want[k] for k in want if k in BOARD_KEYS)
+    return all(got.get(k) == want[k] for k in want if k in BOARD_KEYS + LIST_KEYS)
 
 
 def main():

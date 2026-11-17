@@ -26,6 +26,7 @@ SHOP_JA = {
     '泳池・操场：北侧': 'プール・校庭：北側', '事务所': '事務所', '票务服务': 'きっぷ売り場', '候船大厅 / B2F': '乗船待合室 / B2F',
     '教学楼：左侧': '校舎：左側', '请沿校园通路进入': '入口は校内通路から', '教学楼・保健室': '校舎・保健室',
     '贯通线 · 雾里线': '貫通線・霧里線', '沿街向东约150格': '東へ約600m', '贯通线2楼': '貫通線 2階', '雾里线1楼': '霧里線 1階',
+    'S2 駅前': '新箱根中央 駅前',  # no S2 line exists; both signs stand 63 blocks south of 新箱根中央 station
     '強羅接驳线': '強羅連絡線', '强罗接驳线': '強羅連絡線', '土产': '土産', '黑鸡蛋': '黒たまご', '登山电车': '登山電車',
     '公交': 'バス', '餐厅': 'レストラン', '便利店': 'コンビニ', '机务检修': '機体整備', '航空整备库': '航空整備庫',
     '联合国防卫部': '国連防衛部', 'UN · 战备设施': 'UN · 戦備施設', '身份卡': 'IDカード', '舱门 GATE': 'ハッチ GATE',
@@ -166,3 +167,120 @@ SIGN_WIDTH = 90
 
 def text_width(text):
     return sum(_NARROW.get(c, 6) if ord(c) < 0x2000 or c == '·' else 9 for c in text)
+
+
+# --- P batch: NERV signs outside the place table ------------------------------------------------------------------
+# launch-area observation rooms under the cages: "3号发射区 / 轨道观察室 / 入口 → / 主梯沿廊道向南"
+LAUNCH_ROOMS = {'轨道观察室': '軌道観測室', '发射装置观察室': '射出装置観測室', '夹具检修观察室': '拘束具点検観測室'}
+for _n in (1, 2, 3):
+    for _zh, _ja in LAUNCH_ROOMS.items():
+        NERV_GUIDE_SIGNS[(f'{_n}号发射区', _zh, '入口 →', '主梯沿廊道向南')] = \
+            [f'第{_n}射出区 {_n}号发射区', f'{_ja} →', _zh, 'エレベーター 南']
+NERV_GUIDE_SIGNS.update({
+    ('NERV / A', 'DUTY', '值班准备', 'TO COMMAND >'): ['NERV / A', 'DUTY 当直準備', '值班准备', 'TO COMMAND >'],
+    ('NERV / A', 'BRIEFING', '作战简报', 'STAIRS SOUTH'): ['NERV / A', 'BRIEFING 作戦説明', '作战简报', 'STAIRS SOUTH'],
+    ('明日香待命室', 'NERV 02', '原登栓口同层直达', '待命 / 警卫值守'): ['アスカ待機室', '明日香待命室', 'NERV 02 搭乗口同階', '待機 / 警備員常駐'],
+    ('碇真嗣待命室', 'NERV 01', '原登栓口同层直达', '待命 / 警卫值守'): ['碇シンジ待機室', '碇真嗣待命室', 'NERV 01 搭乗口同階', '待機 / 警備員常駐'],
+    ('绫波丽待命室', 'NERV 00', '原登栓口同层直达', '待命 / 警卫值守'): ['綾波レイ待機室', '绫波丽待命室', 'NERV 00 搭乗口同階', '待機 / 警備員常駐'],
+    ('登机整备层 ↑', '双向扶梯 / 步梯', '下层：发射区检修廊', '上层：三机插入栓入口'):
+        ['搭乗整備フロア ↑', 'エスカレーター・階段', '下：射出区点検通路', '上：3機プラグ搭乗口'],
+    ('NERV 医疗翼', '101  102  103', '独立静养病房', '前方 / AHEAD'): ['NERV 医療棟', '101  102  103', '個室 独立静养病房', '前方 / AHEAD'],
+    ('实验区电梯', '原机库站接驳层', 'LCL 同步实验层', '原机库站接驳层'): ['実験区エレベーター', '旧ケイジ駅連絡階', 'LCL 同調実験フロア', '实验区电梯'],
+    ('', '高级指挥台', '', ''): ['', '上級指揮台', '高级指挥台', ''],
+    ('TECH / 01', 'DATA SERVICE', '数据链路维护', '< WEST STAIR'): ['TECH / 01', 'DATA SERVICE', 'データ回線保守', '< WEST STAIR'],
+    ('TECH / 01', 'DATA SERVICE', '数据链路维护', 'EAST STAIR >'): ['TECH / 01', 'DATA SERVICE', 'データ回線保守', 'EAST STAIR >'],
+    ('东侧主电梯 →', '指挥区 / 科研区', '机库整备层', '沿廊道右转'): ['A号エレベーター →', '第一発令所 / 研究区', 'ケイジ整備フロア', '廊下を右へ'],
+})
+for _n in (101, 102, 103):
+    NERV_GUIDE_SIGNS[(f'病房 {_n}', 'NERV 医疗翼', '静养 / RECOVERY', '')] = [f'病室 {_n}', 'NERV 医療棟', '回復 / RECOVERY', f'病房 {_n}']
+
+# board headings beyond the floor table: (heading on the old board) -> (ja, zh, en)
+BOARD_HEADS = {
+    'NERV · LCL 同步实验层': ('LCL 同調実験フロア', 'LCL 同步实验层', 'LCL Sync Lab Level'),
+    '地面出口 · 大直梯': ('地上出口 大型エレベーター', '地面出口 · 大直梯', 'Surface Lift'),
+    '光学监视室': ('光学監視室', '光学监视室', 'Optical Monitoring'),
+}
+GUIDE_TITLE['房间入口'] = ('入口', '房间入口', 'Entrance')
+# board rows outside the place table: Chinese row -> (ja, zh[, en]); the arrow is kept from the row
+BOARD_PHRASES = {
+    '地面接待层': ('地上受付フロア', '地面接待层', 'Surface Reception'),
+    '门外呼叫 · 轿厢内选层': ('外で呼出・かご内で階選択', '门外呼叫 · 轿厢内选层'),
+    '请保持门口净空': ('ドア前で立ち止まらないでください', '请保持门口净空'),
+    '大直梯 · 地面入口': ('地上行エレベーター', '大直梯 · 地面入口', 'Surface Lift'),
+    '车站 · 地下铁路': ('駅・地下鉄道', '车站 · 地下铁路', 'Station'),
+    '请沿东侧主廊进入候车区': ('東側通路から待合へ', '请沿东侧主廊进入候车区'),
+    '光学监视室': ('光学監視室', '光学监视室', 'Optical Monitoring'),
+    '本层直梯': ('エレベーター', '电梯', 'Lift'),
+    '指挥室／车站 · 经直梯': ('発令所・本部駅 EV経由', '指挥室／车站 · 经直梯', 'Command / Station by lift'),
+}
+
+
+# --- S-4: station names from map-roads' R-4 table (kind, old name, "日文|中文|English") ------------------------------
+def _load_r4():
+    import os
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'r4_station_names.tsv')
+    stations, routes = {}, {}
+    for row in open(path, encoding='utf8'):
+        if row.startswith('#') or '\t' not in row:
+            continue
+        kind, old, new = row.rstrip('\n').split('\t')
+        names = tuple(new.split('|'))
+        (stations if kind == 'stations' else routes)[old] = names
+        if kind == 'stations' and old.endswith('駅'):
+            stations[old[:-1]] = names
+    return stations, routes
+
+
+STATIONS, ROUTES = _load_r4()
+TRACK_SIDE = {'北侧轨道': ('北側のりば', '北侧轨道', 'North Track'), '南侧轨道': ('南側のりば', '南侧轨道', 'South Track'),
+              '东侧轨道': ('東側のりば', '东侧轨道', 'East Track'), '西侧轨道': ('西側のりば', '西侧轨道', 'West Track')}
+# station board rows: Chinese -> (ja, zh[, en]); "每分钟一班" rows stay as they are (owner's decision)
+STATION_PHRASES = {
+    '消防设备': ('消火設備', '消防设备', 'Fire Equipment'),
+    '请勿遮挡': ('物を置かないでください', '请勿遮挡', 'Keep Clear'),
+    '紧急情况联系站务': ('非常時は駅係員へ', '紧急情况联系站务', 'Emergency: Station Staff'),
+    '候车室 / 优先席': ('待合室・優先席', '候车室 / 优先席', 'Waiting Room · Priority Seats'),
+    '请先下后上': ('降りる方が先です', '请先下后上', 'Let Passengers Off First'),
+    '乘车方向见站台信息牌': ('乗車方向はホームの案内で', '乘车方向见站台信息牌', 'Direction: See Platform Signs'),
+    '双向扶梯 · 站台': ('エスカレーター・ホーム', '双向扶梯 · 站台', 'Escalator · Platforms'),
+    '双向联络扶梯': ('連絡エスカレーター', '双向联络扶梯', 'Link Escalator'),
+    '下层站台': ('下りホーム階', '下层站台', 'Lower Platforms'),
+    '上层站台': ('上りホーム階', '上层站台', 'Upper Platforms'),
+    '职员服务 · 通行协助': ('職員サービス・通行案内', '职员服务 · 通行协助', 'Staff Service'),
+    '换乘／出口见南侧导向牌': ('乗換・出口は南側の案内で', '换乘／出口见南侧导向牌', 'Transfer / Exit: South Signs'),
+    '请保留通行证': ('通行証はお持ちください', '请保留通行证', 'Keep Your Pass'),
+    'U1 · 总部／研究模拟区': ('U1 NERV本部・研究シミュレーション区', 'U1 · 总部／研究模拟区', 'U1 HQ / Research'),
+    '大直梯 · 地面出口': ('大型エレベーター 地上出口', '大直梯 · 地面出口', 'Surface Lift'),
+    '服务台在大厅西侧': ('案内所はホール西側', '服务台在大厅西侧', 'Information: West Hall'),
+    '站台 · 双向自动步道': ('ホーム・動く歩道', '站台 · 双向自动步道', 'Platforms · Moving Walkway'),
+    '乘车前请确认方向和站序': ('乗車前に方向と停車駅を確認', '乘车前请确认方向和站序', 'Check Direction and Stops'),
+    '登机楼梯': ('搭乗階段', '登机楼梯', 'Boarding Stairs'),
+    '人员出口 · 双向步道': ('職員出口・歩道', '人员出口 · 双向步道', 'Staff Exit'),
+    '湿舱不作人员通道': ('ウェットデッキは通行不可', '湿舱不作人员通道', 'Wet Deck: No Passage'),
+    '北侧联络厅': ('北側連絡ホール', '北侧联络厅', 'North Link Hall'),
+    '登机请循楼梯标识': ('搭乗は階段の案内に従って', '登机请循楼梯标识', 'Board via the Stairs'),
+    '注液期间禁止进入': ('注水中は立入禁止', '注液期间禁止进入', 'No Entry While Flooding'),
+    '站前导览': ('駅前案内', '站前导览', 'Station Guide'),
+    '到达／换乘指引': ('到着・乗換案内', '到达／换乘指引', 'Arrivals / Transfers'),
+    '到达服务 · 通行咨询': ('到着案内所', '到达服务 · 通行咨询', 'Arrivals Desk'),
+    'U1 · 自动步道接驳': ('U1 動く歩道連絡', 'U1 · 自动步道接驳', 'U1 Walkway Link'),
+    '联合国试验机库': ('国連試験格納庫', '联合国试验机库', 'UN Test Hangar'),
+    '湿舱区域': ('ウェットデッキ', '湿舱区域', 'Wet Deck'),
+}
+# diagram footers
+MAP_FOOTERS = {
+    '发车时间见本侧实时板': '発車時刻はこちら側の発車標で|发车时间见本侧实时板',
+    '出口与楼梯 · 按本侧导向': '出口・階段はこちら側の案内で|出口与楼梯 · 按本侧导向',
+}
+
+
+def station(name):
+    """(ja, zh, en) for an old station name, with an optional " · 北侧轨道" platform side, or None."""
+    base, _, side = name.partition(' · ')
+    names = STATIONS.get(base.strip())
+    if not names:
+        return None
+    if side in TRACK_SIDE:
+        s = TRACK_SIDE[side]
+        return (f'{names[0]} {s[0]}', f'{names[1]} · {s[1]}', f'{names[2]} {s[2]}')
+    return names if not side else None

@@ -64,13 +64,26 @@ def fit_lines(lines):
     return out[:4]
 
 
-def nerv_line(line):
-    """'↑ 东侧主电梯' -> '↑ A号エレベーター  A号电梯  Lift A'; unknown names get Japanese characters only."""
+def multi(names):
+    """'日本語|中文|English': the board renderer draws the Japanese part and the rest in small type under it."""
+    return '|'.join(names)
+
+
+def nerv_line(line, board=False):
+    """'↑ 东侧主电梯' -> '↑ A号エレベーター|A号电梯|Lift A' on boards, '↑ A号エレベーター  A号电梯  Lift A' on signs;
+    unknown names get Japanese characters only."""
     m = re.match(r'^([←→↑↓●│]\s*)?(.*)$', line)
     arrow, name = (m.group(1) or ''), m.group(2).strip()
     names = R.place(name)
     if names:
-        return f'{arrow}{names[0]}  {names[1]}  {names[2]}'
+        return f'{arrow}{multi(names)}' if board else f'{arrow}{names[0]}  {names[1]}  {names[2]}'
+    # a trailing arrow ("本层直梯 →") stays at the end
+    tail = ''
+    if name[-1:] in '←→' and name[:-1].strip() in R.BOARD_PHRASES:
+        name, tail = name[:-1].strip(), ' ' + name[-1]
+    if board and name in R.BOARD_PHRASES:
+        ja, *rest = R.BOARD_PHRASES[name]
+        return f'{arrow}{ja}{tail}|' + '|'.join(rest)
     return f'{arrow}{R.to_ja(name)}' if name else line
 
 
@@ -90,23 +103,125 @@ def nerv_plate(lines):
     return [R.NERV_PHRASES.get(l, nerv_line(l) if l[:1] in '←→↑↓' else l) for l in lines]
 
 
-def board(cur):
+def board(cur, compact):
+    """compact: a hanging nerv_direction_panel, which shows Station as its only heading (Route is not drawn)."""
     station, route = cur['Station'], cur['Route']
     rows = [cur.get(k, '') for k in ('Row0', 'Row1', 'Row2')]
-    if '全线站序' in route or any(r.startswith(('│', '●')) or '本站' in r for r in rows):
+    if '全线站序' in route or any(r.startswith('│') or '本站' in r for r in rows):
         return {}                       # station line diagrams follow the station names (S-4), not the floor rules
-    floor = R.FLOORS.get(station)
-    guide = R.GUIDE_TITLE.get(route)
+    floor = R.FLOORS.get(station) or R.BOARD_HEADS.get(station)
+    guide = R.GUIDE_TITLE.get(route) or (station in R.BOARD_HEADS)
     after = {}
     if floor and guide:
-        # the renderer shows Route on top and Station under it for wayfinding boards
-        after['Route'] = floor[0]
-        after['Station'] = f'{floor[1]} · {floor[2]}'
+        if compact:
+            after['Station'] = multi(floor)
+        else:
+            # large boards draw Route on top and Station under it: the heading's small line takes the Station slot
+            after['Route'] = multi(floor)
+            after['Station'] = ''
     for k in ('Row0', 'Row1', 'Row2'):
         if cur.get(k):
-            after[k] = nerv_line(cur[k])
+            after[k] = nerv_line(cur[k], board=True)
     return {k: v for k, v in after.items() if v != cur.get(k)}
 
+
+
+# --- S-4: station boards, line diagrams and boarding signs --------------------------------------------------------
+ROW = re.compile(r'^([←→↑↓●│]\s*)?(.*)$')
+STATION_HEADS = {'R1 · 站内导向': 'R1 駅構内案内', 'S1 · 站内导向': 'S1 駅構内案内', '通行指引': '案内',
+                 '到达／换乘指引': '到着・乗換案内', '本层通行指引': 'このフロアの案内'}
+
+
+def station_row(row):
+    m = ROW.match(row)
+    arrow, text = (m.group(1) or ''), m.group(2).strip()
+    if not text or '每分钟一班' in text:
+        return row
+    t = re.match(r'^换乘 (\S+)$', text)
+    if t:
+        return f'{arrow}乗換 {t.group(1)}|换乘 {t.group(1)}|Transfer {t.group(1)}'
+    if text in R.STATION_PHRASES:
+        ja, *rest = R.STATION_PHRASES[text]
+        return f'{arrow}{ja}|' + '|'.join(rest)
+    names = R.station(text) or R.place(text)
+    if names:
+        return f'{arrow}{multi(names)}'
+    r = re.match(r'^(\w+) · (.+)$', text)
+    if r and r.group(2) in R.ROUTES:
+        ja, zh, en = R.ROUTES[r.group(2)]
+        return f'{arrow}{r.group(1)} {ja}|{zh}|{en}'
+    return row
+
+
+def map_row(row):
+    """A line-diagram entry: stops in Japanese (the diagram shows one language), footers as "日本語|中文"."""
+    if row.startswith(('│', '●')):
+        names = R.station(row[1:].replace('本站', '').strip())
+        if not names:
+            return row
+        return f'{row[0]} {names[0]}' + ('  本站' if '本站' in row else '')
+    if row in R.MAP_FOOTERS:
+        return R.MAP_FOOTERS[row]
+    m = re.match(r'^行车方向 (\S)\s+下一站 (.+)$', row)
+    if m and R.station(m.group(2)):
+        names = R.station(m.group(2))
+        return f'進行方向 {m.group(1)}  次は {names[0]}|行车方向 {m.group(1)}  下一站 {names[1]}'
+    m = re.match(r'^换乘 (\S+) · 按站内导向$', row)
+    if m:
+        return f'乗換 {m.group(1)} · 駅構内の案内で|换乘 {m.group(1)} · 按站内导向'
+    return row
+
+
+def is_station_board(cur, maps):
+    return (maps is not None or any(t in cur['Route'] for t in ('站内导向', '全线站序', '站前导览', '到达'))
+            or R.station(cur['Station']) is not None or R.station(cur['Route']) is not None
+            or cur['Station'] in R.STATION_PHRASES)
+
+
+def station_board(cur, compact, maps):
+    after = {}
+    st, rt = R.station(cur['Station']), R.station(cur['Route'])
+    head = R.STATION_PHRASES.get(cur['Station'])
+    if maps is not None:
+        if st:
+            after['Station'] = multi(st)
+        new = [map_row(r) for r in maps]
+        if new != maps:
+            after['MapRows'] = new
+        rows = {k: map_row(cur[k]) for k in ('Row0', 'Row1', 'Row2') if cur[k]}
+    else:
+        if compact:
+            if st or head:
+                after['Station'] = multi(st or head)
+            # compact panels do not draw Route; it still follows the names
+            if cur['Route'] in STATION_HEADS:
+                after['Route'] = STATION_HEADS[cur['Route']]
+            elif rt:
+                after['Route'] = rt[0]
+        elif rt:
+            # the station's name heads the board; its Chinese and English take the second line
+            after['Route'], after['Station'] = rt[0], f'{rt[1]} · {rt[2]}'
+        else:
+            if st or head:
+                after['Station'] = multi(st or head)
+            if cur['Route'] in STATION_HEADS:
+                after['Route'] = STATION_HEADS[cur['Route']]
+            elif cur['Route'] in R.STATION_PHRASES:
+                after['Route'] = R.STATION_PHRASES[cur['Route']][0]     # Japanese only: Station holds the second line
+        rows = {k: station_row(cur[k]) for k in ('Row0', 'Row1', 'Row2') if cur[k]}
+    after.update(rows)
+    return {k: v for k, v in after.items() if v != cur.get(k)}
+
+
+def boarding_sign(lines):
+    """GeoFront U-line boarding signs ("NERV 总部 / U1  每分钟一班 / 乘车 → / 北京时间"): no time zone line."""
+    names = R.station(lines[0])
+    if lines[2] == '乘车 →' and lines[3] == '北京时间' and names:
+        ja, second = names[0], names[1] if names[1] != names[0] else names[2]
+        if R.text_width(ja) > R.SIGN_WIDTH:          # 研究シミュレーション区: the last character moves down
+            ja, second = ja[:-1], f'{ja[-1]} · {second}'
+        return [ja, second, lines[1], 'のりば →']
+    return None
 
 def plan(world, positions, nerv_extra=frozenset()):
     """nerv_extra: positions outside the pyramid box that still take the NERV rules (GeoFront)."""
@@ -124,7 +239,8 @@ def plan(world, positions, nerv_extra=frozenset()):
             cur = current(ent, 'sign')
             lines = cur['front']
             nerv = in_nerv(x, y, z) or (x, y, z) in nerv_extra
-            new = nerv_plate(lines) if nerv else street_sign(lines, x, z)
+            boarding = boarding_sign(lines)
+            new = boarding or (nerv_plate(lines) if nerv else street_sign(lines, x, z))
             # the back follows the front where it carried the same text, else it is converted on its own (table only,
             # so other sessions' prop texts outside the tables stay as they are); a blank back stays blank
             after = {}
@@ -134,18 +250,26 @@ def plan(world, positions, nerv_extra=frozenset()):
                 if new != lines:
                     after['back'] = new
             elif any(cur['back']):
-                back = nerv_plate(cur['back']) if nerv else street_sign(cur['back'], x, z)
+                back = boarding_sign(cur['back']) or (nerv_plate(cur['back']) if nerv else street_sign(cur['back'], x, z))
                 if not any(back):
                     back = new          # the back held only a generator label: it shows the plate's name instead
                 if back != cur['back']:
                     after['back'] = back
             if after:
-                edits.append(dict(pos=[x, y, z], type='sign', before=cur, after=after))
+                edits.append(dict(pos=[x, y, z], type='sign', before=cur, after=after,
+                                  batch='S-4' if boarding else 'P' if nerv else 'S'))
         elif str(ent['id']) == 'projectseele:station_departure_board' and int(ent.get('Wayfinding', 0)):
             cur = current(ent, 'board')
-            after = board(cur) if in_nerv(x, y, z) or (x, y, z) in nerv_extra else {}
+            compact = 'nerv_direction_panel' in block_at(root, x, y, z)
+            maps = cur.get('MapRows')
+            station = is_station_board(cur, maps)
+            if station:
+                after = station_board(cur, compact, maps)
+            else:
+                after = board(cur, compact) if in_nerv(x, y, z) or (x, y, z) in nerv_extra else {}
             if after:
-                edits.append(dict(pos=[x, y, z], type='board', before={k: cur[k] for k in after}, after=after))
+                edits.append(dict(pos=[x, y, z], type='board', before={k: cur[k] for k in after}, after=after,
+                                  batch='S-4' if station else 'P'))
     return edits
 
 
