@@ -52,16 +52,16 @@
   "door": {"width": 15, "height": 38, "bottom": 1},
   "bay_depth": 5,
   "towers": [
-    {"tower": 22, "facing": "south"},
-    {"tower": 28, "facing": "south"},
-    {"tower": 40, "facing": "south"},
-    {"tower": 45, "facing": "south"}
+    {"tower": 22, "facing": "north"},
+    {"tower": 28, "facing": "north"},
+    {"tower": 40, "facing": "north"},
+    {"tower": 45, "facing": "north"}
   ]
 }
 ```
 
 - `tower` 是楼在城市升降表里的编号。地块必须是 19×19。
-- `facing` 是大门朝哪一面：south、west、north、east。
+- `facing` 是大门朝哪一面：south、west、north、east。和 map-buildings 定的是 4 栋都朝北（`tools/map_buildings/city_restyle.py` 的 A1：门在北墙 x 2..16、y 1..38，门后 z 2..6 是武器位）。
 - `door`：门在外墙那一圈上（地块边往里 1 格），居中，`width` 宽、`height` 高，从地板以上第 `bottom` 格起。
 - `bay_depth`：门后武器位的深度。
 - 每栋楼的站只建一次，编号记在存档里。站在地块中心、舱盖那一层，没有碰撞。

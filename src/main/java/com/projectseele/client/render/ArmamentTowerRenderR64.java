@@ -31,6 +31,7 @@ final class ArmamentTowerRenderR64
     private static final BlockState SEAM = Blocks.GRAY_CONCRETE.defaultBlockState();
     private static final BlockState FLOOR = Blocks.POLISHED_ANDESITE.defaultBlockState();
     private static final BlockState ROOF = Blocks.GRAY_CONCRETE.defaultBlockState();
+    private static final BlockState FRAME = Blocks.IRON_BLOCK.defaultBlockState();
     private static final BlockState SLAT_A = Blocks.POLISHED_DEEPSLATE.defaultBlockState();
     private static final BlockState SLAT_B = Blocks.DEEPSLATE_TILES.defaultBlockState();
     private static final BlockState YELLOW = Blocks.YELLOW_CONCRETE.defaultBlockState();
@@ -110,25 +111,29 @@ final class ArmamentTowerRenderR64
         poses.popPose();
     }
 
-    /** The pod of the lowered run: floor, armour walls with seams, the door side open below its lintel, roof slab. */
+    /** The pod of the lowered run, dressed as the building: floor, armour walls with seams, iron door frame, warning band, roof slab. */
     private static void pod(PoseStack poses, MultiBufferSource buffers, int light, int bayLight, double base,
             ArmamentTowerLogicR64.Door door, float open, boolean lit)
     {
         double edge = OUT + .5D, inner = OUT - .5D;
+        int side = door.width() / 2, doorTop = door.bottom() + door.height(), plateRows = WALL_ROWS - 1;
         panel(poses, buffers, light, FLOOR, -edge, base, -edge, 2 * OUT + 1, 1, 2 * OUT + 1);
+        // The corners are seams; the two beside the door are its iron jambs up to the lintel.
         for (int x : new int[]{-OUT, OUT})
-            for (int z : new int[]{-OUT, OUT})
-                panel(poses, buffers, light, SEAM, x - .5D, base + 1, z - .5D, 1, WALL_ROWS, 1);
-        int side = door.width() / 2, doorTop = door.bottom() + door.height();
-        for (int row = 1; row <= WALL_ROWS; )
+        {
+            panel(poses, buffers, light, SEAM, x - .5D, base + 1, -edge, 1, plateRows, 1);
+            panel(poses, buffers, light, FRAME, x - .5D, base + 1, inner, 1, Math.min(doorTop, plateRows), 1);
+            if (doorTop < plateRows) panel(poses, buffers, light, SEAM, x - .5D, base + 1 + doorTop, inner, 1, plateRows - doorTop, 1);
+        }
+        for (int row = 1; row <= plateRows; )
         {
             boolean seam = row % 8 == 0;
-            int rows = seam ? 1 : Math.min(8 - row % 8, WALL_ROWS - row + 1);
+            int rows = seam ? 1 : Math.min(8 - row % 8, plateRows - row + 1);
             BlockState plate = seam ? SEAM : WALL;
             panel(poses, buffers, light, plate, -inner, base + row, -edge, 2 * OUT - 1, rows, 1);
             panel(poses, buffers, light, plate, -edge, base + row, -inner, 1, rows, 2 * OUT - 1);
             panel(poses, buffers, light, plate, inner, base + row, -inner, 1, rows, 2 * OUT - 1);
-            // The door side: the strips beside the door, and the full width above it.
+            // The door side: the strips beside the door, and the full width above its lintel.
             if (side < OUT - 1)
             {
                 panel(poses, buffers, light, plate, -inner, base + row, inner, OUT - 1 - side, rows, 1);
@@ -138,14 +143,25 @@ final class ArmamentTowerRenderR64
             if (above > 0) panel(poses, buffers, light, plate, -side - .5D, base + from, inner, door.width(), above, 1);
             row += rows;
         }
-        // The warning strip on the lintel.
-        if (doorTop <= WALL_ROWS)
-            for (int across = -side; across <= side; across++)
-                block(poses, buffers, light, (across & 1) == 0 ? YELLOW : BLACK, across, base + doorTop, OUT);
+        // The iron lintel over the door, and the warning band round the top, as on the building.
+        if (doorTop <= plateRows) panel(poses, buffers, light, FRAME, -side - .5D, base + doorTop, inner, door.width(), 1, 1);
+        for (int along = -OUT; along <= OUT; along++)
+        {
+            block(poses, buffers, light, band(along, -OUT), along, base + WALL_ROWS, -OUT);
+            block(poses, buffers, light, band(along, OUT), along, base + WALL_ROWS, OUT);
+            if (Math.abs(along) == OUT) continue;
+            block(poses, buffers, light, band(-OUT, along), -OUT, base + WALL_ROWS, along);
+            block(poses, buffers, light, band(OUT, along), OUT, base + WALL_ROWS, along);
+        }
         panel(poses, buffers, light, ROOF, -edge, base + WALL_ROWS + 1, -edge, 2 * OUT + 1, 1, 2 * OUT + 1);
         // Behind the bay the pod is closed off, as the building's core closes the bay.
         panel(poses, buffers, bayLight, WALL, -inner, base + 1, OUT - 6.5D, 2 * OUT - 1, WALL_ROWS, 1);
         if (open < .999F) slats(poses, buffers, light, base + door.bottom(), door, open);
+    }
+
+    private static BlockState band(int x, int z)
+    {
+        return ((x + z) & 1) != 0 ? YELLOW : BLACK;
     }
 
     /** A plain door of slats going up into the lintel, where the client has not seen the real one. */
