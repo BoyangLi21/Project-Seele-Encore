@@ -95,6 +95,8 @@
   "hud.projectseele.plug_insertion": "ENTRY PLUG INSERTION — LCL CHARGE",
   "hud.projectseele.plug_sealed": "ENTRY PLUG SEALED — OPTICAL FEED OFFLINE",
   "hud.projectseele.await_prepare": "AWAITING NERV PREPARE AUTHORIZATION",
+  "hud.projectseele.plug_inserting": "ENTRY PLUG — INSERTION",
+  "hud.projectseele.plug_released": "ENTRY PLUG RELEASED — LCL DISCHARGE",
   "hud.projectseele.plug_lock": "ENTRY PLUG — DEPTH LOCKED",
   "hud.projectseele.lcl_pressurize": "LCL INJECTION — PRESSURIZING",
   "hud.projectseele.a10_connect": "A10 NERVE LINK — CIRCUIT OPEN",

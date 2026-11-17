@@ -45,6 +45,11 @@ public abstract class PlayerModelGendoPoseMixin
                 model.rightSleeve.copyFrom(model.rightArm);model.leftSleeve.copyFrom(model.leftArm);
                 model.rightPants.copyFrom(model.rightLeg);model.leftPants.copyFrom(model.leftLeg);
                 model.jacket.copyFrom(model.body);model.hat.copyFrom(model.head);
+                // The four limbs are drawn bent, in two pieces each, by PlugPilotLimbLayerR64: the straight ones
+                // above are what the fit was first proved with and what a renderer without that layer shows.
+                if(com.projectseele.client.render.PlugPilotLimbLayerR64.drawnFor(model))
+                    model.rightArm.visible=model.leftArm.visible=model.rightSleeve.visible=model.leftSleeve.visible
+                            =model.rightLeg.visible=model.leftLeg.visible=model.rightPants.visible=model.leftPants.visible=false;
                 return;
             }
             model.body.xRot=model.body.yRot=model.body.zRot=0;

@@ -22,6 +22,7 @@ public final class CockpitFeedbackClient
     private static Drive drive;
     private static int warningCooldown,lastStance=-1;
     private static java.util.UUID linkedPilotActor;
+    private static boolean linkHintOwed;
     private static double fovTime=Double.NaN,fovSpeed;
     private static EvaUnit01Entity actor(){var p=Minecraft.getInstance().player;return p==null?null:EvaPilotResolver.controlTarget(p);}
     private static final class Drive extends AbstractTickableSoundInstance
@@ -41,7 +42,7 @@ public final class CockpitFeedbackClient
     public static void resetConnectionR45()
     {
         if(drive!=null)Minecraft.getInstance().getSoundManager().stop(drive);
-        drive=null;lastStance=-1;warningCooldown=0;linkedPilotActor=null;fovTime=Double.NaN;fovSpeed=0;
+        drive=null;lastStance=-1;warningCooldown=0;linkedPilotActor=null;linkHintOwed=false;fovTime=Double.NaN;fovSpeed=0;
     }
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent event)
     {
@@ -51,6 +52,12 @@ public final class CockpitFeedbackClient
         {
             resetConnectionR45();
             linkedPilotActor=eva.getUUID();
+            linkHintOwed=true;
+        }
+        // The hint says the nerve link is made: it waits for the capsule's own sequence (lock, LCL, nerve link) to run through.
+        if(linkHintOwed&&!eva.isActivationCinematicActive())
+        {
+            linkHintOwed=false;
             mc.gui.setOverlayMessage(net.minecraft.network.chat.Component.translatable("hud.projectseele.pilot_link_ready"),false);
         }
         if(eva.isPoweredOn()&&(drive==null||drive.isStopped())){drive=new Drive(eva);mc.getSoundManager().play(drive);}

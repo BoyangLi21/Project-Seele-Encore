@@ -133,7 +133,8 @@ public final class EvaHud
                 : activationVisualActive ? activationProgress : 0.0F;
         // LCL and synchronization graphics overlay the live cabin view; they
         // never replace it with an opaque black frame.
-        float rise = Mth.clamp(progress / 0.45F, 0.0F, 1.0F);
+        // R64: the capsule is filled once it is seated (from 14% of the sequence), not on its way to the socket.
+        float rise = Mth.clamp((progress - 0.14F) / 0.31F, 0.0F, 1.0F);
         float fade = progress > 0.76F ? Mth.clamp(1.0F - (progress - 0.76F) / 0.24F, 0.0F, 1.0F) : 1.0F;
         if (rise > 0.0F)
         {

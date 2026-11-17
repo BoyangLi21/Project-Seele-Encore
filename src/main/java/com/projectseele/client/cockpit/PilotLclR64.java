@@ -7,8 +7,8 @@ import net.minecraft.util.Mth;
 /**
  * R64: the LCL in the plug, as the pilot sees it.
  * <p>
- * The plug fills from the floor while the cabin sequence says so (the capsule's own LCL stage outside the Unit, the
- * first part of the Unit's activation when it is boarded directly); the surface climbs past the knees and the yokes,
+ * The plug fills from the floor once it is seated in its Unit, in the LCL step of the Unit's activation (the
+ * original's order: the plug is inserted and locked, then filled); the surface climbs past the knees and the yokes,
  * closes over the eye, and the view is in the liquid. Then the liquid is charged and clears: over a few seconds the
  * colour falls to a trace and the bubbles thin out to one now and then. Leaving the seat, or the capsule being
  * drawn or thrown out, lets it run out from the top down.
@@ -49,18 +49,19 @@ public final class PilotLclR64
         float dt = Mth.clamp(seconds, 0, .1F);
         boolean inSeat = plug != null || driving;
         float wanted;
+        int stage = plug == null ? -1 : plug.getInsertionStage();
         if (!inSeat) wanted = 0;
-        else if (progress >= 0) wanted = Mth.clamp((progress - .06F) / .37F, 0, 1);
+        // Thrown clear with the pilot aboard: the capsule lets its LCL go at once.
+        else if (stage == EntryPlugCarrierEntity.STAGE_FIELD_EJECTING || stage == EntryPlugCarrierEntity.STAGE_FIELD_LANDED) wanted = 0;
+        // Drawn out by the crane: the dorsal hatch opens first, the capsule still seated and full; the LCL goes as it rises.
+        else if (stage == EntryPlugCarrierEntity.STAGE_EJECTING) wanted = plug.getInsertionProgress() >= 100 ? 1 : 0;
+        else if (progress >= 0) wanted = Mth.clamp((progress - PilotCockpitR64.STEP_LCL) / (PilotCockpitR64.STEP_NERVE - .02F - PilotCockpitR64.STEP_LCL), 0, 1);
         else if (driving) wanted = 1;
         else
         {
-            // In the capsule with no sequence running: dry while it waits open, sealed or recovered; full in between.
+            // In the capsule with no sequence running: dry while it waits open, sealed or recovered; full once seated.
             int cabin = plug.getCabinStage();
-            wanted = cabin == EntryPlugCarrierEntity.CABIN_SYNCHRONIZING || cabin == EntryPlugCarrierEntity.CABIN_ONLINE ? 1 : 0;
-            // Thrown clear or being drawn out with the pilot aboard: the capsule lets its LCL go.
-            int stage = plug.getInsertionStage();
-            if (stage == EntryPlugCarrierEntity.STAGE_FIELD_EJECTING || stage == EntryPlugCarrierEntity.STAGE_FIELD_LANDED
-                    || stage == EntryPlugCarrierEntity.STAGE_EJECTING) wanted = 0;
+            wanted = cabin == EntryPlugCarrierEntity.CABIN_ONLINE && plug.isLockedToEva() ? 1 : 0;
         }
         // Found already in the seat with nothing running (a world joined in the Unit, a test boarding): no show.
         if (!known || inSeat && !seated && (progress < 0 || progress > .5F) && wanted >= 1 && fill <= 0)

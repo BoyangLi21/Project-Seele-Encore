@@ -715,7 +715,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             case BRIDGE ->
             {
                 int wanted=NervAssemblyClocksR52.bridgeRemaining((ticks+1)*(quick?2:1));if((ticks+1)%(quick?2:5)==0||ticks>=bridgeTicks-1)if(!applyBridgeState(l,p,wanted,data,own)){hold(o,"complete_original_bridge_state_blocked_"+wanted);return Preparation.WAITING;}
-                capsule.setCabinSequenceProgress(Math.min(30,Math.max(1,(int)Math.round(30D*(ticks+1)/bridgeTicks))));
+                capsule.setCabinSequenceProgress(EntryPlugCarrierEntity.cabinPercentOnBridge((ticks+1)/(double)bridgeTicks));
                 if(ticks>=bridgeTicks-1){if(!bridgeMatches(l,p,0)||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_OCCUPIED||!capsule.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_OCCUPIED,EntryPlugCarrierEntity.STAGE_INSERTING)){hold(o,"original_insertion_epoch_or_bridge_changed");return Preparation.WAITING;}advance(data,Prepare.INSERT);}
             }
             case INSERT ->
@@ -729,7 +729,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                 // Mapped producer performs actual full geometry sweep; absent
                 // permission/geometry is a concrete HOLD, never a teleport.
                 if(!NervMappedPlugMechanicsR52.applyInsertion(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id())){hold(o,"actual_capsule_sweep_blocked");return Preparation.WAITING;}
-                if(!internalDrive&&l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&age>=36)hoist.linkCranePlug(capsule);capsule.setInsertionProgress((int)Math.round(progress*100));capsule.setCabinSequenceProgress(30+(int)Math.round(progress*40));
+                if(!internalDrive&&l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&age>=36)hoist.linkCranePlug(capsule);capsule.setInsertionProgress((int)Math.round(progress*100));capsule.setCabinSequenceProgress(EntryPlugCarrierEntity.cabinPercentInserting(progress));
                 if(age>=(quick?NervAssemblyClocksR52.QUICK_INSERTION_TICKS_R54:EntryPlugDirector.INSERTION_TICKS)){if(!capsule.lockToEva(e)||!e.bindEntryPlug(capsule,capsule.getCabinProgress())){hold(o,"original_lock_graph_rejected");return Preparation.WAITING;}advance(data,Prepare.SEAL);}
             }
             case SEAL -> {if(!originalLaunchLock(l,p.variant(),e,capsule)){hold(o,"real_launch_lock_changed");return Preparation.WAITING;}EvaDorsalMechanism.seal(e,(ticks+1)*(quick?2:1));if(!crane(l,p,capsule,p.dock(),true,quick?3:1))return Preparation.WAITING;if(ticks>=(quick?29:59))advance(data,Prepare.DRAIN);}

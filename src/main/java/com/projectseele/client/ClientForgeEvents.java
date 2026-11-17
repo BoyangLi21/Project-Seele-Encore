@@ -509,7 +509,8 @@ public final class ClientForgeEvents
             playPlugSound(minecraft, SoundEvents.PISTON_EXTEND,
                     1.4F, 0.55F);
         }
-        if (crossed(previous, current, 0.30F))
+        // R64: the capsule's own part of the sequence ends at its lock (7%, where it was 70%): the clunk is the lock.
+        if (crossed(previous, current, EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT / 100F + .005F))
         {
             playPlugSound(minecraft, SoundEvents.IRON_DOOR_CLOSE,
                     1.2F, 0.72F);

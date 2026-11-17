@@ -95,6 +95,8 @@
   "hud.projectseele.plug_insertion": "插入栓固定 —— LCL 注入中",
   "hud.projectseele.plug_sealed": "插入栓密闭 —— 视觉回路离线",
   "hud.projectseele.await_prepare": "等待 NERV 下达 PREPARE 指令",
+  "hud.projectseele.plug_inserting": "插入栓插入 —— 吊装对位",
+  "hud.projectseele.plug_released": "插入栓脱离 —— LCL 排出",
   "hud.projectseele.plug_lock": "插入栓固定 —— 深度锁定",
   "hud.projectseele.lcl_pressurize": "LCL 注入 —— 舱内加压",
   "hud.projectseele.a10_connect": "A10 神经连接 —— 回路开放",

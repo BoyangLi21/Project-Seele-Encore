@@ -25,13 +25,15 @@ public final class PilotSeatPoseR64Test
     public static void main(String[] args)
     {
         float most = 0, low = 9, high = -9, front = 99, back = -99, wide = 0;
-        for (Vector3f p : PilotSeatPoseR64.corners(0, EYE_Y, EYE_Z))
-        {
-            most = Math.max(most, (float) Math.hypot(p.x, p.y));
-            low = Math.min(low, p.y); high = Math.max(high, p.y);
-            front = Math.min(front, p.z); back = Math.max(back, p.z);
-            wide = Math.max(wide, Math.abs(p.x));
-        }
+        // With the model's own straight limbs, and with the bent ones the seated layer draws: both lie inside.
+        for (boolean bent : new boolean[]{false, true})
+            for (Vector3f p : PilotSeatPoseR64.corners(0, EYE_Y, EYE_Z, bent))
+            {
+                most = Math.max(most, (float) Math.hypot(p.x, p.y));
+                low = Math.min(low, p.y); high = Math.max(high, p.y);
+                front = Math.min(front, p.z); back = Math.max(back, p.z);
+                wide = Math.max(wide, Math.abs(p.x));
+            }
         System.out.printf("seated pilot: furthest from the axis %.3f (shell %.2f), y %.3f..%.3f, z %.3f..%.3f, half width %.3f%n",
                 most, RADIUS, low, high, front, back, wide);
         check(most <= RADIUS - .03F, "the figure reaches " + most + " blocks from the plug's axis; the shell's inside is at " + RADIUS);

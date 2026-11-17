@@ -54,10 +54,39 @@ public final class PilotSeatPoseR64
     }
 
     /**
+     * The limbs bent as a seated pilot's are: the thigh raised to the knee and the shin let down to the seat, the
+     * upper arm along the trunk and the forearm forward to the yoke. The game's own limbs are one straight box
+     * each, so these are drawn by a layer of their own (PlugPilotLimbLayerR64) in two pieces. Angles from straight
+     * down the trunk, towards the figure's front (radians); each piece is half a limb long.
+     */
+    public static final float THIGH = rad(72), SHIN = rad(-25), UPPER_ARM = rad(15), FOREARM = rad(78);
+    public static final float HALF_LIMB = 6;
+
+    /** Hip, knee and foot in the model's own pixels (x to the figure's left, y down the trunk, z to its back); side -1 right, +1 left. */
+    public static float[][] legJoints(int side)
+    {
+        float[] hip = {side * 1.9F, 12, 0};
+        float[] knee = {hip[0] + side * .3F, hip[1] + HALF_LIMB * (float) Math.cos(THIGH), hip[2] - HALF_LIMB * (float) Math.sin(THIGH)};
+        float[] foot = {knee[0], knee[1] + HALF_LIMB * (float) Math.cos(SHIN), knee[2] - HALF_LIMB * (float) Math.sin(SHIN)};
+        return new float[][]{hip, knee, foot};
+    }
+
+    /** Shoulder, elbow and hand, likewise. */
+    public static float[][] armJoints(int side)
+    {
+        float[] shoulder = {side * 5, 2, 0};
+        float[] elbow = {shoulder[0] + side * .9F, shoulder[1] + HALF_LIMB * (float) Math.cos(UPPER_ARM), shoulder[2] - HALF_LIMB * (float) Math.sin(UPPER_ARM)};
+        float[] hand = {elbow[0] - side * .5F, elbow[1] + HALF_LIMB * (float) Math.cos(FOREARM), elbow[2] - HALF_LIMB * (float) Math.sin(FOREARM)};
+        return new float[][]{shoulder, elbow, hand};
+    }
+
+    /**
      * Every corner of the posed figure in the plug's frame, for the check. The boxes and joints are the player
      * model's (arms four pixels wide: the wider of the two models).
+     *
+     * @param bent the limbs as PlugPilotLimbLayerR64 draws them; otherwise the model's own straight limbs
      */
-    public static List<Vector3f> corners(float eyeX, float eyeY, float eyeZ)
+    public static List<Vector3f> corners(float eyeX, float eyeY, float eyeZ, boolean bent)
     {
         Vector3f hip = hip(eyeX, eyeY, eyeZ);
         // From model pixels to the plug: the renderer's own flip and scale, the hip brought to its place, the lean.
@@ -66,10 +95,26 @@ public final class PilotSeatPoseR64
         List<Vector3f> out = new ArrayList<>();
         box(out, toPlug, 0, 0, 0, headPitch(), 0, -4, -8, -4, 4, 0, 4);
         box(out, toPlug, 0, 0, 0, 0, 0, -4, 0, -2, 4, 12, 2);
-        box(out, toPlug, -5, 2, 0, armPitch(), ARM_OUT, -3, -2, -2, 1, 10, 2);
-        box(out, toPlug, 5, 2, 0, armPitch(), -ARM_OUT, -1, -2, -2, 3, 10, 2);
-        box(out, toPlug, -1.9F, 12, 0, legPitch(), 0, -2, 0, -2, 2, 12, 2);
-        box(out, toPlug, 1.9F, 12, 0, legPitch(), 0, -2, 0, -2, 2, 12, 2);
+        if (!bent)
+        {
+            box(out, toPlug, -5, 2, 0, armPitch(), ARM_OUT, -3, -2, -2, 1, 10, 2);
+            box(out, toPlug, 5, 2, 0, armPitch(), -ARM_OUT, -1, -2, -2, 3, 10, 2);
+            box(out, toPlug, -1.9F, 12, 0, legPitch(), 0, -2, 0, -2, 2, 12, 2);
+            box(out, toPlug, 1.9F, 12, 0, legPitch(), 0, -2, 0, -2, 2, 12, 2);
+            return out;
+        }
+        for (int side = -1; side <= 1; side += 2)
+            for (float[][] limb : new float[][][]{legJoints(side), armJoints(side)})
+                for (float[] joint : limb)
+                    // A limb is four pixels square about its line: no corner of it is further from a joint
+                    // than the half diagonal, taken here along each of the model's axes.
+                    for (int axis = 0; axis < 3; axis++)
+                        for (int sign = -1; sign <= 1; sign += 2)
+                        {
+                            Vector3f p = new Vector3f(joint[0], joint[1], joint[2]);
+                            p.setComponent(axis, p.get(axis) + sign * 2.83F);
+                            out.add(toPlug.transformPosition(p));
+                        }
         return out;
     }
 

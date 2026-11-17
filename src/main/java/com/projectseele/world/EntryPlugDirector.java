@@ -493,9 +493,8 @@ public final class EntryPlugDirector
     }
 
     /**
-     * PREPARE starts while the split boarding bridge retracts. Run the first
-     * thirty percent of the continuous sequence here so LCL is already rising
-     * before the crane moves.
+     * PREPARE starts while the split boarding bridge retracts. R64: the cabin stays dry until the capsule
+     * is seated (up to R63 the first thirty percent ran here, with the LCL rising before the crane moved).
      */
     public static void tickCabinPreparation(ServerLevel level, int variant,
                                             EvaUnit01Entity unit, int ticks,
@@ -519,9 +518,8 @@ public final class EntryPlugDirector
                 ticks - EntryPlugCarrierEntity.HATCH_SEAL_TICKS + 1);
         int preparationWindow = Math.max(1,
                 totalTicks - EntryPlugCarrierEntity.HATCH_SEAL_TICKS + 1);
-        int progress = Mth.clamp((int) Math.round(
-                30.0D * preparationTicks / preparationWindow), 1, 30);
-        plug.setCabinSequenceProgress(progress);
+        plug.setCabinSequenceProgress(EntryPlugCarrierEntity.cabinPercentOnBridge(
+                preparationTicks / (double) preparationWindow));
     }
 
     public static boolean hasBoardedPilot(ServerLevel level, int variant,
@@ -600,9 +598,9 @@ public final class EntryPlugDirector
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug == null || !plug.isVehicle()
                 || !plug.isHatchFullySealed()
-                || plug.getCabinProgress() < 30
+                || plug.getCabinProgress() < EntryPlugCarrierEntity.CABIN_BRIDGE_PERCENT
                 || plug.getCabinStage()
-                        < EntryPlugCarrierEntity.CABIN_LCL_FILLING)
+                        < EntryPlugCarrierEntity.CABIN_INSERTING)
         {
             return false;
         }
@@ -646,7 +644,7 @@ public final class EntryPlugDirector
         // parked hardware frame made the top mechanism visibly kick once.
         updateCables(level, variant, craneEye.y, craneEye.z, true);
         plug.setInsertionProgress(0);
-        plug.setCabinSequenceProgress(Math.max(30,
+        plug.setCabinSequenceProgress(Math.max(EntryPlugCarrierEntity.CABIN_BRIDGE_PERCENT,
                 plug.getCabinProgress()));
         return true;
     }
@@ -695,8 +693,7 @@ public final class EntryPlugDirector
         }
         plug.setCanonicalTransform(pose);
         plug.setInsertionProgress((int) Math.round(linear * 100.0D));
-        plug.setCabinSequenceProgress(30 + (int) Math.round(linear
-                * (EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT - 30)));
+        plug.setCabinSequenceProgress(EntryPlugCarrierEntity.cabinPercentInserting(linear));
         Vec3 craneEye = pose.transformPoint(
                 EntryPlugKinematics.CRANE_ATTACHMENT_P);
         updateCables(level, variant, craneEye.y,

@@ -50,6 +50,41 @@ public final class PilotCockpitR64
     public static final boolean ON = !"false".equals(System.getProperty("projectseele.cockpitR64"));
     /** The cockpit's own field of view (degrees, vertical) and near plane (blocks): the game's own may be anything. */
     public static final float FOV = 70, NEAR = .05F;
+    /**
+     * The steps of the cabin sequence, 0..1, in the original's order: the capsule is carried and driven in (its
+     * own part, up to STEP_INSERTED: EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT), locks, fills with LCL from
+     * STEP_LCL, the nerve connection runs from STEP_NERVE, the synchronisation from STEP_SYNC, when the wall
+     * comes on. From STEP_INSERTED on it is the Unit's activation that counts.
+     */
+    public static final float STEP_INSERTED = EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT / 100F, STEP_LCL = .14F, STEP_NERVE = .45F, STEP_SYNC = .72F;
+
+    /** How far the seat is drawn down the plug as it locks (blocks). */
+    public static final float SEAT_SLIDE = .8F;
+
+    /**
+     * The original draws the pilot's seat down the plug to its working depth once the plug is seated. Here the
+     * pilot's eye goes that way, towards the insertion tip, during the lock step, and stays there while the cabin
+     * is seen; the glide to the Unit's eyes starts from there.
+     */
+    public static net.minecraft.world.phys.Vec3 seatSlide(EntryPlugCarrierEntity plug, EvaUnit01Entity eva, float partial)
+    {
+        if (!ON || eva == null || !plug.isLockedToEva() || !eva.isActivationCinematicActive()) return net.minecraft.world.phys.Vec3.ZERO;
+        float t = Mth.clamp((eva.getActivationProgress(partial) - STEP_INSERTED) / (STEP_LCL - STEP_INSERTED), 0, 1);
+        return plug.getInterpolatedCanonicalTransform(partial).transformVector(new net.minecraft.world.phys.Vec3(0, 0, -SEAT_SLIDE * t * t * (3 - 2 * t)));
+    }
+
+    /**
+     * The capsule is not drawn once it is inside its Unit. Its own pilot still sits in it: until the wall comes on
+     * they see the cabin around them, where the LCL rises and the nerve connection runs.
+     */
+    public static boolean cabinStillSeen(EntryPlugCarrierEntity plug)
+    {
+        Minecraft mc = Minecraft.getInstance();
+        if (!ON || mc.player == null || mc.player.getVehicle() != plug || !plug.isLockedToEva()
+                || !mc.options.getCameraType().isFirstPerson() || mc.getCameraEntity() != mc.player) return false;
+        EvaUnit01Entity eva = plug.getLinkedEva();
+        return eva != null && eva.isActivationCinematicActive() && eva.getActivationProgress(mc.getFrameTime()) < STEP_SYNC;
+    }
 
     private static final CockpitMeshR64 MESH = new CockpitMeshR64();
     private static final CockpitMeshR64.State STATE = new CockpitMeshR64.State();
@@ -202,7 +237,7 @@ public final class PilotCockpitR64
         boolean sighted = driving && (ClientForgeEvents.isRifleSightActive(eva) || ClientForgeEvents.isCannonScopeActive(eva));
         shown += ((sighted ? 0 : 1) - shown) * ease(dt, .12F);
         // The wall carries the picture once the Unit is synchronised; before that the plug has only its own lamps.
-        float wantedLight = driving && (progress < 0 || progress > .72F) ? 1 : progress > .45F ? .55F : .30F;
+        float wantedLight = driving && (progress < 0 || progress > STEP_SYNC) ? 1 : progress > STEP_NERVE ? .55F : .30F;
         light += (wantedLight - light) * ease(dt, .35F);
 
         float forward = 0, strafe = 0;

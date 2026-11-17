@@ -39,7 +39,8 @@ public final class EvaPilotDisplayR45
 
         // Power: the five minutes the original counts down once the cable is gone, to the hundredth of a second.
         // At the top of the view, in the middle: the corners are the minimap's and other mods'.
-        int px = (width - 104) / 2, py = Math.max(4, margin - 4);
+        // The cannon's scope writes its range at the top of the view, in the middle: the countdown stands aside for it.
+        int px = ClientForgeEvents.isCannonScopeActive(eva) ? width - margin - 104 : (width - 104) / 2, py = Math.max(4, margin - 4);
         window(g, px, py, 104, 40, powerColour);
         line(g, font, stopped ? "电源停止  OFFLINE" : external ? "外部电源  EXTERNAL" : "内部电源  INTERNAL", px + 5, py + 4, 96, powerColour);
         if (stopped) figures(g, px + 6, py + 15, -1, -1, -1, RED);
@@ -79,6 +80,8 @@ public final class EvaPilotDisplayR45
         String stance = eva.isPilotProne() ? "趴伏" : eva.isPilotCrouching() ? "下蹲" : eva.isPilotSprinting() ? "冲刺" : "常规操纵";
         String radio = Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString() + " 指挥通信";
         line(g, font, stance + "  /  " + radio, rx + 5, ly + 16, panel - 10, MUTED);
+        // What the command post says: a sound-only window under the weapon's, while a line is up.
+        com.projectseele.client.cockpit.PilotCommWindowR64.render(g, font, rx, ly + 34, panel);
 
         alerts(g, font, eva, partial, width, height, py + 18, hull, stopped);
     }

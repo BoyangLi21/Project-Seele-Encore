@@ -128,11 +128,13 @@ public class ClientEvents
         if (standard != null)
         {
             standard.addLayer(new GendoPoseArmLayer(standard, false));
+            standard.addLayer(new com.projectseele.client.render.PlugPilotLimbLayerR64<>(standard, false));
         }
         PlayerRenderer slim = event.getSkin("slim");
         if (slim != null)
         {
             slim.addLayer(new GendoPoseArmLayer(slim, true));
+            slim.addLayer(new com.projectseele.client.render.PlugPilotLimbLayerR64<>(slim, true));
         }
     }
 

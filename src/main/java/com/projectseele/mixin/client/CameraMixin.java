@@ -252,6 +252,8 @@ public abstract class CameraMixin
         if (plug.isLockedToEva() && eva != null
                 && eva.isActivationCinematicActive())
         {
+            // R64: the seat is drawn down the plug as it locks; the glide starts from there.
+            eye = eye.add(com.projectseele.client.cockpit.PilotCockpitR64.seatSlide(plug, eva, partialTick));
             // Continue from the physical capsule eye into the EVA optical
             // socket during the final 30% of synchronization.  Both endpoints
             // are world-space positions, so no camera frame can escape the

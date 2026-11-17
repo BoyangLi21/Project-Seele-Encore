@@ -20,6 +20,13 @@ public final class EntryPlugPilotPoseR47
 {
     private static final ThreadLocal<ArrayDeque<UUID>> PLAYER_PASSES=ThreadLocal.withInitial(ArrayDeque::new);
 
+    /** R64: the figure lies in a capsule's seat (and is drawn there): its limbs are the seated layer's, its hands hold nothing. */
+    public static boolean seated(LivingEntity rider)
+    {
+        return com.projectseele.client.cockpit.PilotCockpitR64.ON&&rider.getVehicle() instanceof EntryPlugCarrierEntity plug
+                &&plug.hasCanonicalPose()&&(!plug.isLockedToEva()||plug.usesPhysicalPilotSeatR52());
+    }
+
     public static boolean push(PoseStack pose,LivingEntity rider,float partial)
     {
         if(!(rider.getVehicle() instanceof EntryPlugCarrierEntity plug)||(plug.isLockedToEva()&&!plug.usesPhysicalPilotSeatR52())
