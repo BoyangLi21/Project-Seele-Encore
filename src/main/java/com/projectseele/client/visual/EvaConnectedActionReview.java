@@ -951,20 +951,27 @@ public final class EvaConnectedActionReview
      * and their walks also go backward, sideways and round. Run with tourEnd=420.
      * -Dprojectseele.tourGaitFastR64=<ticks>: the fast run's length, where 30 is too short to count its cycles (it
      * is at full speed from its 14th tick); tourEnd is then 390 and these ticks.
+     * -Dprojectseele.tourGaitFastAtR64=<tick>: the tick the fast run starts at, 350 where it is not given. A Unit
+     * turns 4 degrees a tick where it stands, so at 350 it is still 58 degrees short of about: every fast run went
+     * off 30 to 70 blocks to its right, into a wall of the review world at x 59 to 100, z -132, up a stair behind
+     * it and off a ledge 5 high (2026-11-17: the fast run's worst slides and its deepest feet were all there, and
+     * one capture stood against the wall to its end). From 370 it has turned, and it turns about the other way, so
+     * that the 6 degrees it stops short by take it back along the lane it ran in on. tourEnd is then this, 40 and
+     * the fast run's ticks.
      */
     private static final boolean GAIT=Boolean.getBoolean("projectseele.tourGaitR64");
-    private static final int GAIT_FAST_R64=Integer.getInteger("projectseele.tourGaitFastR64",30);
+    private static final int GAIT_FAST_R64=Integer.getInteger("projectseele.tourGaitFastR64",30),GAIT_FAST_AT_R64=Integer.getInteger("projectseele.tourGaitFastAtR64",350);
     private static void gaitR64(Minecraft mc)
     {
-        int t=tick;
-        boolean walk=t>=30&&t<160,run=t>=200&&t<310,fast=t>=350&&t<350+GAIT_FAST_R64,move=walk||run||fast;
+        int t=tick,at=GAIT_FAST_AT_R64;
+        boolean walk=t>=30&&t<160,run=t>=200&&t<310,fast=t>=at&&t<at+GAIT_FAST_R64,move=walk||run||fast;
         mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
-        mc.player.setYRot(t>=170&&t<320?180:0);mc.player.setXRot(0);
+        mc.player.setYRot(t>=170&&t<320?180:at>350&&t>=320&&t<335?90:0);mc.player.setXRot(0);
         // The client re-syncs held sprint and dash to the real keys, so hold them.
         mc.options.keySprint.setDown(run||fast);
-        com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=354&&t<350+GAIT_FAST_R64);
-        if(at(200)||at(350))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
-        if(at(310)||at(350+GAIT_FAST_R64))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=at+4&&t<at+GAIT_FAST_R64);
+        if(at(200)||at(at))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(310)||at(at+GAIT_FAST_R64))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
     }
 
     /**
