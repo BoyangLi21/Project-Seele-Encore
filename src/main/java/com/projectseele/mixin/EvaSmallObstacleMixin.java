@@ -28,9 +28,9 @@ public abstract class EvaSmallObstacleMixin
         if(!(context instanceof EntityCollisionContext entityContext))return shape;
         var entity=entityContext.getEntity();
         if(entity instanceof EvaUnit01Entity eva)return EvaObstacleCollision.ignores(eva,state,pos,shape)?Shapes.empty():shape;
-        // An Angel or a mass-production unit walks through listed street furniture too (R64): Sachiel steps only two.
-        if((entity instanceof com.projectseele.entity.Angel||entity instanceof com.projectseele.entity.MassProductionEvaEntity)
-                &&!shape.isEmpty()&&com.projectseele.world.StreetPassR64.passes(entity.level(),pos,state))return Shapes.empty();
+        // An Angel or a mass-production unit walks through thin and listed street furniture too (R64): Sachiel steps only two.
+        if((entity instanceof com.projectseele.entity.Angel||entity instanceof com.projectseele.entity.MassProductionEvaEntity)&&!shape.isEmpty()
+                &&(EvaObstacleCollision.thin(state)||com.projectseele.world.StreetPassR64.passes(entity.level(),pos,state)))return Shapes.empty();
         return shape;
     }
 }
