@@ -625,6 +625,7 @@ public final class EvaConnectedActionReview
         if(COMBAT_R64){combatR64(mc,eva);positionCamera(mc,eva);return;}
         if(KNIFE_R64){knifeR64(mc,eva);positionCamera(mc,eva);return;}
         if(IMPACT_R64){impactR64(mc,eva);positionCamera(mc,eva);return;}
+        if(MOVING_R64){movingR64(mc,eva);positionCamera(mc,eva);return;}
         if(BEAM_R64){beamR64(mc,eva);positionCamera(mc,eva);return;}
         if(HITS){hitsR63(mc,eva);positionCamera(mc,eva);return;}
         if(RAMIEL){ramielR63(mc,eva);positionCamera(mc,eva);return;}
@@ -1357,6 +1358,36 @@ public final class EvaConnectedActionReview
         if(at(470)||at(502))heavyR64();
         if(at(TOUR_END-14))removeTargetR63(mc,"sachiel");
         if(at(TOUR_END-10))mc.player.connection.sendCommand(ARM+"fists");
+    }
+
+    /**
+     * -Dprojectseele.tourMovingR64=true (tourEnd=470): blows begun while the Unit walks, and blows taken from it,
+     * with -Dprojectseele.combatDiagR64=true. It walks at a still Sachiel 58 blocks ahead and presses light once
+     * (40); walks at a fresh one and presses light three times six ticks apart (150, 156, 162); walks at a third
+     * and presses heavy (250); stands before a fourth, presses light and steps aside six ticks later (330, 336:
+     * the row is left for the step); presses light and is struck four ticks later (400, 404).
+     */
+    private static final boolean MOVING_R64=Boolean.getBoolean("projectseele.tourMovingR64");
+    private static void movingR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        boolean walk=tick>=22&&tick<70||tick>=132&&tick<190||tick>=232&&tick<280,aside=tick>=336&&tick<346;
+        mc.options.keyUp.setDown(walk);mc.player.input.up=walk;mc.player.input.forwardImpulse=walk?1:0;mc.player.zza=walk?1:0;
+        mc.options.keyLeft.setDown(aside);mc.player.input.left=aside;mc.player.input.leftImpulse=aside?1:0;mc.player.xxa=aside?1:0;
+        mc.options.keySprint.setDown(false);
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        if(at(10)||at(120)||at(220))dummyR64(mc,eva,58,0);
+        if(at(310)||at(380))dummyR64(mc,eva,20,0);
+        if(at(40))lightR64();
+        if(at(150)||at(156)||at(162))lightR64();
+        if(at(250))heavyR64();
+        if(at(330))lightR64();
+        if(at(400))lightR64();
+        if(at(404))
+        {
+            mc.player.connection.sendCommand("damage "+eva.getStringUUID()+" 30 minecraft:mob_attack by @e[type=projectseele:sachiel,limit=1,sort=nearest]");
+            ProjectSeele.LOGGER.info("R64TOUR tick {} game {} the unit is struck",tick,mc.level.getGameTime());
+        }
+        if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
     }
 
     /**
