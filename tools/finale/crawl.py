@@ -6,21 +6,31 @@ and out, the body hauls itself over them, then the other side.  The chest
 swings and rolls towards the reaching shoulder, the pelvis swings against it,
 the spine snakes between them, and the head stays up looking ahead.  Hands and
 feet in contact hold still on the ground: the entity travels 12 blocks a cycle.
-The body lies on its belly, thighs and knees. Each limb is then brought down by
-itself until it is on the ground while it bears, and just clear of it while it
-is carried forward: a body fitted by its one lowest point lay on its hands with
-the belly, knees and feet 1 to 3 blocks in the air.  An arm bears on its whole
-forearm: the hand is set on the ground by its own height, and the elbow, which
-would go under the ground with the hand so near the shoulder, is turned out to
-the side until it lies on the ground too.  (Bringing the arm down by its one
-lowest point put the elbow on the ground and held the forearm upright, the
-fist nine blocks in the air.)
-Armed, the hands are on the gun and the rifle rig poses the arms afterwards.
+Armed, the hands are on the gun and the elbows on the ground, so the body stays
+down on its belly and the arms do not hold it up.
 Written as an overlay in the {bones, frames} form EvaBodyPose reads.
+
+2026-11-17. This is the crawl of 2026-11-06 again (in the packs R60 to R62), which the owner chose over the one that
+lay the body on its belly with its knees and elbows turned out (2026-11-13, R63), with the three things he said of
+it mended: "the ankles, certainly; the hands must not look as if they felt their way forward; the back and the
+stride must not writhe so: human and reasonable will do."
+  ankles  A foot was held at one heading in the world while its shin rolled with the knee that was drawn up and
+          out: the ankle was twisted by the difference, 50 to 74 degrees. A foot now lies in line with its own shin,
+          toes back, and can only be pointed. The legs trail nearly straight and are drawn up 4 blocks where they
+          were drawn 6: the knee of a leg drawn further has nowhere to go but out to the side (it cannot go into
+          the ground), which is the frog's leg. So the feet no longer hold still on the ground: they are dragged 2
+          blocks of every 6, as the legs of a body pulled along on its arms are.
+  hands   A hand was lifted 4.6 blocks, reached forward and patted down with the forearm in the air behind it. The
+          body is now pulled along on its forearms: the hand is set down ahead of the shoulder, towards the body's
+          middle, and stays where it is while the body goes over it; the forearm lies on the ground behind it and
+          the elbow rests on the ground, outside the shoulder, where the two bones of the arm put it; then the arm
+          is carried forward close to the ground.
+  trunk   The chest swung 14 degrees either way and rolled 15, the pelvis 9 and 8 against it. Now 5 and 6, 3 and 3:
+          a body that turns a little into each pull and is otherwise straight.
+The armed crawl is as it was.
 """
 import json
 import math
-import os
 import sys
 
 import numpy as np
@@ -31,26 +41,34 @@ import rig as R
 import scene as S
 
 FRAMES = 61
+SHOULDER = np.zeros(3)   # half the distance between the shoulders, their height, how far ahead they are (found in main)
 STRIDE = 12.0            # blocks a cycle, set by the gait clock
 BONES = ['torso_lower', 'torso_upper', 'neck', 'head', 'clavicle_l', 'clavicle_r', 'arm_l', 'forearm_l', 'wrist_l',
          'hand_l', 'arm_r', 'forearm_r', 'wrist_r', 'hand_r', 'leg_l', 'shin_l', 'ankle_l', 'foot_l',
          'leg_r', 'shin_r', 'ankle_r', 'foot_r']
 PELVIS_PITCH, CHEST_PITCH, HEAD_LEAN = 86.0, 76.0, 6.0
-PELVIS_SWING, CHEST_SWING = 9.0, 14.0     # yaw, against each other
+PELVIS_SWING, CHEST_SWING = 3.0, 5.0      # yaw, against each other (9 and 14 up to R62)
 CHEST_LEAD = 0.0                          # degrees the left shoulder is held forward
-PELVIS_ROLL, CHEST_ROLL = 8.0, 15.0       # about the spine
-HIP_Y, HIP_Z = 6.8, 7.4
-SURGE, HEAVE = 1.8, .8                    # two lunges a cycle: blocks forward, blocks up
-HAND_FAR, HAND_OUT, HAND_Y, HAND_LIFT = 32.0, 8.2, 2.6, 4.6
+PELVIS_ROLL, CHEST_ROLL = 3.0, 6.0        # about the spine (8 and 15 up to R62)
+HIP_Y, HIP_Z = 8.0, 7.4                   # (the hips' height before the body is set on the ground: 6.8 up to R62)
+SWAY = .4                                 # blocks the hips go to the side (.8 up to R62)
+SURGE, HEAVE = 1.2, .4                    # two lunges a cycle: blocks forward, blocks up (1.8 and .8 up to R62)
+HAND_FAR, HAND_OUT, HAND_Y, HAND_LIFT = 32.0, 8.2, 2.6, 4.6      # the armed crawl's, and the crawl's up to R62
 FOOT_DRAWN, FOOT_OUT, FOOT_Y, FOOT_LIFT = -15.0, 10.0, 3.6, 2.4
 TOE_PITCH = -128.0
-LIMBS = {'arm_l': ('arm_l', 'forearm_l', 'hand_l'), 'arm_r': ('arm_r', 'forearm_r', 'hand_r'),
-         'leg_l': ('shin_l', 'foot_l'), 'leg_r': ('shin_r', 'foot_r')}
-# A limb carried forward clears the ground by this much at its lowest point: the hand or the foot rises by its lift,
-# the elbow and the shin slide along just over the ground under it.
-CLEAR = .6
-# The elbow is turned out from straight down by no more than this (radians).
-SPLAY_MOST = 1.45
+# The crawl on the forearms. Where the wrist is set down: ahead of where the shoulder is carried, and from the
+# body's middle; how high the wrist's centre and the elbow's lie over the ground; how high they are carried forward.
+# (The elbow's centre at 2.8, the forearm level: the game then lifts the elbow by 1.2, since the elbow's own
+# surface is under the ground at that. 3.9 is the elbow lying on the ground; the forearm slopes 8 degrees to it.)
+WRIST_AHEAD, WRIST_OUT, WRIST_Y, ELBOW_Y = 10.5, 3.6, 2.6, 3.9
+WRIST_LIFT, ELBOW_LIFT = 1.8, 1.2
+# The legs: how far behind the hips the ankle of a drawn leg is and how far it goes back from there; how far apart
+# the feet trail, and how much further out a drawn foot is; the ankle's height; the heading of a knee from straight
+# down the body's length, how much further out it is drawn, and how high its centre stays over the ground (it is
+# turned out until it does); how far the foot is turned down from square to its shin (90: in line with it).
+LEG_DRAWN, LEG_STROKE, FEET_OUT, FEET_DRAW, ANKLE_Y = -25.6, 3.5, 6.0, 1.5, 3.0
+KNEE_OUT, KNEE_DRAW, KNEE_Y = 25.0, 30.0, 2.4
+FOOT_POINT = 84.0
 
 
 ARMED = len(sys.argv) > 3 and sys.argv[3] == 'armed'
@@ -61,9 +79,7 @@ if ARMED:
     PELVIS_SWING, CHEST_SWING, PELVIS_ROLL, CHEST_ROLL = 6.0, 5.0, 6.0, 6.0
     CHEST_LEAD = 8.0
     SURGE, HEAVE, HIP_Y, CHEST_PITCH = 1.2, .4, 7.2, 78.0
-else:
-    # The feet trail low, toes back, and are carried forward just clear of the ground.
-    FOOT_Y, FOOT_LIFT, TOE_PITCH = 2.0, 1.4, -104.0
+    SWAY = .8
 
 
 def smooth(t):
@@ -85,42 +101,10 @@ def spine(yaw, pitch, twist):
     return R.qmul(R.qmul(B.heading_q(yaw), R.qx(-math.radians(pitch))), R.qy(math.radians(twist)))
 
 
-def lowest(actors, m, parts=None):
-    """Height of the lowest point of the body. Armed it is the body and legs (the rifle rig poses the arms
-    afterwards); unarmed the belly and thighs, each limb being put on the ground by itself."""
-    if parts is None and not ARMED:
-        # the belly, the thighs and the knees: a knee drawn up under the body carries the hip over it
-        return min(lowest(actors, m, ('leg_', 'torso_lower')), lowest_end(actors, m, 'shin_l', True), lowest_end(actors, m, 'shin_r', True))
-    if parts is None:
-        parts = ('leg_', 'shin_', 'foot_', 'torso_lower')
+def lowest(actors, m):
+    # Armed, the rifle rig poses the arms afterwards: only the body and legs lie on the ground.
     return min(float((t.reshape(-1, 3) @ m[b][:3, :3].T + m[b][:3, 3])[:, 1].min()) for b, t, _ in actors.eva_mesh.parts
-               if b.startswith(parts))
-
-
-def lowest_end(actors, m, bone, upper):
-    """Height of the lowest point of one end of a bone's mesh: the half that is higher (or lower) in the rest pose."""
-    best = 1e9
-    for b, t, _ in actors.eva_mesh.parts:
-        if b == bone:
-            v = t.reshape(-1, 3)
-            middle = np.median(v[:, 1])
-            v = v[v[:, 1] >= middle] if upper else v[v[:, 1] < middle]
-            best = min(best, float((v @ m[b][:3, :3].T + m[b][:3, 3])[:, 1].min()))
-    return best
-
-
-def lowest_half(actors, m, bone, start, end, first):
-    """Height of the lowest point of the half of a bone's mesh nearer its start (or its end), the two given in the rest pose."""
-    best = 1e9
-    axis = end - start
-    for b, t, _ in actors.eva_mesh.parts:
-        if b == bone:
-            v = t.reshape(-1, 3)
-            along = (v - start) @ axis / float(axis @ axis)
-            v = v[along < .5] if first else v[along >= .5]
-            if len(v):
-                best = min(best, float((v @ m[b][:3, :3].T + m[b][:3, 3])[:, 1].min()))
-    return best
+               if not ARMED or b.startswith(('leg_', 'shin_', 'foot_', 'torso_lower')))
 
 
 def main():
@@ -137,54 +121,8 @@ def main():
     ident = np.array([1.0, 0, 0, 0])
 
     def pose(f, drop):
-        """The frame with every limb on the ground: each limb's target is moved up or down until the limb's own
-        lowest point is on the ground while it bears, and just clear of it while it is carried forward."""
-        if ARMED:
-            return solve(f, drop, {})
-        # The ankle's height sets the foot and the ankle end of the shin; the knee end lies with the body.
-        # The wrist's height sets the hand and the wrist end of the forearm; the elbow is turned out (splay,
-        # radians from straight down) until the upper arm and the elbow end of the forearm are on the ground.
-        shift = dict.fromkeys(LIMBS, 0.0)
-        splay = {'arm_l': 0.0, 'arm_r': 0.0}
-
-        def hand_low(m, side):
-            return min(lowest(actors, m, ('hand_' + side,)), lowest_half(actors, m, 'forearm_' + side, pv['forearm_' + side], pv['wrist_' + side], False))
-
-        def elbow_low(m, side):
-            return min(lowest(actors, m, ('arm_' + side,)), lowest_half(actors, m, 'forearm_' + side, pv['forearm_' + side], pv['wrist_' + side], True))
-
-        for _ in range(2):
-            for _ in range(4):
-                rot, pos, m, lifts = solve(f, drop, shift, splay, True)
-                for limb in LIMBS:
-                    side = limb[-1]
-                    if limb.startswith('leg_'):
-                        shift[limb] += .7 * (min(CLEAR, lifts[limb]) - min(lowest(actors, m, ('foot_' + side,)), lowest_end(actors, m, 'shin_' + side, False)))
-                    else:
-                        # the hand rises by its whole lift
-                        shift[limb] += .8 * (lifts[limb] - hand_low(m, side))
-            # Both elbows at once: halve the range of each until it lies at its own clearance.
-            lo = dict.fromkeys(splay, 0.0)
-            hi = dict.fromkeys(splay, SPLAY_MOST)
-            for _ in range(7):
-                for arm in splay:
-                    splay[arm] = (lo[arm] + hi[arm]) / 2
-                rot, pos, m, lifts = solve(f, drop, shift, splay, True)
-                for arm in splay:
-                    if elbow_low(m, arm[-1]) < min(CLEAR, lifts[arm]):
-                        lo[arm] = splay[arm]
-                    else:
-                        hi[arm] = splay[arm]
-            for arm in splay:
-                # an elbow that is clear of the ground hanging straight down stays there: the arm is reaching
-                splay[arm] = hi[arm] if hi[arm] < SPLAY_MOST else SPLAY_MOST
-                if lo[arm] == 0.0 and hi[arm] < .03:
-                    splay[arm] = 0.0
-        return solve(f, drop, shift, splay)
-
-    def solve(f, drop, shift, splay=None, tell=False):
         u = f / period
-        lifts = {}
+        info = {}
         rot, pos = G.frame_pose(bones, clip, min(f, len(clip['frames']) - 1))
         raw = rig.fk(rot, pos, world)
         hands = {s: B.mat_rot(raw['hand_' + s]) for s in 'lr'}
@@ -202,10 +140,11 @@ def main():
         rot['head'] = R.qmul(R.qconj(neck), head)
         for s, sign, phase in (('l', -1, .5), ('r', 1, 0.0)):
             reach = math.cos(2 * math.pi * (u + phase))
-            rot['clavicle_' + s] = R.qmul(R.qz(math.radians(sign * (3 + 5 * reach))), R.qy(math.radians(sign * (4 + 10 * reach))))
+            # (The shoulder goes forward with its arm: 10 degrees up to R62 and armed, 5 now.)
+            rot['clavicle_' + s] = R.qmul(R.qz(math.radians(sign * (3 + (5 if ARMED else 3) * reach))), R.qy(math.radians(sign * (4 + (10 if ARMED else 5) * reach))))
         m = rig.fk(rot, pos, world)
         hip = (B.point(m['leg_l'], pv['leg_l']) + B.point(m['leg_r'], pv['leg_r'])) / 2
-        target = np.array([.8 * cycle, HIP_Y + HEAVE * lunge - drop, HIP_Z + SURGE * lunge])
+        target = np.array([SWAY * cycle, HIP_Y + HEAVE * lunge - drop, HIP_Z + SURGE * lunge])
         pos['root'] = pos['root'] + (target - hip) / S.SCALE
         # Legs: the left one pushes as the right arm pulls.
         for s, side, phase in (('l', 1.0, 0.0), ('r', -1.0, .5)):
@@ -213,34 +152,103 @@ def main():
             v = u + phase
             along, lift = stroke(v, FOOT_DRAWN, FOOT_LIFT)
             drawn = (math.cos(2 * math.pi * v) + 1) / 2
-            lifts['leg_' + s] = lift
-            ankle = np.array([side * (FOOT_OUT + 3.6 * drawn), max(.4, FOOT_Y + lift + shift.get('leg_' + s, 0.0)), along])
-            q_foot = B.foot_q(side * 12, TOE_PITCH)
-            pole = R.qmat(B.heading_q(side * (62 + 24 * drawn))) @ np.array([0, 0, -1.0]) + np.array([0, -.55, 0])
+            if ARMED:
+                ankle = np.array([side * (FOOT_OUT + 3.6 * drawn), FOOT_Y + lift - drop * 0, along])
+                pole = R.qmat(B.heading_q(side * (62 + 24 * drawn))) @ np.array([0, 0, -1.0]) + np.array([0, -.55, 0])
+            else:
+                # The ankle goes back LEG_STROKE from where it is drawn to while the ground goes back 6, and is
+                # drawn forward again: so many blocks behind the hips, which go on and back with the body's lunges.
+                back = LEG_STROKE * (1 - drawn)
+                hip_now = B.point(m['torso_lower'], pv['leg_' + s])
+                ankle = np.array([side * (FEET_OUT + FEET_DRAW * drawn), ANKLE_Y + .6 * lift / max(FOOT_LIFT, 1e-6), hip_now[2] + LEG_DRAWN - back])
+                pole = R.qmat(B.heading_q(side * (KNEE_OUT + KNEE_DRAW * drawn))) @ np.array([0, 0, -1.0]) + np.array([0, -.55, 0])
             limb = solver.limbs['leg_' + s]
-            qu, ql, qw, ang, err = limb.solve(B.point(m['torso_lower'], pv['leg_' + s]), ankle, pole, B.mat_rot(m['torso_lower']))
+            hip_at = B.point(m['torso_lower'], pv['leg_' + s])
+            qu, ql, qw, ang, err = limb.solve(hip_at, ankle, pole, B.mat_rot(m['torso_lower']))
+            if not ARMED:
+                # A knee cannot go into the ground: it is turned out until its centre is over it.
+                def knee_at(turn):
+                    aim = R.qmat(B.heading_q(side * (KNEE_OUT + KNEE_DRAW * drawn + turn))) @ np.array([0, 0, -1.0]) + np.array([0, -.55 * (1 - turn / 70), 0])
+                    found = limb.solve(hip_at, ankle, aim, B.mat_rot(m['torso_lower']))
+                    probe = dict(rot)
+                    probe['leg_' + s], probe['shin_' + s] = found[0], found[1]
+                    return B.point(rig.fk(probe, pos, world)['leg_' + s], solver.knee[s])[1], found
+                turn = 0.0
+                height, found = knee_at(0.0)
+                if height < KNEE_Y:
+                    lo_t, hi_t = 0.0, 70.0
+                    for _ in range(18):
+                        turn = (lo_t + hi_t) / 2
+                        height, found = knee_at(turn)
+                        if height < KNEE_Y:
+                            lo_t = turn
+                        else:
+                            hi_t = turn
+                    turn = hi_t
+                    height, found = knee_at(turn)
+                qu, ql, qw, ang, err = found
+                info['knee_out_' + s], info['knee_y_' + s] = KNEE_OUT + KNEE_DRAW * drawn + turn, height
             rot['leg_' + s], rot['shin_' + s] = qu, ql
             rot['ankle_' + s] = ident
-            rot['foot_' + s] = R.qmul(R.qconj(R.qmul(qw, ql)), q_foot)
+            # Armed, the foot is held at a heading in the world. Otherwise it lies in line with its own shin, turned
+            # down from square to it and no other way: an ankle that only points the foot cannot be twisted.
+            rot['foot_' + s] = R.qmul(R.qconj(R.qmul(qw, ql)), B.foot_q(side * 12, TOE_PITCH)) if ARMED else R.qx(-math.radians(FOOT_POINT))
+            info['knee_' + s], info['leg_err_' + s] = ang, err
             pos['shin_' + s] = R.Rig.hinge_offset(ql, pv['shin_' + s], solver.knee[s])
         # Arms: the right hand plants at the start of the cycle.
         for s, side, phase in (('l', 1.0, .5), ('r', -1.0, 0.0)):
             m = rig.fk(rot, pos, world)
-            along, lift = stroke(u + phase, HAND_FAR, HAND_LIFT)
-            lifts['arm_' + s] = lift
-            target_hand = np.array([side * HAND_OUT, max(.4, HAND_Y + lift + shift.get('arm_' + s, 0.0)), along])
             shoulder = B.point(m['clavicle_' + s], pv['arm_' + s])
             limb = solver.limbs['arm_' + s]
-            turn = splay['arm_' + s] if splay else 0.0
-            pole = np.array([side * (.45 * math.cos(turn) + math.sin(turn)), -math.cos(turn), -.2])
+            if ARMED:
+                along, lift = stroke(u + phase, HAND_FAR, HAND_LIFT)
+                target_hand = np.array([side * HAND_OUT, HAND_Y + lift, along])
+                pole = np.array([side * .45, -1.0, -.2])
+            else:
+                # The wrist is set down and stays where it is on the ground while the body goes over it (in the
+                # entity's own frame it goes back at the body's pace), then goes forward. The elbow lies on the
+                # ground where the upper arm from the shoulder and the forearm from the wrist meet, outside them.
+                along, lift = stroke(u + phase, SHOULDER[2] + WRIST_AHEAD, 1.0)
+                target_hand = np.array([side * WRIST_OUT, WRIST_Y + WRIST_LIFT * lift, along])
+                ey = ELBOW_Y + ELBOW_LIFT * lift
+                upper, fore = limb.reach(0.0)[0] * 0 + np.linalg.norm(limb.a) * S.SCALE, np.linalg.norm(limb.b) * S.SCALE
+                r1 = math.sqrt(max(.01, upper ** 2 - (shoulder[1] - ey) ** 2))
+                r2 = math.sqrt(max(.01, fore ** 2 - (target_hand[1] - ey) ** 2))
+                c1, c2 = np.array([shoulder[0], shoulder[2]]), np.array([target_hand[0], target_hand[2]])
+                d = float(np.linalg.norm(c2 - c1))
+                d = min(max(d, abs(r1 - r2) + .05), r1 + r2 - .05)
+                along_line = (r1 * r1 - r2 * r2 + d * d) / (2 * d)
+                off = math.sqrt(max(0.0, r1 * r1 - along_line * along_line))
+                line = (c2 - c1) / max(float(np.linalg.norm(c2 - c1)), 1e-6)
+                across = np.array([line[1], -line[0]])
+                if across[0] * side < 0:
+                    across = -across
+                spot = c1 + line * along_line + across * off
+                elbow = np.array([spot[0], ey, spot[1]])
+                pole = elbow - shoulder
             qu, ql, qw, ang, err = limb.solve(shoulder, target_hand, pole, B.mat_rot(m['clavicle_' + s]))
             rot['arm_' + s], rot['forearm_' + s] = qu, ql
             pos['forearm_' + s] = R.Rig.hinge_offset(ql, pv['forearm_' + s], solver.elbow[s])
             rot['wrist_' + s] = ident
             m = rig.fk(rot, pos, world)
-            rot['hand_' + s] = R.qmul(R.qconj(B.mat_rot(m['wrist_' + s])), hands[s])
-        return (rot, pos, rig.fk(rot, pos, world), lifts) if tell else (rot, pos, rig.fk(rot, pos, world))
+            if ARMED:
+                rot['hand_' + s] = R.qmul(R.qconj(B.mat_rot(m['wrist_' + s])), hands[s])
+            else:
+                # The hand lies flat as the capture's does, turned the way its forearm points.
+                at = B.point(m['forearm_' + s], solver.elbow[s])
+                fore = B.point(m['wrist_' + s], pv['wrist_' + s]) - at
+                rot['hand_' + s] = R.qmul(R.qconj(B.mat_rot(m['wrist_' + s])), R.qmul(R.qy(math.atan2(fore[0], fore[2])), hands[s]))
+                info['elbow_y_' + s], info['elbow_off_' + s] = float(at[1]), float(np.linalg.norm(at - elbow))
+                info['planted_' + s] = (u + phase) % 1.0 < .5
+            info['elbow_' + s], info['arm_err_' + s] = ang, err
+        return rot, pos, rig.fk(rot, pos, world), info
 
+    # Where the shoulders are carried, the body lying still: the arms are set down from there.
+    SHOULDER[:] = 0
+    still = pose(0, 0.0)[2]
+    both = [B.point(still['clavicle_' + s], pv['arm_' + s]) for s in 'lr']
+    SHOULDER[:] = [abs(both[0][0] - both[1][0]) / 2, (both[0][1] + both[1][1]) / 2, (both[0][2] + both[1][2]) / 2]
+    print('shoulders carried %.1f apart, %.1f high, %.1f ahead' % (2 * SHOULDER[0], SHOULDER[1], SHOULDER[2]))
     low = np.array([lowest(actors, pose(f, 0.0)[2]) for f in range(FRAMES)])
     print('lowest point by itself: %.2f .. %.2f' % (low.min(), low.max()))
     drops = low.copy()
@@ -253,8 +261,8 @@ def main():
         drops = drops + residual
     frames, posed = [], []
     for f in range(FRAMES):
-        rot, pos, m = pose(f, drops[f])
-        posed.append((rot, pos, m))
+        rot, pos, m, info = pose(f, drops[f])
+        posed.append((rot, pos, m, info))
         p = pos['root']
         row = {'root_m': [round(float(x), 6) for x in np.array([-p[0], p[1], p[2]]) * 16 / 112], 'rotation_wxyz': [],
                'bone_position_xyz': {}}
@@ -264,25 +272,23 @@ def main():
             t = pos[n]
             row['bone_position_xyz'][n] = [round(float(x), 4) for x in (-t[0] * 16, t[1] * 16, t[2] * 16)]
         frames.append(row)
-    fastest = 0
+    fastest, quick = 0, ''
     for i in range(1, FRAMES):
         for b in BONES:
             d = abs(float(np.dot(B.mat_rot(posed[i][2][b]), B.mat_rot(posed[i - 1][2][b]))))
-            fastest = max(fastest, 2 * math.degrees(math.acos(min(1, d))))
-    print('fastest joint %.1f deg/frame, lowest point %.2f .. %.2f' % (fastest, min(lowest(actors, p[2]) for p in posed), max(lowest(actors, p[2]) for p in posed)))
-    for limb, parts in LIMBS.items():
-        # a limb bears for the first half of its own stroke
-        own = [lowest(actors, p[2], parts) for p in posed]
-        print('  %s lowest point %.2f .. %.2f, on the ground (under 0.3) in %d of %d frames' % (limb, min(own), max(own), sum(v < .3 for v in own), FRAMES))
+            if 2 * math.degrees(math.acos(min(1, d))) > fastest:
+                fastest, quick = 2 * math.degrees(math.acos(min(1, d))), '%s at frame %d' % (b, i)
+    print('fastest joint %.1f deg/frame (%s), lowest point %.2f .. %.2f' % (fastest, quick, min(lowest(actors, p[2]) for p in posed), max(lowest(actors, p[2]) for p in posed)))
     if not ARMED:
+        on = [p[3] for p in posed]
         for side in 'lr':
-            hand = [min(lowest(actors, p[2], ('hand_' + side,)), lowest_half(actors, p[2], 'forearm_' + side, pv['forearm_' + side], pv['wrist_' + side], False)) for p in posed]
-            elbow = [min(lowest(actors, p[2], ('arm_' + side,)), lowest_half(actors, p[2], 'forearm_' + side, pv['forearm_' + side], pv['wrist_' + side], True)) for p in posed]
-            both = sum(h < .3 and e < .3 for h, e in zip(hand, elbow))
-            print('  arm_%s: hand %.2f .. %.2f (on the ground in %d frames), elbow %.2f .. %.2f (on the ground in %d), whole forearm down in %d of %d'
-                  % (side, min(hand), max(hand), sum(v < .3 for v in hand), min(elbow), max(elbow), sum(v < .3 for v in elbow), both, FRAMES))
-    whole = [lowest(actors, p[2], ('',)) for p in posed]
-    print('  whole body lowest point %.2f .. %.2f' % (min(whole), max(whole)))
+            down = [i['elbow_y_' + side] for i in on if i['planted_' + side]]
+            print('  arm_%s: elbow bent %.0f..%.0f; while it bears its centre is %.2f..%.2f over the ground, %.2f at most from where it was set; out of reach by %.2f at most' % (
+                side, min(i['elbow_' + side] for i in on), max(i['elbow_' + side] for i in on), min(down), max(down),
+                max(i['elbow_off_' + side] for i in on if i['planted_' + side]), max(i['arm_err_' + side] for i in on)))
+            print('  leg_%s: knee bent %.0f..%.0f, turned out %.0f..%.0f, its centre %.2f..%.2f over the ground; out of reach by %.2f at most' % (
+                side, min(i['knee_' + side] for i in on), max(i['knee_' + side] for i in on), min(i['knee_out_' + side] for i in on), max(i['knee_out_' + side] for i in on),
+                min(i['knee_y_' + side] for i in on), max(i['knee_y_' + side] for i in on), max(i['leg_err_' + side] for i in on)))
     names = sorted({b for b, _, _ in actors.eva_mesh.parts})
     for f in range(0, FRAMES, 15):
         m = posed[f][2]
@@ -294,23 +300,20 @@ def main():
     print('wrote', out, FRAMES, 'frames')
     if len(sys.argv) > 2 and sys.argv[2] != '-':
         images = []
-        # CRAWL_TILE=WxH and CRAWL_STEP=n for a closer look: larger tiles, every n-th frame
-        size = tuple(int(v) for v in os.environ.get('CRAWL_TILE', '320x240').split('x'))
-        step = int(os.environ.get('CRAWL_STEP', '10'))
-        shown = range(0, FRAMES - 1, step)
-        for f in shown:
+        size = (320, 240)
+        for f in range(0, FRAMES - 1, 10):
             m = posed[f][2]
             groups = [actors.eva_mesh.triangles(m, np.eye(4))]
             images.append(R.render(R.Camera((-90, 30, 16), (0, 8, 4), 36, size), groups, label='side %d' % f, ground=(-70, 70, -70, 70)))
-        for f in shown:
+        for f in range(0, FRAMES - 1, 10):
             m = posed[f][2]
             groups = [actors.eva_mesh.triangles(m, np.eye(4))]
             images.append(R.render(R.Camera((-8, 100, 2), (0, 6, 4), 40, size, up=(0, 0, 1)), groups, label='top %d' % f, ground=(-70, 70, -70, 70)))
-        for f in shown:
+        for f in range(0, FRAMES - 1, 10):
             m = posed[f][2]
             groups = [actors.eva_mesh.triangles(m, np.eye(4))]
             images.append(R.render(R.Camera((-40, 26, 100), (0, 8, 10), 36, size), groups, label='front %d' % f, ground=(-70, 70, -70, 70)))
-        R.sheet(images, len(shown)).save(sys.argv[2])
+        R.sheet(images, 6).save(sys.argv[2])
 
 
 if __name__ == '__main__':

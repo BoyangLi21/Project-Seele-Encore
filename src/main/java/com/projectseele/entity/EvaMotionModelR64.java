@@ -143,6 +143,31 @@ public final class EvaMotionModelR64
         if(e.getEntityData().get(JUMP_KEY)!=jump)e.getEntityData().set(JUMP_KEY,jump);
     }
 
+    /**
+     * R64: going to the ground and crawling, for a Unit of the planted model bare handed or with the knife.
+     * <p>
+     * The owner (2026-11-16): going down is very bad and slow. Three things that were so in every version: it took
+     * 64 ticks to get down and as long to get up (now DOWN_GATHER and DOWN_RATE on the stance clock: 35); held
+     * forward, the body went on 37 to 46 blocks through that with no step under it (now it does not move between
+     * its crouch and the ground); and it crawled 5.4 blocks a second (now CRAWL_SPEED on the speed key that was
+     * 0.10: 8.6). The crawl itself is tools/finale/crawl.py.
+     */
+    public static final float DOWN_GATHER=.015F,DOWN_RATE=.10F,CRAWL_SPEED=.16F;
+
+    /** Goes to the ground as this model has it: bare handed or with the knife (with the rifle it lies behind the gun as before). */
+    public static boolean ground(EvaUnit01Entity e)
+    {
+        return planted(e)&&(e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE);
+    }
+
+    /** Between its crouch and the ground, where no clip steps: it does not move. (The crawl comes in from 2.5.) */
+    public static boolean goingDown(EvaUnit01Entity e)
+    {
+        if(!ground(e))return false;
+        float stance=e.rifleStanceLevel(0);
+        return stance>1.05F&&stance<2.55F;
+    }
+
     /** Blocks a Unit of the planted model jumps (the server's); 0 for a Unit that jumps as up to R63. */
     public static float jumpHeight(EvaUnit01Entity e){return planted(e)?e.getEntityData().get(JUMP_KEY):0F;}
 

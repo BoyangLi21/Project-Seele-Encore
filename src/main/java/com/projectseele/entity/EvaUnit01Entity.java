@@ -1524,7 +1524,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             float stance=this.entityData.get(DATA_RIFLE_STANCE);
             float priorStance=stance;
             if(!rifleStanceInitialized){stance=wanted;rifleStanceInitialized=true;}
-            var step=EvaStanceTimingR53.advance(stance,wanted,rifleStanceVelocity);
+            // R64: a Unit of the planted model is down, and up again, in 35 ticks where it took 64.
+            var step=EvaMotionModelR64.ground(this)
+                    ?EvaStanceTimingR53.advance(stance,wanted,rifleStanceVelocity,EvaMotionModelR64.DOWN_GATHER,EvaMotionModelR64.DOWN_RATE)
+                    :EvaStanceTimingR53.advance(stance,wanted,rifleStanceVelocity);
             stance=step.phase();rifleStanceVelocity=step.velocity();
             this.entityData.set(DATA_RIFLE_STANCE,stance);
             EvaStanceFoleyR41.tick(this,priorStance,stance);
@@ -8157,6 +8160,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             // on top of the capture as a second, sliding trajectory.
             return null;
         }
+        // R64: between its crouch and the ground it does not move (the body slid 37 to 46 blocks through that,
+        // held forward, with no step under it).
+        if(EvaMotionModelR64.goingDown(this))return Vec3.ZERO;
         double strafe = this.isPilotProne() ? 0.28D
                 : this.isPilotCrouching() ? 0.45D : 0.7D;
         if(EvaMotionModelR64.walks(this))
@@ -8203,7 +8209,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // R64 (M2): and the slope ahead holds it.
         variantSpeed*=EvaMotionModelR64.slopeScale(this,this.isPilotSprinting(),this.slopeAheadR64);
         float stance=this.rifleStanceInitialized?this.entityData.get(DATA_RIFLE_STANCE):this.isPilotProne()?3:this.isPilotCrouching()?1:0;
-        float speed=stance<=1?Mth.lerp(stance,variantSpeed,CROUCH_SPEED):Mth.lerp(Mth.clamp((stance-1)/2,0,1),CROUCH_SPEED,PRONE_SPEED);
+        float speed=stance<=1?Mth.lerp(stance,variantSpeed,CROUCH_SPEED):Mth.lerp(Mth.clamp((stance-1)/2,0,1),CROUCH_SPEED,EvaMotionModelR64.ground(this)?EvaMotionModelR64.CRAWL_SPEED:PRONE_SPEED);
         return speed * synchronizationSpeed * EvaSprintR50.speed(this);
     }
 

@@ -167,7 +167,8 @@ public final class EvaBodyPose
                 {
                     overlayClipR59(combatClips,variant,"rifle_stance","rifle_stance","eva_rifle_legs_r59.json");
                     overlayClipR59(combatClips,variant,"dash_run","dash_run","eva_dash_r59.json");
-                    overlayClipR59(combatClips,variant,"prone_crawl","prone_crawl","eva_crawl_r59.json");
+                    // (Review only: -Dprojectseele.crawlClipR64=eva_crawl_r59_1111.json puts the crawl of R60 to R62 in its place.)
+                    overlayClipR59(combatClips,variant,"prone_crawl","prone_crawl",System.getProperty("projectseele.crawlClipR64","eva_crawl_r59.json"));
                     overlayClipR59(combatClips,variant,"prone_crawl","prone_crawl_armed_r59","eva_crawl_armed_r59.json");
                     smoothGaitsR59(combatClips,variant);
                 }
@@ -546,7 +547,7 @@ public final class EvaBodyPose
         body.dirty();
         var p=new Matrix4f(EvaRifleKinematics.world(eva,partial)).mul(body.matrix("head")).transformPosition(eyePoint(eva));return new net.minecraft.world.phys.Vec3(p.x,p.y,p.z);
     }
-    private static Sample ordinaryClipBaseR52(Data d,int variant,float phase,float idlePhase,float move,float run,float crouch,float prone,float stance,float dash,boolean rifle)
+    private static Sample ordinaryClipBaseR52(Data d,int variant,float phase,float idlePhase,float move,float run,float crouch,float prone,float stance,float dash,boolean rifle,boolean rests)
     {
         var gait=mix(clip(d,variant,"walk",phase),clip(d,variant,"run",phase),run);
 
@@ -579,11 +580,17 @@ public final class EvaBodyPose
             supportWeight=supportWeight*supportWeight*(3-2*supportWeight);
             float mobility=move*(1-supportWeight);
             if(mobility>0)body=mix(body,mix(gait,clip(d,variant,"crouch_walk",phase),Math.min(1,stance)),mobility);
-            if(stance>2.5F&&move>0&&d.clips().containsKey("prone_crawl"))
+            if(stance>2.5F&&(move>0||rests&&!armed)&&d.clips().containsKey("prone_crawl"))
             {
                 float t=Mth.clamp((stance-2.5F)*2,0,1);t=t*t*(3-2*t);
                 // On the gun the arms cannot prop the chest up: the body stays down on its belly.
                 boolean belly=armed&&d.combatClips().getOrDefault(variant,Map.of()).containsKey("prone_crawl_armed_r59");
+                // R64: a Unit of the planted model lies still as it crawls, on its forearms with its legs trailing in
+                // line: the crawl stopped where both hands are on the ground. (The capture's lying body has its legs
+                // rolled out and its soles turned out in a V; a body that crawled with its feet in line and lay with
+                // them turned out changed them every time it stopped. The crawl's two halves met in the middle were
+                // tried for a body that lies evenly: the elbows of that stood 5 blocks in the air.)
+                if(rests&&!armed)body=mix(body,clip(d,variant,"prone_crawl",0),t);
                 body=mix(body,clip(d,variant,belly?"prone_crawl_armed_r59":"prone_crawl",phase),move*t);
             }
         }
@@ -617,7 +624,7 @@ public final class EvaBodyPose
     {
         if(!input.current(e)||!Double.isFinite(clock))throw new IllegalStateException("Original ordinary target identity changed");Data d=data;int variant=input.variant;float phase=input.phase-Mth.floor(input.phase),time=(float)((clock%24000)/20);
         var idleClip=d.combatClips().getOrDefault(variant,Map.of()).getOrDefault("idle",d.clips().get("idle"));float idlePhase=(float)((clock/20/idleClip.duration())%1);boolean supported=d.clips().containsKey("rifle_stance");float prone=input.prone;prone=prone*prone*prone*(10+prone*(-15+6*prone));
-        var body=ordinaryClipBaseR52(d,variant,phase,idlePhase,0,0,input.crouch,prone,input.stance,0,false);
+        var body=ordinaryClipBaseR52(d,variant,phase,idlePhase,0,0,input.crouch,prone,input.stance,0,false,EvaMotionModelR64.ground(e));
         var bareChest=new Quaternionf(body.rotations.get("torso_lower")).mul(body.rotations.get("torso_upper"));var chest=new Quaternionf(bareChest);if(!supported)chest.rotateY(-.22F);
         var captured=mocap(d,"idle",(time/4)%1);captured.slerp(chest,supported?Math.min(1,input.stance):input.crouch);float ready=input.ready*input.ready*(3-2*input.ready);captured=bareChest.slerp(captured,ready);body.rotations.put("torso_upper",new Quaternionf(body.rotations.get("torso_lower")).invert().mul(captured));body.dirty();
         if(!supported&&prone>0&&!d.prone().entrySet().isEmpty())
@@ -674,7 +681,7 @@ public final class EvaBodyPose
         float idlePhase=(float)((((double)entity.level().getGameTime()+partial)/20.0/idleClip.duration())%1.0);
         float move=entity.rifleMoveBlend(partial),run=entity.rifleRunBlend(partial),crouch=entity.rifleCrouchBlend(partial),prone=entity.rifleProneBlend(partial);prone=prone*prone*prone*(10+prone*(-15+6*prone));
         float dash=EvaSprintR50.blend(entity,partial);boolean supported=d.clips().containsKey("rifle_stance");float stance=entity.rifleStanceLevel(partial);
-        Sample body=ordinaryClipBaseR52(d,variant,phase,idlePhase,move,run,crouch,prone,stance,dash,entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||entity.fixedCannonOperatingR52());
+        Sample body=ordinaryClipBaseR52(d,variant,phase,idlePhase,move,run,crouch,prone,stance,dash,entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||entity.fixedCannonOperatingR52(),EvaMotionModelR64.ground(entity));
         var capturedLocomotion=EvaCapturedLocomotionR44.sample(entity,variant,d.rigs().get(variant),partial);
         boolean capturedLocomotionOwns=capturedLocomotion!=null;
         if(capturedLocomotionOwns)body=capturedLocomotion;

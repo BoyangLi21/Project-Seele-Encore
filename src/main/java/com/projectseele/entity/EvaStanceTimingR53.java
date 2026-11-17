@@ -7,33 +7,37 @@ public final class EvaStanceTimingR53
     private static final float ACCELERATION=.006F,LOW_RATE=.05F;
 
     public static Step advance(float phase,float target,float velocity)
+    {return advance(phase,target,velocity,ACCELERATION,LOW_RATE);}
+
+    /** R64: the same clock at another pace: how fast it gathers (a tick, each tick) and how fast it goes at most below phase 1.9. */
+    public static Step advance(float phase,float target,float velocity,float gather,float rate)
     {
         if(!Float.isFinite(phase+target+velocity))throw new IllegalArgumentException("Nonfinite stance clock");
         phase=Math.max(0,Math.min(3,phase));target=Math.max(0,Math.min(3,target));
         float remaining=target-phase;
-        if(Math.abs(remaining)<.00001F&&Math.abs(velocity)<=ACCELERATION)return new Step(target,0);
+        if(Math.abs(remaining)<.00001F&&Math.abs(velocity)<=gather)return new Step(target,0);
         // The standing/crouching capture concentrates its knee bend in less
         // than half a phase, and from kneeling the front leg sweeps back as
         // far as phase 1.9. Only the lowering of the hips after it may hurry.
-        float limit=LOW_RATE+.03F*smooth((phase-1.9F)/.5F);
+        float limit=rate+.03F*smooth((phase-1.9F)/.5F);
         // The phase advances in server ticks. A continuous v^2/(2a) stop
         // distance omits the next discrete step and then snaps the final
         // velocity to zero. Account for every remaining braking step instead.
-        float desired=Math.copySign(Math.min(limit,brakingSpeed(Math.abs(remaining))),remaining);
-        float next=velocity+Math.max(-ACCELERATION,Math.min(ACCELERATION,desired-velocity));
+        float desired=Math.copySign(Math.min(limit,brakingSpeed(Math.abs(remaining),gather)),remaining);
+        float next=velocity+Math.max(-gather,Math.min(gather,desired-velocity));
         // A reversed request first brakes the preceding movement. It must
         // not snap to a nearby target while still travelling away from it.
-        if(next*remaining>0&&Math.abs(next)>=Math.abs(remaining)&&Math.abs(velocity)<=ACCELERATION)
+        if(next*remaining>0&&Math.abs(next)>=Math.abs(remaining)&&Math.abs(velocity)<=gather)
             return new Step(target,0);
         float result=Math.max(0,Math.min(3,phase+next));
         // The last braking step lands on the target to within rounding: it must not cross it.
-        if(next*remaining>0&&Math.abs(next)>=Math.abs(remaining)&&Math.abs(next)<=ACCELERATION)result=target;
+        if(next*remaining>0&&Math.abs(next)>=Math.abs(remaining)&&Math.abs(next)<=gather)result=target;
         return new Step(result,result==phase?0:next);
     }
-    private static float brakingSpeed(float distance)
+    private static float brakingSpeed(float distance,float gather)
     {
-        int ticks=Math.max(1,(int)Math.ceil((Math.sqrt(1+8*distance/ACCELERATION)-1)/2));
-        return (distance+ACCELERATION*ticks*(ticks-1)/2)/ticks;
+        int ticks=Math.max(1,(int)Math.ceil((Math.sqrt(1+8*distance/gather)-1)/2));
+        return (distance+gather*ticks*(ticks-1)/2)/ticks;
     }
 
     private static float smooth(float value)
