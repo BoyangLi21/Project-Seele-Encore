@@ -17,7 +17,8 @@ public final class SeeleNetwork
     // 78 is the R63r release (R63 plus the R64 audio); main adds synchronized entity
     // data beyond it (planted model, gait keys), so it must not accept an R63r peer.
     // 81 adds the Yashima gunnery told to the shooter's sight (ClientboundCannonServiceR64).
-    private static final String PROTOCOL_VERSION = "81";
+    // 82 adds the street-pass list (ClientboundStreetPassR64): an older client would collide where the server does not.
+    private static final String PROTOCOL_VERSION = "82";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),
@@ -186,6 +187,9 @@ public final class SeeleNetwork
         CHANNEL.messageBuilder(ClientboundCannonServiceR64.class,id++,NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(ClientboundCannonServiceR64::encode).decoder(ClientboundCannonServiceR64::new)
                 .consumerMainThread(ClientboundCannonServiceR64::handle).add();
+        CHANNEL.messageBuilder(ClientboundStreetPassR64.class,id++,NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundStreetPassR64::encode).decoder(ClientboundStreetPassR64::new)
+                .consumerMainThread(ClientboundStreetPassR64::handle).add();
         com.projectseele.world.DeadSeaReadingR45.installBridge((player,challenge)->CHANNEL.send(
                 net.minecraftforge.network.PacketDistributor.PLAYER.with(()->player),new ClientboundDeadSeaReadChallengeR45(
                         challenge.nonce(),challenge.revision(),challenge.pages())));

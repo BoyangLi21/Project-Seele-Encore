@@ -25,7 +25,12 @@ public abstract class EvaSmallObstacleMixin
                 ||state.is(net.minecraft.world.level.block.Blocks.VOID_AIR))return Shapes.empty();
         VoxelShape shape=com.projectseele.entity.SbwStaticShapesR24.shape(state,context);
         if(shape==null){com.projectseele.entity.SbwRestCollisionR24.shapeFallback();shape=state.getCollisionShape(level,pos,context);}
-        return context instanceof EntityCollisionContext entityContext&&entityContext.getEntity() instanceof EvaUnit01Entity eva
-                &&EvaObstacleCollision.ignores(eva,state,pos,shape)?Shapes.empty():shape;
+        if(!(context instanceof EntityCollisionContext entityContext))return shape;
+        var entity=entityContext.getEntity();
+        if(entity instanceof EvaUnit01Entity eva)return EvaObstacleCollision.ignores(eva,state,pos,shape)?Shapes.empty():shape;
+        // An Angel or a mass-production unit walks through listed street furniture too (R64): Sachiel steps only two.
+        if((entity instanceof com.projectseele.entity.Angel||entity instanceof com.projectseele.entity.MassProductionEvaEntity)
+                &&!shape.isEmpty()&&com.projectseele.world.StreetPassR64.passes(entity.level(),pos,state))return Shapes.empty();
+        return shape;
     }
 }

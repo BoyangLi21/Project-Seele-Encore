@@ -15,6 +15,9 @@ public final class EvaObstacleCollision
     public static boolean ignores(EvaUnit01Entity eva,BlockState state,BlockPos pos,VoxelShape shape)
     {
         if(shape.isEmpty()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive())return false;
+        // Listed street furniture does not stop a giant at any height (R64). The 1.75 band below moves with the
+        // feet, so on its own it lifts a Unit onto a pole and then holds it on the wires.
+        if(com.projectseele.world.StreetPassR64.passes(eva.level(),pos,state))return true;
         Block block=state.getBlock();
         // These are structural walking surfaces or access-control barriers, even when thin.
         if(block instanceof SlabBlock||block instanceof StairBlock||block instanceof TrapDoorBlock||block instanceof DoorBlock
