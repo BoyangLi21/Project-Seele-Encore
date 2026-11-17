@@ -88,6 +88,16 @@ public final class PilotCockpitReviewR64
      */
     private static final boolean YASHIMA = Boolean.getBoolean("projectseele.plugWatchYashimaR64");
     private static final boolean YASHIMA_VIDEO = Boolean.getBoolean("projectseele.plugWatchVideoR64");
+    /**
+     * -Dprojectseele.plugWatchYashimaViewR64=carriage: the emplaced gun's field carriage from outside. The gun's
+     * rise from its well is watched from its far side, every tick (every frame with the video switch), the Unit
+     * standing still meanwhile; then the walk goes on from the seat. Once the Unit lies at the gun, six pictures
+     * from round it, fifty ticks each; and the barrel's swing in the second charge is watched from above.
+     */
+    private static final boolean CARRIAGE = "carriage".equals(System.getProperty("projectseele.plugWatchYashimaViewR64"));
+    private static int carriageNear = -1, carriageRise = -1, carriageReady = -1, carriageDone = -1;
+    private static double carriageLow = Double.MAX_VALUE;
+    private static boolean yashimaOutside;
     private record YashimaSite(Vec3 prone, java.util.List<Vec3> approach, java.util.List<net.minecraft.core.BlockPos> grid) {}
     private record YashimaState(String phase, String notice, Vec3 core, int charge, boolean exposed, int beam, float health, boolean alive, String service, long slowest) {}
     private static volatile YashimaSite yashimaSite;
@@ -257,7 +267,7 @@ public final class PilotCockpitReviewR64
         int t = tick;
         if (eva == null) return;
         if (at(previous, 5)) mc.player.connection.sendCommand(ARM + "cannon");
-        // -Dprojectseele.cockpitReviewCannonTargetR64=true: a Ramiel that does nothing stands 180 blocks ahead (its core
+        // -Dprojectseele.cockpitReviewCannonTargetR64=true: a Ramiel that does nothing stands 150 blocks ahead (its core
         // shut), and each charge begins seven degrees to the side of the core and comes onto it. Every shot digs a
         // crater where it lands and the target sinks into it (it falls whatever it is told about gravity), so this
         // wants a fresh copy of the lab's world each time: a Ramiel left by an earlier run does not die of /kill (its
@@ -267,7 +277,10 @@ public final class PilotCockpitReviewR64
             mc.player.connection.sendCommand("execute as @e[type=projectseele:ramiel,tag=!cockpit_review] run data merge entity @s {Health:0f}");
         if (targeted && at(previous, 6))
         {
-            cannonTarget = new Vec3(eva.getX(), eva.getY() + 1, eva.getZ() + 180);
+            // -Dprojectseele.cockpitReviewCannonRangeR64=<blocks> (150): nearer for a short render distance. A target
+            // the server does not track for the client is not there for the sight, and it tracks none further than
+            // sixteen blocks short of the render distance: within 176 at 12 chunks, within 112 at 8.
+            cannonTarget = new Vec3(eva.getX(), eva.getY() + 1, eva.getZ() + Integer.getInteger("projectseele.cockpitReviewCannonRangeR64", 150));
             mc.player.connection.sendCommand(String.format(Locale.ROOT, "summon projectseele:ramiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,Tags:[\"cockpit_review\"]}",
                     cannonTarget.x, cannonTarget.y, cannonTarget.z));
         }
@@ -545,7 +558,7 @@ public final class PilotCockpitReviewR64
         }
         else if (YASHIMA)
         {
-            if (mc.player == null || yashimaStage < 2) return;
+            if (mc.player == null || yashimaStage < 2 && !yashimaOutside) return;
             boolean dense = yashimaDense > 0 || yashimaHolding;
             if (dense && YASHIMA_VIDEO)
             {
@@ -896,6 +909,8 @@ public final class PilotCockpitReviewR64
                     state.notice.length() > 110 ? state.notice.substring(0, 110) : state.notice);
         if (site == null) return false;
         if (yashimaDense > 0) yashimaDense--;
+        yashimaOutside = false;
+        if (CARRIAGE && carriage(mc, eva, site)) return false;
         switch (yashimaStage)
         {
             case 0 ->
@@ -1013,6 +1028,91 @@ public final class PilotCockpitReviewR64
             }
         }
         return false;
+    }
+
+    /** The gun's carriage from outside; true while the script waits for the outside camera's pictures. */
+    private static boolean carriage(Minecraft mc, EvaUnit01Entity eva, YashimaSite site)
+    {
+        com.projectseele.entity.YashimaCannonEntityR52 gun = null;
+        for (var entity : mc.level.entitiesForRendering())
+            if (entity instanceof com.projectseele.entity.YashimaCannonEntityR52 found) { gun = found; break; }
+        if (gun == null || gun.geometryR52() == null || gun.cradleR52() == null) return false;
+        var g = gun.geometryR52();
+        var rest = new org.joml.Quaternionf();
+        Vec3 pivot = g.point(Vec3.ZERO, rest, g.pivot()), bore = g.boreWorld(rest), ahead = new Vec3(bore.x, 0, bore.z).normalize(), aside = new Vec3(ahead.z, 0, -ahead.x);
+        // The carriage's middle: 18 along the barrel from the pivot, 9 above the gun's root when it is up.
+        Vec3 middle = new Vec3(gun.getX() + pivot.x, gun.cradleR52().raisedRootY() + 9, gun.getZ() + pivot.z).add(ahead.scale(18));
+        Vec3[] from = {
+                middle.add(ahead.scale(6)).add(aside.scale(-44)).add(0, 13, 0),    // its far side
+                middle.add(ahead.scale(50)).add(aside.scale(-20)).add(0, 9, 0),    // from ahead
+                middle.add(ahead.scale(-48)).add(aside.scale(-16)).add(0, 15, 0),  // from behind, over the cabinet and the mast
+                middle.add(aside.scale(-8)).add(0, 64, 0),                         // from above, the barrel across the picture
+                middle.add(ahead.scale(14)).add(aside.scale(42)).add(0, 7, 0),     // the Unit's side
+                middle.add(ahead.scale(22)).add(aside.scale(-17)).add(0, 4, 0)};   // close on the frames and the support
+        if (carriageDone < 0)
+        {
+            carriageLow = Math.min(carriageLow, gun.getY());
+            if (carriageRise < 0 && gun.readyR52())
+            {
+                carriageDone = watchTicks;
+                ProjectSeele.LOGGER.info("Plug watch: carriage: the gun was up before its rise was seen (tick {})", watchTicks);
+                return false;
+            }
+            if (carriageRise < 0 && gun.getY() > carriageLow + .02)
+            {
+                carriageRise = watchTicks;
+                ProjectSeele.LOGGER.info("Plug watch: carriage: the gun rises from tick {} (y {}, the Unit {} blocks from its place)", watchTicks,
+                        String.format(Locale.ROOT, "%.2f", gun.getY()), Math.round(eva.position().subtract(site.prone()).horizontalDistance()));
+            }
+            if (carriageRise < 0)
+            {
+                // Before the rise the well is in the picture already from a little further out than the gun rises
+                // at; if the rise does not come, the seat's view is given back for the walk.
+                if (carriageNear < 0 && eva.position().subtract(site.prone()).horizontalDistance() < 104) carriageNear = watchTicks;
+                if (carriageNear >= 0 && watchTicks - carriageNear < 160) outside(mc, from[0], middle.add(0, -3, 0));
+                return false;
+            }
+            if (gun.readyR52() && carriageReady < 0) carriageReady = watchTicks;
+            if (carriageReady >= 0 && watchTicks - carriageReady > 80 || watchTicks - carriageRise > 700)
+            {
+                carriageDone = watchTicks;
+                // (The Unit stood still for it: the walk's own watch for a walk that makes no way begins again.)
+                yashimaProgress = Double.MAX_VALUE;
+                ProjectSeele.LOGGER.info("Plug watch: carriage: the rise was watched from tick {} to {} (ready at {})", carriageRise, watchTicks, carriageReady);
+                return false;
+            }
+            walk(mc, false); mc.options.keySprint.setDown(false);
+            yashimaDense = 3;
+            outside(mc, from[0], middle.add(0, -3, 0));
+            return true;
+        }
+        if (yashimaStage == 3 && yashimaShot == 0 && !yashimaHolding && yashimaSince >= 40 && yashimaSince < 40 + from.length * 50)
+        {
+            outside(mc, from[(yashimaSince - 40) / 50], middle);
+            return true;
+        }
+        if (yashimaStage == 3 && yashimaShot == 1 && watchTicks - yashimaShotAt >= 250) outside(mc, from[3], middle);
+        return false;
+    }
+
+    /** The picture is taken from a point outside, looking at another, until the next tick. */
+    private static void outside(Minecraft mc, Vec3 position, Vec3 target)
+    {
+        if (camera == null)
+        {
+            camera = EntityType.ARMOR_STAND.create(mc.level);
+            if (camera == null) throw new IllegalStateException("plug watch camera");
+            camera.setInvisible(true); camera.setNoGravity(true);
+        }
+        camera.setPos(position.x, position.y - camera.getEyeHeight(), position.z);
+        camera.setYRot(yawTo(position, target));
+        camera.setXRot(pitchTo(position, target));
+        camera.setYHeadRot(camera.getYRot());
+        camera.xo = camera.xOld = camera.getX(); camera.yo = camera.yOld = camera.getY(); camera.zo = camera.zOld = camera.getZ();
+        camera.yRotO = camera.getYRot(); camera.xRotO = camera.getXRot();
+        mc.options.hideGui = true;
+        mc.setCameraEntity(camera);
+        yashimaOutside = true;
     }
 
     private static void finish(Minecraft mc, String reason)
