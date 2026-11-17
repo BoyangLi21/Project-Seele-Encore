@@ -79,15 +79,15 @@ public final class PeriodFixtureRenderer implements BlockEntityRenderer<PeriodFi
         }
         else if(kind==PeriodFixtureBlock.Kind.WALL_CLOCK)
         {
-            var time=Instant.ofEpochMilli(entity.clockMillis()).atZone(ZoneId.of("Asia/Shanghai"));
+            var time=Instant.ofEpochMilli(entity.clockMillis()).atZone(ZoneId.of("Asia/Tokyo"));
             double minute=time.getMinute()+time.getSecond()/60D,hour=time.getHour()%12+minute/60D;
             pose.pushPose();pose.translate(.5,.5,.192);pose.mulPose(Axis.ZP.rotationDegrees((float)(-hour*30)));mesh("clock_hour",pose,light,1);pose.popPose();
             pose.pushPose();pose.translate(.5,.5,.204);pose.mulPose(Axis.ZP.rotationDegrees((float)(-minute*6)));mesh("clock_minute",pose,light,1);pose.popPose();
         }
         else if(kind==PeriodFixtureBlock.Kind.NEWSPAPER_RACK)
-            line(pose,buffers,"报刊 · 书讯",1.742,.406,.71F,0xFFF0E9D2);
+            line(pose,buffers,"新聞・雑誌",1.742,.406,.71F,0xFFF0E9D2);
         else if(kind==PeriodFixtureBlock.Kind.VENDING_MACHINE)
-            line(pose,buffers,"清凉饮料",1.878,1.001,.64F,0xFFF2EDD7,.009F);
+            line(pose,buffers,"清涼飲料",1.878,1.001,.64F,0xFFF2EDD7,.009F);
         else if(kind==PeriodFixtureBlock.Kind.LETTER_BOX)
             line(pose,buffers,"邮便",1.01,.78,.35F,0xFFF2EDD7,.009F);
         else if(kind==PeriodFixtureBlock.Kind.SHOP_SIGN)

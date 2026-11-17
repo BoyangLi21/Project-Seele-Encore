@@ -16,7 +16,7 @@ import java.util.HashMap;
 public final class NativeStationDepartures
 {
     public record Snapshot(long platformId, long clock, List<Long> departures, List<String> rows) {}
-    private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Asia/Shanghai"));
+    private static final DateTimeFormatter CLOCK = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Asia/Tokyo"));
     private record Cached(long until, Snapshot snapshot) {}
     private static final Map<Object,Map<String,Cached>> CACHE = new WeakHashMap<>();
     private static Object call(Object object, String method) throws ReflectiveOperationException
