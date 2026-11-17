@@ -15,6 +15,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -210,7 +211,7 @@ public final class PilotChatPanelR64
                 g.fill(x + w - 8 - i * 3, y + 10 - level, x + w - 6 - i * 3, y + 10, ink << 24 | AMBER);
             }
         }
-        else g.drawString(font, "通信  COMM", x + 5, y + 3, alpha(strongest) << 24 | MUTED, true);
+        else g.drawString(font, I18n.get(PlugChatSourceR64.KEY_HEADER), x + 5, y + 3, alpha(strongest) << 24 | MUTED, true);
 
         int row = y + 13;
         for (int i = 0; i < shown.size(); i++)
@@ -225,57 +226,34 @@ public final class PilotChatPanelR64
     }
 
     /**
-     * "(who): what", the tag in its source's colour and what is said beginning on the tag's own row, cut to its
-     * rows: the chat's history has all of it.
+     * "(who): what", the tag in its source's colour and what is said beginning on the tag's own row, on the rows
+     * PlugChatRowsR64 lays it on.
      */
     private static List<FormattedCharSequence> wrap(Font font, Shown line, int width, int most)
     {
-        String tag = "(" + line.tag + "):", rest = line.body.replace('\n', ' ').strip();
+        String tag = "(" + label(line) + "):";
         Style who = Style.EMPTY.withColor(switch (line.kind) { case PLAYER -> WHITE; case PERSON -> CYAN; case COMMAND -> AMBER; case SYSTEM -> MUTED; });
         Style what = Style.EMPTY.withColor(line.kind == Kind.SYSTEM ? PLAIN : WHITE);
-        int lead = font.width(tag + " ");
+        List<String> parts = PlugChatRowsR64.split(line.body, font.width(tag + " "), width, most, sign -> font.width(String.valueOf((char) sign)));
         List<FormattedCharSequence> rows = new ArrayList<>();
-        // Broken here and not by the game's splitter: that one knows words and spaces only, and sends a whole
-        // sentence without spaces to the next row and a comma to a row's head.
-        for (int row = 0; row < most; row++)
+        for (int row = 0; row < parts.size(); row++)
         {
-            int room = row == 0 ? Math.max(0, width - lead) : width;
-            String part = font.plainSubstrByWidth(rest, room);
-            if (part.length() == rest.length()) rest = "";
-            else if (row == most - 1)
-            {
-                part = font.plainSubstrByWidth(rest, Math.max(0, room - font.width("…"))) + "…";
-                rest = "";
-            }
-            else
-            {
-                int cut = part.length();
-                if (cut > 0 && word(rest.charAt(cut - 1)) && word(rest.charAt(cut)))
-                {
-                    // Not through the middle of a word where the script has words.
-                    int space = part.lastIndexOf(' ');
-                    if (space > 0) cut = space;
-                    else if (row == 0) cut = 0;
-                }
-                else if (cut > 1 && CLOSING.indexOf(rest.charAt(cut)) >= 0) cut--;
-                part = rest.substring(0, cut);
-                rest = rest.substring(cut).stripLeading();
-            }
-            part = part.strip();
+            String part = parts.get(row);
             rows.add(row > 0 ? Component.literal(part).withStyle(what).getVisualOrderText()
                     : Component.literal(tag).withStyle(who).append(Component.literal(part.isEmpty() ? "" : " " + part).withStyle(what)).getVisualOrderText());
-            if (rest.isEmpty()) break;
         }
         return rows;
     }
 
-    /** Marks that close what stands before them: a row does not begin with one. */
-    private static final String CLOSING = "，。、；：！？）」』”’》】…,.;:!?)";
-
-    /** A letter or a digit of a script written in words (not a Chinese character, a kana, a full-width sign). */
-    private static boolean word(char sign)
+    /**
+     * The tag in the reader's language: the system, the command post and the staff's names have their keys. A
+     * player whose name would pass for one of those is called a player before it.
+     */
+    private static String label(Shown line)
     {
-        return sign < 0x2E80 && Character.isLetterOrDigit(sign);
+        if (line.kind == Kind.PLAYER) return PlugChatSourceR64.taken(line.tag) ? I18n.get(PlugChatSourceR64.KEY_PLAYER, line.tag) : line.tag;
+        String key = PlugChatSourceR64.key(new Line(line.kind, line.tag, ""));
+        return key != null && I18n.exists(key) ? I18n.get(key) : line.tag;
     }
 
     /** In over a sixth of a second, out over the last second. */
