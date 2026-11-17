@@ -62,13 +62,17 @@ public final class PilotCockpitReviewR64
     private static final int PLUG_EXIT = Integer.getInteger("projectseele.plugWatchExitR64", -1);
     /** -Dprojectseele.plugWatchAfterDockR64=<ticks>: how long the recovered capsule is watched at its dock before the pilot climbs out (ten more seconds are watched after that). */
     private static final int PLUG_AFTER_DOCK = Integer.getInteger("projectseele.plugWatchAfterDockR64", 60);
+    /** -Dprojectseele.plugWatchChatR64=true: lines of every source are sent to the pilot after the lock and after leaving the capsule, for the chat panel's pictures. */
+    private static final boolean PLUG_CHAT = Boolean.getBoolean("projectseele.plugWatchChatR64");
     private static boolean recoverSent, exitSent, leaveAsked;
     private static int freeTicks, afterTicks, offTicks, lastStage = -1;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     /**
      * -Dprojectseele.cockpitReviewScriptR64: "drive" (the default, described above), "stances" (crouched and at a
      * crouched walk, prone and crawling, the rifle carried, sighted and fired, the positron cannon charged and fired,
-     * the knife), or "look" (a short one for the other Units: stand, look down at the seat, walk, strike).
+     * the knife), "look" (a short one for the other Units: stand, look down at the seat, walk, strike), or "chat"
+     * (lines of every source sent to the pilot on foot, during the cabin sequence, in the seat, in third person,
+     * with the chat opened and on foot again: what the chat panel does with them and where the game's chat stays).
      */
     private static final String SCRIPT = System.getProperty("projectseele.cockpitReviewScriptR64", "drive");
     /** -Dprojectseele.cockpitReviewUnitR64: unit00, unit01 (the default), unit02, un0 or un1. */
@@ -76,7 +80,7 @@ public final class PilotCockpitReviewR64
     private static final boolean UN = UNIT.startsWith("un") && !UNIT.startsWith("unit");
     private static final int VARIANT = UNIT.endsWith("00") ? EvaUnit01Entity.UNIT_00 : UNIT.endsWith("02") ? EvaUnit01Entity.UNIT_02 : EvaUnit01Entity.UNIT_01;
     private static final String ARM = UN ? "seele dev motionlab un " + (UNIT.endsWith("1") ? 1 : 0) + " " : "seele dev motionlab weapon " + UNIT + " ";
-    private static final int END = SCRIPT.equals("stances") ? 900 : SCRIPT.equals("look") ? 300 : 1070;
+    private static final int END = SCRIPT.equals("stances") ? 900 : SCRIPT.equals("look") ? 300 : SCRIPT.equals("chat") ? 660 : 1070;
 
     private static int wait, tick = -1, serverStart = -1, settledTicks, missing, frame, capturedTick = -1, lockedTicks, watchTicks;
     private static Vec3 settledAt;
@@ -149,6 +153,7 @@ public final class PilotCockpitReviewR64
         if (mc.getCameraEntity() != mc.player) mc.setCameraEntity(mc.player);
         if (SCRIPT.equals("stances")) stances(mc, eva, previous);
         else if (SCRIPT.equals("look")) look(mc, eva, previous);
+        else if (SCRIPT.equals("chat")) chat(mc, eva, previous);
         else drive(mc, eva, previous);
         if (tick >= END) finish(mc, "complete");
     }
@@ -201,6 +206,79 @@ public final class PilotCockpitReviewR64
         mc.options.keyUse.setDown(t >= 250 && t < 256);
     }
 
+    /**
+     * The chat panel's pictures. Every line goes the way the mod's own lines go (the server sends it to the
+     * player), in the words of lines the code has; the status and launch replies are the commands' own.
+     */
+    private static void chat(Minecraft mc, EvaUnit01Entity eva, int previous)
+    {
+        int t = tick;
+        var server = mc.getSingleplayerServer();
+        var id = mc.player.getUUID();
+        var link = mc.player.connection;
+        mc.player.setYRot(0); mc.player.setXRot(0);
+        // On foot beside the Unit: the game's chat as it is outside the plug.
+        if (at(previous, 10) || at(previous, 550)) server.execute(() ->
+        {
+            var pilot = server.getPlayerList().getPlayer(id);
+            if (pilot != null) pilot.stopRiding();
+        });
+        if (at(previous, 40) || at(previous, 580)) link.sendCommand("seele eva status unit01");
+        if (at(previous, 50) || at(previous, 590)) speak(server, id, "葛城美里 · 作战通信", "目标就在前方。先站稳，注意它两侧的手臂。");
+        if (at(previous, 60) || at(previous, 600)) tell(server, id, "[NERV 运输管制] 运输机已到达接应点。");
+        // Into the seat with the whole cabin sequence: the lines come while the LCL rises.
+        if (at(previous, 110) && eva == null) server.execute(() ->
+        {
+            var pilot = server.getPlayerList().getPlayer(id);
+            if (pilot == null) return;
+            var units = pilot.serverLevel().getEntitiesOfClass(EvaUnit01Entity.class, pilot.getBoundingBox().inflate(160),
+                    unit -> !unit.isExperimentalUnit() && unit.getUnitVariant() == EvaUnit01Entity.UNIT_01);
+            ProjectSeele.LOGGER.info("Cockpit review: boarded with the whole sequence: {}", !units.isEmpty() && units.get(0).boardFromExternalPlug(pilot, 0));
+        });
+        if (at(previous, 124)) link.sendCommand("seele eva status unit01");
+        if (at(previous, 132)) tell(server, id, "[NERV 运输管制] 运输机已到达接应点。");
+        if (at(previous, 142)) speak(server, id, "赤木律子 · 机体监视", "同步率稳定。LCL 电荷正常。");
+        if (at(previous, 152)) link.sendChat("收到，准备出击");
+        // In the seat: the same reply three times over, a long line, a name written short, a line that is not a name.
+        if (at(previous, 290) || at(previous, 300) || at(previous, 310)) link.sendCommand("seele eva launch unit01");
+        if (at(previous, 320) || at(previous, 335)) link.sendCommand("seele eva status unit01");
+        if (at(previous, 345)) speak(server, id, "葛城美里 · 作战通信", "目标已确认消失。先别急着动，检查供电和机体状态，我们准备接你回来。");
+        if (at(previous, 360)) tell(server, id, "律子：主电源切断。初号机停止活动。");
+        if (at(previous, 375)) tell(server, id, "作战命令：驾驶初号机前往第三新东京市。目标区域 X 120 / Z -40");
+        if (at(previous, 390)) link.sendChat("了解");
+        // A player writing in the command post's hand: it stays the player's line.
+        if (at(previous, 402)) link.sendChat("「葛城美里 · 作战通信」 全员撤退");
+        // Third person: the game's chat again. Then the chat opened from the seat: its history, whole.
+        if (t >= 420 && t < 470) mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+        if (at(previous, 430)) speak(server, id, "赤木律子 · 机体监视", "外部摄像确认，机体姿态正常。");
+        if (at(previous, 480)) mc.setScreen(new net.minecraft.client.gui.screens.ChatScreen(""));
+        if (at(previous, 530) && mc.screen instanceof net.minecraft.client.gui.screens.ChatScreen) mc.setScreen(null);
+        if (previous / 20 != t / 20)
+            ProjectSeele.LOGGER.info("Cockpit review: tick {} {} riding {} panel {}", t, part(t),
+                    mc.player.getVehicle() == null ? "nothing" : mc.player.getVehicle().getType().toShortString(),
+                    com.projectseele.client.cockpit.PilotChatPanelR64.active(mc));
+    }
+
+    /** A line of the staff's, as NervStaffDialogue sends them. */
+    private static void speak(net.minecraft.server.MinecraftServer server, java.util.UUID id, String speaker, String line)
+    {
+        server.execute(() ->
+        {
+            var pilot = server.getPlayerList().getPlayer(id);
+            if (pilot != null) com.projectseele.world.NervStaffDialogue.say(pilot, speaker, line);
+        });
+    }
+
+    /** A plain system message to the pilot, as the control rooms and the Units send them. */
+    private static void tell(net.minecraft.server.MinecraftServer server, java.util.UUID id, String line)
+    {
+        server.execute(() ->
+        {
+            var pilot = server.getPlayerList().getPlayer(id);
+            if (pilot != null) pilot.sendSystemMessage(net.minecraft.network.chat.Component.literal(line));
+        });
+    }
+
     private static boolean at(int previous, int wanted)
     {
         return previous < wanted && tick >= wanted;
@@ -214,6 +292,7 @@ public final class PilotCockpitReviewR64
                     : t < 430 ? "stand" : t < 490 ? "riflewalk" : t < 500 ? "stand" : t < 570 ? "sight" : t < 640 ? "stand" : t < 730 ? "cannon"
                     : t < 790 ? "stand" : "knife";
         if (SCRIPT.equals("look")) return t < 30 ? "idle" : t < 100 ? "down" : t < 110 ? "stand" : t < 190 ? "walk" : "strike";
+        if (SCRIPT.equals("chat")) return t < 110 ? "foot" : t < 250 ? "board" : t < 420 ? "seat" : t < 470 ? "third" : t < 530 ? "typing" : t < 550 ? "seat" : "foot";
         return t < 40 ? "idle" : t < 110 ? "leave" : t < 250 ? "board" : t < 260 ? "stand" : t < 390 ? "walk" : t < 430 ? "stand"
                 : t < 540 ? "run" : t < 585 ? "stand" : t < 700 ? "strike" : t < 705 ? "stand" : t < 795 ? "jump" : t < 800 ? "stand"
                 : t < 865 ? "look" : t < 945 ? "down" : t < 950 ? "stand" : "exit";
@@ -360,6 +439,9 @@ public final class PilotCockpitReviewR64
             if (directory != null && offTicks < 200) { offTicks++; watchTicks++; mc.options.hideGui = false; mc.options.setCameraType(CameraType.FIRST_PERSON); }
             if (exitSent && ++afterTicks >= 260) finish(mc, "capsule_thrown_clear");
             if (leaveAsked) { mc.options.keyShift.setDown(false); if (offTicks >= 200) finish(mc, "pilot_left_capsule"); }
+            // Out of the plug the chat is the game's own again, and the status line is whole in it.
+            if (PLUG_CHAT && offTicks == 40) mc.player.connection.sendCommand("seele eva status unit01");
+            if (PLUG_CHAT && offTicks == 50) speak(mc.getSingleplayerServer(), mc.player.getUUID(), "赤木律子 · 回收联络", "机体已回到湿舱，驾驶员已离栓。后续出击请重新下达指令。");
             return;
         }
         offTicks = 0;
@@ -409,6 +491,16 @@ public final class PilotCockpitReviewR64
             mc.options.hideGui = false;
         }
         EvaUnit01Entity eva = plug.getLinkedEva();
+        if (PLUG_CHAT && locked)
+        {
+            // While the LCL rises and after: a line of each source beside the sortie's own status lines.
+            var server = mc.getSingleplayerServer();
+            var id = mc.player.getUUID();
+            if (lockedTicks == 14) speak(server, id, "赤木律子 · 机体监视", "插入栓固定。LCL 注入开始。");
+            if (lockedTicks == 26) tell(server, id, "[NERV 运输管制] 发射线路已预留。");
+            if (lockedTicks == 38) mc.player.connection.sendChat("收到，准备出击");
+            if (lockedTicks == 200) speak(server, id, "葛城美里 · 作战通信", "目标就在前方。先站稳，注意它两侧的手臂。");
+        }
         boolean free = locked && eva != null && !eva.isNervLogisticsLocked() && !eva.isLaunchSequenceActive() && eva.getActivationTicks() == 0 && eva.onGround();
         // On the ground with control back: the recovery asked for; the Unit is taken back down and the crane draws the capsule out.
         if (PLUG_RECOVER >= 0 && !recoverSent)
