@@ -138,7 +138,7 @@ def material(s, lu, lv, kind, vertical, base='black'):
     return floor if kind == 'floor' else wall
 
 
-def plan_leg(world, curve, keep, piece=32, reach=70, umax=28, vmin=-66, vmax=15, guard=3, base='black'):
+def plan_leg(world, curve, keep, piece=32, reach=70, umax=28, vmin=-66, vmax=15, guard=3, base='black', skip_start=0):
     s, pos, d, u, v, vertical = centre_samples(curve)
     tree = cKDTree(pos)
     rows, why = {}, Counter()
@@ -164,7 +164,7 @@ def plan_leg(world, curve, keep, piece=32, reach=70, umax=28, vmin=-66, vmax=15,
         wx, wy, wz = cx + lo[0], cy + lo[1], cz + lo[2]
         pts = np.stack([wx + .5, wy + .5, wz + .5], 1)
         dist, k = tree.query(pts)
-        inside = (s[k] >= s0) & (s[k] < s0 + piece)
+        inside = (s[k] >= s0) & (s[k] < s0 + piece) & (s[k] >= skip_start)
         r = pts - pos[k]
         lu, lv = np.einsum('ij,ij->i', r, u[k]), np.einsum('ij,ij->i', r, v[k])
         inside &= (np.abs(lu) <= umax) & (lv >= vmin) & (lv <= vmax)
@@ -206,6 +206,8 @@ def main():
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--base', choices=['black', 'keep'], default='black',
                     help='black: side walls and ceiling black concrete; keep: keep the blue panel, change only lights, ribs and stray faces')
+    ap.add_argument('--skip-start', type=float, default=90,
+                    help='leave the first blocks of each leg alone: the bank chamber and its first hatch, dressed in light panels')
     ap.add_argument('--s-range', type=float, nargs=2, help='only this stretch of each leg (testing)')
     a = ap.parse_args()
     directory = json.loads((a.world / 'ROOT_RUNTIME_DIRECTORY.json').read_text('utf8'))
@@ -219,7 +221,7 @@ def main():
             s, pos, *_ = centre_samples(curve)
             sel = pos[(s >= a.s_range[0]) & (s <= a.s_range[1])]
             curve = {'segments': [{'controls': [list(sel[i]), list(sel[i + 1])]} for i in range(0, len(sel) - 1, 8)]}
-        r, why = plan_leg(a.world, curve, keep, base=a.base)
+        r, why = plan_leg(a.world, curve, keep, base=a.base, skip_start=0 if a.s_range else a.skip_start)
         for row in r:
             rows.setdefault(tuple(row[:3]), row)
         total += why
