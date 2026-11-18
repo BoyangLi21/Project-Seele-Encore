@@ -143,6 +143,8 @@ def classify(state, shapes, unknown):
     ns, base = name.split(':', 1)
     if base in ('air', 'cave_air', 'void_air', 'light', 'structure_void', 'water', 'bubble_column', 'moving_piston'):
         return FEET | HEAD | OPTICAL
+    if ns == 'projectseele' and base.startswith('lcl'):
+        return FEET | HEAD | SUPPORT | OPTICAL  # LCL is swum through: any depth carries a swimmer
     if base in ('lava', 'fire', 'soul_fire', 'powder_snow'):
         return 0
     if base in ('ladder', 'vine', 'twisting_vines', 'twisting_vines_plant', 'weeping_vines', 'weeping_vines_plant'):
@@ -428,6 +430,23 @@ def arrow(d, face):
     return '→' if right > abs(forward) else '←' if -right > abs(forward) else '↑' if forward > 0 else '↓'
 
 
+ARROW_VECTOR = {'↑': lambda nx, nz: (-nx, -nz), '↓': lambda nx, nz: (nx, nz),
+                '→': lambda nx, nz: (nz, -nx), '←': lambda nx, nz: (-nz, nx)}
+
+
+def open_ahead(K, at, sign, face, steps=2):
+    """The first cells from the reader in the arrow's direction are walkable (a step up or down allowed)."""
+    if sign not in ARROW_VECTOR:
+        return True
+    vx, vz = ARROW_VECTOR[sign](*NORMAL[face])
+    x, y, z = (int(v) for v in at)
+    for k in range(1, steps + 1):
+        cx, cz = x + vx * k, z + vz * k
+        if not any(lookup(K, key_of(np.array([cx]), yy, np.array([cz])))[0] >= 0 for yy in (y - 1, y, y + 1)):
+            return False
+    return True
+
+
 def trace(c, pred, start, run):
     pts = [start]
     cur, h, special = start, 0.0, None
@@ -514,7 +533,7 @@ def destination(name):
     name = re.sub(r'\s*·\s*(经楼梯|直梯|梯)$', '', name.strip())
     if name in NON_CANON:
         return NON_CANON[name]
-    first = name.split('  ')[0]
+    first = name.split('|')[0].split('  ')[0]      # "日本語|中文|English" board rows: the Japanese part
     for cand in (name, first, EXTRA_NAMES.get(name), EXTRA_NAMES.get(first)):
         if not cand:
             continue
@@ -822,6 +841,18 @@ def main():
                     end = long_pts[-1]
                     e['note'] = (e.get('note', '') + '; ' if e.get('note') else '') + f'corner within {leg} m, 6 m point used'
                 new = arrow(c[end] - c[ri_], face)
+                if new == '↓' and not open_ahead(K, c[ri_], new, face):
+                    # the 6 m point lies past a corner and the arrow points back into the wall behind the reader: take the
+                    # first leg,
+                    # else the first step of the path (map-roads found 32 such rows in the in-game check)
+                    leg_end, _, _ = first_leg(c, K, p, ri_)
+                    step = p[ri_] if p[ri_] >= 0 else ri_
+                    for cand in (leg_end, step):
+                        alt = arrow(c[cand] - c[ri_], face)
+                        if alt != '●' and open_ahead(K, c[ri_], alt, face, steps=1):
+                            end, new = cand, alt
+                            e['note'] = (e.get('note', '') + '; ' if e.get('note') else '') + 'wall ahead, first leg used'
+                            break
                 dv = c[end] - c[ri_]
                 nx_, nz_ = NORMAL[face]
                 rt, fw = dv[0] * nz_ - dv[2] * nx_, -dv[0] * nx_ - dv[2] * nz_
