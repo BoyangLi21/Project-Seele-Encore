@@ -75,6 +75,8 @@ public final class NervPilotCombatR30
         if(!phase.equals("DEPLOYED"))
         {
             eva.stopAutonomousR30();if(l.getGameTime()<b.nextOrder)return;b.nextOrder=l.getGameTime()+100;
+            // Its parked readback gave up before the bay had loaded: read it again, or the pilot is never sent (R64).
+            if(phase.equals("SERVICE_HOLD"))NervRouteRuntimeR52.retryParkedReadbackR64(l,sortie.unit);
             if(phase.equals("PARKED"))
             {
                 if(d.active.equals("ramiel"))TvYashimaArrivalR50.recovered(eva);

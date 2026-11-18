@@ -419,18 +419,22 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                 &&eva.carrierRiseProgress(1)==0&&!EvaMechanicalFrameR52.flightCustody(eva)
                 &&pose(NervOwnerPlacementR52.actualRoot(eva),plant.bay())&&originalClampsBear(level,plant);
     }
+    private static final String HULL_UNLOADED_R64="回库现场原机体未加载",BAY_UNLOADED_R64="回库承托区块尚未加载",LCL_UNLOADED_R64="回库液体区块尚未加载";
+    /** The holds a parked readback gives while the hull, its bay or its liquid is not loaded yet (R64). */
+    static boolean loadingHoldR64(String hold)
+    {return hold.equals(HULL_UNLOADED_R64)||hold.equals(BAY_UNLOADED_R64)||hold.equals(LCL_UNLOADED_R64);}
     /** A persisted DONE is not evidence that chunk blocks survived the same save. */
     public String parkedServiceHoldR53(ServerLevel level,Original original)
     {
         var plant=plant(original);var eva=hull(level,original);
-        if(plant==null||eva==null)return "回库现场原机体未加载";
-        if(!parkedBayBlocksLoadedR54(level,original))return "回库承托区块尚未加载";
+        if(plant==null||eva==null)return HULL_UNLOADED_R64;
+        if(!parkedBayBlocksLoadedR54(level,original))return BAY_UNLOADED_R64;
         if(!pose(NervOwnerPlacementR52.actualRoot(eva),plant.bay()))return "回库记录与原机实际位置不一致";
         if(eva.carrierRiseProgress(1)!=0||!originalClampsBear(level,plant)
                 ||!gateAtRest(level,servicePit(plant),false)||!gateAtRest(level,gates.get("bay_"+plant.variant()+"_front"),false))
             return "回库完成记录与实际承托或封口状态不一致";
         for(var layer:plant.lcl())for(var cell:layer)
-            if(!level.hasChunkAt(cell.at()))return "回库液体区块尚未加载";
+            if(!level.hasChunkAt(cell.at()))return LCL_UNLOADED_R64;
         if(!plant.lcl().stream().allMatch(layer->matches(level,layer,false)))return "回库完成记录与实际 LCL 不一致，等待现场整备修复";
         if(!bridgeMatches(level,plant,9))return "回库完成记录与实际登机桥不一致，等待现场整备修复";
         return "";

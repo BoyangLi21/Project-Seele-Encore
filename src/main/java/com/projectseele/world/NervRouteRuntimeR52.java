@@ -137,6 +137,15 @@ public final class NervRouteRuntimeR52
         catch(java.io.IOException|RuntimeException failure){LIVE.remove(level);throw new IllegalStateException("Claimed Root installation held: actual declared air transport did not commission",failure);}
         finally{INSTALLING.remove(level);}return true;
     }
+    /** A readback that gave up while the bay was still unloaded leaves the unit in SERVICE_HOLD, where no sortie
+     * dispatches it: in the formal world Unit-00 stayed in its cage through the whole Yashima operation. A sortie that
+     * wants the unit opens the readback window again (R64). */
+    public static void retryParkedReadbackR64(ServerLevel level,int variant)
+    {
+        var c=LIVE.get(level);var job=c==null?null:c.saved.job(variant);
+        if(job==null||job.phase()!=Phase.PARKED||!NervAssemblyOwnerR52.loadingHoldR64(job.waiting()))return;
+        c.parkedReadbacksR53.remove(job.snapshot().task());
+    }
     public static EvaLogisticsDirector.ActionResult resumeParkedServiceR53(ServerLevel level,int variant)
     {
         var controller=LIVE.get(level);var job=controller==null?null:controller.saved.job(variant);
@@ -875,8 +884,10 @@ public final class NervRouteRuntimeR52
                     {
                         UUID task=job.snapshot().task();long now=level.getGameTime();
                         Long began=parkedReadbackStartedR54.putIfAbsent(task,now);
-                        // One short cold-read ticket, never permanent residency for parked machines.
-                        if(began==null)plant.retainOriginalBayBlocksR54(level,job.snapshot().original());
+                        // One short cold-read window, never permanent residency for parked machines. The ticket is
+                        // asked for on every tick of the window: the hull often loads a few ticks after the window
+                        // opens, and a ticket asked for before it was there was never asked for again (R64).
+                        plant.retainOriginalBayBlocksR54(level,job.snapshot().original());
                         String hold=plant.parkedServiceHoldR53(level,job.snapshot().original());
                         if(!hold.equals(job.waiting()))saved.put(job.update(job.snapshot(),job.phase(),job.ownerData(),hold));
                         if(plant.parkedBayBlocksLoadedR54(level,job.snapshot().original())
