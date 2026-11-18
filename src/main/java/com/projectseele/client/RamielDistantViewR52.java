@@ -24,7 +24,7 @@ public final class RamielDistantViewR52
     public static final class ReloadRegistration
     {
         @SubscribeEvent public static void register(net.minecraftforge.client.event.RegisterClientReloadListenersEvent event)
-        {event.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)manager->{resources=null;resourceId="";reported=null;});}
+        {event.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)manager->{resources=null;resourceId="";reported=null;RamielHorizonClipR64.reload();});}
         private ReloadRegistration(){}
     }
     private static final MultiBufferSource.BufferSource BUFFERS=MultiBufferSource.immediate(new BufferBuilder(8192));
