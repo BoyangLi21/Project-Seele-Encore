@@ -115,16 +115,23 @@ public final class YashimaCarriageLayoutR64Test
         that(Math.abs(layout.axis(layout.along(muzzle)).distanceTo(muzzle)) < 1e-6 && Math.abs(layout.along(layout.axis(40)) - 40) < 1e-6, "the barrel's axis is the bore through the muzzle");
         that(Math.abs(layout.axis(44).y - 12.53) < .05, "the barrel is 12.53 high at 44 along: " + layout.axis(44).y);
 
-        // The connector shoes: on the stretch the position's cables arrive at, just inside the well's west edge.
+        // The connector shoes: just inside the well's west edge, each before a block of the stretch where the
+        // position's cables end (world z -1420..-1414, one block each), and each one's tongue, slid out, reaches the
+        // cable's end one block outside the edge (world x -1280) and is inside the edge while it is in.
         for (int shoe = 0; shoe < 4; shoe++)
         {
             Vec3 at = layout.shoe(shoe);
-            that(at.x - west <= 1.2 && at.x - .4 >= west && at.z >= -1425 + 1400.5 && at.z <= -1405 + 1400.5, "a shoe off the cables' stretch: " + at);
+            that(at.x - west <= 1.2 && at.x - .4 >= west && at.z > -1420 + 1400.5 && at.z < -1413 + 1400.5, "a shoe off the cables' stretch: " + at);
+            // (The root stands at a half block, so the middle of a block is a whole number from it.)
+            that(Math.abs(at.z - Math.rint(at.z)) < 1e-9, "a shoe not before the middle of a block: " + at);
         }
+        that(YashimaCarriageLayoutR64.TONGUE_HEAD >= west, "a tongue's head outside the well while it is in");
+        that(Math.abs(YashimaCarriageLayoutR64.TONGUE_HEAD - YashimaCarriageLayoutR64.TONGUE - (west - 1)) < 1e-9, "the tongues do not reach the cables' ends");
         // The cabinet is clear of the rear pad beside it and stands on the far side.
         Vec3 pad = layout.pad(0);
-        that(pad.z - YashimaCarriageLayoutR64.PAD * 1.42 > YashimaCarriageLayoutR64.CABINET_NORTH, "the cabinet stands south of the pad beside it: " + pad);
-        that(layout.across(new Vec3(YashimaCarriageLayoutR64.CABINET_EAST, 0, YashimaCarriageLayoutR64.CABINET_SOUTH)) < -3, "the cabinet is on the far side");
+        that(pad.x - YashimaCarriageLayoutR64.PAD * 1.42 > YashimaCarriageLayoutR64.CABINET_EAST + .5, "the cabinet stands west of the rear pad: " + pad);
+        that(layout.across(new Vec3(YashimaCarriageLayoutR64.CABINET_EAST, 0, YashimaCarriageLayoutR64.CABINET_SOUTH)) < -3
+                && layout.across(new Vec3(YashimaCarriageLayoutR64.CABINET_EAST, 0, YashimaCarriageLayoutR64.CABINET_NORTH)) < -3, "the cabinet is on the far side");
 
         System.out.println("YashimaCarriageLayoutR64Test: " + checked + " checks passed.");
     }

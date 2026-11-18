@@ -16,10 +16,11 @@ import static com.projectseele.world.YashimaCarriageLayoutR64.*;
 /**
  * R64: the emplaced Yashima gun's field carriage, drawn. YashimaCarriageLayoutR64 says what it is and where its
  * parts stand; here they are built once for a gun, of plain coloured boxes and round bars in the gun's own frame,
- * and drawn each frame in five groups: what does not move, the pads and connector shoes (down once the gun is
- * ready), the upper carriage (turned to the gun's bearing), the barrel's saddle (which rises and falls in it with
- * the elevation), and what is on the gun itself (turned with its whole aim). The four cable links between the mast
- * and the gun's plug are laid from end to end each frame.
+ * and drawn each frame in groups: what does not move, the pads and connector shoes (down once the gun is ready)
+ * with the shoes' tongues (slid out to the position's cables once they are down), the upper carriage (turned to
+ * the gun's bearing), the barrel's saddle (which rises and falls in it with the elevation), and what is on the
+ * gun itself (turned with its whole aim). The four cable links between the mast and the gun's plug are laid from
+ * end to end each frame.
  */
 final class YashimaCarriageR64
 {
@@ -27,10 +28,10 @@ final class YashimaCarriageR64
             CABLE = 0x26272B, BAND = 0xC4621E, JACKET = 0xB4BABD, RING = 0x4B5054, COOLANT = 0x426E9E, CABINET = 0x80888C, WARNING = 0xA83228;
     private static final double[][] LINK_AT = {{-.42, -.42}, {.42, -.42}, {-.42, .42}, {.42, .42}};
 
-    private record Parts(YashimaCarriageLayoutR64 layout, RigidMachineryPartR44 lower, RigidMachineryPartR44 feet, RigidMachineryPartR44 upper,
-                         RigidMachineryPartR44 saddle, RigidMachineryPartR44 onGun, RigidMachineryPartR44 tube, RigidMachineryPartR44 rod)
+    private record Parts(YashimaCarriageLayoutR64 layout, RigidMachineryPartR44 lower, RigidMachineryPartR44 feet, RigidMachineryPartR44 tongues,
+                         RigidMachineryPartR44 upper, RigidMachineryPartR44 saddle, RigidMachineryPartR44 onGun, RigidMachineryPartR44 tube, RigidMachineryPartR44 rod)
     {
-        java.util.List<RigidMachineryPartR44> all() { return java.util.List.of(lower, feet, upper, saddle, onGun, tube, rod); }
+        java.util.List<RigidMachineryPartR44> all() { return java.util.List.of(lower, feet, tongues, upper, saddle, onGun, tube, rod); }
     }
 
     /**
@@ -60,9 +61,13 @@ final class YashimaCarriageR64
         float yaw = (float)(Math.atan2(now.x, now.z) - Math.atan2(rest.x, rest.z));
 
         parts.lower.draw(poses, buffers, light);
+        // The pads and shoes come down first; over the last of it the shoes' tongues slide out to the cables' ends.
+        float down = jacks(gun, partial), eased = down * down * (3 - 2 * down), late = Math.max(0, (down - .6F) / .4F);
         poses.pushPose();
-        poses.translate(0, JACK_STROKE * (1 - jacks(gun, partial)), 0);
+        poses.translate(0, JACK_STROKE * (1 - eased), 0);
         parts.feet.draw(poses, buffers, light);
+        poses.translate(-TONGUE * late * late * (3 - 2 * late), 0, 0);
+        parts.tongues.draw(poses, buffers, light);
         poses.popPose();
 
         poses.pushPose();
@@ -102,15 +107,15 @@ final class YashimaCarriageR64
         return layout.pivot().add(new Vec3(aim.transform(point.subtract(layout.pivot()).toVector3f())));
     }
 
-    /** The jacks come down in a second and a half once the gun is up and its hatch shut, and go up twice as fast. */
+    /** The jacks come down in two seconds once the gun is up and its hatch shut, and go up twice as fast: how far down they are, 0..1. */
     private static float jacks(YashimaCannonEntityR52 gun, float partial)
     {
         float time = gun.tickCount + partial;
         float[] state = JACKS.computeIfAbsent(gun, key -> new float[]{key.readyR52() ? 1 : 0, time});
         float passed = Math.max(0, Math.min(40, time - state[1]));
         state[1] = time;
-        state[0] = gun.readyR52() ? Math.min(1, state[0] + passed / 30) : Math.max(0, state[0] - passed / 15);
-        return state[0] * state[0] * (3 - 2 * state[0]);
+        state[0] = gun.readyR52() ? Math.min(1, state[0] + passed / 40) : Math.max(0, state[0] - passed / 20);
+        return state[0];
     }
 
     private static Parts build(Geometry g, FixedCannonCradleR52.Spec spec)
@@ -121,7 +126,7 @@ final class YashimaCarriageR64
         var columns = new java.util.ArrayList<Vec3>();
         for (var piece : FixedCannonCradleR52.pieces(g, spec, Vec3.ZERO, rest))
             if (piece.part().name().equals("crosshead")) columns.add(piece.frame().translation());
-        return new Parts(layout, lower(layout, columns), feet(layout), upper(layout), saddle(layout), onGun(layout), link(.28, CABLE, true), link(.19, STEEL_DARK, false));
+        return new Parts(layout, lower(layout, columns), feet(layout), tongues(layout), upper(layout), saddle(layout), onGun(layout), link(.28, CABLE, true), link(.19, STEEL_DARK, false));
     }
 
     // ---------------------------------------------------------------------------------------------- the parts
@@ -187,9 +192,9 @@ final class YashimaCarriageR64
         s.block(MAST_ALONG - .9, MAST_ALONG + .9, box.y + .5, box.y + .68, MAST_ACROSS - .95, MAST_ACROSS + MAST_FACE + .05, BAND);
         for (double along : new double[]{-7.1, -5.5})
         {
-            s.tube(l.at(along, BEAM_HIGH, -6.8), l.at(along, 6.9, -6.8), .75, 12, CABINET);
-            s.tube(l.at(along, 6.9, -6.8), l.at(along, 7.2, -6.8), .5, 12, RING);
-            s.tube(l.at(along, 5.7, -6.8), l.at(along, 5.95, -6.8), .8, 12, BAND);
+            s.tube(l.at(along, BEAM_HIGH, -6.8), l.at(along, 6.2, -6.8), .75, 12, CABINET);
+            s.tube(l.at(along, 6.2, -6.8), l.at(along, 6.5, -6.8), .5, 12, RING);
+            s.tube(l.at(along, 5.3, -6.8), l.at(along, 5.55, -6.8), .8, 12, BAND);
             s.tube(l.at(along, BEAM_HIGH, -6.8), l.at(along, BEAM_HIGH + .2, -6.8), .85, 12, RING);
         }
         s.block(-2.7, -1.0, BEAM_HIGH, 6.0, -7.8, -6.0, CABINET);
@@ -202,8 +207,8 @@ final class YashimaCarriageR64
         s.box(new Vec3(x, CABINET_TOP + .08, z), new Vec3((CABINET_EAST - CABINET_WEST) / 2 + .08, 0, 0), new Vec3(0, .08, 0), new Vec3(0, 0, (CABINET_NORTH - CABINET_SOUTH) / 2 + .08), STEEL_DARK);
         for (int door = 0; door < 4; door++)
             s.box(new Vec3(CABINET_EAST + .03, (low + CABINET_TOP) / 2 - .3, CABINET_SOUTH + 1.05 + door * 2.03), new Vec3(.03, 0, 0), new Vec3(0, 1.2, 0), new Vec3(0, 0, .8), STEEL_DARK);
-        s.bar(l.at(FAR_FROM + .5, BEAM_HIGH - .6, -BEAM_ASIDE), new Vec3(CABINET_EAST, BEAM_HIGH - .6, CABINET_NORTH - 2.4), .4, .4, OLIVE_DARK);
-        s.bar(l.at(FAR_FROM + .3, BEAM_HIGH - .12, -7.6), new Vec3(CABINET_EAST, BEAM_HIGH - .12, CABINET_NORTH - .5), .3, .12, OLIVE_DARK);
+        s.bar(l.at(FAR_FROM + .5, BEAM_HIGH - .6, -BEAM_ASIDE), new Vec3(CABINET_EAST, BEAM_HIGH - .6, z - 1.5), .4, .4, OLIVE_DARK);
+        s.bar(l.at(FAR_FROM + .3, BEAM_HIGH - .12, -7.6), new Vec3(CABINET_EAST, BEAM_HIGH - .12, z + .2), .3, .12, OLIVE_DARK);
         for (int i = 0; i < 4; i++)
         {
             s.box(new Vec3(SHOE_LINE + .05, 4.8, SHOE_AT[i]), new Vec3(.35, 0, 0), new Vec3(0, .9, 0), new Vec3(0, 0, .42), OLIVE_DARK);
@@ -213,7 +218,7 @@ final class YashimaCarriageR64
             for (int piece = 1; piece <= 7; piece++)
             {
                 double t = piece / 7D;
-                Vec3 next = from.lerp(socket.add(0, .4, 0), t).add(0, -1.3 * 4 * t * (1 - t), 0);
+                Vec3 next = from.lerp(socket.add(0, .4, 0), t).add(0, -.7 * 4 * t * (1 - t), 0);
                 s.tube(last, next, .3, 8, CABLE);
                 last = next;
             }
@@ -237,6 +242,22 @@ final class YashimaCarriageR64
             s.box(shoe.add(0, .12, 0), new Vec3(.4, 0, 0), new Vec3(0, .12, 0), new Vec3(0, 0, .5), RUBBER);
             s.box(shoe.add(0, .45, 0), new Vec3(.34, 0, 0), new Vec3(0, .21, 0), new Vec3(0, 0, .42), BAND);
             s.tube(shoe.add(0, .66, 0), shoe.add(0, .66 + JACK_STROKE + .9, 0), .16, 8, STEEL);
+        }
+        return s.out.finish();
+    }
+
+    /**
+     * The tongues of the four connector shoes, as they lie drawn in: each a bar through its shoe with a plug at its
+     * west end, which slides out over the well's edge to the end of the position's cable before it.
+     */
+    private static RigidMachineryPartR44 tongues(YashimaCarriageLayoutR64 l)
+    {
+        var s = new Shape(l);
+        for (int i = 0; i < 4; i++)
+        {
+            Vec3 shoe = l.shoe(i);
+            s.box(new Vec3(TONGUE_HEAD + .65, shoe.y + .42, shoe.z), new Vec3(.5, 0, 0), new Vec3(0, .13, 0), new Vec3(0, 0, .2), STEEL);
+            s.box(new Vec3(TONGUE_HEAD + .075, shoe.y + .42, shoe.z), new Vec3(.075, 0, 0), new Vec3(0, .26, 0), new Vec3(0, 0, .32), BAND);
         }
         return s.out.finish();
     }

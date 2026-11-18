@@ -43,7 +43,7 @@ public record YashimaCarriageLayoutR64(Vec3 pivot, Vec3 ahead, Vec3 aside, Vec3 
     /** The underside of the outriggers' arms: the pads, drawn up, lie under them. */
     public static final double ARM_LOW = 3.0;
     /** The four outriggers (along, across): three on the far side and one ahead on the gunner's. */
-    public static final double[][] LEGS = {{-6, -8.6}, {14, -10.0}, {34, -8.6}, {34, 8.6}};
+    public static final double[][] LEGS = {{0, -8.6}, {14, -10.0}, {34, -8.6}, {34, 8.6}};
     /** The pads' half width and thickness, the jack housings' half width, and how far the jacks bring the pads down once the gun is up. */
     public static final double PAD = 1.3, PAD_THICK = .45, HOUSING = .6, JACK_STROKE = FLOOR - GROUND + .05;
     /** The half width of a truck of the upper carriage on its rail. */
@@ -69,13 +69,19 @@ public record YashimaCarriageLayoutR64(Vec3 pivot, Vec3 ahead, Vec3 aside, Vec3 
     public static final double LINK = 2.6;
 
     /**
-     * The position's own cables come to the well's west edge (world x -1279, z -1425..-1405, the root standing at
-     * -1242.5, -1400.5: map-buildings, 2026-11-18). The carriage's junction cabinet hangs just inside that edge and
+     * The position's own cables end two blocks outside the well's west edge (world x -1281, z -1420..-1414, the
+     * well's edge being x -1279 and the root standing at -1242.5, -1400.5: map-buildings, 2026-11-18). Nothing may
+     * stand outside the edge while the gun rises. The carriage's junction cabinet hangs just inside that edge and
      * its four connector shoes come down beside it with the jacks. From the root: the cabinet's west and east
      * faces, its south and north ends, its top, and the line the shoes stand on.
      */
-    public static final double CABINET_WEST = -35.5, CABINET_EAST = -33.9, CABINET_SOUTH = -25.6, CABINET_NORTH = -17.4, CABINET_TOP = 6.4, SHOE_LINE = -35.9;
-    public static final double[] SHOE_AT = {-24.5, -22.5, -20.5, -18.5};
+    public static final double CABINET_WEST = -35.5, CABINET_EAST = -33.9, CABINET_SOUTH = -20.2, CABINET_NORTH = -11.8, CABINET_TOP = 6.4, SHOE_LINE = -35.9;
+    public static final double[] SHOE_AT = {-19.0, -17.0, -15.0, -13.0};
+    /**
+     * Out of each shoe, once it is down, a tongue slides west over the edge to the end of the cable before it: its
+     * head's west face while it is in, and how far it slides.
+     */
+    public static final double TONGUE_HEAD = -36.45, TONGUE = 1.05;
 
     /**
      * @param pivot  the point the gun turns about, at rest
