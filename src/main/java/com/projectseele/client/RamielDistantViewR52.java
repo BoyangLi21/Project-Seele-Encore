@@ -79,11 +79,67 @@ public final class RamielDistantViewR52
             float haze=hazeR64(distance);
             if(haze<=0){RenderSystem.setShaderFogStart(Math.max(fogStart,distance+64));RenderSystem.setShaderFogEnd(Math.max(fogEnd,distance+512));}
             else{RenderSystem.setShaderFogStart(0);RenderSystem.setShaderFogEnd(distance/haze);}
-            RamielRenderer.renderObservedR52(state,event.getPartialTick(),view.ageClientTicks(),poses,BUFFERS);BUFFERS.endBatch();
+            var horizon=RamielHorizonClipR64.profile(camera,state);
+            if(horizon==null||!horizon.any())
+            {RamielRenderer.renderObservedR52(state,event.getPartialTick(),view.ageClientTicks(),poses,BUFFERS);BUFFERS.endBatch();}
+            else
+            {
+                drawAboveHorizonR64(event,horizon,state,poses,view.ageClientTicks());
+                RamielRenderer.renderObservedR52(state,event.getPartialTick(),view.ageClientTicks(),poses,BUFFERS,false,true);BUFFERS.endBatch();
+            }
             if(EncounterObserverCacheR45.markDrawn(packet)&&!state.target().equals(reported))
             {reported=state.target();com.projectseele.ProjectSeele.LOGGER.info("R52 real distant Ramiel frame drawn: uuid={} generation={} distance={} scale={} sequence={}",state.target(),packet.generation(),distance,scale,packet.sequence());}
         }
         finally{RenderSystem.setShaderFogStart(fogStart);RenderSystem.setShaderFogEnd(fogEnd);poses.popPose();}
+    }
+    /**
+     * The body and drill drawn in vertical slices, each under a scissor that keeps only what lies above the far
+     * horizon in that slice (RamielHorizonClipR64). Scissor touches neither depth nor colour targets, so it behaves
+     * the same with and without a shader pack.
+     */
+    private static void drawAboveHorizonR64(RenderLevelStageEvent event,RamielHorizonClipR64.Profile h,
+            ClientboundEncounterObserverPacket.Snapshot state,com.mojang.blaze3d.vertex.PoseStack poses,long age)
+    {
+        var target=Minecraft.getInstance().getMainRenderTarget();int width=target.width,height=target.height;
+        var view=new Matrix4f(event.getPoseStack().last().pose());var projection=event.getProjectionMatrix();
+        var camera=event.getCamera().getPosition();
+        int n=RamielHorizonClipR64.COLUMNS;double step=2*h.halfAngle()/(n-1);
+        boolean scissor=false;
+        try
+        {
+            for(int i=0;i<n;i++)
+            {
+                double e=h.elevation()[i];
+                if(e==Double.POSITIVE_INFINITY)continue;
+                double az=h.azimuth(i);
+                // the slice's left and right edges (the outer slices reach well past the body), and its horizon height
+                double a0=az-step*(i==0?40:.5),a1=az+step*(i==n-1?40:.5);
+                float[] p0=screen(view,projection,camera,h,a0,0,width,height),p1=screen(view,projection,camera,h,a1,0,width,height);
+                if(p0==null||p1==null)continue;
+                int x0=(int)Math.floor(Math.max(0,Math.min(p0[0],p1[0]))),x1=(int)Math.ceil(Math.min(width,Math.max(p0[0],p1[0])));
+                if(x1<=x0)continue;
+                int y0=0;
+                if(!Double.isNaN(e))
+                {
+                    float[] ph=screen(view,projection,camera,h,az,e,width,height);
+                    if(ph==null)continue;
+                    y0=(int)Math.max(0,Math.min(height,Math.ceil(ph[1])));
+                }
+                if(y0>=height)continue;
+                com.mojang.blaze3d.systems.RenderSystem.enableScissor(x0,y0,x1-x0,height-y0);scissor=true;
+                RamielRenderer.renderObservedR52(state,event.getPartialTick(),age,poses,BUFFERS,true,false);BUFFERS.endBatch();
+            }
+        }
+        finally{if(scissor)com.mojang.blaze3d.systems.RenderSystem.disableScissor();}
+    }
+    /** Framebuffer pixel (origin bottom left) of the point at the Angel's axis distance in this direction. */
+    private static float[] screen(Matrix4f view,Matrix4f projection,net.minecraft.world.phys.Vec3 camera,RamielHorizonClipR64.Profile h,double azimuth,double elevation,int width,int height)
+    {
+        double d=h.horizontal();
+        var p=new org.joml.Vector4f((float)(h.camera().x+Math.cos(azimuth)*d-camera.x),(float)(h.camera().y+Math.tan(elevation)*d-camera.y),(float)(h.camera().z+Math.sin(azimuth)*d-camera.z),1);
+        view.transform(p);projection.transform(p);
+        if(p.w<=1e-4F)return null;
+        return new float[]{(p.x/p.w*.5F+.5F)*width,(p.y/p.w*.5F+.5F)*height};
     }
     /**
      * Share of the fog colour laid over the far Angel: none within 384 blocks, rising to 35 % at about 2.2 km, so at the

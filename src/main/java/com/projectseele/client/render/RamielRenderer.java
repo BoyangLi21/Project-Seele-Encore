@@ -169,11 +169,17 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
     /** The same selected model, drawn from the real server UUID snapshot. No client entity is spawned. */
     public static void renderObservedR52(com.projectseele.network.ClientboundEncounterObserverPacket.Snapshot state,
             float partial,long age,PoseStack poses,MultiBufferSource buffers)
+    {renderObservedR52(state,partial,age,poses,buffers,true,true);}
+    /** The body (with its charge rays and drill) and the beam separately: far terrain may hide the first, never the
+     *  part of the beam that comes out toward the viewer. */
+    public static void renderObservedR52(com.projectseele.network.ClientboundEncounterObserverPacket.Snapshot state,
+            float partial,long age,PoseStack poses,MultiBufferSource buffers,boolean drawBody,boolean drawBeam)
     {
         float scale=state.height()/15F,center=state.height()*.5F;
         boolean charging=(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.CHARGING)!=0;
         boolean exposed=(charging&&age<20||state.beamTicks()>age)&&(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.EXPOSED)!=0;
         float time=state.poseTick()+partial,gap=exposed?3.75F:0;
+        if(drawBody){
         poses.pushPose();poses.translate(0,center,0);poses.scale(scale,scale,scale);poses.mulPose(Axis.YP.rotationDegrees(time*.75F));
         if (!RamielSourceModelR53.draw(poses,buffers,exposed?1:0,time,charging,LightTexture.pack(0,15),0F))
         {
@@ -187,16 +193,17 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
             poses.pushPose();poses.translate(0,-gap,0);drawOctahedronEdgeSet(poses,glow,8.25F,.11F,BOTTOM_EDGES,.75F,.92F,1,.8F);poses.popPose();
         }
         poses.popPose();
+        }
         var glow=buffers.getBuffer(RenderType.lightning());
-        if(state.beamTicks()>age)
+        if(drawBeam&&state.beamTicks()>age)
         {
             Vec3 delta=state.beamEnd().subtract(state.position());var start=new Vector3f(0,center,0);var end=delta.toVector3f();
             renderSustainedBeam(poses.last().pose(),glow,start,end,state.beamTicks()-age-partial,
                     RamielEntity.YASHIMA_BEAM_TICKS_R54,time,null);
         }
-        if(charging)
+        if(drawBody&&charging)
         { poses.pushPose();poses.translate(0,center,0);drawChargeRays(time,poses,glow);poses.popPose(); }
-        if((state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.DRILLING)!=0&&state.drillDepth()>0)
+        if(drawBody&&(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.DRILLING)!=0&&state.drillDepth()>0)
             drawStarRibbon(poses.last().pose(),glow,new Vector3f(0,center,0),new Vector3f(0,center-state.drillDepth(),0),2.6F,2.6F,.35F,.65F,1,.75F);
     }
 
