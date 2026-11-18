@@ -351,8 +351,13 @@ for c in [c for c in conns if 'repave_box' in c]:
             cols += 1
     report.append(dict(id=c['id'], repaved_columns=cols, cells=len(writes) - n0, purpose=c.get('purpose', '')))
 conns = [c for c in conns if 'repave_box' not in c]
+# Region by region: each cached capture region holds two copies of up to 224 MiB, so drop the ones left behind.
+conns.sort(key=lambda c: (int(c['points'][0][0]) // 512, int(c['points'][0][1]) // 512))
 
 for c in conns:
+    near = {((int(c['points'][0][0]) + dx) // 512, (int(c['points'][0][1]) + dz) // 512) for dx in (-256, 0, 256) for dz in (-256, 0, 256)}
+    for k in [k for k in cap.editor.regions if k not in near]:
+        del cap.editor.regions[k]
     pts = np.array(c['points'], float) + .5
     seg = np.diff(pts, axis=0)
     lens = np.hypot(*seg.T)

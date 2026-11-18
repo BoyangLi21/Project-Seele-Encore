@@ -6,6 +6,7 @@ cut: the declared cells whose nearest skeleton cell lies on the spur part being 
 junction, or to the last door) are taken up like R1-A: paving back to the natural top of the untouched
 columns around, buried paving filled, the declaration dropped.
 undeclare (取消声明): the same spur columns as a cut leave the declaration and no block changes (paving buried in the hill).
+拆除列: the columns listed in d['columns'] (prune_road_maze output) are taken up like a cut.
 viewpoint: the end stays as a terminal; its outer edge cells that face water or a drop of 2 or more get a
 stone brick wall on the footway, and a lantern on a wall post marks the end.
 Writes connections.json (for build_road_connection), rows-cut.json, rows-view.json, network-cut.npz,
@@ -33,6 +34,16 @@ options = {o['id']: o for o in json.load(open(sys.argv[5], encoding='utf8'))}
 out = Path(sys.argv[6])
 out.mkdir(parents=True, exist_ok=True)
 ids = [int(a) for a in sys.argv[7:]]
+# Region by region: each cached capture region holds two copies of up to 224 MiB, so drop the ones left behind.
+ids.sort(key=lambda i: (decisions[i]['x'] // 512, decisions[i]['z'] // 512))
+
+
+def focus(i):
+    x, z = decisions[i]['x'], decisions[i]['z']
+    near = {((x + dx) // 512, (z + dz) // 512) for dx in (-160, 0, 160) for dz in (-160, 0, 160)}
+    for k in [k for k in cap.editor.regions if k not in near]:
+        del cap.editor.regions[k]
+
 ax, az = map(int, network['bounds'][:2])
 cx, cz = map(int, cap.bounds[:2])
 road, walk, g2 = network['road'], network['walk'], network['grade2']
@@ -79,6 +90,7 @@ for i in ids:
     d, o = decisions[i], options[i]
     if d['decision'] not in ('接通', '架桥接通') or i in failed:
         continue
+    focus(i)
     c = o['connect']
     pts = [tuple(p) for p in c['route']]
     if pts[0] != (d['x'], d['z']):
@@ -172,11 +184,29 @@ def natural_top(x, y, z, skip):
     return None
 
 
-cut_rows, cut_report = {}, []
+def guard(x, f, z):
+    """Why a cut column must stay: rails on it (track bed is light grey concrete too) or a roof over it."""
+    for y in range(f - 3, f + 4):
+        s = cap.state(x, y, z)
+        if s.startswith('mtr:') or 'rail' in name(s):
+            return 'track'
+    for y in range(f + 2, f + 12):
+        n = name(cap.state(x, y, z))
+        if n not in AIR and not n.endswith(PLANTS) and not n.endswith(('_leaves', '_log', 'vine', 'lantern', 'torch', 'bars', 'chain'))                 and 'lamp' not in n and 'sign' not in n:
+            return 'roof'
+    return None
+
+
+cut_rows, cut_report, row_owner = {}, [], {}
 for i in ids:
     d = decisions[i]
+    focus(i)
     undeclare = d['decision'] == '取消声明'
-    if d['decision'] == '拆除碎片':
+    if d['decision'] == '拆除列':
+        # Columns chosen by another planner (prune_road_maze): taken up as they are.
+        cols = {tuple(c) for c in json.load(open(d['columns'], encoding='utf8'))['columns']}
+        path, doors = [], {}
+    elif d['decision'] == '拆除碎片':
         # A stray piece of declared road joined to nothing: all of it goes, not just the spur.
         pieces, _ = ndimage.label(road | walk, structure=np.ones((3, 3)))
         near = [(d['x'] + dx, d['z'] + dz) for r in range(4) for dx in range(-r, r + 1) for dz in range(-r, r + 1)
@@ -207,6 +237,13 @@ for i in ids:
                 break
         doors = doors_along(path)
         stop = min(doors) if doors else len(path) - 3       # leave the last cells before the junction to the junction road
+        if d.get('stop_xz'):                                # a cut stopped by hand (at a footpath to a door, say)
+            sx, sz = d['stop_xz']
+            hit = [k for k, p in enumerate(path) if abs(p[0] - sx) + abs(p[1] - sz) <= 4]
+            if not hit:
+                cut_report.append(dict(id=i, error=f'stop point {sx},{sz} is not on the spur'))
+                continue
+            stop = min(stop, hit[0])
         # Another end of the same piece is being connected in this batch: take up only this end's half.
         for j in ids:
             if j != i and decisions[j]['decision'] in ('接通', '架桥接通') and j not in failed:
@@ -229,11 +266,16 @@ for i in ids:
                     if q in taken and abs(feet_at(x, z) - feet_at(*q)) <= 3:
                         cols.add((x, z))
     n0 = len(cut_rows)
+    guarded = Counter()
     for (x, z) in sorted(cols):
         if undeclare:
             walk[z - az, x - ax] = road[z - az, x - ax] = False
             continue
         f = feet_at(x, z)
+        g = guard(x, math.floor(f), z)
+        if g:                                  # track bed or a floor under a roof: the paving there is not the road's to take up
+            guarded[g] += 1
+            continue
         ys = [y for y in range(math.floor(f) - 3, math.floor(f) + 2) if paving(cap.state(x, y, z))]
         if ys:
             base = min(ys)
@@ -253,9 +295,11 @@ for i in ids:
                     after = 'minecraft:air'
                 if s != after:
                     cut_rows[x, y, z] = [x, y, z, s, after]
+                    row_owner[x, y, z] = i
         walk[z - az, x - ax] = road[z - az, x - ax] = False
-    cut_report.append(dict(id=i, spur=len(path), kept_for_doors=bool(doors), columns=len(cols), cells=len(cut_rows) - n0))
+    cut_report.append(dict(id=i, spur=len(path), kept_for_doors=bool(doors), columns=len(cols), cells=len(cut_rows) - n0, guarded=dict(guarded)))
 json.dump(list(cut_rows.values()), open(out / 'rows-cut.json', 'w', encoding='utf8'))
+json.dump([[x, y, z, i] for (x, y, z), i in row_owner.items()], open(out / 'rows-cut-owner.json', 'w', encoding='utf8'))
 
 # ---- viewpoints
 view_rows, view_report = {}, []
@@ -263,6 +307,7 @@ for i in ids:
     d = decisions[i]
     if d['decision'] != '观景点':
         continue
+    focus(i)
     x0, z0 = d['x'], d['z']
     edge = []
     for x in range(x0 - 6, x0 + 7):
