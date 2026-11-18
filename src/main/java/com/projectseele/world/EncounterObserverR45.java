@@ -96,6 +96,9 @@ public final class EncounterObserverR45
                 target.getBeamEnd(), target.getDrillDepth());
     }
 
+    /** The operation (by its generation) whose night has become a blackout in this level. */
+    private static final Map<ServerLevel, Long> POWERED_R64 = new java.util.WeakHashMap<>();
+
     @SubscribeEvent
     public static void tick(TickEvent.LevelTickEvent event)
     {
@@ -109,7 +112,15 @@ public final class EncounterObserverR45
             // victory recovery. No shared Overworld clock or gamerule changes.
             boolean night = "ramiel".equals(data.active) && data.owner != null && data.generationR43 > 0
                     && java.util.Set.of("alert", "approach", "combat", "combat_victory").contains(data.phase);
-            var sky = new ClientboundEncounterObserverPacket(night ? ClientboundEncounterObserverPacket.Kind.NIGHT
+            // R64: from the moment the gun has its power (the first fire-control lock: the gun manned and ready, the
+            // grid and the cable on it) the night is a blackout, as in the original, and stays one until it ends: a
+            // gunner who lets the gun go for a moment does not bring the lights back.
+            boolean powered = night && TvYashimaDirectorR50.gunPoweredR64(level, data);
+            if (!night) POWERED_R64.remove(level);
+            else if (powered) POWERED_R64.put(level, data.generationR43);
+            else powered = Long.valueOf(data.generationR43).equals(POWERED_R64.get(level));
+            var sky = new ClientboundEncounterObserverPacket(powered ? ClientboundEncounterObserverPacket.Kind.BLACKOUT
+                    : night ? ClientboundEncounterObserverPacket.Kind.NIGHT
                     : ClientboundEncounterObserverPacket.Kind.DAY, new UUID(0, 0), Math.max(1, data.generationR43),
                     level.dimension().location(), ClientboundEncounterObserverPacket.RAMIEL, 0, level.getGameTime(), null);
             SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension), sky);

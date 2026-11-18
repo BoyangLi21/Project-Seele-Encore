@@ -15,7 +15,12 @@ public record ClientboundEncounterObserverPacket(Kind kind, UUID nonce, long gen
         ResourceLocation dimension, ResourceLocation entityType, long sequence, long serverTick,
         Snapshot snapshot)
 {
-    public enum Kind { CAPABILITY, STATE, CLEAR, NIGHT, DAY }
+    /**
+     * BLACKOUT (R64) is the operation's night once the power has been switched to the gun: the cities go dark from
+     * then on (YashimaBlackoutR64). It is sent in place of NIGHT, and is the last of the kinds so that the others
+     * keep their numbers on the wire.
+     */
+    public enum Kind { CAPABILITY, STATE, CLEAR, NIGHT, DAY, BLACKOUT }
     public static final int SCHEMA = 1;
     public static final int MAX_BYTES = 1024;
     public static final int STALE_TICKS = 60;

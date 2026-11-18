@@ -272,6 +272,17 @@ public final class TvYashimaDirectorR50
                 +"，"+net.minecraft.util.Mth.floor(side.y+.01)+"，"+net.minecraft.util.Mth.floor(side.z)+"）。";
         return "";
     }
+    /**
+     * R64: the gun has its power. In the shipped site the three grid switches stand closed from the start, so the
+     * moment is the first fire-control lock (the gun manned and ready, its service and the shield bearer in place);
+     * a shot already fired in this operation says the same after a reload of the world.
+     */
+    public static boolean gunPoweredR64(ServerLevel level,TvCampaignSavedData data)
+    {
+        if(!data.active.equals("ramiel")||!java.util.Set.of("combat","combat_victory").contains(data.phase))return false;
+        var state=TvYashimaSavedDataR50.get(level);
+        return state.matches(data)&&(state.fireControlLocked||state.shots>0);
+    }
     /** Gate only this accepted mission's fire intent, never the actors' damage/collision. */
     public static boolean fireAiAllowedR50(net.minecraft.world.entity.Mob boss)
     {

@@ -13,7 +13,7 @@ public final class TvYashimaNightClientR54
 {
     private static WeakReference<ClientLevel> bound = new WeakReference<>(null);
     private static long receivedTick = Long.MIN_VALUE;
-    private static boolean night;
+    private static boolean night, powered;
 
     public static void receive(ClientboundEncounterObserverPacket packet)
     {
@@ -22,13 +22,21 @@ public final class TvYashimaNightClientR54
                 || !level.dimension().location().equals(packet.dimension())) return;
         if (bound.get() == level && packet.serverTick() < receivedTick) return;
         bound = new WeakReference<>(level);receivedTick = packet.serverTick();
-        night = packet.kind() == ClientboundEncounterObserverPacket.Kind.NIGHT;
+        // R64: BLACKOUT is the same night with the power switched to the gun.
+        powered = packet.kind() == ClientboundEncounterObserverPacket.Kind.BLACKOUT;
+        night = powered || packet.kind() == ClientboundEncounterObserverPacket.Kind.NIGHT;
     }
 
     /** The mission's night is on in this world, wherever the camera is (the client thread's). */
     public static boolean night(ClientLevel level)
     {
         return night && level != null && bound.get() == level && level.dimension().equals(FacilitySchemaV2.DIMENSION);
+    }
+
+    /** The mission's night is on in this world and the power has been switched to the gun (R64). */
+    public static boolean blackout(ClientLevel level)
+    {
+        return powered && night(level);
     }
 
     public static boolean surfaceNight(Level level)

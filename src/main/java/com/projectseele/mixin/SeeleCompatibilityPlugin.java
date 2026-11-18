@@ -95,6 +95,14 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
                 return c!=null&&method(c,"addQuadUp","(SSSSSIBBB)V")!=null&&method(c,"addQuadDown","(SSSSSIBBB)V")!=null
                         &&method(c,"addQuadAdj","(Lcom/seibel/distanthorizons/core/enums/EDhDirection;SSSSSIBBB)V")!=null;
             }
+            if(mixin.endsWith("YashimaBlackoutDhTreeR64Mixin"))
+            {
+                ClassNode c=readClass("com/seibel/distanthorizons/core/render/LodQuadTree");
+                ClassNode node=readClass("com/seibel/distanthorizons/core/util/objects/quadTree/QuadNode");
+                ClassNode tree=readClass("com/seibel/distanthorizons/core/util/objects/quadTree/QuadTree");
+                return c!=null&&node!=null&&tree!=null&&field(c,"treeReadWriteLock","Ljava/util/concurrent/locks/ReentrantLock;")
+                        &&method(c,"reloadPos","(J)V")!=null&&field(node,"sectionPos","J")&&method(tree,"nodeIterator","()Ljava/util/Iterator;")!=null;
+            }
             return true;
         }
         catch(Exception unreadable){return false;}

@@ -161,7 +161,8 @@ public final class YashimaBlackoutR64
         }
         if (level == null) return;
         depth = dark ? Math.min(FADE, depth + 1) : Math.max(0, depth - 1);
-        boolean wanted = !held && SeeleConfig.YASHIMA_BLACKOUT.get() && TvYashimaNightClientR54.night(level);
+        // The server says when: the operation's night, from the moment the power is switched to the gun.
+        boolean wanted = !held && SeeleConfig.YASHIMA_BLACKOUT.get() && TvYashimaNightClientR54.blackout(level);
         boolean known = centred, moved = false;
         double x = centreX, z = centreZ;
         // The gun's place: looked for once a second (it does not move level; it is there whenever its chunk is).
@@ -222,9 +223,38 @@ public final class YashimaBlackoutR64
                 }
     }
 
-    /** Distant Horizons builds its far view again from its stored data (DhApi.Delayed.renderProxy.clearRenderDataCache). */
+    /**
+     * Distant Horizons' tree of far-view sections (YashimaBlackoutDhTreeR64Mixin): it can have every section's
+     * picture made again while the old one stays up, so that the far view never goes blank.
+     */
+    public interface FarView
+    {
+        /** Every section is queued to be built again; false when this tree could not do it. */
+        boolean seele$relight();
+    }
+
+    private static final java.util.Set<FarView> FAR_VIEWS = java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
+
+    /** A far-view tree has been made (any thread). */
+    public static void farView(FarView tree)
+    {
+        synchronized (FAR_VIEWS) { FAR_VIEWS.add(tree); }
+    }
+
+    /**
+     * The far view is built again with the light as it is now read: section by section where Distant Horizons'
+     * trees are known, each keeping its old picture until the new one is ready; otherwise, or if one of them
+     * cannot, all at once from its stored data (DhApi.Delayed.renderProxy.clearRenderDataCache), which leaves the
+     * far view blank for some seconds.
+     */
     private static void rebuildFarView()
     {
+        FarView[] trees;
+        synchronized (FAR_VIEWS) { trees = FAR_VIEWS.toArray(new FarView[0]); }
+        boolean all = trees.length > 0;
+        for (FarView tree : trees) all &= tree.seele$relight();
+        ProjectSeele.LOGGER.info("Yashima blackout: far view built again {} ({} trees)", all ? "section by section" : "all at once", trees.length);
+        if (all) return;
         try
         {
             Object proxy = Class.forName("com.seibel.distanthorizons.api.DhApi$Delayed").getField("renderProxy").get(null);

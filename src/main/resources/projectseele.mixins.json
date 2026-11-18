@@ -105,7 +105,8 @@
     "client.YashimaBlackoutEmbeddiumR64Mixin",
     "client.YashimaBlackoutEmbeddiumBlockR64Mixin",
     "client.YashimaBlackoutOculusR64Mixin",
-    "client.YashimaBlackoutDhR64Mixin"
+    "client.YashimaBlackoutDhR64Mixin",
+    "client.YashimaBlackoutDhTreeR64Mixin"
   ],
   "injectors": {
     "defaultRequire": 1

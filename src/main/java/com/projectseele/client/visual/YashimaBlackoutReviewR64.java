@@ -75,9 +75,10 @@ public final class YashimaBlackoutReviewR64
             mc.stop();
             return;
         }
-        // The night, as the server's signal puts it on (again every second: nothing else sends one here).
+        // The night with the power on the gun, as the server's signal puts it on (again every second: nothing else
+        // sends one here).
         if (since % 20 == 0)
-            TvYashimaNightClientR54.receive(new ClientboundEncounterObserverPacket(ClientboundEncounterObserverPacket.Kind.NIGHT, UUID.randomUUID(), 1,
+            TvYashimaNightClientR54.receive(new ClientboundEncounterObserverPacket(ClientboundEncounterObserverPacket.Kind.BLACKOUT, UUID.randomUUID(), 1,
                     mc.level.dimension().location(), ClientboundEncounterObserverPacket.RAMIEL, 0, ++night + mc.level.getGameTime() * 4, null));
         if (since == 0)
         {
