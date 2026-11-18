@@ -694,9 +694,8 @@ public final class NervRouteRuntimeR52
                     {saved.put(job.update(snapshot,Phase.RETURNING,data,"滑靴转回转移导向"));return;}
                     boolean requested=route.recovery()||data.getBoolean("ContinuousAutoLaunchR52")||data.getBoolean("ReleaseWhenReady");
                     if(!requested){saved.put(job.update(snapshot,Phase.READY,data,""));return;}
-                    // The first launch step needs every shaft door open. Counting
-                    // down while they were still opening left the airframe
-                    // waiting at "one" until the last leaf finished.
+                    // Preserve the bank's original release window. Downstream leaves
+                    // can still be travelling while the first section is clear.
                     if(!route.recovery()&&!FacilityRouteAudioR53.countdown(level,job,data,headsPrepared&&data.getBoolean("LaunchDoorsOpenR60"))){saved.put(job.update(snapshot,Phase.READY,data,"发射倒计时"));return;}
                     phased=NervLaunchPhasesR53.crossStoppedBank(data,snapshot.task(),directory,route,at);
                     continuousPrimedR52.remove(snapshot.task());stored=data.getCompound("ContinuousClockR52");
@@ -764,6 +763,10 @@ public final class NervRouteRuntimeR52
                 {
                     boolean first=NervLaunchPhasesR53.firstLaunchCommit(data,phased,at,next.distance(),readyDistanceR52(route));
                     if(first&&level.getEntity(snapshot.original().eva()) instanceof EvaUnit01Entity launched)FacilityPaR31.announce(level,launched.position().add(0,52,0),"pa_launch");
+                    if ((first || (level.getGameTime() & 3) == 0)
+                            && level.getEntity(snapshot.original().eva()) instanceof EvaUnit01Entity unit
+                            && unit.getPilotEntity() instanceof net.minecraft.server.level.ServerPlayer pilot)
+                        com.projectseele.network.ClientboundLaunchRideR65.send(pilot, unit.getId(), directory, route, next.distance());
                     NervLaunchFeedbackR53.afterCommittedMotion(level,data,snapshot.task(),true,first,(next.distance()-at)*20,contacts);
                 }
                 if(next.complete()&&data.getString("ContinuousBrakeR52").equals("CANCEL")){finishContinuousCancelR52(job,result.state(),data);return;}

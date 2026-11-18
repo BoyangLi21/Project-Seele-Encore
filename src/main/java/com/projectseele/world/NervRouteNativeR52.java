@@ -53,6 +53,7 @@ public final class NervRouteNativeR52 implements NativeAccess
         default boolean preflightCheckedContinuousCarrierR53(ServerLevel level,CheckedContinuousTraversalR52 proof,CompoundTag ownerData){return false;}
         default Sweep sweptContinuousAssemblyR52(ServerLevel level,Original original,List<DirectoryTrajectoryR52> paths,CompoundTag ownerData){return null;}
         default boolean applyCheckedContinuousR52(ServerLevel level,CheckedContinuousTraversalR52 proof,CompoundTag ownerData){return false;}
+        default boolean requiresOpenOnStep(Route route,String door,List<DirectoryTrajectoryR52> paths){return true;}
         FootSupportFrameR52.Binding originalBinding(ServerLevel level,Original original,CompoundTag ownerData);
         net.minecraft.world.phys.Vec3 actualFootBearingCentre(ServerLevel level,Original original,CompoundTag ownerData);
         /** Classify through Root's actual bound receiver domains, never a
@@ -246,7 +247,12 @@ public final class NervRouteNativeR52 implements NativeAccess
         if(!NervTraversalPolicyR53.strict(level))
         {
             if(!owner.actualFrameMatches(level,original,paths.get(0).sample(0),ownerData))return continuousHeldR53(original,"actual_source_frame");
-            for(String id:ids)if(directory.resource(id).kind()!=ResourceKind.SPACE&&!resourceReady(id,directory.resource(id).kind()==ResourceKind.DOOR))return continuousHeldR53(original,"resource="+id);
+            for(String id:ids)
+            {
+                var kind=directory.resource(id).kind();
+                boolean requireOpen=kind==ResourceKind.DOOR&&owner.requiresOpenOnStep(route,id,paths);
+                if(kind!=ResourceKind.SPACE&&!resourceReady(id,requireOpen))return continuousHeldR53(original,"resource="+id);
+            }
             continuousFailuresR53.remove(original.eva());
             return new CheckedContinuousTraversalR52(this,original,route,paths,paths,null,allowPendingSource);
         }
