@@ -165,6 +165,8 @@ public final class NervCarrierPlatformRenderer
                                   MultiBufferSource buffers,
                                   int packedLight)
     {
+        var tank = com.projectseele.client.HangarCoolantVisualR52.tank(entity.getUnitVariant());
+        if (tank != null && tank.gantry == entity) return; // Drawn after opaque EVA and cage geometry.
         float level = entity.getLclVisualLevel(partialTick);
         if (level <= 0.01F)
         {
@@ -205,6 +207,8 @@ public final class NervCarrierPlatformRenderer
     private static boolean hasEarlierGantryCopy(
             NervCarrierPlatformEntity entity)
     {
+        var tank = com.projectseele.client.HangarCoolantVisualR52.tank(entity.getUnitVariant());
+        if (tank != null && tank.gantry.distanceToSqr(entity) < 1.0D) return tank.gantry != entity;
         AABB anchor = AABB.ofSize(entity.position(), 2.0D, 2.0D, 2.0D);
         return entity.level().getEntitiesOfClass(
                 NervCarrierPlatformEntity.class, anchor,

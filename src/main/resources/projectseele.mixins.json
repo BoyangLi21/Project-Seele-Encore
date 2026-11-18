@@ -53,6 +53,8 @@
   "client": [
     "client.BufferBuilderDirectMixin",
     "client.LclBubbleR54Mixin",
+    "client.HangarLclTerrainMixin",
+    "client.HangarLclEmbeddiumMixin",
     "client.GeoFrontMissionDayTimeR54Mixin",
     "client.TvGeoFrontHorizonR64Mixin",
     "client.GeoFrontMissionSunR54Mixin",

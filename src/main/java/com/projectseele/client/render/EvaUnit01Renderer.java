@@ -162,6 +162,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                         : textureResourceForVariant(entity.getUnitVariant()),
                 (entity,bone) -> (!entity.fixedCannonOperatingR52()||ShaderShadowPassR44.active()||!isLocalPilotView(Minecraft.getInstance(),entity))
                         &&EvaHandSurfaceR45.applies(entity)&&(bone.getName().startsWith("hand_")||bone.getName().startsWith("r45_hand_"))));
+        this.addRenderLayer(new HangarLclRunoff(this));
         this.addRenderLayer(new EvaChargingPlugLayerR48(this));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 EvaUnit01Renderer::meshResourceForEntity,
