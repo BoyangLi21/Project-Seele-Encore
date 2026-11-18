@@ -168,11 +168,13 @@ def plan(world):
         if inside(x, BEAM_X):
             continue
         for z in range(CROSS_Z[0], CROSS_Z[1] + 1):
+            # only the red arm moves: the grey trim beside the upright and anything else stay as they are
             for y in range(ARMS_OLD_Y[0], ARMS_OLD_Y[1] + 1):
-                if not inside(y, ARMS_NEW_Y):
+                if not inside(y, ARMS_NEW_Y) and w.get(x, y, z) == RED:
                     want[x, y, z] = AIR
             for y in range(ARMS_NEW_Y[0], ARMS_NEW_Y[1] + 1):
-                want[x, y, z] = RED
+                if w.get(x, y, z).split('[')[0] == AIR:
+                    want[x, y, z] = RED
 
     want[30, LINTEL_Y[1], WALL_Z[1] + 1] = 'minecraft:dark_oak_wall_sign[facing=south,waterlogged=false]'
     want[30, LINTEL_Y[1], WALL_Z[0] - 1] = 'minecraft:dark_oak_wall_sign[facing=north,waterlogged=false]'
