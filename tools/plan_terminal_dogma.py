@@ -4,6 +4,8 @@ D1  Heaven's Door: an antechamber in the old void behind the chamber's north wal
     from the arrival porch, and a 25 x 29 gate in the north wall with its two leaves left ajar; the 7-wide gap
     lines up with the crucifix and Lilith.  Original blocks only.
 D2  The grey kiosk inside the chamber next to the porch (x 16..30, z 262..277) goes; the gallery floor continues.
+D5  The cross arms move up six blocks to meet Lilith's palms at her new scale (the scale itself is entity data,
+    written with write_entity_fields.py).
 D3  The LCL lake is deepened to 14 blocks under the unchanged surface (the leg-like growths stay just above it,
     as in the TV series where the lake pools below the cross); a tiled bed at the bottom.
 The crucifix, the lift and the existing porch entrance are left as they are.  write_deep_cells runs the lift,
@@ -49,6 +51,13 @@ LCL_NEW_BOTTOM = -1279
 BED_Y = -1280
 LCL_BOX = dict(x=(-34, 94), z=(262, 392))
 PROTECTED = ('red_concrete',)        # the crucifix passes through the lake floor
+# D5: at the measured scale 1.95 Lilith's nailed palms sit 3 blocks in from the arm ends, 39.6 blocks above her
+# anchor (y -1264), so the arms move up six blocks to meet them; her growths stay above the lake
+CROSS_Z = (352, 355)
+BEAM_X = (27, 33)
+ARM_X = (-2, 62)
+ARMS_OLD_Y = (-1233, -1228)
+ARMS_NEW_Y = (-1227, -1222)
 
 
 class Cells:
@@ -153,6 +162,17 @@ def plan(world):
                     want[x, y, z] = 'projectseele:lcl[level=0]'
             if not any(p in w.get(x, BED_Y, z) for p in PROTECTED):
                 want[x, BED_Y, z] = BED
+
+    # D5 cross arms up six blocks (the upright stays)
+    for x in range(ARM_X[0], ARM_X[1] + 1):
+        if inside(x, BEAM_X):
+            continue
+        for z in range(CROSS_Z[0], CROSS_Z[1] + 1):
+            for y in range(ARMS_OLD_Y[0], ARMS_OLD_Y[1] + 1):
+                if not inside(y, ARMS_NEW_Y):
+                    want[x, y, z] = AIR
+            for y in range(ARMS_NEW_Y[0], ARMS_NEW_Y[1] + 1):
+                want[x, y, z] = RED
 
     want[30, LINTEL_Y[1], WALL_Z[1] + 1] = 'minecraft:dark_oak_wall_sign[facing=south,waterlogged=false]'
     want[30, LINTEL_Y[1], WALL_Z[0] - 1] = 'minecraft:dark_oak_wall_sign[facing=north,waterlogged=false]'
