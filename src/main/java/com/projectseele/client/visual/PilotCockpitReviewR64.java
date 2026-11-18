@@ -89,6 +89,15 @@ public final class PilotCockpitReviewR64
     private static final boolean YASHIMA = Boolean.getBoolean("projectseele.plugWatchYashimaR64");
     private static final boolean YASHIMA_VIDEO = Boolean.getBoolean("projectseele.plugWatchVideoR64");
     /**
+     * -Dprojectseele.plugWatchRideVideoR64=true: the ride out to the exit, from the seat, every drawn frame (v_*.png
+     * with video.csv): from the first tick the Unit moves on its carriage until it has stood free at the exit for a
+     * second. The run ends there: nothing of the operation after the ride is played.
+     */
+    private static final boolean RIDE_VIDEO = Boolean.getBoolean("projectseele.plugWatchRideVideoR64");
+    private static boolean rideMoving;
+    private static Vec3 rideLast;
+    private static int rideFrom = -1;
+    /**
      * -Dprojectseele.plugWatchYashimaViewR64=carriage: the emplaced gun's field carriage from outside. The gun's
      * rise from its well is watched from its far side, every tick (every frame with the video switch), the Unit
      * standing still meanwhile; then the walk goes on from the seat. Once the Unit lies at the gun, six pictures
@@ -573,9 +582,10 @@ public final class PilotCockpitReviewR64
         }
         else if (YASHIMA)
         {
-            if (mc.player == null || yashimaStage < 2 && !yashimaOutside) return;
-            boolean dense = yashimaDense > 0 || yashimaHolding;
-            if (dense && YASHIMA_VIDEO)
+            boolean ride = RIDE_VIDEO && yashimaStage == 0 && rideMoving;
+            if (mc.player == null || yashimaStage < 2 && !yashimaOutside && !ride) return;
+            boolean dense = yashimaDense > 0 || yashimaHolding || ride;
+            if (dense && (YASHIMA_VIDEO || ride))
             {
                 // Every drawn frame, with the time it was drawn at: the clip is cut to the rate the game ran at.
                 try
@@ -956,9 +966,26 @@ public final class PilotCockpitReviewR64
         {
             case 0 ->
             {
+                // The ride's recording begins with the Unit's first movement (more than a block in a second).
+                if (RIDE_VIDEO && !rideMoving && watchTicks % 20 == 0)
+                {
+                    Vec3 now = eva.position();
+                    if (rideLast != null && now.distanceTo(rideLast) > 1)
+                    {
+                        rideMoving = true; rideFrom = watchTicks;
+                        ProjectSeele.LOGGER.info("Plug watch: ride: the Unit moves from tick {} at {}", watchTicks, now);
+                    }
+                    rideLast = now;
+                }
                 // Free on the ground at the exit for a second: the walk begins. The switches are closed now; they are far from the gun.
                 if (!free) { yashimaSince = 0; return false; }
                 if (yashimaSince < 20) return false;
+                if (RIDE_VIDEO)
+                {
+                    ProjectSeele.LOGGER.info("Plug watch: ride: recorded from tick {} to {}, {} frames kept, {} let go, at {}", rideFrom, watchTicks, yashimaVideoFrames, tapDropped, eva.position());
+                    finish(mc, "ride_recorded");
+                    return false;
+                }
                 server.execute(() ->
                 {
                     var level = server.getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
