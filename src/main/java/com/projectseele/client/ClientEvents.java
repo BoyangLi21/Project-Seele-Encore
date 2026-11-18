@@ -150,6 +150,8 @@ public class ClientEvents
         event.registerAboveAll("plug_insertion", EvaHud.INSERTION);
         // The pilot's chat: in the plug it is a window on the wall, not the game's chat.
         event.registerAboveAll("eva_plug_chat_r64",com.projectseele.client.cockpit.PilotChatPanelR64.OVERLAY);
+        // The eject warning, over the plug's other windows, in whatever view the pilot has.
+        event.registerAboveAll("eva_plug_eject_r64",(gui,g,p,w,h)->com.projectseele.client.cockpit.PlugEjectConfirmR64.render(g,w,h));
         event.registerAboveAll("nuclear_flash", EvaHud.NUCLEAR_FLASH);
         event.registerAboveAll("eva_command_feed_capture", EvaCommandFeedClient.CAPTURE_OVERLAY);
         event.registerAboveAll("first_battle",FirstBattleClient.OVERLAY);
@@ -165,7 +167,7 @@ public class ClientEvents
         event.register(Keybinds.EXIT_EVA);
         event.register(Keybinds.TOGGLE_PRONE);
         event.register(Keybinds.CANCEL_LAUNCH);
-        event.register(Keybinds.SELF_LAUNCH);
+        event.register(Keybinds.EJECT_CANCEL);
         event.register(Keybinds.COMMANDER_POSE);
         event.register(Keybinds.UN_EYE_LASER);
         event.register(Keybinds.UN_FLIGHT);

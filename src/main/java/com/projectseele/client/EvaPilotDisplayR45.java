@@ -167,8 +167,6 @@ public final class EvaPilotDisplayR45
                 default -> "hud.projectseele.launch_surface_clear";
             };
             centred(g, font, Component.translatable(key).getString(), width, top + 30, RED);
-            if (eva.getLaunchPhase() == EvaUnit01Entity.LAUNCH_LOCKED)
-                centred(g, font, Component.translatable("hud.projectseele.self_launch_hint", Keybinds.SELF_LAUNCH.getTranslatedKeyMessage()).getString(), width, top + 42, AMBER);
         }
         else if (stopped)
             centred(g, font, EvaShutdownR30.wreck(eva) ? "机体损伤 / 等待回收" : "操纵系统停止", width, top + 30, RED);
@@ -233,8 +231,6 @@ public final class EvaPilotDisplayR45
                 default -> "hud.projectseele.launch_surface_clear";
             };
             centred(g, font, Component.translatable(key).getString(), width, margin + 38, RED);
-            if (eva.getLaunchPhase() == EvaUnit01Entity.LAUNCH_LOCKED)
-                centred(g, font, Component.translatable("hud.projectseele.self_launch_hint", Keybinds.SELF_LAUNCH.getTranslatedKeyMessage()).getString(), width, margin + 50, AMBER);
         }
         else if (stopped)
             centred(g, font, EvaShutdownR30.wreck(eva) ? "机体损伤 / 等待回收" : "操纵系统停止", width, margin + 38, RED);

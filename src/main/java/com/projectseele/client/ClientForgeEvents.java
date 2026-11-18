@@ -244,13 +244,20 @@ public final class ClientForgeEvents
                 send(ServerboundEvaControlPacket.ACTION_TOGGLE_AT_FIELD);
             }
         }
+        // R64: one press of the eject key asks, a second while the warning stands ejects; the cancel key takes the
+        // warning down, and it goes by itself (PlugEjectConfirmR64).
+        // Seated in a docked plug that is not locked to its Unit yet, the same key asks the same way and then calls
+        // the boarding off (the request the old cancel-launch key sent from there).
+        int ejectSeat = eva != null ? eva.getId() : player.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity docked
+                && docked.laboratorySlotR47() < 0 ? docked.getId() : -1;
         while (Keybinds.EXIT_EVA.consumeClick())
         {
-            if (eva != null)
-            {
-                send(ServerboundEvaControlPacket.ACTION_EXIT);
-            }
+            if (ejectSeat < 0 || !com.projectseele.client.cockpit.PlugEjectConfirmR64.pressed(ejectSeat)) continue;
+            if (eva != null) send(ServerboundEvaControlPacket.ACTION_EXIT);
+            else SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH, -1));
         }
+        while (Keybinds.EJECT_CANCEL.consumeClick()) com.projectseele.client.cockpit.PlugEjectConfirmR64.cancelled();
+        com.projectseele.client.cockpit.PlugEjectConfirmR64.tick(ejectSeat);
         while (Keybinds.TOGGLE_PRONE.consumeClick())
         {
             if (eva != null)
@@ -260,13 +267,6 @@ public final class ClientForgeEvents
         }
         int contextualCClicksR45=0;
         while (Keybinds.CANCEL_LAUNCH.consumeClick())contextualCClicksR45++;
-        while (Keybinds.SELF_LAUNCH.consumeClick())
-        {
-            if (eva != null)
-            {
-                send(ServerboundEvaControlPacket.ACTION_SELF_LAUNCH);
-            }
-        }
         while(Keybinds.UN_EYE_LASER.consumeClick())if(eva instanceof com.projectseele.entity.EvaPrototypeEntity)send(ServerboundEvaControlPacket.ACTION_UN_EYE_LASER);
         while(Keybinds.UN_FLIGHT.consumeClick())if(eva instanceof com.projectseele.entity.EvaPrototypeEntity)send(ServerboundEvaControlPacket.ACTION_UN_FLIGHT);
         while(Keybinds.EVA_GRAPPLE.consumeClick())if(eva!=null)send(ServerboundEvaControlPacket.ACTION_GRAPPLE);
@@ -375,17 +375,11 @@ public final class ClientForgeEvents
         // Send sprint start/stop before C on the same channel, including Ctrl+C's first frame.
         while(contextualCClicksR45-->0)
         {
-            if(eva==null)
-            {
-                // Seated in a docked plug that is not locked to its EVA yet.
-                if(player.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity)
-                    SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(
-                            ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH,-1));
-                continue;
-            }
-            boolean originalCancel=eva.isExperimentalUnit()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive();
-            if(!originalCancel&&minecraft.screen!=null)continue;
-            int directions=originalCancel?-1:(minecraft.options.keyUp.isDown()?1:0)
+            // R64: this key evades and rolls and nothing else. It no longer calls a launch off: not from a docked
+            // plug, not in the cage, not on the catapult (there the eject key has the way out).
+            if(eva==null||eva.isExperimentalUnit()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()
+                    ||minecraft.screen!=null)continue;
+            int directions=(minecraft.options.keyUp.isDown()?1:0)
                     |(minecraft.options.keyDown.isDown()?2:0)|(minecraft.options.keyLeft.isDown()?4:0)
                     |(minecraft.options.keyRight.isDown()?8:0);
             SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(

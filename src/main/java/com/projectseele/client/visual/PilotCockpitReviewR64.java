@@ -487,8 +487,14 @@ public final class PilotCockpitReviewR64
             mc.options.keyAttack.setDown(t >= 590 && t < 594 || t >= 604 && t < 608 || t >= 618 && t < 622);
             mc.options.keyUse.setDown(t >= 650 && t < 656);
             mc.options.keyJump.setDown(t >= 710 && t < 714);
-            if (at(previous, 950)) send(ServerboundEvaControlPacket.ACTION_EXIT);
+            // R64: the eject key itself, as a pilot presses it: it asks (950), the cancel key takes the warning down
+            // (970), it asks again (985), and the second press ejects (1000).
+            if (at(previous, 950) || at(previous, 985) || at(previous, 1000)) net.minecraft.client.KeyMapping.click(com.projectseele.client.Keybinds.EXIT_EVA.getKey());
+            if (at(previous, 970)) net.minecraft.client.KeyMapping.click(com.projectseele.client.Keybinds.EJECT_CANCEL.getKey());
         }
+        if (at(previous, 953) || at(previous, 973) || at(previous, 988) || at(previous, 1003))
+            ProjectSeele.LOGGER.info("Cockpit review: eject key: tick {} warning {} riding {}", t, com.projectseele.client.cockpit.PlugEjectConfirmR64.asking(),
+                    mc.player.getVehicle() == null ? "nothing" : mc.player.getVehicle().getType().toShortString());
         // Whatever the exit did (a capsule thrown clear in the field, or refused in the lab): out of the seat by the end.
         if (at(previous, 1010) && mc.player.isPassenger()) server.execute(() ->
         {

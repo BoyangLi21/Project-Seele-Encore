@@ -24,14 +24,14 @@ public final class Keybinds
     public static final KeyMapping UN_EYE_LASER=new KeyMapping("key.projectseele.un_eye_laser",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_K,CATEGORY);
     public static final KeyMapping UN_FLIGHT=new KeyMapping("key.projectseele.un_flight",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_F,CATEGORY);
     public static final KeyMapping EVA_GRAPPLE=new KeyMapping("key.projectseele.eva_grapple",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_COMMA,CATEGORY);
-    // Pilot-initiated launch abort while silo-locked: recalls the airframe to
-    // its wet cage without waiting for a command-room release.
+    // Evade and roll in the field. Until R64 the same key also called a launch off from the cage and the
+    // catapult; the key's id is the old one, so that a player's own binding of it is kept.
     public static final KeyMapping CANCEL_LAUNCH = new KeyMapping(
             "key.projectseele.cancel_launch", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_C, CATEGORY);
-    // Temporary pilot-side release for rapid visual testing. The server still
-    // requires the normal occupied LAUNCH_LOCKED state and a linked silo bed.
-    public static final KeyMapping SELF_LAUNCH = new KeyMapping(
-            "key.projectseele.self_launch", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_X, CATEGORY);
+    // Takes the eject warning down (PlugEjectConfirmR64). Until R64 this key was the pilot's own launch release,
+    // a test aid: launches are released by the operation now.
+    public static final KeyMapping EJECT_CANCEL = new KeyMapping(
+            "key.projectseele.eject_cancel", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_X, CATEGORY);
     /** Toggle the synchronized Commander Ikari thinking pose while seated. */
     public static final KeyMapping COMMANDER_POSE = new KeyMapping(
             "key.projectseele.commander_pose", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, CATEGORY);

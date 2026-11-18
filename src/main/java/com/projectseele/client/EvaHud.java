@@ -318,14 +318,6 @@ public final class EvaHud
             guiGraphics.drawCenteredString(gui.getFont(),
                     Component.translatable(launchKey).withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
                     width / 2, m + 30 + uy, 0xFFFF3030);
-            if (eva.getLaunchPhase() == EvaUnit01Entity.LAUNCH_LOCKED)
-            {
-                guiGraphics.drawCenteredString(gui.getFont(),
-                        Component.translatable("hud.projectseele.self_launch_hint",
-                                        Keybinds.SELF_LAUNCH.getTranslatedKeyMessage())
-                                .withStyle(ChatFormatting.GOLD),
-                        width / 2, m + 42 + uy, NERV_ORANGE);
-            }
         }
 
         // Helmet sight and artificial horizon. It stays subtle until the
