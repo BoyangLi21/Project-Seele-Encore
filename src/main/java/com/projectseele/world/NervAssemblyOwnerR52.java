@@ -982,6 +982,9 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         double travelled=data.getDouble("ContinuousDistanceR52");
         boolean stagedLaunch=route.phased()&&!route.recovery();
         boolean atBank=stagedLaunch&&travelled>=directory.readyDistanceR53(route)-1e-6;
+        if (atBank && (data.getBoolean("ReleaseWhenReady") || data.getBoolean("ContinuousAutoLaunchR52")
+                || travelled > directory.readyDistanceR53(route)))
+            prefetchLaunchActors(l, o, kind(data), route, binding, travelled);
         var plan=stagedLaunch?shaftPlan(route,geometry.source(),binding):null;
         var launchDoors=plan==null?List.<Gate>of():plan.leaves();
         if(!route.id().equals(data.getString("LaunchDoorsRouteR54")))
@@ -1271,6 +1274,46 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     @Override public Sweep sweptContinuousAssemblyR52(ServerLevel l,Original o,List<DirectoryTrajectoryR52> paths,CompoundTag data)
     {if(paths.isEmpty()||!transportSourceReadyR54(l,o,data))return null;var rotation=NervAircraftFrameR52.decodeRigid(data.getCompound("ContinuousRotationR52"));for(var path:paths)if(!path.pureTranslation()||path.leg().motion()==Motion.FOOT_BEARING_TURN||path.sample(0).evaRoot().rotationErrorDegrees(rotation)>.0001||path.sample(1).evaRoot().rotationErrorDegrees(rotation)>.0001)return null;return new Sweep(captured.get(o.eva()).sweep(paths,.005));}
     private static final TicketType<net.minecraft.world.level.ChunkPos> CONTINUOUS_ACTOR_TICKET_R63=TicketType.create("r63_continuous_actor",Comparator.comparingLong(net.minecraft.world.level.ChunkPos::toLong),100);
+    private Vec3 routeRootAt(Route route, double metres, FootSupportFrameR52.Binding binding)
+    {
+        var position = directory.locateDistance(route, metres);
+        var leg = directory.leg(route.legs().get(position.legIndex()));
+        return directory.sample(leg, position.fraction(), binding).evaRoot().translation();
+    }
+
+    private void prefetchLaunchActors(ServerLevel level, Original original, Kind kind, Route route,
+                                      FootSupportFrameR52.Binding binding, double travelled)
+    {
+        if ((level.getGameTime() & 7) != 0) return;
+        var carrier = NervOriginalCarrierR52.controller(level, original);
+        if (carrier == null) return;
+
+        // Upright ascent translates all original members by the same root displacement.
+        // A diagonal edge or a bend can put the plug and the carrier in different columns.
+        var ids = new HashSet<>(TransportMembershipR52.members(original, kind));
+        ids.add(carrier.getUUID());
+        var previous = routeRootAt(route, travelled, binding);
+        var offsets = new ArrayList<Vec3>();
+        for (var id : ids)
+        {
+            var actor = level.getEntity(id);
+            if (actor != null) offsets.add(actor.position().subtract(previous));
+        }
+
+        double end = Math.min(directory.routeLength(route),
+                travelled + Math.min(576, route.motionProfile().launch().cruiseMps() * 3));
+        var columns = new HashSet<net.minecraft.world.level.ChunkPos>();
+        for (double at = travelled; at < end; )
+        {
+            at = Math.min(at + 8, end);
+            var next = routeRootAt(route, at, binding);
+            for (var offset : offsets)
+                addContinuousChunksR53(columns, new AABB(previous.add(offset), next.add(offset)).inflate(.01, 0, .01));
+            previous = next;
+        }
+        for (var column : columns)
+            level.getChunkSource().addRegionTicket(CONTINUOUS_ACTOR_TICKET_R63, column, 2, column);
+    }
     private boolean continuousActorChunksReadyR63(ServerLevel level,Original original,Kind kind,
             FootSupportFrameR52.Sample from,FootSupportFrameR52.Sample to,NervCarrierPlatformEntity carrier)
     {
