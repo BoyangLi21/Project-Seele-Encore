@@ -188,6 +188,9 @@ public final class CityCreateDistrictR45
                 return new Tokyo3RetractionDirector.RequestResult(true, "Unplaced preparation cancelled; original city was untouched.");
             }
             context.state.rollback = rollback;
+            context.endpointSave = null;
+            context.replayStreetInventory = true;
+            context.waitingForStreets = false;
             context.clearReconcileFold();
             context.endpointFinalizer = null;
             context.meshSettleFrom = -1;
@@ -364,6 +367,9 @@ public final class CityCreateDistrictR45
         final List<Plan> plans = new ArrayList<>();
         final Map<Integer, Entity> entities = new HashMap<>();
         CityEndpointFinalizerR51<EndpointOwner> endpointFinalizer;
+        CityEndpointSaveR64 endpointSave;
+        CompletableFuture<ForcedCheckpoint> preparedMove;
+        boolean replayStreetInventory, waitingForStreets;
         /** Game time the last endpoint write finished, or -1; kept only in memory, a restart waits again. */
         long meshSettleFrom = -1;
         final java.util.Set<UUID> ownerIds = new java.util.HashSet<>();
@@ -415,6 +421,7 @@ public final class CityCreateDistrictR45
                 state.validate(towers.size());
                 if (!state.phase.equals("IDLE"))
                 {
+                    replayStreetInventory = true;
                     // Incomplete preparation had no world placements. Restart
                     // its exact observation instead of trusting a lost scratch.
                     if (state.phase.equals("PREPARE") || state.phase.equals("WAL_WAIT"))
@@ -529,6 +536,26 @@ public final class CityCreateDistrictR45
             level.resetEmptyTime();
             claim(true);
             if (!resident()) return;
+            if (replayStreetInventory)
+            {
+                // The city's WAL can survive a crash before the street chunks or their SavedData.
+                // Recheck the entire existing inventory before resuming a trip to the surface.
+                int endpoint = state.rollback ? state.journeySourceDepth : state.journeyTargetDepth;
+                if (endpoint == 0 && BattlefieldR21.installed(level))
+                {
+                    var streets = BattlefieldR21.state(level);
+                    streets.job = "restore";
+                    streets.cursor = streets.conflicts = 0;
+                    streets.setDirty();
+                    waitingForStreets = true;
+                }
+                replayStreetInventory = false;
+            }
+            if (waitingForStreets)
+            {
+                if (BattlefieldR21.concealed(level)) return;
+                waitingForStreets = false;
+            }
             // MOVE owns its occupancy check immediately before translation.
             occupied = !state.phase.equals("MOVE") && !state.phase.equals("FLUSH") && !state.phase.equals("COMMIT") && occupied();
             if (occupied) { stopEntities(); return; }
@@ -554,7 +581,7 @@ public final class CityCreateDistrictR45
                 case "READY" ->
                 {
                     for (Entity entity : entities.values()) if (!CityCreateBridgeR45.collisionReady(entity)) return;
-                    state.phase = "MOVE"; persist();
+                    enterMoveWhenDurable();
                 }
                 // The ledger keeps the motion tick MOVE began with. A clean stop
                 // writes the current one; after a crash an explicit recovery
@@ -565,13 +592,20 @@ public final class CityCreateDistrictR45
                 case "RECONCILE" -> reconcile(start);
                 case "FLUSH" ->
                 {
-                    // One explicit native persistence barrier per journey,
-                    // never once per tower/layer. Its measured cost is separate
-                    // from the 8ms placement/capture budget, not hidden as zero.
-                    syncEndpointMetadata();
-                    long before = System.nanoTime(); level.save(null, true, false);
-                    endpointFlushNanos += System.nanoTime() - before;
-                    state.phase = "COMMIT"; persist();
+                    // Serialize city chunks under the placement budget. Keep the final native
+                    // barrier for other dirty chunks, entities and dimension data before COMMIT.
+                    if (endpointSave == null)
+                    {
+                        syncEndpointMetadata();
+                        endpointSave = new CityEndpointSaveR64(level, chunks);
+                    }
+                    if (endpointSave.drain(start + WORK_NANOS))
+                    {
+                        long before = System.nanoTime(); level.save(null, true, false);
+                        endpointFlushNanos += System.nanoTime() - before;
+                        state.phase = "COMMIT"; persist();
+                        endpointSave = null;
+                    }
                 }
                 case "COMMIT" -> commit();
                 default -> throw new IllegalStateException("Unknown persistent city phase " + state.phase);
@@ -1057,12 +1091,51 @@ public final class CityCreateDistrictR45
 
         void stopEntities() throws Exception { for (Entity entity : entities.values()) if (entity.isAlive()) CityCreateBridgeR45.stop(entity); }
 
+        CompoundTag ledgerRoot(String phase)
+        {
+            CompoundTag tag = state.save(); tag.putString("Phase", phase); tag.putInt("Version", 1);
+            tag.putString("WorldUUID", world); tag.putLong("Origin", origin.asLong());
+            CompoundTag root = new CompoundTag(); root.put("data", tag); NbtUtils.addCurrentDataVersion(root);
+            return root;
+        }
+
+        void enterMoveWhenDurable() throws Exception
+        {
+            if (preparedMove == null)
+            {
+                CompoundTag snapshot = ledgerRoot("MOVE");
+                preparedMove = CompletableFuture.supplyAsync(() -> {
+                    long began = System.nanoTime();
+                    try { return new ForcedCheckpoint(writePending(file, snapshot), System.nanoTime() - began); }
+                    catch (IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
+                });
+                return;
+            }
+            if (!preparedMove.isDone()) return;
+            ForcedCheckpoint ready = preparedMove.join();
+            preparedMove = null;
+            // Only the server thread publishes a ledger or starts moving its owners.
+            long began = System.nanoTime();
+            publish(ready.path(), file);
+            state.phase = "MOVE"; observePhaseTiming();
+            ledgerIoNanos += ready.writeNanos() + System.nanoTime() - began; lastPersistTick = level.getGameTime(); lastPersistPhase = state.phase;
+        }
+
         void persist() throws Exception
         {
+            if (preparedMove != null)
+            {
+                // A reversal, fault, or server stop supersedes the uncommitted READY snapshot.
+                // Its writer owns only a unique temporary file and cannot overwrite this record.
+                preparedMove.thenAccept(ready -> {
+                    try { Files.deleteIfExists(ready.path()); }
+                    catch (IOException failure) { ProjectSeele.LOGGER.warn("Could not remove unpublished city checkpoint {}", ready, failure); }
+                });
+                preparedMove = null;
+            }
             observePhaseTiming();
             long began = System.nanoTime();
-            CompoundTag tag = state.save(); tag.putInt("Version", 1); tag.putString("WorldUUID", world); tag.putLong("Origin", origin.asLong());
-            CompoundTag root = new CompoundTag(); root.put("data", tag); NbtUtils.addCurrentDataVersion(root); atomic(file, root);
+            atomic(file, ledgerRoot(state.phase));
             ledgerIoNanos += System.nanoTime() - began; lastPersistTick = level.getGameTime(); lastPersistPhase = state.phase;
         }
 
@@ -1087,6 +1160,7 @@ public final class CityCreateDistrictR45
     }
 
     private record EndpointOwner(Plan plan, Entity entity) {}
+    private record ForcedCheckpoint(Path path, long writeNanos) {}
 
     private static int duration(Plan plan)
     {
@@ -1405,14 +1479,29 @@ public final class CityCreateDistrictR45
 
     private static void atomic(Path target, CompoundTag tag) throws IOException
     {
+        publish(writePending(target, tag), target);
+    }
+
+    private static Path writePending(Path target, CompoundTag tag) throws IOException
+    {
         Files.createDirectories(target.getParent()); Path pending = Files.createTempFile(target.getParent(), target.getFileName().toString(), ".pending");
         try
         {
             try (DataOutputStream output = new DataOutputStream(new GZIPOutputStream(Files.newOutputStream(pending), 65536)
             { { def.setLevel(Deflater.BEST_SPEED); } })) { NbtIo.write(tag, output); }
             try (FileChannel file = FileChannel.open(pending, StandardOpenOption.WRITE)) { file.force(true); }
-            Files.move(pending, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            return pending;
         }
+        catch (IOException | RuntimeException | Error failure)
+        {
+            try { Files.deleteIfExists(pending); } catch (IOException cleanup) { failure.addSuppressed(cleanup); }
+            throw failure;
+        }
+    }
+
+    private static void publish(Path pending, Path target) throws IOException
+    {
+        try { Files.move(pending, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
         finally { Files.deleteIfExists(pending); }
     }
 }
