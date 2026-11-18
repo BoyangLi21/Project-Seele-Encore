@@ -51,6 +51,9 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         var bounds=new AABB(entity.getX() - radius, y - radius, entity.getZ() - radius,
                 entity.getX() + radius, y + radius, entity.getZ() + radius);
         if(entity.getBeamTicks()>0)bounds=bounds.minmax(new AABB(entity.getPosition(1),entity.getBeamEnd()).inflate(10));
+        // The mission drill runs from the core down to the armour front and can be longer than the body's radius.
+        if(entity.isDrilling()&&entity.getDrillDepth()>0.1F)
+            bounds=bounds.minmax(new AABB(entity.getX()-3,y-entity.getDrillDepth()-3,entity.getZ()-3,entity.getX()+3,y,entity.getZ()+3));
         return frustum.isVisible(bounds);
     }
 

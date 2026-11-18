@@ -66,6 +66,9 @@ public final class RamielDistantViewR52
         var packet=view.current();var state=packet.snapshot();if((state.flags()&ClientboundEncounterObserverPacket.ALIVE)==0)return;
         var camera=event.getCamera().getPosition();float scale=state.height()/15F,radius=16*scale;
         var box=new AABB(state.position().add(-radius,state.height()*.5-radius,-radius),state.position().add(radius,state.height()*.5+radius,radius));
+        // The drill reaches from the core down to the armour front, which can lie below the body's box.
+        if((state.flags()&ClientboundEncounterObserverPacket.DRILLING)!=0&&state.drillDepth()>0)
+            box=box.minmax(new AABB(state.position().add(-3,state.height()*.5-state.drillDepth()-3,-3),state.position().add(3,state.height()*.5,3)));
         if(state.beamTicks()>view.ageClientTicks())box=box.minmax(new AABB(state.position(),state.beamEnd()).inflate(10));
         if(!event.getFrustum().isVisible(box))return;
         var poses=event.getPoseStack();float fogStart=RenderSystem.getShaderFogStart(),fogEnd=RenderSystem.getShaderFogEnd();
@@ -73,12 +76,21 @@ public final class RamielDistantViewR52
         try
         {
             float distance=(float)state.position().distanceTo(camera);
-            RenderSystem.setShaderFogStart(Math.max(fogStart,distance+64));RenderSystem.setShaderFogEnd(Math.max(fogEnd,distance+512));
+            float haze=hazeR64(distance);
+            if(haze<=0){RenderSystem.setShaderFogStart(Math.max(fogStart,distance+64));RenderSystem.setShaderFogEnd(Math.max(fogEnd,distance+512));}
+            else{RenderSystem.setShaderFogStart(0);RenderSystem.setShaderFogEnd(distance/haze);}
             RamielRenderer.renderObservedR52(state,event.getPartialTick(),view.ageClientTicks(),poses,BUFFERS);BUFFERS.endBatch();
             if(EncounterObserverCacheR45.markDrawn(packet)&&!state.target().equals(reported))
             {reported=state.target();com.projectseele.ProjectSeele.LOGGER.info("R52 real distant Ramiel frame drawn: uuid={} generation={} distance={} scale={} sequence={}",state.target(),packet.generation(),distance,scale,packet.sequence());}
         }
         finally{RenderSystem.setShaderFogStart(fogStart);RenderSystem.setShaderFogEnd(fogEnd);poses.popPose();}
     }
+    /**
+     * Share of the fog colour laid over the far Angel: none within 384 blocks, rising to 35 % at about 2.2 km, so at the
+     * Yashima range it reads as standing out in the air over the city instead of sharp just behind the ridge, while the
+     * body stays clearly visible. Linear fog from 0 to distance/haze gives exactly this share at the Angel's distance.
+     */
+    static float hazeR64(float distance)
+    {return Math.min(.35F,Math.max(0F,(distance-384F)/5200F));}
     private RamielDistantViewR52(){}
 }
