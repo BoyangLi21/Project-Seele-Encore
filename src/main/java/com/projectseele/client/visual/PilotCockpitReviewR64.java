@@ -95,6 +95,15 @@ public final class PilotCockpitReviewR64
      * from round it, fifty ticks each; and the barrel's swing in the second charge is watched from above.
      */
     private static final boolean CARRIAGE = "carriage".equals(System.getProperty("projectseele.plugWatchYashimaViewR64"));
+    /**
+     * -Dprojectseele.plugWatchNoSightSyncR64=true: the server's sync for the plug's cannon sight
+     * (CannonSightSyncR64, which asks the encounter's rules ten times a second whether the gun may charge) is taken
+     * off the event bus for this run. With cannonSight = false in the client's config this is the game as it was
+     * before the sight: for telling what the sight changed from what was there before. The second charge of every
+     * Yashima watch is logged tick by tick ("Yashima charge trace").
+     */
+    private static final boolean NO_SIGHT_SYNC = Boolean.getBoolean("projectseele.plugWatchNoSightSyncR64");
+    private static boolean syncOff;
     private static int carriageNear = -1, carriageRise = -1, carriageReady = -1, carriageDone = -1;
     private static double carriageLow = Double.MAX_VALUE;
     private static boolean yashimaOutside;
@@ -907,6 +916,32 @@ public final class PilotCockpitReviewR64
                     state.charge, state.exposed, state.beam, state.health,
                     java.util.stream.StreamSupport.stream(mc.level.entitiesForRendering().spliterator(), false).filter(com.projectseele.entity.RamielEntity.class::isInstance).count(), state.service, state.slowest,
                     state.notice.length() > 110 ? state.notice.substring(0, 110) : state.notice);
+        if (NO_SIGHT_SYNC && !syncOff)
+        {
+            syncOff = true;
+            server.execute(() -> net.minecraftforge.common.MinecraftForge.EVENT_BUS.unregister(com.projectseele.world.CannonSightSyncR64.class));
+            ProjectSeele.LOGGER.info("Plug watch: the cannon sight's server sync is off for this run");
+        }
+        // The second charge, tick by tick as the server has it: the charge, how far the gun is turned from its rest
+        // and whether its turning is held (FixedCannonAimHeldR54), and what could lock the pilot's hands.
+        if (yashimaStage == 3 && yashimaShot == 1 && watchTicks - yashimaShotAt >= 290)
+        {
+            int at = watchTicks, seen = eva.getCannonCharge();
+            float off = yashimaOff;
+            var id = eva.getUUID();
+            server.execute(() ->
+            {
+                var level = server.getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
+                if (level == null || !(level.getEntity(id) instanceof EvaUnit01Entity unit)) return;
+                var emplaced = unit.fixedCannonBodyR52();
+                ProjectSeele.LOGGER.info("Plug watch: Yashima charge trace: tick {} server tick {} charge {} (client {}) look off {} gun turned {} held {} | handling {} dynamics {} field {} sword {} cooldown {}",
+                        at, server.getTickCount(), unit.getCannonCharge(), seen, off,
+                        emplaced == null ? "-" : String.format(Locale.ROOT, "%.1f", Math.toDegrees(2 * Math.acos(Math.min(1, Math.abs(emplaced.aimR52(1).w))))),
+                        emplaced != null && emplaced.getPersistentData().getBoolean("FixedCannonAimHeldR54"),
+                        com.projectseele.entity.EvaWeaponHandlingR45.active(unit), com.projectseele.physics.CombatBodyDynamics.active(unit),
+                        com.projectseele.entity.EvaFieldActionsR45.active(unit), com.projectseele.entity.EvaSwordActionsR45.active(unit), unit.getCannonCooldown());
+            });
+        }
         if (site == null) return false;
         if (yashimaDense > 0) yashimaDense--;
         yashimaOutside = false;
