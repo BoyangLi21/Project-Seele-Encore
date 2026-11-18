@@ -121,8 +121,12 @@ def read_box(world, x0, x1, y0, y1, z0, z1):
     return ids, pal
 
 
-def material(s, lu, lv, kind, vertical, base='black'):
+TIDY = {'every': 16, 'ceiling': True, 'bar': (-30, -6), 'straight': 0}
+
+
+def material(s, lu, lv, kind, vertical, base='black', style=None):
     # bands two blocks thick: on a wall that steps diagonally in plan, a one-block band misses every other row
+    style = style or TIDY
     if 8 <= s % 32 < 10:
         return RIB
     if base == 'keep':
@@ -133,15 +137,19 @@ def material(s, lu, lv, kind, vertical, base='black'):
         if s % 16 < 8 and abs(abs(lu if kind == 'z' else lv) - 9.5) < 1.0:
             return LIGHT
         return wall
-    if s % 16 < 2 and ((kind == 'side' and -30 <= lv <= -6) or (kind == 'ceiling' and abs(lu) <= 6)):
+    lo, hi = style['bar']
+    if s % style['every'] < 2 and ((kind == 'side' and lo <= lv <= hi) or (style['ceiling'] and kind == 'ceiling' and abs(lu) <= 6)):
         return LIGHT
     return floor if kind == 'floor' else wall
 
 
-def plan_leg(world, curve, keep, piece=32, reach=70, umax=28, vmin=-66, vmax=15, guard=3, base='black', skip_start=0):
+def plan_leg(world, curve, keep, piece=32, reach=70, umax=28, vmin=-66, vmax=15, guard=3, base='black', skip_start=0,
+             bands='frame', style=None):
     s, pos, d, u, v, vertical = centre_samples(curve)
     tree = cKDTree(pos)
     rows, why = {}, Counter()
+    style = style or TIDY
+    bars = {}                                      # (band, wall side) -> [(x, y, z, old, plain wall)]
     for s0 in np.arange(0, s[-1], piece):
         m = (s >= s0 - 2) & (s < s0 + piece + 2)
         lo = np.floor(pos[m].min(0) - reach).astype(int)
@@ -168,6 +176,15 @@ def plan_leg(world, curve, keep, piece=32, reach=70, umax=28, vmin=-66, vmax=15,
         r = pts - pos[k]
         lu, lv = np.einsum('ij,ij->i', r, u[k]), np.einsum('ij,ij->i', r, v[k])
         inside &= (np.abs(lu) <= umax) & (lv >= vmin) & (lv <= vmax)
+        # band position: 'frame' is the distance along the curve, so a band is a plane square to the travel and cuts
+        # a stepped wall into zigzags; 'plan' measures it in plan only, so on a slope every band is the same for the
+        # whole height of a block column and wall lights come out as straight upright bars
+        sb = s[k].copy()
+        if bands == 'plan':
+            dxz = d[k][:, [0, 2]]
+            h = (dxz ** 2).sum(1)
+            ok = ~vertical[k] & (h > 1e-6)
+            sb[ok] += (r[ok][:, [0, 2]] * dxz[ok]).sum(1) / h[ok]
         for i in np.nonzero(inside)[0]:
             x, y, z = int(wx[i]), int(wy[i]), int(wz[i])
             old = pal[ids[cy[i], cz[i], cx[i]]]
@@ -191,12 +208,68 @@ def plan_leg(world, curve, keep, piece=32, reach=70, umax=28, vmin=-66, vmax=15,
             else:
                 nv, nu = -nvec @ v[kk], -nvec @ u[kk]       # outward: air to solid
                 kind = 'floor' if nv > max(abs(nu), 0.3) else 'ceiling' if -nv > max(abs(nu), 0.3) else 'side'
-            new = material(s[kk], lu[i], lv[i], kind, vertical[kk], base)
+            new = material(sb[i] if not vertical[kk] else s[kk], lu[i], lv[i], kind, vertical[kk], base, style)
+            if (style['straight'] and new == LIGHT and kind in ('side', 'ceiling') and not vertical[kk]
+                    and (x, y, z) not in rows):
+                bars.setdefault((int(sb[i] // style['every']), 'ceiling' if kind == 'ceiling' else lu[i] > 0), []).append(
+                    (x, y, z, old, FLOOR if base == 'keep' else WALL))
+                rows[(x, y, z)] = None             # decided once the whole band is known
+                continue
             if new == old or (x, y, z) in rows:
                 continue
             rows[(x, y, z)] = [x, y, z, old, new]
             why[new.split('[')[0].split(':')[1]] += 1
-    return list(rows.values()), why
+    for (band, side), cells in bars.items():
+        keep_bar = flat_bar(cells) if side == 'ceiling' else straight_bar(cells, style['straight'])
+        for x, y, z, old, plain in cells:
+            new = LIGHT if (x, y, z) in keep_bar else plain
+            if new == old:
+                del rows[(x, y, z)]
+                continue
+            rows[(x, y, z)] = [x, y, z, old, new]
+            why[new.split('[')[0].split(':')[1]] += 1
+    return [r for r in rows.values() if r], why
+
+
+def flat_bar(cells):
+    """Ceiling bar: the ceiling steps up every few blocks, so keep only the row the most cells sit on."""
+    ys = Counter(y for _, y, *_ in cells)
+    top = ys.most_common(1)[0][0] if ys else None
+    return {(x, y, z) for x, y, z, *_ in cells if y == top}
+
+
+def straight_bar(cells, length):
+    """The wall face on the slopes jogs one block sideways every eight to ten rows, so a light that follows the face
+    gets a kink at every jog. Keep one unbroken upright run of one block column (with its neighbour in the band when
+    that holds the same rows), cut to the bar length: of the runs that reach the length, the one nearest the middle of
+    the band's rows, so the bars of successive rings sit at the same height."""
+    cols = {}
+    for x, y, z, *_ in cells:
+        cols.setdefault((x, z), set()).add(y)
+    ymid = sum(y for _, y, *_ in cells) / len(cells)
+    best = None
+    for c, ys in cols.items():
+        ys = sorted(ys)
+        start = ys[0]
+        for a, b in zip(ys, ys[1:] + [None]):
+            if b != a + 1:
+                n = a - start + 1
+                lo = max(start, min(a - length + 1, round(ymid - length / 2)))
+                hi = min(a, lo + length - 1)
+                score = (min(n, length), -abs((lo + hi) / 2 - ymid))
+                if best is None or score > best[0]:
+                    best = (score, c, lo, hi)
+                start = b
+    if not best or best[0][0] < min(4, length):
+        return set()
+    _, (x, z), lo, hi = best
+    keep = {(x, y, z) for y in range(lo, hi + 1)}
+    for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        ys = cols.get((x + dx, z + dz), set())
+        if all(y in ys for y in range(lo, hi + 1)):
+            keep |= {(x + dx, y, z + dz) for y in range(lo, hi + 1)}
+            break
+    return keep
 
 
 def main():
@@ -209,6 +282,13 @@ def main():
     ap.add_argument('--skip-start', type=float, default=90,
                     help='leave the first blocks of each leg alone: the bank chamber and its first hatch, dressed in light panels')
     ap.add_argument('--s-range', type=float, nargs=2, help='only this stretch of each leg (testing)')
+    ap.add_argument('--bands', choices=['frame', 'plan'], default='frame',
+                    help='frame: bands square to the travel (zigzag on stepped slope walls); plan: bands measured in plan, upright bars on slopes')
+    ap.add_argument('--light-every', type=int, default=16, help='light ring spacing on slopes, blocks')
+    ap.add_argument('--no-ceiling-light', action='store_true', help='slopes: wall bars only, no ceiling bar')
+    ap.add_argument('--bar', type=float, nargs=2, default=(-30, -6), help='slope wall bar, from and to in the tunnel frame (negative is up)')
+    ap.add_argument('--straight', type=int, default=0,
+                    help='slopes: cut every wall bar to one straight upright run of this many blocks (0: follow the wall face)')
     a = ap.parse_args()
     directory = json.loads((a.world / 'ROOT_RUNTIME_DIRECTORY.json').read_text('utf8'))
     legs = {lg['id']: lg for lg in directory['legs']}
@@ -221,7 +301,9 @@ def main():
             s, pos, *_ = centre_samples(curve)
             sel = pos[(s >= a.s_range[0]) & (s <= a.s_range[1])]
             curve = {'segments': [{'controls': [list(sel[i]), list(sel[i + 1])]} for i in range(0, len(sel) - 1, 8)]}
-        r, why = plan_leg(a.world, curve, keep, base=a.base, skip_start=0 if a.s_range else a.skip_start)
+        style = {'every': a.light_every, 'ceiling': not a.no_ceiling_light, 'bar': tuple(a.bar), 'straight': a.straight}
+        r, why = plan_leg(a.world, curve, keep, base=a.base, skip_start=0 if a.s_range else a.skip_start,
+                          bands=a.bands, style=style)
         for row in r:
             rows.setdefault(tuple(row[:3]), row)
         total += why
