@@ -14,6 +14,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.*;
@@ -209,7 +210,10 @@ public final class TvYashimaStationR52
         var data=TvCampaignSavedData.get(level);var boss=data.angel!=null&&level.getEntity(data.angel) instanceof RamielEntity ramiel?ramiel:null;
         if(pilot instanceof TrainingPilotEntity&&boss!=null&&com.projectseele.event.TvEncounterDirectorR45.owned(boss,data))return boss.getBoundingBox().getCenter();
         Vec3 eye=EvaBodyPose.opticalEye(eva,1),end=eye.add(direction.scale(range));
-        var block=level.clip(new net.minecraft.world.level.ClipContext(eye,end,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,eva));
+        // Turning can put the sight outside the retained firing corridor. Use the same
+        // loaded-chunk trace as the shot so aiming never waits for terrain generation.
+        var sight = new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, eva);
+        var block = TvYashimaFirelineR53.clip(level, sight).hit();
         if(block.getType()!=net.minecraft.world.phys.HitResult.Type.MISS)end=block.getLocation();
         if(boss!=null){var hit=boss.getBoundingBox().clip(eye,end);if(hit.isPresent())return hit.get();}return end;
     }
