@@ -982,29 +982,44 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         double travelled=data.getDouble("ContinuousDistanceR52");
         boolean stagedLaunch=route.phased()&&!route.recovery();
         boolean atBank=stagedLaunch&&travelled>=directory.readyDistanceR53(route)-1e-6;
-        var launchDoors=new ArrayList<Gate>();
-        if(stagedLaunch)for(String legId:route.legs())for(String id:directory.leg(legId).doors())
-        {
-            var gate=gates.get(id);
-            if(gate!=null&&gate.kind()==GateKind.SILO&&id.startsWith("bank_"+route.bank()+"_"))
-                for(var member:gateGroupR54(gate))if(!launchDoors.contains(member))launchDoors.add(member);
-        }
-        launchDoors.sort(Comparator.comparingDouble(g->g.frame().translation().y));
+        var plan=stagedLaunch?shaftPlan(route,geometry.source(),binding):null;
+        var launchDoors=plan==null?List.<Gate>of():plan.leaves();
         if(!route.id().equals(data.getString("LaunchDoorsRouteR54")))
         {data.remove("LaunchDoorsStartedR54");data.putString("LaunchDoorsRouteR54",route.id());}
         boolean doorsDue=atBank||launchDoorsDueR60(route,data,travelled,launchDoors);
         if(doorsDue&&!data.contains("LaunchDoorsStartedR54"))data.putLong("LaunchDoorsStartedR54",l.getGameTime());
-        boolean launchDoorsOpen=doorsDue;
+        long elapsed=l.getGameTime()-data.getLong("LaunchDoorsStartedR54");
+        boolean staged=plan!=null&&!geometry.strict()&&plan.ascending();
+        // The former sequence finished at this tick. Keep that release window
+        // for preparation/countdown, even for routes with only distant leaves.
+        boolean launchDoorsOpen=doorsDue&&(!staged||elapsed>=plan.preparationTicks()-1);
+        boolean pastBank=stagedLaunch&&travelled>directory.readyDistanceR53(route);
+        boolean ascending=data.getCompound(NervLaunchPhasesR53.KEY).getString("Stage").equals("ASCENT");
         for(int i=0;doorsDue&&i<launchDoors.size();i++)
         {
             var door=launchDoors.get(i);
-            boolean started=l.getGameTime()-data.getLong("LaunchDoorsStartedR54")>=i*LAUNCH_DOOR_STAGGER_R60;
+            var timing=plan.timing().get(door.resource());
+            boolean needed=!staged||travelled+plan.step()>=timing.clearBy();
+            boolean precharge=timing.beforeRelease()>0&&(pastBank||elapsed>=plan.preparationTicks()-timing.beforeRelease());
+            boolean started=staged?(precharge||travelled>=timing.startAt()):elapsed>=i*LAUNCH_DOOR_STAGGER_R60;
+            // A 120-tick leaf near the bank needs part of its stroke before
+            // departure. Hold that lead while the pilot waits, then finish
+            // the rest during ascent, even after an indefinite manual wait.
+            boolean needsPrecharge=staged&&!ascending&&!needed&&timing.beforeRelease()>0;
+            if(needsPrecharge&&precharged(l,door,timing.beforeRelease()))continue;
+            if(!started&&!needed)
+            {
+                if(needsPrecharge)launchDoorsOpen=false;
+                continue;
+            }
             boolean open=started&&gateLeafR54(l,door,true,TransportMembershipR52.members(o,kind(data)));
-            launchDoorsOpen&=open;
-            // Open each higher leaf twelve ticks later, while the stopped
-            // carrier retracts and changes guide axis below. In NORMAL mode
-            // animation completion is not a prerequisite for those actuators.
-            if(atBank&&geometry.strict()&&!open){ready=false;pending="opening_launch_gate/"+door.resource();}
+            if(needsPrecharge&&!open&&!precharged(l,door,timing.beforeRelease()))launchDoorsOpen=false;
+            if(needed&&!open)
+            {
+                launchDoorsOpen=false;
+                if(atBank&&(geometry.strict()||staged&&pastBank))
+                {ready=false;pending="opening_launch_gate/"+door.resource();}
+            }
         }
         data.putBoolean("LaunchDoorsOpenR60",launchDoorsOpen);
         for(String id:geometry.resources())
@@ -1035,6 +1050,79 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         return ready;
     }
     private static final int LAUNCH_DOOR_STAGGER_R60=12;
+    private record ShaftTiming(double clearBy,double startAt,int beforeRelease) {}
+    private record ShaftPlan(java.lang.ref.WeakReference<FullAssemblyGeometryR52.Captured> source,List<Gate> leaves,Map<String,ShaftTiming> timing,
+                             int preparationTicks,double step,boolean ascending) {}
+    private final Map<String,ShaftPlan> shaftPlans=new HashMap<>();
+
+    private ShaftPlan shaftPlan(Route route,FullAssemblyGeometryR52.Captured source,FootSupportFrameR52.Binding binding)
+    {
+        var cached=shaftPlans.get(route.id());
+        if(cached!=null&&cached.source().get()==source)return cached;
+        var members=new LinkedHashSet<Gate>();
+        for(String legId:route.legs())for(String id:directory.leg(legId).doors())
+        {
+            var gate=gates.get(id);
+            if(gate!=null&&gate.kind()==GateKind.SILO&&id.startsWith("bank_"+route.bank()+"_"))
+                members.addAll(gateGroupR54(gate));
+        }
+        var leaves=members.stream().sorted(Comparator.comparingDouble(g->g.frame().translation().y)).toList();
+        double bank=directory.readyDistanceR53(route),end=directory.routeLength(route);
+        var speed=route.motionProfile().launch();
+        double step=speed.cruiseMps()/20;
+        var profile=new NervMechanicalTravelR52.ContinuousProfile(bank,end,speed.cruiseMps(),speed.accelerationMps2(),speed.decelerationMps2());
+        var start=directory.routeSlices(route,bank,bank,binding);
+        double height=source.loadingEnvelopesR54(start).stream().mapToDouble(box->box.maxY).max().orElseThrow()-shaftHeight(route,bank)+3;
+        var timing=new HashMap<String,ShaftTiming>();
+        int preparation=0;
+        boolean ascending=true;
+        for(int legIndex=directory.locateDistance(route,bank).legIndex();legIndex<route.legs().size();legIndex++)
+        {
+            var leg=directory.leg(route.legs().get(legIndex));
+            // The height schedule applies to upright captured ascents only.
+            for(int sample=0;sample<=64;sample++)if(directory.tangent(leg,sample/64D).y<0)ascending=false;
+        }
+        for(int i=0;i<leaves.size();i++)
+        {
+            var gate=leaves.get(i);
+            double top=gate.frame().translation().y-height;
+            double lo=bank,hi=end;
+            for(int n=0;n<32;n++){double mid=(lo+hi)/2;if(shaftHeight(route,mid)<top)lo=mid;else hi=mid;}
+            int contact=0,last=(int)Math.ceil(profile.durationSeconds()*20);
+            while(contact<last){int mid=(contact+last)/2;if(profile.distanceAt(mid)<hi)contact=mid+1;else last=mid;}
+            int stroke=gate.siloHatch().openTicks();
+            // Allow four control ticks for the proof and the discrete leaf endpoint.
+            // Negative times belong to the existing pre-launch actuator window.
+            int startTick=contact-stroke-4;
+            timing.put(gate.resource(),new ShaftTiming(hi,startTick<0?Double.POSITIVE_INFINITY:profile.distanceAt(startTick),
+                    Math.max(0,-startTick)));
+            preparation=Math.max(preparation,i*LAUNCH_DOOR_STAGGER_R60+stroke);
+        }
+        var result=new ShaftPlan(new java.lang.ref.WeakReference<>(source),leaves,Map.copyOf(timing),preparation,step,ascending);
+        shaftPlans.put(route.id(),result);
+        return result;
+    }
+    private boolean precharged(ServerLevel level,Gate gate,int lead)
+    {
+        if(!(level.getEntity(gate.visual()) instanceof NervSiloDoorEntity door))return false;
+        float fraction=Math.min(1F,(float)lead/gate.siloHatch().openTicks());
+        return door.actualOpenProgressR52()>=EvaDorsalMechanism.smooth(fraction);
+    }
+
+    private double shaftHeight(Route route,double metres)
+    {
+        var at=directory.locateDistance(route,metres);
+        return directory.centrePoint(directory.leg(route.legs().get(at.legIndex())),at.fraction()).y;
+    }
+    @Override public boolean requiresOpenOnStep(Route route,String door,List<DirectoryTrajectoryR52> paths)
+    {
+        var plan=shaftPlans.get(route.id());
+        var timing=plan==null?null:plan.timing().get(door);
+        if(timing==null||!plan.ascending())return true;
+        var last=paths.get(paths.size()-1);
+        int index=route.legs().indexOf(last.leg().id());
+        return directory.routeDistance(route,index,last.toFraction())>=timing.clearBy();
+    }
     /** A requested launch must not stand at the bank waiting for its shaft.
      *  The staged doors start while the carrier is still approaching, so the
      *  last leaf finishes no later than the moment it stops. */

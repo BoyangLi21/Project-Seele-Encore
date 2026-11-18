@@ -190,6 +190,9 @@ public final class SeeleNetwork
         CHANNEL.messageBuilder(ClientboundStreetPassR64.class,id++,NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(ClientboundStreetPassR64::encode).decoder(ClientboundStreetPassR64::new)
                 .consumerMainThread(ClientboundStreetPassR64::handle).add();
+        CHANNEL.messageBuilder(ClientboundLaunchRideR65.class,id++,NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundLaunchRideR65::encode).decoder(ClientboundLaunchRideR65::new)
+                .consumerMainThread(ClientboundLaunchRideR65::handle).add();
         com.projectseele.world.DeadSeaReadingR45.installBridge((player,challenge)->CHANNEL.send(
                 net.minecraftforge.network.PacketDistributor.PLAYER.with(()->player),new ClientboundDeadSeaReadChallengeR45(
                         challenge.nonce(),challenge.revision(),challenge.pages())));
