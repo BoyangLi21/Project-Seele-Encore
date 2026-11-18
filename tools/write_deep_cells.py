@@ -8,7 +8,7 @@ Rows: [x, y, z, before, after] with block states written as name[prop=value,...]
 {"id": "trafficcraft:colored_block_entity", "color": n} giving the new block its paint.
 """
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict
 import io
 import json
 import math
@@ -199,6 +199,13 @@ def apply(a):
             raise SystemExit(f'{pos}: only trafficcraft:colored_block_entity can be given, not {e.get("id")}')
     rows = [r[:5] for r in rows]
     signs = json.loads(a.signs.read_text('utf8')) if a.signs else []
+    # A cell listed twice passes the preflight (both rows match the old world) and then fails halfway through the
+    # write, after some region files were already replaced. Refuse it before anything is touched.
+    for label, cells in (('rows', [(x, y, z) for x, y, z, _, _ in rows]), ('signs', [tuple(s['pos']) for s in signs])):
+        repeated = sorted(pos for pos, n in Counter(cells).items() if n > 1)
+        if repeated:
+            raise SystemExit(f'{len(repeated)} cells appear more than once in the {label}, nothing written: '
+                             + ', '.join(map(str, repeated[:20])))
     grouped = defaultdict(lambda: defaultdict(list))
     for x, y, z, before, after in rows:
         grouped[x >> 9, z >> 9][x >> 4, z >> 4].append((x, y, z, before, after))
