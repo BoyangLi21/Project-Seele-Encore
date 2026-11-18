@@ -25,8 +25,11 @@
 | 11 | 打包检查（必须 0 处失败） | `tools/package_r60.py --check <报告> --geofront-lod WORK/out/geofront_lod.sqlite --xaero-map <report 给的路径> --compare-build <main 构建 jar>` | 1 分钟 | — |
 | 12 | 打包 | 同上把 `--check <报告>` 换成 `--pack --date YYYYMMDD --map-note "<一行地图说明>" --server-address <地址>` | 5 分钟 | F 峰值约 6 GB |
 | 13 | 本机专用服务器进服测试 | 解压服务端包，`Start-Server.bat`；客户端用打出的 PCL 包 | 15 分钟 | E 约 3 GB |
+| 14 | **把新远景库换进正式世界**（负责人主客户端看到的城北"平顶墙"是正式世界自己的旧库：R62 时期 11-09/10 烘的 90,949 行 LZMA2，不在包里） | 世界必须关着：没有客户端或服务端开着它，`session.lock` 没被占（写入会话确认）。旧库连同 `-wal`/`-shm` 先备份到 D 盘 junction 之外的目录；删掉正式世界里的 `-wal`/`-shm`，再把 `WORK/out/geofront_lod.sqlite` 复制成 `HOTFIX_20261025/dimensions/projectseele/geofront/data/DistantHorizons.sqlite`。之后正式世界每写一批，DH 只会在玩家走近时更新那些区块，远处保持烘焙时的样子 | 2 分钟 | F 约 1.2 GB |
 
 合计（外圈已烘完）：客户端约 6 小时（小地图预生成 4.1 + 核心 1.3 + 升城两次 0.3 + 其他 0.3）。第 8 步和第 9 步的预生成都只占普通槽位时可以同时跑（两个客户端，各 6–8 GB）。第 9 步用自己的镜像，第 5b 步只改 `MAP_REVIEW`；第 5b 步必须在第 6 步之前（工具会拦：`prepare` 跑过之后再 `raise` 会被拒，要先重新 `mirror`）。
+
+第 14 步换进去的库是按城市升起烘的；正式世界里城市现在是降下的（Depth 312），所以在正式世界里从远处看到的是升起的城市，走近后显示真实区块。
 
 ## 2026-11-18 远景压缩测试（map-edges）
 
