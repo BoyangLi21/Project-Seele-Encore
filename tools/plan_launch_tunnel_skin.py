@@ -179,12 +179,15 @@ def plan_leg(world, curve, keep, piece=32, reach=70, umax=28, vmin=-66, vmax=15,
         # band position: 'frame' is the distance along the curve, so a band is a plane square to the travel and cuts
         # a stepped wall into zigzags; 'plan' measures it in plan only, so on a slope every band is the same for the
         # whole height of a block column and wall lights come out as straight upright bars
+        # only on the gentle slopes (under 30 degrees): on the steep stretch an upright bar runs nearly along the
+        # travel and stops reading as a ring, so that stretch keeps the square bands
         sb = s[k].copy()
+        planned = np.zeros(len(k), bool)
         if bands == 'plan':
             dxz = d[k][:, [0, 2]]
             h = (dxz ** 2).sum(1)
-            ok = ~vertical[k] & (h > 1e-6)
-            sb[ok] += (r[ok][:, [0, 2]] * dxz[ok]).sum(1) / h[ok]
+            planned = ~vertical[k] & (np.abs(d[k][:, 1]) < 0.5)
+            sb[planned] += (r[planned][:, [0, 2]] * dxz[planned]).sum(1) / h[planned]
         for i in np.nonzero(inside)[0]:
             x, y, z = int(wx[i]), int(wy[i]), int(wz[i])
             old = pal[ids[cy[i], cz[i], cx[i]]]
@@ -209,7 +212,7 @@ def plan_leg(world, curve, keep, piece=32, reach=70, umax=28, vmin=-66, vmax=15,
                 nv, nu = -nvec @ v[kk], -nvec @ u[kk]       # outward: air to solid
                 kind = 'floor' if nv > max(abs(nu), 0.3) else 'ceiling' if -nv > max(abs(nu), 0.3) else 'side'
             new = material(sb[i] if not vertical[kk] else s[kk], lu[i], lv[i], kind, vertical[kk], base, style)
-            if (style['straight'] and new == LIGHT and kind in ('side', 'ceiling') and not vertical[kk]
+            if (style['straight'] and new == LIGHT and kind in ('side', 'ceiling') and planned[i]
                     and (x, y, z) not in rows):
                 bars.setdefault((int(sb[i] // style['every']), 'ceiling' if kind == 'ceiling' else lu[i] > 0), []).append(
                     (x, y, z, old, FLOOR if base == 'keep' else WALL))
@@ -242,7 +245,8 @@ def straight_bar(cells, length):
     """The wall face on the slopes jogs one block sideways every eight to ten rows, so a light that follows the face
     gets a kink at every jog. Keep one unbroken upright run of one block column (with its neighbour in the band when
     that holds the same rows), cut to the bar length: of the runs that reach the length, the one nearest the middle of
-    the band's rows, so the bars of successive rings sit at the same height."""
+    the band's rows, so the bars of successive rings sit at the same height. Where no run is long enough, the face
+    is followed over the bar length."""
     cols = {}
     for x, y, z, *_ in cells:
         cols.setdefault((x, z), set()).add(y)
@@ -261,7 +265,8 @@ def straight_bar(cells, length):
                     best = (score, c, lo, hi)
                 start = b
     if not best or best[0][0] < min(4, length):
-        return set()
+        # the face jogs every few rows here: no straight run, so follow the face over the bar length instead
+        return {(x, y, z) for x, y, z, *_ in cells if abs(y - ymid) < length / 2}
     _, (x, z), lo, hi = best
     keep = {(x, y, z) for y in range(lo, hi + 1)}
     for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
