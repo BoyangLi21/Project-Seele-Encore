@@ -140,8 +140,8 @@ final class YashimaCarriageR64
         // Their top flanges, a shade lighter, and the cross beams between them.
         s.block(FAR_FROM - .1, BEAM_TO + .1, BEAM_HIGH - .14, BEAM_HIGH, -outer - .12, -inner + .12, OLIVE_LIGHT);
         s.block(NEAR_FROM - .1, BEAM_TO + .1, BEAM_HIGH - .14, BEAM_HIGH, inner - .12, outer + .12, OLIVE_LIGHT);
-        for (double along : new double[]{NEAR_FROM + .5, GUIDE_ALONG, BEAM_TO - .5})
-            s.block(along - .5, along + .5, BEAM_LOW + .15, BEAM_HIGH - .15, -inner, inner, OLIVE_DARK);
+        for (double along : new double[]{NEAR_FROM + .7, GUIDE_ALONG, BEAM_TO - .7})
+            s.block(along - .7, along + .7, BEAM_LOW + .15, BEAM_HIGH - .15, -inner, inner, OLIVE_DARK);
         // Each lifting column carries the carriage in a collar, tied to the beams.
         for (Vec3 column : columns)
         {
@@ -149,20 +149,20 @@ final class YashimaCarriageR64
             for (int i = 0; i < 8; i++)
             {
                 double a = i * Math.PI / 4, b = (i + 1) * Math.PI / 4;
-                s.bar(l.at(along + Math.cos(a) * 1.3, arm, across + Math.sin(a) * 1.3), l.at(along + Math.cos(b) * 1.3, arm, across + Math.sin(b) * 1.3), .28, .42, STEEL_DARK);
+                s.bar(l.at(along + Math.cos(a) * 1.4, arm, across + Math.sin(a) * 1.4), l.at(along + Math.cos(b) * 1.4, arm, across + Math.sin(b) * 1.4), .38, .55, STEEL_DARK);
             }
-            s.block(along - .4, along + .4, ARM_LOW + .1, BEAM_HIGH - .1, -inner, across - 1.5, OLIVE_DARK);
-            if (along >= NEAR_FROM) s.block(along - .4, along + .4, ARM_LOW + .1, BEAM_HIGH - .1, across + 1.5, inner, OLIVE_DARK);
+            s.block(along - .55, along + .55, ARM_LOW + .1, BEAM_HIGH - .1, -inner, across - 1.7, OLIVE_DARK);
+            if (along >= NEAR_FROM) s.block(along - .55, along + .55, ARM_LOW + .1, BEAM_HIGH - .1, across + 1.7, inner, OLIVE_DARK);
         }
         // The outriggers: an arm, the jack's housing with its warning band and cap, a strut down to the beam.
         for (double[] leg : LEGS)
         {
             double side = Math.signum(leg[1]), reach = Math.abs(leg[1]);
-            s.block(leg[0] - .55, leg[0] + .55, ARM_LOW + .04, BEAM_HIGH - .04, Math.min(side * outer, side * (reach - HOUSING)), Math.max(side * outer, side * (reach - HOUSING)), OLIVE);
-            s.block(leg[0] - HOUSING, leg[0] + HOUSING, ARM_LOW + .02, 5.6, leg[1] - HOUSING, leg[1] + HOUSING, OLIVE_DARK);
+            s.block(leg[0] - ARM_HALF, leg[0] + ARM_HALF, ARM_LOW + .04, BEAM_HIGH - .04, Math.min(side * outer, side * (reach - HOUSING)), Math.max(side * outer, side * (reach - HOUSING)), OLIVE);
+            s.block(leg[0] - HOUSING, leg[0] + HOUSING, ARM_LOW + .02, 6.2, leg[1] - HOUSING, leg[1] + HOUSING, OLIVE_DARK);
             s.block(leg[0] - HOUSING - .06, leg[0] + HOUSING + .06, ARM_LOW + .3, ARM_LOW + .75, leg[1] - HOUSING - .06, leg[1] + HOUSING + .06, HAZARD);
-            s.block(leg[0] - HOUSING - .06, leg[0] + HOUSING + .06, 5.6, 5.8, leg[1] - HOUSING - .06, leg[1] + HOUSING + .06, STEEL_DARK);
-            s.bar(l.at(leg[0], BEAM_HIGH, side * BEAM_ASIDE), l.at(leg[0], 5.3, side * (reach - HOUSING)), .24, .24, OLIVE_DARK);
+            s.block(leg[0] - HOUSING - .06, leg[0] + HOUSING + .06, 6.2, 6.45, leg[1] - HOUSING - .06, leg[1] + HOUSING + .06, STEEL_DARK);
+            s.bar(l.at(leg[0], BEAM_HIGH, side * BEAM_ASIDE), l.at(leg[0], 5.9, side * (reach - HOUSING)), .32, .32, OLIVE_DARK);
         }
         // The two rails, a knee under each end that overhangs the beams, and a stop at each end.
         for (Rail rail : new Rail[]{cheekRail(), guideRail()})
@@ -171,23 +171,23 @@ final class YashimaCarriageR64
             for (int i = 0; i < pieces; i++)
             {
                 double a = rail.from() + (rail.to() - rail.from()) * i / pieces, b = rail.from() + (rail.to() - rail.from()) * (i + 1) / pieces;
-                s.bar(l.onRail(rail, a, 0).add(0, .125, 0), l.onRail(rail, b, 0).add(0, .125, 0), RAIL_HALF, .125, STEEL);
+                s.bar(l.onRail(rail, a, 0).add(0, RAIL_THICK / 2, 0), l.onRail(rail, b, 0).add(0, RAIL_THICK / 2, 0), RAIL_HALF, RAIL_THICK / 2, STEEL);
             }
             double crossing = Math.toDegrees(Math.asin(outer / rail.radius()));
             for (double end : new double[]{rail.from(), rail.to()})
             {
                 double from = Math.signum(end) * crossing;
-                if (Math.abs(end) > crossing + 1) s.bar(l.onRail(rail, from, 0).add(0, -.42, 0), l.onRail(rail, end, 0).add(0, -.42, 0), .4, .4, OLIVE_DARK);
-                Vec3 stop = l.onRail(rail, end, 0).add(0, .5, 0), along = l.onRail(rail, end + Math.signum(end) * .8, 0).subtract(l.onRail(rail, end, 0)).normalize();
-                s.box(stop, along.scale(.18), new Vec3(0, .25, 0), new Vec3(-along.z, 0, along.x).scale(RAIL_HALF), HAZARD);
+                if (Math.abs(end) > crossing + 1) s.bar(l.onRail(rail, from, 0).add(0, -.55, 0), l.onRail(rail, end, 0).add(0, -.55, 0), .55, .52, OLIVE_DARK);
+                Vec3 stop = l.onRail(rail, end, 0).add(0, RAIL_THICK + .28, 0), along = l.onRail(rail, end + Math.signum(end) * .8, 0).subtract(l.onRail(rail, end, 0)).normalize();
+                s.box(stop, along.scale(.22), new Vec3(0, .28, 0), new Vec3(-along.z, 0, along.x).scale(RAIL_HALF), HAZARD);
             }
         }
         // Behind on the far side: a deck beside the beam's tail with the cable mast, two condensers and a switch box.
         s.block(FAR_FROM, -.6, BEAM_HIGH - .25, BEAM_HIGH, -8.0, -outer, OLIVE_DARK);
         Vec3 box = l.mastBox();
-        s.block(MAST_ALONG - .4, MAST_ALONG + .4, BEAM_HIGH, box.y + 1.0, MAST_ACROSS - .4, MAST_ACROSS + .4, OLIVE);
-        s.bar(l.at(MAST_ALONG + 1.6, BEAM_HIGH, -BEAM_ASIDE), l.at(MAST_ALONG + .3, 7.4, MAST_ACROSS + .3), .2, .22, OLIVE_DARK);
-        s.bar(l.at(MAST_ALONG - 1.6, BEAM_HIGH, -BEAM_ASIDE), l.at(MAST_ALONG - .3, 7.4, MAST_ACROSS + .3), .2, .22, OLIVE_DARK);
+        s.block(MAST_ALONG - .5, MAST_ALONG + .5, BEAM_HIGH, box.y + 1.0, MAST_ACROSS - .5, MAST_ACROSS + .5, OLIVE);
+        s.bar(l.at(MAST_ALONG + 1.6, BEAM_HIGH, -BEAM_ASIDE), l.at(MAST_ALONG + .3, 7.4, MAST_ACROSS + .3), .27, .29, OLIVE_DARK);
+        s.bar(l.at(MAST_ALONG - 1.6, BEAM_HIGH, -BEAM_ASIDE), l.at(MAST_ALONG - .3, 7.4, MAST_ACROSS + .3), .27, .29, OLIVE_DARK);
         s.block(MAST_ALONG - .85, MAST_ALONG + .85, box.y - .85, box.y + .85, MAST_ACROSS - .9, MAST_ACROSS + MAST_FACE, CABINET);
         s.block(MAST_ALONG - .9, MAST_ALONG + .9, box.y + .5, box.y + .68, MAST_ACROSS - .95, MAST_ACROSS + MAST_FACE + .05, BAND);
         for (double along : new double[]{-7.1, -5.5})
@@ -277,30 +277,30 @@ final class YashimaCarriageR64
         {
             double cheek = near ? CHEEK_NEAR : CHEEK_FAR, post = near ? GUIDE_NEAR : GUIDE_FAR, out = near ? 1 : -1;
             // The trucks on the rails and the member between them.
-            s.block(CHEEK_ALONG - 1.1, CHEEK_ALONG + 1.1, FRAME_LOW, FRAME_HIGH, cheek - TRUCK, cheek + TRUCK, STEEL_DARK);
+            s.block(CHEEK_ALONG - TRUCK_LONG, CHEEK_ALONG + TRUCK_LONG, FRAME_LOW, FRAME_HIGH, cheek - TRUCK, cheek + TRUCK, STEEL_DARK);
             s.block(GUIDE_ALONG - .9, GUIDE_ALONG + .9, FRAME_LOW, FRAME_HIGH, post - TRUCK, post + TRUCK, STEEL_DARK);
-            s.bar(l.at(CHEEK_ALONG + 1.1, middle, member(near, CHEEK_ALONG + 1.1)), l.at(GUIDE_ALONG - .9, middle, member(near, GUIDE_ALONG - .9)), .42, half, OLIVE);
+            s.bar(l.at(CHEEK_ALONG + TRUCK_LONG, middle, member(near, CHEEK_ALONG + TRUCK_LONG)), l.at(GUIDE_ALONG - .9, middle, member(near, GUIDE_ALONG - .9)), MEMBER_HALF, half, OLIVE);
             // The trunnion frame: two uprights with the slot between them, closed above and below, strutted forward.
-            s.block(CHEEK_ALONG - 1.0, CHEEK_ALONG - .45, FRAME_HIGH, SLOT_HIGH + .5, cheek - CHEEK_HALF, cheek + CHEEK_HALF, OLIVE);
-            s.block(CHEEK_ALONG + .45, CHEEK_ALONG + 1.0, FRAME_HIGH, SLOT_HIGH + .5, cheek - CHEEK_HALF, cheek + CHEEK_HALF, OLIVE);
+            s.block(CHEEK_ALONG - TRUCK_LONG, CHEEK_ALONG - .45, FRAME_HIGH, SLOT_HIGH + .5, cheek - CHEEK_HALF, cheek + CHEEK_HALF, OLIVE);
+            s.block(CHEEK_ALONG + .45, CHEEK_ALONG + TRUCK_LONG, FRAME_HIGH, SLOT_HIGH + .5, cheek - CHEEK_HALF, cheek + CHEEK_HALF, OLIVE);
             s.block(CHEEK_ALONG - .45, CHEEK_ALONG + .45, SLOT_HIGH, SLOT_HIGH + .5, cheek - CHEEK_HALF, cheek + CHEEK_HALF, OLIVE);
             s.block(CHEEK_ALONG - .45, CHEEK_ALONG + .45, FRAME_HIGH, SLOT_LOW, cheek - CHEEK_HALF, cheek + CHEEK_HALF, OLIVE);
-            s.block(CHEEK_ALONG - 1.08, CHEEK_ALONG + 1.08, SLOT_HIGH + .5, SLOT_HIGH + .68, cheek - CHEEK_HALF - .07, cheek + CHEEK_HALF + .07, STEEL_DARK);
-            s.bar(l.at(CHEEK_ALONG + 4.4, FRAME_HIGH, member(near, CHEEK_ALONG + 4.4)), l.at(CHEEK_ALONG + 1.0, SLOT_HIGH - 1.2, cheek), .3, .3, OLIVE_DARK);
+            s.block(CHEEK_ALONG - TRUCK_LONG - .08, CHEEK_ALONG + TRUCK_LONG + .08, SLOT_HIGH + .5, SLOT_HIGH + .72, cheek - CHEEK_HALF - .07, cheek + CHEEK_HALF + .07, STEEL_DARK);
+            s.bar(l.at(CHEEK_ALONG + 4.4, FRAME_HIGH, member(near, CHEEK_ALONG + 4.4)), l.at(CHEEK_ALONG + TRUCK_LONG, SLOT_HIGH - 1.2, cheek), .38, .38, OLIVE_DARK);
             // Marks of the elevation beside the slot, on the frame's outer face.
             for (int mark = 0; mark <= 4; mark++)
-                s.block(CHEEK_ALONG + .45, CHEEK_ALONG + 1.0, SLOT_LOW + .6 + mark * .9, SLOT_LOW + .72 + mark * .9,
+                s.block(CHEEK_ALONG + .45, CHEEK_ALONG + TRUCK_LONG, SLOT_LOW + .6 + mark * .9, SLOT_LOW + .72 + mark * .9,
                         Math.min(cheek + out * CHEEK_HALF, cheek + out * (CHEEK_HALF + .03)), Math.max(cheek + out * CHEEK_HALF, cheek + out * (CHEEK_HALF + .03)), HAZARD);
             // The support's post: two flanges with the screw between them, capped, strutted back.
-            s.block(GUIDE_ALONG - .6, GUIDE_ALONG - .3, FRAME_HIGH, POST_TOP, post - POST_HALF, post + POST_HALF, OLIVE);
-            s.block(GUIDE_ALONG + .3, GUIDE_ALONG + .6, FRAME_HIGH, POST_TOP, post - POST_HALF, post + POST_HALF, OLIVE);
-            s.block(GUIDE_ALONG - .68, GUIDE_ALONG + .68, POST_TOP, POST_TOP + .4, post - POST_HALF - .08, post + POST_HALF + .08, STEEL_DARK);
+            s.block(GUIDE_ALONG - .72, GUIDE_ALONG - .3, FRAME_HIGH, POST_TOP, post - POST_HALF, post + POST_HALF, OLIVE);
+            s.block(GUIDE_ALONG + .3, GUIDE_ALONG + .72, FRAME_HIGH, POST_TOP, post - POST_HALF, post + POST_HALF, OLIVE);
+            s.block(GUIDE_ALONG - .8, GUIDE_ALONG + .8, POST_TOP, POST_TOP + .45, post - POST_HALF - .08, post + POST_HALF + .08, STEEL_DARK);
             s.tube(l.at(GUIDE_ALONG, FRAME_HIGH, post), l.at(GUIDE_ALONG, POST_TOP, post), .18, 8, STEEL);
-            s.bar(l.at(GUIDE_ALONG - 4.2, FRAME_HIGH, member(near, GUIDE_ALONG - 4.2)), l.at(GUIDE_ALONG - .6, 11.6, post), .26, .28, OLIVE_DARK);
+            s.bar(l.at(GUIDE_ALONG - 4.2, FRAME_HIGH, member(near, GUIDE_ALONG - 4.2)), l.at(GUIDE_ALONG - .72, 11.6, post), .34, .36, OLIVE_DARK);
         }
         // Two ties across, where the gun leaves them room at its lowest.
-        s.bar(l.at(16.8, middle, member(false, 16.8)), l.at(16.8, middle, member(true, 16.8)), .4, half, OLIVE_DARK);
-        s.bar(l.at(GUIDE_ALONG, middle, GUIDE_FAR + TRUCK), l.at(GUIDE_ALONG, middle, GUIDE_NEAR - TRUCK), .4, half, OLIVE_DARK);
+        s.bar(l.at(16.8, middle, member(false, 16.8)), l.at(16.8, middle, member(true, 16.8)), .5, half, OLIVE_DARK);
+        s.bar(l.at(GUIDE_ALONG, middle, GUIDE_FAR + TRUCK), l.at(GUIDE_ALONG, middle, GUIDE_NEAR - TRUCK), .5, half, OLIVE_DARK);
         return s.out.finish();
     }
 

@@ -39,27 +39,31 @@ public record YashimaCarriageLayoutR64(Vec3 pivot, Vec3 ahead, Vec3 aside, Vec3 
     public static final double GUNNER_CLEAR = 12;
 
     /** The lower carriage's two beams: how far aside, their half width, underside and top, and from where to where each runs. */
-    public static final double BEAM_ASIDE = 4.9, BEAM_HALF = .7, BEAM_LOW = 2.6, BEAM_HIGH = 4.0, FAR_FROM = -8, NEAR_FROM = 13, BEAM_TO = 36;
+    public static final double BEAM_ASIDE = 5.1, BEAM_HALF = .95, BEAM_LOW = 2.6, BEAM_HIGH = 4.3, FAR_FROM = -8, NEAR_FROM = 13, BEAM_TO = 36;
     /** The underside of the outriggers' arms: the pads, drawn up, lie under them. */
     public static final double ARM_LOW = 3.0;
+    /** The half width of an outrigger's arm. */
+    public static final double ARM_HALF = .75;
     /** The four outriggers (along, across): three on the far side and one ahead on the gunner's. */
-    public static final double[][] LEGS = {{0, -8.6}, {14, -10.0}, {34, -8.6}, {34, 8.6}};
+    public static final double[][] LEGS = {{0, -8.6}, {14, -10.8}, {34, -8.6}, {34, 8.6}};
     /** The pads' half width and thickness, the jack housings' half width, and how far the jacks bring the pads down once the gun is up. */
-    public static final double PAD = 1.3, PAD_THICK = .45, HOUSING = .6, JACK_STROKE = FLOOR - GROUND + .05;
+    public static final double PAD = 1.5, PAD_THICK = .45, HOUSING = .8, JACK_STROKE = FLOOR - GROUND + .05;
     /** The half width of a truck of the upper carriage on its rail. */
-    public static final double TRUCK = .5;
-    /** The rails lie on the beams; their half width, and how far beyond a foot's travel each runs, in degrees. */
-    public static final double RAIL_TOP = BEAM_HIGH + .25, RAIL_HALF = .75, RAIL_OVER = 3;
+    public static final double TRUCK = .65;
+    /** Half the length of a trunnion frame's truck along its rail, and the half width of the member between the trucks. */
+    public static final double TRUCK_LONG = .9, MEMBER_HALF = .55;
+    /** The rails lie on the beams: their thickness, their top, their half width, and how far beyond a foot's travel each runs, in degrees. */
+    public static final double RAIL_THICK = .35, RAIL_TOP = BEAM_HIGH + RAIL_THICK, RAIL_HALF = .95, RAIL_OVER = 3;
 
     /**
      * The trunnion frames: so far ahead of the pivot, so far to either side (the gun's sight unit reaches 5.92 on
      * the far side there), their plates' half thickness; the cross shaft's height at rest and the slots' ends.
      */
-    public static final double CHEEK_ALONG = 14, CHEEK_FAR = -6.8, CHEEK_NEAR = 3.5, CHEEK_HALF = .35, SHAFT_HEIGHT = 10.5, SLOT_LOW = 8.1, SLOT_HIGH = 12.9;
+    public static final double CHEEK_ALONG = 14, CHEEK_FAR = -6.8, CHEEK_NEAR = 3.6, CHEEK_HALF = .45, SHAFT_HEIGHT = 10.5, SLOT_LOW = 8.1, SLOT_HIGH = 12.9;
     /** The barrel's support: so far ahead, its posts so far to either side and their half width, the saddle's top at rest and its thickness, and the posts' top. */
-    public static final double GUIDE_ALONG = 26, GUIDE_FAR = -2.77, GUIDE_NEAR = 1.63, POST_HALF = .45, SADDLE = 10.6, SADDLE_THICK = .6, POST_TOP = 14.9;
+    public static final double GUIDE_ALONG = 26, GUIDE_FAR = -2.77, GUIDE_NEAR = 1.63, POST_HALF = .5, SADDLE = 10.6, SADDLE_THICK = .6, POST_TOP = 14.9;
     /** The upper carriage's frame, from its underside (clear of the rails) to its top. */
-    public static final double FRAME_LOW = RAIL_TOP + .05, FRAME_HIGH = 4.9;
+    public static final double FRAME_LOW = RAIL_TOP + .05, FRAME_HIGH = FRAME_LOW + .6;
 
     /** The cooling jacket round the barrel: from where to where along it, and its radius. */
     public static final double JACKET_FROM = 38, JACKET_TO = 50.8, JACKET_RADIUS = 1.3;

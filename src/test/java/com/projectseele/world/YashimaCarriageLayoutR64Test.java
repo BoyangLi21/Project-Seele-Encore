@@ -62,7 +62,7 @@ public final class YashimaCarriageLayoutR64Test
         that(layout.along(layout.onRail(cheekRail, cheekRail.to(), -YashimaCarriageLayoutR64.RAIL_HALF)) >= YashimaCarriageLayoutR64.GUNNER_CLEAR,
                 "the trunnion frames' rail ends ahead of the Unit: " + layout.along(layout.onRail(cheekRail, cheekRail.to(), -YashimaCarriageLayoutR64.RAIL_HALF)));
         for (double turn = -yaw; turn <= yaw; turn += 4)
-            that(layout.along(layout.turned(layout.shaft(true), turn)) - .8 >= YashimaCarriageLayoutR64.GUNNER_CLEAR, "the near trunnion frame swings back to the Unit at " + turn);
+            that(layout.along(layout.turned(layout.shaft(true), turn)) - YashimaCarriageLayoutR64.TRUCK_LONG >= YashimaCarriageLayoutR64.GUNNER_CLEAR, "the near trunnion frame swings back to the Unit at " + turn);
         that(YashimaCarriageLayoutR64.MAST_ACROSS < -3 && YashimaCarriageLayoutR64.PLUG_ACROSS < 0, "the cables are on the far side");
 
         // The gun itself, cut at the stations (its mesh, at rest): the frames stand outside it and the saddle under it.
