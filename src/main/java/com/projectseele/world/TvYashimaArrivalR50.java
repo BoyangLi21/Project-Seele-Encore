@@ -28,15 +28,22 @@ public final class TvYashimaArrivalR50
             var equipment=YashimaCannonGeometryR52.vector(row.getAsJsonObject("equipment_approach").getAsJsonArray("0"));var side=YashimaCannonGeometryR52.vector(row.getAsJsonArray("shield_wait_port"));double radius=row.get("route_arrival_radius").getAsDouble();
             if(!Double.isFinite(radius)||radius<.5||radius>2||access.get(0).distanceTo(site.landings().get(0).point())>2
                     ||access.get(access.size()-1).distanceTo(equipment)>2||cover.get(0).distanceTo(equipment)>2||cover.get(cover.size()-1).distanceTo(side)>2)throw new IllegalArgumentException("Original shield landing/supply/side endpoints rejected");
-            // Keep one station to the left of the authored defence position.
-            Vec3 line=site.angel().subtract(site.hero()).multiply(1,0,1).normalize();
-            side=site.cover().add(line.z*12,0,-line.x*12);
+            // R64: the station is the authored waiting port itself, where the walk in ends (in the shipped site about 31
+            // blocks to the left of the cover point, seen from the gunner toward the Angel, and 2 behind it). Until then the
+            // bearer walked on from the port to 12 left of the cover point, and stood in the left half of the gunner's sight:
+            // the sight's window is about 5.9 blocks to either side at that distance at full charge and about 13 with the
+            // visor just down, its axis passes about 4 to the left of the cover point, and the bearer's stance reaches about
+            // 10 to its right. Between the two there is nowhere to stand clear of the window: from about 17 to the left the
+            // bearer's hull meets the trees east of the cover point's deck, and the port's pad is the only level ground
+            // beyond them (trees stand close to the north of the pad too: 2 blocks on from the port the hull is in them).
             return Optional.of(new Plan(access,cover,equipment,side,radius));
         }catch(Exception error){com.projectseele.ProjectSeele.LOGGER.error("Installed separate far shield walk unavailable",error);return Optional.empty();}}).orElse(null);
     }
     public static Vec3 shieldSide(ServerLevel level)
     {
         var site=TvEncounterSitesR45.site(level,"ramiel").orElse(null);if(site==null)return null;
+        var plan=plan(level);if(plan!=null)return plan.side();
+        // No authored walk to read the port from (the operation does not start then): the place reckoned as before R64.
         Vec3 forward=site.angel().subtract(site.hero()).multiply(1,0,1).normalize();
         return site.cover().add(forward.z*12,0,-forward.x*12);
     }
