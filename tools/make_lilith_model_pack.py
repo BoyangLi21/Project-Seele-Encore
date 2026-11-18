@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Convert Kiki's Lilith GLB into Project SEELE's LOCAL-ONLY mesh layers.
+"""Convert Kiki's Lilith GLB into Project SEELE's mesh layers.
 
-The source artwork is never copied into the public mod resources. The output
-lives in the ignored eva_real_model resource pack and must not be distributed
-without the original author's permission and attribution.
+The source artwork is never copied into the public mod resources or Git. The
+output lives in the ignored eva_real_model resource pack. The model is CC BY
+4.0 and the owner approved shipping it with credit on 2026-11-18; every
+release that carries it must show ATTRIBUTION (see docs/ASSETS.md).
 """
 
 from __future__ import annotations
@@ -23,6 +24,14 @@ WORK_GLB = REPO / "external-assets/work/lilith/kiki/source/lilith_-_evangelion.g
 DEFAULT_OUTPUT = REPO / "run/resourcepacks/eva_real_model/assets/projectseele"
 BLENDER = Path(r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe")
 EXPORT_VERSION = 1
+# The owner approved shipping the converted model with credit on 2026-11-18 ("用 Kiki 署名"). The source is CC BY 4.0;
+# the mesh and textures still stay out of Git (size) and travel in the release's private asset pack.
+RELEASE_APPROVED_ON = "2026-11-18"
+LICENSE = "CC-BY-4.0"
+ATTRIBUTION = ("\"Lilith - Evangelion\" by kiki260100 "
+               "(https://sketchfab.com/3d-models/lilith-evangelion-8203459ac3dc48e18bad7b2a6b46995f), "
+               "licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); "
+               "converted into mesh layers for Project SEELE, the cross material removed.")
 
 LAYER_FOR_MATERIAL = {
     "m_lilith": "lilith_body",
@@ -203,9 +212,11 @@ def blender_export(source: Path, output: Path) -> None:
             raise RuntimeError(f"No triangles exported for {layer}")
         payload = {
             "format_version": 1,
-            "source": "Kiki260100 Lilith - Sketchfab, local evaluation only",
+            "source": "Kiki260100 Lilith - Sketchfab",
             "local_only": True,
-            "release_approved": False,
+            "release_approved": True,
+            "license": LICENSE,
+            "attribution": ATTRIBUTION,
             "model_height_blocks": 32.0,
             "stride": 8,
             "parts": {"root": {"pivot": [0.0, 0.0, 0.0], "vertices": values}},
@@ -224,7 +235,10 @@ def blender_export(source: Path, output: Path) -> None:
         "source_sha256": source_hash,
         "source": "Kiki260100 Lilith - Evangelion",
         "local_only": True,
-        "release_approved": False,
+        "release_approved": True,
+        "release_approved_on": RELEASE_APPROVED_ON,
+        "license": LICENSE,
+        "attribution": ATTRIBUTION,
         "height_blocks": 32.0,
         "layers": triangles,
         "excluded_materials": ["blinn6 (cross; Project SEELE uses its red block crucifix)"],

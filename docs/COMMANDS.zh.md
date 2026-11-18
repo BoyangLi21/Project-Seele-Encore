@@ -69,6 +69,8 @@
 | `/seele city raise` | 楼群升回地表（原 `tokyo3 restore`） |
 | `/seele city lower` | 楼群降入地下（原 `tokyo3 retract`） |
 | `/seele city recover` | 升降被中断（崩溃、断电）后停在故障状态时，从中断的那一步重做 |
+| `/seele lilith spear` | 终极教条里朗基努斯之枪现在的显示方式 |
+| `/seele lilith spear auto\|present\|removed` | `auto`（默认）按剧情：战役完成第 22 集"鸟天使"之前插在莉莉丝胸口，之后取走；`present`、`removed` 固定显示或取走，审查和自制地图用。写进莉莉丝实体的存档，要先到终极教条附近、区块已加载 |
 | `/seele un reset <un0\|un1>` | UN 机体维护复位：回到库位，机体和插入栓复位；驾驶员在舱内时拒绝 |
 | `/seele un defense\|power` | 切换 UN 基地防御系统、防御能源网 |
 | `/seele admin server [status]` | 服务器、地图接入、驾驶舱画面和岗位概况 |

@@ -17,11 +17,31 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public class LilithEntity extends PathfinderMob implements GeoEntity
 {
     private static final net.minecraft.network.syncher.EntityDataAccessor<Float> CONTAINMENT_SCALE=net.minecraft.network.syncher.SynchedEntityData.defineId(LilithEntity.class,net.minecraft.network.syncher.EntityDataSerializers.FLOAT);
-    @Override protected void defineSynchedData(){super.defineSynchedData();this.entityData.define(CONTAINMENT_SCALE,1F);}
+    private static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> SPEAR_SHOWN=net.minecraft.network.syncher.SynchedEntityData.defineId(LilithEntity.class,net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
+    /** How the sealing spear is shown: "auto" follows the TV story (taken in episode 22, chapter "arael"),
+     *  "present" and "removed" fix it for reviews and custom maps. */
+    public static final java.util.List<String> SPEAR_MODES=java.util.List.of("auto","present","removed");
+    private static final String SPEAR_TAKEN_CHAPTER="arael";
+    private String spearMode="auto";
+    @Override protected void defineSynchedData(){super.defineSynchedData();this.entityData.define(CONTAINMENT_SCALE,1F);this.entityData.define(SPEAR_SHOWN,true);}
+    public boolean isSpearShown(){return this.entityData.get(SPEAR_SHOWN);}
+    public String getSpearMode(){return spearMode;}
+    public void setSpearMode(String mode){spearMode=SPEAR_MODES.contains(mode)?mode:"auto";refreshSpear();}
+    private void refreshSpear()
+    {
+        boolean shown=switch(spearMode){case "present"->true;case "removed"->false;default->!spearTakenInStory();};
+        if(shown!=isSpearShown())this.entityData.set(SPEAR_SHOWN,shown);
+    }
+    private boolean spearTakenInStory()
+    {
+        if(!(this.level() instanceof net.minecraft.server.level.ServerLevel level))return false;
+        var campaign=com.projectseele.world.TvCampaignSavedData.peek(level.getServer().overworld());
+        return campaign!=null&&campaign.completed.contains(SPEAR_TAKEN_CHAPTER);
+    }
     public float getContainmentScale(){return this.entityData.get(CONTAINMENT_SCALE);}
     public void setContainmentScale(float value){this.entityData.set(CONTAINMENT_SCALE,net.minecraft.util.Mth.clamp(value,.5F,2F));}
-    @Override public void addAdditionalSaveData(net.minecraft.nbt.CompoundTag tag){super.addAdditionalSaveData(tag);tag.putFloat("ContainmentScale",getContainmentScale());}
-    @Override public void readAdditionalSaveData(net.minecraft.nbt.CompoundTag tag){super.readAdditionalSaveData(tag);setContainmentScale(tag.contains("ContainmentScale")?tag.getFloat("ContainmentScale"):1F);}
+    @Override public void addAdditionalSaveData(net.minecraft.nbt.CompoundTag tag){super.addAdditionalSaveData(tag);tag.putFloat("ContainmentScale",getContainmentScale());tag.putString("SpearMode",spearMode);}
+    @Override public void readAdditionalSaveData(net.minecraft.nbt.CompoundTag tag){super.readAdditionalSaveData(tag);setContainmentScale(tag.contains("ContainmentScale")?tag.getFloat("ContainmentScale"):1F);spearMode=SPEAR_MODES.contains(tag.getString("SpearMode"))?tag.getString("SpearMode"):"auto";}
     private final AnimatableInstanceCache geoCache =
             GeckoLibUtil.createInstanceCache(this);
 
@@ -59,6 +79,10 @@ public class LilithEntity extends PathfinderMob implements GeoEntity
         this.setYRot(0.0F);
         this.yBodyRot = 0.0F;
         this.yHeadRot = 0.0F;
+        if (!this.level().isClientSide && this.tickCount % 40 == 0)
+        {
+            refreshSpear();
+        }
     }
 
     @Override
