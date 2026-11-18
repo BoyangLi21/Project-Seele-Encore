@@ -7,11 +7,15 @@ Steps, in order (each is resumable and writes WORK/logs/<step>.json):
   check     read-only: inputs, world lock, junctions, disk, slot status, changed chunks, estimates
   instance  copy the shipped client (no saves) into WORK/client and give it a bake config
   mirror    mirror the stopped formal world to WORK/client/saves/MAP_REVIEW (holds session.lock while copying)
+  raise     R64: raise Tokyo-3 on the mirror (one short client run, render distance 2, no DH), so the towers are in
+            the saved chunks; prepare then finds the city chunks changed and core bakes the far view with the city up
   prepare   on the mirror's GeoFront LOD database: drop rows of changed chunks and of the deleted outer ring,
-            add the outer ring that map-edges baked on E:, flag rows whose parent must be rebuilt, write viewpoints
+            add the outer ring that map-edges baked on D:, flag rows whose parent must be rebuilt, write viewpoints;
+            --v6 then runs dh_v6_prepare.py on the rebuild list so DH rebuilds those sections from far away too
   core      client run (slot, probe jar, PRE_EXISTING_ONLY): DH rebuilds the dropped sections from saved chunks
             and the flagged parents; then coverage gate, an optional fill pass, export WORK/out/geofront_lod.sqlite
-  xaero     fresh mirror, final jar without DH and Oculus, -Dprojectseele.xaeroBake=true; WORK/out has the baked map
+  xaero     fresh mirror, final jar without DH and Oculus, -Dprojectseele.xaeroBake=true; WORK/out has the baked map;
+            --city-raised raises the city on that mirror first, --xaero-pregen generates the outer ring first
   report    the package_r60.py command for these outputs
 
 Changed chunks are found by comparing every GeoFront chunk with the world inside the reference server zip
@@ -23,6 +27,7 @@ from contextlib import contextmanager, nullcontext
 from pathlib import Path
 import argparse
 import datetime
+import gzip
 import json
 import math
 import os
@@ -40,12 +45,16 @@ FORMAL = Path('F:/eva/artifacts/r53_repair_20261015/client/saves/HOTFIX_20261025
 SHIP = Path('F:/eva/artifacts/r53_repair_20261015/client')
 # The world the starting LOD database was built from. R64 starts from R63r's (batch 455, the R63 far view).
 REFERENCE_SERVER_ZIP = Path('F:/eva/delivery/Project_SEELE_Encore_R63r_20261115_Server.zip')
-RING_DB = Path('E:/eva-map-edges/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite')
+# The R64 outer ring map-edges baked with the R64 generator on its D: copy (2026-11-17, 39,160 sections, LZ4 rows).
+RING_DB = Path('D:/eva-ringbake/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite')
 WORK = Path('E:/eva-r63-rebake')
 ARGS_TEMPLATE = Path('F:/eva/.claude/map-work/run17.args')
 TEMPLATE_GAME_DIR = 'F:/eva/.claude/map-work/client'
 # Probe classes (MapProbeLocal and inner classes) come from the jar map-edges bakes the outer ring with.
-PROBE_JAR = Path('E:/eva-map-edges/client/mods/projectseele-0.1.0-all.jar')
+PROBE_JAR = Path('D:/eva-ringbake/client/mods/projectseele-0.1.0-all.jar')
+# Tokyo-3's fixed origin in the GeoFront dimension (IntegratedNervMapBuilder.tokyo3Origin) and its R45 lift state file.
+CITY_ORIGIN = (30, 80, 220)
+CITY_CONTROL = 'data/projectseele_city_rigid_control_r45_8246338109520.dat'
 # Public build of main (b5ef09c1 or later) for the DH bake client; the pack still ships the private jar.
 PUBLIC_JAR = Path('F:/eva/.claude/worktrees/motion/build/libs/projectseele-0.1.0-all.jar')
 JAVAW_FALLBACK = Path('E:/Users/liboy/jdks/jdk-17.0.19+10/bin/javaw.exe')
@@ -484,6 +493,64 @@ def jar_classes(path):
     return [c for c in R63_CLASSES if 'com/projectseele/' + c + '.class' not in names]
 
 
+def city_state(world):
+    """Depth, Target and Phase of the R45 rigid city lift (Depth 0 = raised, 312 = lowered)."""
+    data = gzip.decompress((world / GEO / CITY_CONTROL).read_bytes())
+    out = {}
+    for key in ('Depth', 'Target'):
+        tag = b'\x03' + struct.pack('>H', len(key)) + key.encode()
+        i = data.find(tag)
+        out[key] = struct.unpack_from('>i', data, i + len(tag))[0] if i >= 0 else None
+    tag = b'\x08\x00\x05Phase'
+    i = data.find(tag)
+    if i >= 0:
+        n = struct.unpack_from('>H', data, i + len(tag))[0]
+        out['Phase'] = data[i + len(tag) + 2:i + len(tag) + 2 + n].decode('utf8', 'replace')
+    return out
+
+
+def raise_city(name, heap='6G', exclusive=False):
+    """Raise Tokyo-3 on one of our mirrors with a short client run: /seele city raise needs a player, so the probe
+    runs it through execute as @p. Render distance 2 and no DH, so the run saves no extra outer chunks and writes
+    no LOD rows; the R45 lift saves the moved chunks itself before it commits."""
+    game = WORK / 'client'
+    world = game / 'saves' / name
+    before = city_state(world)
+    if before.get('Depth') == 0 and before.get('Phase') == 'IDLE':
+        return dict(skipped='already raised', before=before)
+    x, y, z = CITY_ORIGIN
+    steps = [dict(op='cmd', text=t, wait=5) for t in ('gamerule doDaylightCycle false', 'time set 6000', 'weather clear 1000000',
+                                                      'gamerule doMobSpawning false', 'execute as @p run gamemode creative')]
+    steps += [dict(op='cmd', text='execute in projectseele:geofront run tp @p %d %d %d' % (x, y + 60, z), wait=400),
+              dict(op='cmd', text='execute as @p at @p run seele city raise', wait=20),
+              # A raise took 99-112 s on the R64 copies (2026-11-17); wait well past it, then save.
+              dict(op='cmd', text='time set 6000', wait=6000),
+              dict(op='cmd', text='save-all flush', wait=400)]
+    script = guard(WORK / ('scripts/city-raise-%s.json' % name))
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(json.dumps(steps), 'utf8')
+    Path(str(script) + '.log').unlink(missing_ok=True)
+    options = game / 'options.txt'
+    kept = options.read_text('utf8')
+    held = WORK / 'mods-held-raise'
+    shutil.copyfile(WORK / 'jars/probe.jar', guard(game / JAR))
+    moved = hold_mods(game, ['DistantHorizons-*.jar', 'oculus-*.jar'], held)
+    try:
+        guard(options).write_text(re.sub(r'(?m)^renderDistance:\d+', 'renderDistance:2', kept), 'utf8')
+        args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'raise-%s.args' % name, heap, world=name)
+        result = run_client(args, 20, 'R64 bake: raise Tokyo-3 on the mirror ' + name, exclusive)
+    finally:
+        options.write_text(kept, 'utf8')
+        restore_mods(game, held)
+        shutil.copyfile(WORK / 'jars/final.jar', game / JAR)
+    log = client_log()
+    text = (game / 'logs/latest.log').read_text('utf8', 'replace')
+    after = city_state(world)
+    ok = log['ok'] and after.get('Depth') == 0 and after.get('Target') == 0 and after.get('Phase') == 'IDLE'
+    return dict(ok=ok, before=before, after=after, client=result, client_log=log, held_mods=moved,
+                endpoint_lines=[l[-200:] for l in text.splitlines() if 'R45 rigid city endpoint' in l][-2:])
+
+
 # ---- steps ---------------------------------------------------------------------------------------------
 
 def step_check(a):
@@ -719,6 +786,19 @@ def step_mirror(a):
     json.dump(fingerprint, guard(WORK / 'logs/mirror-fingerprint.json').open('w'))
 
 
+def step_raise(a):
+    """R64: the far view shows Tokyo-3 raised. Run after mirror and before prepare: the raised towers then count
+    as changed chunks, so prepare drops their R63r rows and core bakes them from the raised city."""
+    if not log_path('mirror').exists():
+        raise SystemExit('Run mirror first')
+    if log_path('prepare').exists() and log_path('prepare').stat().st_mtime > log_path('mirror').stat().st_mtime:
+        raise SystemExit('prepare already ran on this mirror: run mirror again, then raise, then prepare')
+    result = raise_city(COPY, a.raise_heap, a.exclusive)
+    save('raise', result)
+    if not (result.get('ok') or result.get('skipped')):
+        raise SystemExit('The city did not reach the raised state on the mirror: ' + json.dumps(result.get('after')))
+
+
 def world_unchanged_since_mirror():
     path = WORK / 'logs/mirror-fingerprint.json'
     return path.exists() and json.load(path.open()) == region_fingerprint(FORMAL)
@@ -784,7 +864,19 @@ def step_prepare(a):
                          dropped=len(plan['drop']), dropped_by_reason=plan['why'], taken_from_ring=len(plan['take']),
                          flagged_for_parent_rebuild=len(plan['flag']), level0_to_rebuild=len(plan['rebuild']),
                          viewpoints=plan_steps, client_minutes=sum(p['minutes'] for p in plan_steps) + CLIENT_START_MIN,
-                         seconds=round(time.time() - t, 1)))
+                         city=city_state(world), seconds=round(time.time() - t, 1)))
+    if a.v6:
+        # V6 (approved 2026-11-15): drop the L1-L3 ancestors of the rebuilt sections and flag their kept children,
+        # so DH also rebuilds sections far from every viewpoint.
+        run = subprocess.run([sys.executable, str(ROOT / 'tools/dh_v6_prepare.py'), str(db), str(WORK / 'lod/rebuild_sections.json')],
+                             capture_output=True, text=True, errors='replace')
+        if run.returncode or not run.stdout.rstrip().endswith('done'):
+            raise SystemExit('dh_v6_prepare failed: ' + (run.stdout + run.stderr)[-600:])
+        data = json.loads(log_path('prepare').read_text('utf8'))
+        data.pop('step', None)
+        data.pop('at', None)
+        data['v6'] = run.stdout.strip().splitlines()
+        save('prepare', data)
 
 
 def fully_saved(saved):
@@ -920,6 +1012,13 @@ def step_xaero(a):
     game = WORK / 'client'
     info = mirror_world(name=XAERO_COPY)
     info.pop('region_fingerprint')
+    raised = None
+    if a.city_raised:
+        # The minimap shows the same city as the far view.
+        raised = raise_city(XAERO_COPY, a.raise_heap, a.exclusive)
+        if not (raised.get('ok') or raised.get('skipped')):
+            save('xaero', dict(ok=False, raise_city=raised, mirror=info))
+            raise SystemExit('The city did not reach the raised state on the minimap mirror')
     baked = game / 'xaero/world-map' / XAERO_COPY.replace('_', '^us^') / 'projectseele$geofront'
     if baked.exists():
         shutil.move(str(baked), str(guard(baked.with_name('projectseele$geofront.before-' + time.strftime('%H%M%S')))))
@@ -949,7 +1048,7 @@ def step_xaero(a):
             shutil.rmtree(guard(out))
         shutil.copytree(baked, guard(out))
     save('xaero', dict(ok=finished and bool(zips), client=result, pregen=pregen, finished=finished, region_zips=len(zips), held_mods=moved,
-                       mirror=info, output=str(out)))
+                       mirror=info, raise_city=raised, output=str(out)))
     if not (finished and zips):
         raise SystemExit('Minimap bake did not finish')
 
@@ -964,7 +1063,10 @@ def step_report(a):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('step', choices=['check', 'instance', 'mirror', 'prepare', 'drystart', 'core', 'fill', 'xaero', 'report'])
+    p.add_argument('step', choices=['check', 'instance', 'mirror', 'raise', 'prepare', 'drystart', 'core', 'fill', 'xaero', 'report'])
+    p.add_argument('--v6', action='store_true', help='prepare: then run dh_v6_prepare.py on the rebuild list (R64)')
+    p.add_argument('--city-raised', action='store_true', help='xaero: raise Tokyo-3 on the minimap mirror before baking (R64)')
+    p.add_argument('--raise-heap', default='6G', help='raise, xaero --city-raised: client heap for the city raise run')
     p.add_argument('--hover', type=int, help='fill: minutes per viewpoint (default 20; 0 skips the client pass)')
     p.add_argument('--min-sections', type=int, default=1, help='fill: smallest group of missing sections worth a viewpoint')
     p.add_argument('--backfill-old', action='store_true', help='fill: give sections still missing their R62 rows, flagged for the levels above')
@@ -972,7 +1074,7 @@ def main():
     p.add_argument('--bake-jar', default=str(PUBLIC_JAR), help='instance --slim-bake: public build of main whose placeholder replaces the prototype mesh')
     p.add_argument('--world', help='prepare: world whose saved chunks count (default: the mirror)')
     p.add_argument('--db', help='prepare: database to change in place (default: the mirror\'s GeoFront database); must be under WORK')
-    p.add_argument('--ring-db', help='prepare: outer ring database (default: the map-edges copy on E:)')
+    p.add_argument('--ring-db', help='prepare: outer ring database (default: the map-edges R64 ring copy on D:)')
     p.add_argument('--minutes', type=int, help='core: client time limit (default: the plan plus 10)')
     p.add_argument('--fill-threshold', type=int, default=50, help='core: missing core sections tolerated without a fill pass')
     p.add_argument('--points', type=int, help='prepare: keep only the first N viewpoints (trial runs)')
@@ -982,6 +1084,7 @@ def main():
     p.add_argument('--no-lock', action='store_true', help='mirror: copy without holding session.lock (trial runs only, never for packing)')
     p.add_argument('--batch', type=int, help='mirror: the batch the formal world should be at; refuse if the batch table says otherwise')
     p.add_argument('--work', help='work folder (default E:/eva-r63-rebake)')
+    p.add_argument('--slot-name', help='slot.py name for the client runs (default r63-pack; trial runs by another session use their own)')
     p.add_argument('--xaero-pregen', help='xaero: x0,z0,x1,z1 block bounds to generate and save on the mirror first (outer ring: -6464,-5408,7584,5920)')
     p.add_argument('--pregen-minutes', type=int, default=240, help='xaero --xaero-pregen: client time limit for the pregeneration run')
     a = p.parse_args()
@@ -990,6 +1093,8 @@ def main():
     a.dh_threads = a.dh_threads or (4 if a.exclusive else 3)
     if a.work:
         globals()['WORK'] = Path(a.work)
+    if a.slot_name:
+        globals()['SLOT_NAME'] = a.slot_name
     globals()['step_' + a.step](a)
 
 
