@@ -21,6 +21,7 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
         if(mixin.endsWith("client.MtrRailMathCacheR51Mixin"))return FMLLoader.getDist()==Dist.CLIENT
                 &&com.projectseele.compat.MtrRailMathCompatibilityR51.accepted(getClass().getClassLoader());
         if(mixin.endsWith("CreateContraptionFlagsMixin"))return createFlagsAbi();
+        if(mixin.contains("client.YashimaBlackout"))return blackoutAbiR64(mixin);
         if (!mixin.endsWith("CityExactUnionCreateMixinR45") && !mixin.endsWith("CitySavedOwnerUnionMixinR45")) return true;
         if (!CityUnionPortableBootstrapR45.requested()) return false;
         if(cityAbiAccepted!=null)return cityAbiAccepted;
@@ -58,6 +59,54 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
                     &&method(base,"readBlocksCompound","(Lnet/minecraft/nbt/Tag;Lnet/minecraft/world/level/Level;Z)V")!=null;
         }
         catch(Exception absent){return false;}
+    }
+    /**
+     * R64 blackout: a hook into another mod is applied only where that mod's class has the members the hook names, as
+     * the installed Embeddium 0.3.31, Oculus 1.8.0 and Distant Horizons 2.3.4 have them. Any other shape keeps that
+     * mod's own drawing (the blackout then shows less), and nothing fails to load.
+     */
+    private boolean blackoutAbiR64(String mixin)
+    {
+        try
+        {
+            String tint="Lnet/minecraft/world/level/BlockAndTintGetter;",state="Lnet/minecraft/world/level/block/state/BlockState;";
+            if(mixin.endsWith("YashimaBlackoutEmbeddiumR64Mixin"))
+            {
+                ClassNode c=readClass("me/jellysquid/mods/sodium/client/model/light/data/LightDataAccess");
+                return c!=null&&field(c,"world",tint)&&method(c,"compute","(III)I")!=null
+                        &&method(c,"packBL","(I)I")!=null&&method(c,"unpackBL","(I)I")!=null&&method(c,"unpackSL","(I)I")!=null
+                        &&method(c,"packLU","(I)I")!=null&&method(c,"unpackLU","(I)I")!=null
+                        &&method(c,"packEM","(Z)I")!=null&&method(c,"unpackEM","(I)Z")!=null;
+            }
+            if(mixin.endsWith("YashimaBlackoutEmbeddiumBlockR64Mixin"))
+            {
+                ClassNode c=readClass("me/jellysquid/mods/sodium/client/render/chunk/compile/pipeline/BlockRenderContext");
+                return c!=null&&field(c,"localSlice",tint)&&method(c,"update","(Lnet/minecraft/core/BlockPos;Lnet/minecraft/core/BlockPos;"+state
+                        +"Lnet/minecraft/client/resources/model/BakedModel;JLnet/minecraftforge/client/model/data/ModelData;Lnet/minecraft/client/renderer/RenderType;)V")!=null;
+            }
+            if(mixin.endsWith("YashimaBlackoutOculusR64Mixin"))
+            {
+                ClassNode c=readClass("net/irisshaders/iris/compat/sodium/impl/block_context/BlockContextHolder");
+                return c!=null&&field(c,"blockId","S")&&field(c,"lightValue","B")&&method(c,"set","("+state+"SB)V")!=null;
+            }
+            if(mixin.endsWith("YashimaBlackoutDhR64Mixin"))
+            {
+                ClassNode c=readClass("com/seibel/distanthorizons/core/dataObjects/render/bufferBuilding/LodQuadBuilder");
+                return c!=null&&method(c,"addQuadUp","(SSSSSIBBB)V")!=null&&method(c,"addQuadDown","(SSSSSIBBB)V")!=null
+                        &&method(c,"addQuadAdj","(Lcom/seibel/distanthorizons/core/enums/EDhDirection;SSSSSIBBB)V")!=null;
+            }
+            return true;
+        }
+        catch(Exception unreadable){return false;}
+    }
+    /** Another mod's class as it is installed, read without loading it; null when that mod is not there. */
+    private ClassNode readClass(String internalName)throws Exception
+    {
+        try(var stream=getClass().getClassLoader().getResourceAsStream(internalName+".class"))
+        {
+            if(stream==null)return null;
+            var node=new ClassNode();new ClassReader(stream).accept(node,ClassReader.SKIP_CODE|ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);return node;
+        }
     }
     private ClassNode readCityClass(String name)throws Exception
     {

@@ -97,7 +97,14 @@
     "client.OculusDhRenderPassR54Mixin",
     "client.DhWaterTransparencyR53Mixin",
     "client.SoundChannelAccessorR61",
-    "client.GiantEntityVisibilityR61Mixin"
+    "client.GiantEntityVisibilityR61Mixin",
+    "client.YashimaBlackoutLightR64Mixin",
+    "client.YashimaBlackoutEntityR64Mixin",
+    "client.YashimaBlackoutLightmapR64Mixin",
+    "client.YashimaBlackoutEmbeddiumR64Mixin",
+    "client.YashimaBlackoutEmbeddiumBlockR64Mixin",
+    "client.YashimaBlackoutOculusR64Mixin",
+    "client.YashimaBlackoutDhR64Mixin"
   ],
   "injectors": {
     "defaultRequire": 1

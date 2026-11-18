@@ -25,6 +25,12 @@ public final class TvYashimaNightClientR54
         night = packet.kind() == ClientboundEncounterObserverPacket.Kind.NIGHT;
     }
 
+    /** The mission's night is on in this world, wherever the camera is (the client thread's). */
+    public static boolean night(ClientLevel level)
+    {
+        return night && level != null && bound.get() == level && level.dimension().equals(FacilitySchemaV2.DIMENSION);
+    }
+
     public static boolean surfaceNight(Level level)
     {
         var minecraft = Minecraft.getInstance();

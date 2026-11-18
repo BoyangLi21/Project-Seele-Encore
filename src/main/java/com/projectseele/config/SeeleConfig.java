@@ -130,6 +130,7 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.DoubleValue COCKPIT_LCL_TINT;
     public static final ForgeConfigSpec.BooleanValue COCKPIT_CHAT_PANEL;
     public static final ForgeConfigSpec.BooleanValue COCKPIT_CANNON_SIGHT;
+    public static final ForgeConfigSpec.BooleanValue YASHIMA_BLACKOUT;
 
     static
     {
@@ -489,6 +490,9 @@ public final class SeeleConfig
         FX_INTENSITY = client
                 .comment("Global brightness/opacity multiplier for beam and explosion effects (0 disables cross explosions).")
                 .defineInRange("fxIntensity", 1.0D, 0.0D, 1.0D);
+        YASHIMA_BLACKOUT = client
+                .comment("The Yashima operation's night is a blackout: for as long as it lasts the surface is drawn without any block's light (lamps, lit windows), except round the gun's own position. Only this client's picture; the world is not changed.")
+                .define("yashimaBlackout", true);
         client.pop();
         client.push("shadows");
         SMALL_ENTITY_SHADOW_DISTANCE = client
