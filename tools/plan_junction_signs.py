@@ -533,10 +533,17 @@ def dijkstra(G, src, lengths):
 def load_places(world, notes):
     from prepare_mtr_member_patch_r52 import Parser
     places = []
+    # since batch 521 the MTR names are the R-4 "日本語|中文|English" form; the table is keyed by the old names
+    renamed = {}
+    for line in Path(notes, 'map-roads-R4-names-20261118.tsv').read_text('utf8').splitlines():
+        parts = line.split('	')
+        if len(parts) == 3 and parts[0] == 'stations':
+            renamed[parts[2]] = parts[1]
     for f in sorted((Path(world) / 'mtr/projectseele/geofront/stations').rglob('*')):
         if not f.is_file():
             continue
         v = Parser(f.read_bytes()).node().value
+        v['name'] = renamed.get(v['name'], v['name'])
         if v['name'] not in PLACE_TABLE or v['position1']['y'] < -150:
             continue
         name, weight = PLACE_TABLE[v['name']]
@@ -721,6 +728,11 @@ def main():
     ap.add_argument('--signs-audit', type=Path, help='existing signs (rail-signs-audit signs.json); default under --notes')
     ap.add_argument('--rescan', action='store_true')
     ap.add_argument('--target', type=int, default=60)
+    ap.add_argument('--only', help='fill-in pass: only candidates within 15 blocks of these "x,z;x,z" centres')
+    ap.add_argument('--right-fallback', action='store_true', help='fill-in pass: try the right shoulder when the left has no spot')
+    ap.add_argument('--deck-post', action='store_true',
+                    help='fill-in pass: on a deck with nothing under the shoulder, stand the post on the outer footway cell')
+    ap.add_argument('--min-approaches', type=int, default=2)
     a = ap.parse_args()
     a.work.mkdir(parents=True, exist_ok=True)
     a.out.mkdir(parents=True, exist_ok=True)
@@ -994,8 +1006,8 @@ def main():
             return 'foot'
         return 'other'
 
-    def place_sign(c, arm):
-        """First good post spot for an approach, or the reason there is none."""
+    def place_sign(c, arm, side=1):
+        """First good post spot for an approach, or the reason there is none. side=-1 tries the right shoulder."""
         path = np.asarray(arm['path'], float)
         cz, cx = G.pos[c['node']]
         along = np.r_[0, np.cumsum(np.hypot(*np.diff(path, axis=0).T))]
@@ -1012,7 +1024,7 @@ def main():
                 continue
             t = t / np.hypot(*t)                                   # (dz, dx) outward
             hx, hz = -t[1], -t[0]                                  # driving towards the junction
-            lx, lz = hz, -hx                                       # driver's left
+            lx, lz = hz * side, -hx * side                         # driver's left (right when side is -1)
             z0, x0 = path[i]
             yroad = None
             post = None
@@ -1046,6 +1058,8 @@ def main():
                     continue
                 post = last_foot                                   # wide footway: its outer edge
             outward = [post] if post == last_foot else [post] + [(int(round(post[0] + lz * k_)), int(round(post[1] + lx * k_))) for k_ in (1, 2)]
+            if a.deck_post and last_foot is not None and last_foot not in outward:
+                outward.append(last_foot)                          # deck: the outer footway cell, tried last
             for pz, px in outward:
                 if math.hypot(pz - z0, px - x0) > arm['width'] / 2 + 6:
                     reasons['shoulder too far'] += 1
@@ -1111,9 +1125,12 @@ def main():
     def run():
       rows, signs, junctions, skipped = [], [], [], []
       used_cells, used_names = set(), set()
+      only = [tuple(float(v) for v in q.split(',')) for q in a.only.split(';')] if a.only else None
       for c in order:
           if len(junctions) >= a.target:
               break
+          if only is not None and not any(math.hypot(c['x'] - ox, c['z'] - oz) <= 15 for ox, oz in only):
+              continue
           sp = GRID_SPACING if in_grid(c) else SPACING
           if any(math.hypot(c['x'] - o['x'], c['z'] - o['z']) < sp for o in junctions):
               continue
@@ -1152,6 +1169,12 @@ def main():
               if bad:
                   raise SystemExit(f'line too wide: {bad}')
               spot, why = place_sign(c, arm)
+              if spot is None and a.right_fallback:
+                  spot, why2 = place_sign(c, arm, -1)
+                  if spot is not None:
+                      spot['side'] = 'right'
+                  else:
+                      why = Counter(why) + Counter({f'right: {k}': v for k, v in why2.items()})
               if spot is None:
                   misses.append(dict(dir=arm['d'], reason=max(why, key=why.get) if why else 'no spot', tried=why))
                   continue
@@ -1161,7 +1184,7 @@ def main():
                   continue
               used_cells.update(cells3)
               approaches.append(dict(arm=arm, spot=spot, front=front, lines=lines))
-          if len(approaches) < 2:
+          if len(approaches) < a.min_approaches:
               skipped.append(dict(x=round(c['x']), z=round(c['z']), name=c['name'],
                                   reason=f'only {len(approaches)} approach(es) could take a sign',
                                   misses=[m['reason'] for m in misses]))
@@ -1188,7 +1211,7 @@ def main():
                   sign=[x, y, z], post=spot['post'], rotation=spot['rotation'],
                   facing={0: 'S', 1: 'SSW', 2: 'SW', 3: 'WSW', 4: 'W', 5: 'WNW', 6: 'NW', 7: 'NNW', 8: 'N', 9: 'NNE', 10: 'NE',
                           11: 'ENE', 12: 'E', 13: 'ESE', 14: 'SE', 15: 'SSE'}[spot['rotation']],
-                  along=spot['along'], road_y=spot['road_y'], driver_eye=spot['eye'], lines=ap_['front'],
+                  along=spot['along'], road_y=spot['road_y'], driver_eye=spot['eye'], lines=ap_['front'], side=spot.get('side', 'left'),
                   destinations=[dict(arrow=ar, place=nm, road_blocks=d) for ar, nm, d in ap_['lines']]))
           junctions.append(dict(jrec, x=c['x'], z=c['z']))
       return rows, signs, junctions, skipped
