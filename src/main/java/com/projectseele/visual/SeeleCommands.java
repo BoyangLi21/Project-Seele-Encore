@@ -58,6 +58,7 @@ public final class SeeleCommands
                 .then(EvaCombatCommandsR64.combatCommand().requires(ADMIN))
                 .then(ArmamentStationCommands.armamentCommand().requires(ADMIN))
                 .then(ThirdTokyoCommands.cityCommand().requires(ADMIN))
+                .then(LilithCommands.lilithCommand().requires(ADMIN))
                 .then(Commands.literal("admin").requires(ADMIN)
                         .then(NervCrewCommands.serverCommand())
                         .then(NervAirLiftR30.transportCommand())

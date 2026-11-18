@@ -42,8 +42,11 @@ public final class LilithRenderer extends GeoEntityRenderer<LilithEntity>
             ResourceLocation mesh = meshResource(layer);
             ResourceLocation texture =
                     resource("textures/entity/" + layer + ".png");
-            this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
-                    entity -> mesh, entity -> texture));
+            // the sealing spear is hidden once it has been taken (episode 22) or switched off
+            this.addRenderLayer("lilith_spear".equals(layer)
+                    ? new LocalTriangleMeshLayer<>(this, entity -> mesh, entity -> texture,
+                            (entity, bone) -> entity.isSpearShown())
+                    : new LocalTriangleMeshLayer<>(this, entity -> mesh, entity -> texture));
         }
         this.shadowRadius = 0.0F;
     }

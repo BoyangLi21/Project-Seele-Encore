@@ -123,7 +123,18 @@ source licence and is outside the repository's MIT code licence.
 | Ultraman private avatar | User-supplied `ultraman-rig-updated.zip`; no licence or author metadata included | Local/private testing only. FBX contains a 54-bone Character Creator rig and 20,565 exported triangles. `tools/make_ultraman_avatar_pack.py` emits an ignored rigid-bone runtime derivative. Never publish or redistribute the source or derivative without provenance and permission. |
 
 
-## Local Kiki260100 Lilith evaluation (2026-07-19)
+## Kiki260100 Lilith (evaluated 2026-07-19, release approved 2026-11-18)
+
+**Release:** the owner approved shipping this model with credit on 2026-11-18
+("用 Kiki 署名"). It is CC BY 4.0, so every release that carries it shows the credit
+below (release notes and the in-game credits/README of the pack):
+
+> "Lilith - Evangelion" by kiki260100
+> (https://sketchfab.com/3d-models/lilith-evangelion-8203459ac3dc48e18bad7b2a6b46995f),
+> licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+> Converted into mesh layers for Project SEELE; the cross material was removed
+> (Project SEELE uses its own block crucifix).
+
 
 - Source: [Kiki260100 `Lilith - Evangelion`](https://sketchfab.com/3d-models/lilith-evangelion-8203459ac3dc48e18bad7b2a6b46995f), downloaded manually by the user.
 - Local archive: `external-assets/incoming/lilith-kiki260100.zip.zip`; GLB SHA-256 `6693b5ca325d6fa5c355152962e75cf50162266320a4519aab3130c2ecfef06c`.
@@ -139,10 +150,16 @@ source licence and is outside the repository's MIT code licence.
 - Runtime height is 32 blocks and wrist span is approximately 42 blocks. The
   source body's front/side visual audit confirms the cross remains behind the
   body and the sealing spear extends toward the observation gallery.
-- Converter, entity integration and clean-room fallback geometry may ship as
-  code. The generated Kiki mesh/textures may be redistributed under CC BY
-  with the credit above; they still stay out of Git (size), like the other
-  model packs.
+- Converter, entity integration and clean-room fallback geometry ship as
+  code. The generated Kiki mesh/textures ship in the release's private asset
+  pack under CC BY with the credit above; they still stay out of Git (size),
+  like the other model packs. `lilith-local.json` and the mesh headers carry
+  `release_approved: true`, the licence and the attribution line.
+- In the formal world (R64) Lilith hangs at (30.5, -1264, 348.5) at containment
+  scale 1.95 (render scale 0.82 x 1.95): the nails sit 3 blocks in from the
+  ends of the cross arms, which were raised to y -1227..-1222 to meet them.
+  The sealing spear follows the story (`/seele lilith spear auto`): shown until
+  the campaign completes episode 22 ("arael"), then hidden.
 
 `tools/make_tiger_eva_variants_pack.py` writes each EVA target incrementally
 and never clears the active resource pack. During development its `--output`
