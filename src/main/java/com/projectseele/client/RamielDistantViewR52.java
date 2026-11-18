@@ -50,6 +50,10 @@ public final class RamielDistantViewR52
             });installed=true;
         }
     }
+    @SubscribeEvent public static void frame(TickEvent.RenderTickEvent event)
+    {
+        if(event.phase==TickEvent.Phase.START)RamielTerrainDepthR64.newFrame();
+    }
     /** Extend the actual world projection only during an authorized distant frame, preserving ordinary depth/occlusion. */
     public static Matrix4f projection(Matrix4f original)
     {
@@ -79,7 +83,13 @@ public final class RamielDistantViewR52
             float haze=hazeR64(distance);
             if(haze<=0){RenderSystem.setShaderFogStart(Math.max(fogStart,distance+64));RenderSystem.setShaderFogEnd(Math.max(fogEnd,distance+512));}
             else{RenderSystem.setShaderFogStart(0);RenderSystem.setShaderFogEnd(distance/haze);}
-            RamielRenderer.renderObservedR52(state,event.getPartialTick(),view.ageClientTicks(),poses,BUFFERS);BUFFERS.endBatch();
+            boolean terrainDepth = distance >= 128 && RamielTerrainDepthR64.begin(event.getProjectionMatrix());
+            try {
+                RamielRenderer.renderObservedR52(state,event.getPartialTick(),view.ageClientTicks(),poses,BUFFERS);
+                BUFFERS.endBatch();
+            } finally {
+                if (terrainDepth) RamielTerrainDepthR64.end();
+            }
             if(EncounterObserverCacheR45.markDrawn(packet)&&!state.target().equals(reported))
             {reported=state.target();com.projectseele.ProjectSeele.LOGGER.info("R52 real distant Ramiel frame drawn: uuid={} generation={} distance={} scale={} sequence={}",state.target(),packet.generation(),distance,scale,packet.sequence());}
         }

@@ -93,6 +93,7 @@
     "client.AircraftCorrectionBudgetMixin",
     "client.CommandShaderLightR39Mixin",
     "client.DhFirstLevelKeyWaitMixin",
+    "client.DhTerrainDepthMixin",
     "client.OculusDhReloadR53Mixin",
     "client.OculusDhRenderPassR54Mixin",
     "client.DhWaterTransparencyR53Mixin",
