@@ -19,6 +19,7 @@ full = m['full'].astype(bool)
 # Distance (blocks) from every column to the nearest column outside the fully generated map.
 edge_dist = ndimage.distance_transform_edt(np.pad(full, 1, constant_values=False))[1:-1, 1:-1]
 road, walk, g2 = net['road'], net['walk'], net['grade2']
+foot = walk & ~road        # once: per end it was a fresh map-sized array
 AIR = ('minecraft:air', 'minecraft:cave_air', 'minecraft:void_air')
 SOFT = ('grass', 'fern', 'flower', 'snow', 'bush', 'torch', 'lantern', 'sign', 'button', 'carpet', 'rail', 'pressure_plate', 'vine', 'leaves')
 
@@ -75,7 +76,7 @@ for i, e in enumerate(ends):
             cover = y - int(feet)
             break
     paved7 = int(road[iz - 3:iz + 4, ix - 3:ix + 4].sum())
-    walk7 = int((walk & ~road)[iz - 4:iz + 5, ix - 4:ix + 5].sum())
+    walk7 = int(foot[iz - 4:iz + 5, ix - 4:ix + 5].sum())
     reasons = []
     if ed <= 24 or (out_ahead and out_ahead <= 48):
         cls = 'boundary'

@@ -47,16 +47,16 @@ def G(a, x, z, ox=ax, oz=az):
     return a[z - oz, x - ox]
 
 
+from road_dead_ends_scan_pruned import crossing, bfs_spur
+skb = sk.astype(bool)
+cross = crossing(skb)
+
+
 def spur_path(x, z):
-    path, prev, cur = [(x, z)], None, (x, z)
-    while len(path) < 4000:
-        nb = [(cur[0] + dx, cur[1] + dz) for dx in (-1, 0, 1) for dz in (-1, 0, 1) if (dx or dz) and G(sk, cur[0] + dx, cur[1] + dz)
-              and (cur[0] + dx, cur[1] + dz) != prev and (cur[0] + dx, cur[1] + dz) not in path[-3:]]
-        if len(nb) != 1 or G(deg, *cur) >= 3:
-            break
-        prev, cur = cur, nb[0]
-        path.append(cur)
-    return path
+    """The spur from the end to its junction along the skeleton (crossing number, so knots of cells at wide ends
+    do not stop it after one step)."""
+    path, _ = bfs_spur(skb, cross, (z - az, x - ax), 4000)
+    return [(px + ax, pz + az) for pz, px in path]
 
 
 def nearest_sk(x, z):
@@ -68,12 +68,13 @@ def nearest_sk(x, z):
     return x, z
 
 
-def network_distance(x, z, limit):
-    """Geodesic distance over declared road+walk from (x, z), up to limit, in a dict."""
+def network_distance(x, z, limit, window=320):
+    """Geodesic distance over declared road+walk from (x, z), up to limit, in a dict; cells more than `window`
+    blocks away are not visited (whatever lies beyond counts as reached only the long way round)."""
     dist, q = {(x, z): 0}, deque([(x, z)])
     while q:
         p = q.popleft()
-        if dist[p] >= limit:
+        if dist[p] >= limit or abs(p[0] - x) > window or abs(p[1] - z) > window:
             continue
         for dx in (-1, 0, 1):
             for dz in (-1, 0, 1):

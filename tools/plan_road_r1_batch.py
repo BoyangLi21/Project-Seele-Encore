@@ -127,15 +127,14 @@ def spur(x, z):
             break
     else:
         return []
-    path, prev, cur = [hits[0]], None, hits[0]
-    while len(path) < 4000:
-        nb = [(cur[0] + dx, cur[1] + dz) for dx in (-1, 0, 1) for dz in (-1, 0, 1) if (dx or dz) and G(sk, cur[0] + dx, cur[1] + dz)
-              and (cur[0] + dx, cur[1] + dz) != prev and (cur[0] + dx, cur[1] + dz) not in path[-3:]]
-        if len(nb) != 1 or G(deg, *cur) >= 3:
-            break
-        prev, cur = cur, nb[0]
-        path.append(cur)
-    return path
+    # crossing-number search: a knot of cells at a wide end does not stop the spur after one step
+    from road_dead_ends_scan_pruned import crossing, bfs_spur
+    global _cross, _skb
+    if '_cross' not in globals():
+        _skb = sk.astype(bool)
+        _cross = crossing(_skb)
+    path, _ = bfs_spur(_skb, _cross, (hits[0][1] - az, hits[0][0] - ax), 4000)
+    return [(px + ax, pz + az) for pz, px in path]
 
 
 def doors_along(path):
