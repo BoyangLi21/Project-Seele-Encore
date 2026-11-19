@@ -35,6 +35,19 @@ class LaunchProtection:
                 for cz in range(z // 16, Z // 16 + 1):
                     self.by_chunk[cx, cz].append((identity, bounds))
 
+    def inside(self, positions):
+        """The given positions that lie in a protected volume."""
+        out = set()
+        groups = defaultdict(list)
+        for x, y, z in positions:
+            groups[int(x) // 16, int(z) // 16].append((x, y, z))
+        for key, points in groups.items():
+            p = np.asarray(points)
+            for identity, b in self.by_chunk.get(key, ()):
+                hit = np.all((p >= b[:3]) & (p <= b[3:]), axis=1)
+                out.update(tuple(int(v) for v in q) for q in p[hit])
+        return out
+
     def assert_positions(self, positions):
         groups = defaultdict(list)
         for x, y, z in positions:
