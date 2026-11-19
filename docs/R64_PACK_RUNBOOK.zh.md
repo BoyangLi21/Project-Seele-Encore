@@ -33,7 +33,7 @@
 
 同机有其他工作时，可用 `core --segment-minutes 5 --heap 8G --dh-threads 4` 分段重烘，或在长客户端正常保存退出后用同一个命令接续。每次从已保存数据库选择仍缺段的一个视点，短客户端退出后重新计算覆盖率，再排下一次槽位。工具默认在 Windows 可提交余量连续两次降到 6.5 GiB 时让当前分段客户端正常保存退出，并验明关闭日志及 SQLite 完整性。每段的补前、补后缺段数及原生日志写入 `WORK/logs/core-progress.json`。所有视点均无新增覆盖时会报告剩余缺段。
 
-小地图启用 `--city-raised` 时会另建 `WORK/xaero-client/saves/MAP_REVIEW`。升城探针只接受已标记的审图世界或这个固定存档名。核心和小地图各用自己客户端里的审图存档，双方校验清单分别保留为 `manifest-MAP_REVIEW.json` 和 `manifest-R63_XAERO.json`。小地图成品统一导出至 `WORK/out/xaero`。
+小地图启用 `--city-raised` 时会另建 `WORK/xaero-client/saves/MAP_REVIEW`。升城探针只接受已标记的审图世界或这个固定存档名。核心和小地图各用自己客户端里的审图存档，双方校验清单分别保留为 `manifest-MAP_REVIEW.json` 和 `manifest-R63_XAERO.json`。小地图成品统一导出至 `WORK/out/xaero`。烘图跨越午夜时，Log4j 会在结束前轮转日志。工具从同次 Forge 启动行拼接前一日归档和最新日志，将完整验收原文保存为 `WORK/logs/xaero-maps-native.log`。
 
 小地图长客户端如需正常保存退出，等日志出现全部维度已保存、进程退出后，在同一 WORK 下执行 `tools/rebake_r63.py xaero --city-raised --xaero-pregen=-6464,-5408,7584,5920 --resume-pregen --pregen-strip-chunks 80000 --heap 8G`，沿用原有输入、槽位和路径参数。工具核对世界镜像、原始边界、升城状态及停机日志，从区域文件的每个区块槽位读取顶层 Status。整行已为 FULL 的部分可以跳过，剩余行分为互不重叠、含首尾的条带。每条使用一次短客户端，分别核验游戏完成计数、正常保存及该条带存盘后的全部 FULL。随后逐格复核整个矩形并烘焙地表及完整洞穴层。源世界原有 FULL、恢复前 FULL、分段访问数、最终新增 FULL 和各段时间见 `WORK/logs/xaero-strip-progress.json` 与 `WORK/logs/xaero.json`。
 

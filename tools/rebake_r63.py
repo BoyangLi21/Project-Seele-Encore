@@ -414,9 +414,31 @@ def client_args(game, extra_props, out_name, heap='6G', world=COPY):
     return path
 
 
-def client_log(game=None):
+def client_run_log(game, started):
+    """Read this launch across Log4j's date rollover, stopping at its own Forge launch line."""
+    logs = game / 'logs'
+    latest = logs / 'latest.log'
+    current = latest.read_bytes()
+    launch = b'ModLauncher running: args ['
+    if launch in current or datetime.date.fromtimestamp(started) >= datetime.date.fromtimestamp(latest.stat().st_mtime):
+        return current
+    archives = sorted((p for p in logs.glob('????-??-??-*.log.gz') if p.stat().st_mtime >= started),
+                      key=lambda path: path.stat().st_mtime, reverse=True)
+    parts = [current]
+    for path in archives:
+        part = gzip.decompress(path.read_bytes())
+        marker = part.rfind(launch)
+        if marker >= 0:
+            parts.append(part[part.rfind(b'\n', 0, marker) + 1:])
+            return b''.join(reversed(parts))
+        parts.append(part)
+    return current
+
+
+def client_log(game=None, text=None):
     """What the last client run's log says: a broken mod load still exits with code 0."""
-    text = ((game or WORK / 'client') / 'logs/latest.log').read_text('utf8', 'replace')
+    if text is None:
+        text = ((game or WORK / 'client') / 'logs/latest.log').read_text('utf8', 'replace')
     bad = [m for m in ('Failed to register automatic subscribers', 'Unhandled game exception', 'broken mod state',
                        'Missing required mod', 'Registry Object not present', 'Hand joint missing', 'missing registry entries',
                        'Encountered an unexpected exception', 'This crash report has been saved') if m.lower() in text.lower()]
@@ -1131,10 +1153,10 @@ def resume_xaero_strips(a, game, name):
         started = time.time()
         result = run_client(args, a.pregen_minutes, 'Xaero pregeneration strip %d of %d' % (i, len(strips)), a.exclusive, game=game)
         native = guard(WORK / 'logs' / (tag + '.log'))
-        shutil.copyfile(game / 'logs/latest.log', native)
+        native.write_bytes(client_run_log(game, started))
         text = native.read_text('utf8', 'replace')
         done = re.search(r'Xaero bake pregeneration finished: (\d+) chunks in (\d+) s', text)
-        if (result != 'exit=0' or not done or int(done[1]) != expected or not client_log(game)['ok']
+        if (result != 'exit=0' or not done or int(done[1]) != expected or not client_log(game, text)['ok']
                 or 'All dimensions are saved' not in text):
             raise SystemExit('Xaero strip did not finish and save normally; inspect ' + str(native))
         _, verify = audit['scan'](region, (x0, z0, x1, z1))
@@ -1152,6 +1174,24 @@ def resume_xaero_strips(a, game, name):
     return dict(expected=a.pregen_chunks, generated=final['full'], seconds=sum(s['native_seconds'] for s in receipt['strips']),
                 log=str(log_path('xaero-strip-progress')), full_in_source=baseline['full'], full_before_resume=saved['full'],
                 new_full=final['full'] - baseline['full'], resumed_native_visits=native_total, final_scan=final)
+
+
+def export_xaero_map(game, baked, result, started):
+    native = guard(WORK / 'logs/xaero-maps-native.log')
+    native.write_bytes(client_run_log(game, started))
+    logtext = native.read_text('utf8', 'replace')
+    zips = sorted(baked.rglob('*.zip')) if baked.exists() else []
+    caves = sum('caves' in p.relative_to(baked).parts for p in zips)
+    surface = len(zips) - caves
+    finished = (result == 'exit=0' and client_log(game, logtext)['ok'] and 'Xaero map bake finished' in logtext
+                and 'Xaero map bake surface finished, full cave layer started' in logtext and surface > 0 and caves > 0)
+    out = WORK / 'out/xaero/projectseele$geofront'
+    if finished and zips:
+        if out.exists():
+            shutil.rmtree(guard(out))
+        shutil.copytree(baked, guard(out))
+    return dict(ok=finished, finished=finished, region_zips=len(zips), surface_region_zips=surface,
+                cave_region_zips=caves, output=str(out), native_log=str(native))
 
 
 def step_xaero(a):
@@ -1211,12 +1251,12 @@ def step_xaero(a):
             args = client_args(game, {'projectseele.xaeroBakePregen': a.xaero_pregen}, 'xaero-pregen.args', world=name)
             pregen = run_client(args, a.pregen_minutes, 'Xaero bake outer ring pregeneration', a.exclusive, game=game)
             native_log = WORK / 'logs/xaero-pregen-native.log'
-            shutil.copyfile(game / 'logs/latest.log', guard(native_log))
+            guard(native_log).write_bytes(client_run_log(game, starts['pregen']))
             text = native_log.read_text('utf8', 'replace')
             match = re.search(r'Xaero bake pregeneration finished: (\d+) chunks in (\d+) s', text)
             pregen_result = dict(expected=a.pregen_chunks, generated=int(match[1]) if match else None,
                                  seconds=int(match[2]) if match else None, log=str(native_log))
-            if pregen_result['generated'] != a.pregen_chunks or not client_log(game)['ok'] or pregen != 'exit=0':
+            if pregen_result['generated'] != a.pregen_chunks or not client_log(game, text)['ok'] or pregen != 'exit=0':
                 save('xaero', dict(ok=False, pregen=pregen, pregen_result=pregen_result, pregen_finished=False, mirror=info))
                 raise SystemExit('Outer ring pregeneration did not finish')
         starts['bake_maps'] = time.time()
@@ -1224,24 +1264,13 @@ def step_xaero(a):
         result = run_client(args, 25 if not a.xaero_pregen else 90, 'R63 Xaero minimap bake', a.exclusive, game=game)
     finally:
         restore_mods(game, held)
-    logtext = (game / 'logs/latest.log').read_text('utf8', 'replace')
-    zips = sorted(baked.rglob('*.zip')) if baked.exists() else []
-    caves = sum('caves' in p.relative_to(baked).parts for p in zips)
-    surface = len(zips) - caves
-    finished = (result == 'exit=0' and client_log(game)['ok'] and 'Xaero map bake finished' in logtext
-                and 'Xaero map bake surface finished, full cave layer started' in logtext and surface > 0 and caves > 0)
-    out = WORK / 'out/xaero/projectseele$geofront'
-    if finished and zips:
-        if out.exists():
-            shutil.rmtree(guard(out))
-        shutil.copytree(baked, guard(out))
+    exported = export_xaero_map(game, baked, result, starts['bake_maps'])
     start_times = list(starts.values())
     phases = {name: dict(start=start, end=end, seconds=round(end - start, 1))
               for (name, start), end in zip(starts.items(), start_times[1:] + [time.time()])}
-    save('xaero', dict(ok=finished and bool(zips), client=result, pregen=pregen, finished=finished, region_zips=len(zips), held_mods=moved,
-                       pregen_result=pregen_result, surface_region_zips=surface, cave_region_zips=caves,
-                       mirror=info, raise_city=raised, phases=phases, output=str(out)))
-    if not (finished and zips):
+    save('xaero', dict(**exported, client=result, pregen=pregen, held_mods=moved,
+                       pregen_result=pregen_result, mirror=info, raise_city=raised, phases=phases))
+    if not exported['ok']:
         raise SystemExit('Minimap bake did not finish')
 
 
