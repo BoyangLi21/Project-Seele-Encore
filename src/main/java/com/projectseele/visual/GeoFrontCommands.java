@@ -217,8 +217,7 @@ public final class GeoFrontCommands
         ServerLevel level = geoFront(player);
         if (level == null)
         {
-            source.sendFailure(Component.literal(
-                    "GeoFront dimension is unavailable; verify the Project SEELE datapack."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.datapack"));
             return 0;
         }
         saveReturn(player);
@@ -261,8 +260,7 @@ public final class GeoFrontCommands
         ServerLevel level = geoFront(player);
         if (level == null)
         {
-            source.sendFailure(Component.literal(
-                    "GeoFront dimension is unavailable; verify the Project SEELE datapack."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.datapack"));
             return 0;
         }
         saveReturn(player);
@@ -298,7 +296,7 @@ public final class GeoFrontCommands
         ServerLevel level = geoFront(player);
         if (level == null)
         {
-            source.sendFailure(Component.literal("GeoFront dimension is unavailable."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.unavailable"));
             return 0;
         }
         if (!IntegratedNervMapBuilder.isInstalled(level))
@@ -323,14 +321,13 @@ public final class GeoFrontCommands
         ServerPlayer player = source.getPlayerOrException();
         if (player.isPassenger())
         {
-            source.sendFailure(Component.literal(
-                    "Dismount before linking the GeoFront sortie terminals."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.dismount"));
             return 0;
         }
         ServerLevel geoFront = geoFront(player);
         if (geoFront == null)
         {
-            source.sendFailure(Component.literal("GeoFront dimension is unavailable."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.unavailable"));
             return 0;
         }
         IntegratedNervMapBuilder.RuntimeAudit mapAudit =
@@ -506,13 +503,12 @@ public final class GeoFrontCommands
         ServerLevel destination = geoFront(player);
         if (destination == null)
         {
-            source.sendFailure(Component.literal("GeoFront dimension is unavailable."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.unavailable"));
             return 0;
         }
         if (!IntegratedNervMapBuilder.isInstalled(destination))
         {
-            source.sendFailure(Component.literal(
-                    "The connected map is not installed. Run /seele dev geofront setup first."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.install"));
             return 0;
         }
         if (!player.serverLevel().dimension().equals(GEOFRONT))
@@ -557,8 +553,7 @@ public final class GeoFrontCommands
         ServerLevel level = geoFront(player);
         if (level == null)
         {
-            source.sendFailure(Component.literal(
-                    "GeoFront dimension is unavailable."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.unavailable"));
             return 0;
         }
         feet = S24CoordinateTransform.apply(source.getServer(), feet);
@@ -609,8 +604,7 @@ public final class GeoFrontCommands
         }
         restoreManualPlayerPhysics(player);
         player.teleportTo(destination, x, y, z, player.getYRot(), player.getXRot());
-        source.sendSuccess(() -> Component.literal(
-                "Exited the combined Tokyo-3 / GeoFront development world."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.geofront.exited"), false);
         return 1;
     }
 
@@ -624,7 +618,7 @@ public final class GeoFrontCommands
         ServerLevel level = geoFront(player);
         if (level == null)
         {
-            source.sendFailure(Component.literal("GeoFront dimension is unavailable."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.unavailable"));
             return 0;
         }
         IntegratedAudit result = IntegratedNervMapBuilder.inspect(level);
@@ -652,8 +646,7 @@ public final class GeoFrontCommands
         }
         if (!IntegratedNervMapBuilder.isInstalled(level))
         {
-            source.sendFailure(Component.literal(
-                    "The connected map is not installed. Run /seele dev geofront setup first."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.install"));
             return 0;
         }
         if (!player.serverLevel().dimension().equals(GEOFRONT))
@@ -674,13 +667,12 @@ public final class GeoFrontCommands
         ServerLevel level = geoFront(player);
         if (level == null)
         {
-            source.sendFailure(Component.literal("GeoFront dimension is unavailable."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.unavailable"));
             return 0;
         }
         if (!IntegratedNervMapBuilder.isInstalled(level))
         {
-            source.sendFailure(Component.literal(
-                    "The connected map is not installed. Run /seele dev geofront setup first."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.install"));
             return 0;
         }
         BlockPos origin = IntegratedNervMapBuilder.geoFrontOrigin(level);
@@ -702,8 +694,7 @@ public final class GeoFrontCommands
         player.teleportTo(level, origin.getX() + 0.5D,
                 origin.getY() + 8.0D,
                 origin.getZ() + 18.5D, 180.0F, 0.0F);
-        source.sendSuccess(() -> Component.literal(
-                "NERV operations centre: tactical command level."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.geofront.operations"), false);
         return 1;
     }
 
@@ -717,7 +708,7 @@ public final class GeoFrontCommands
         ServerLevel level = geoFront(player);
         if (level == null)
         {
-            source.sendFailure(Component.literal("GeoFront dimension is unavailable."));
+            source.sendFailure(Component.translatable("message.projectseele.geofront.unavailable"));
             return 0;
         }
         BlockPos origin = IntegratedNervMapBuilder.geoFrontOrigin(level);

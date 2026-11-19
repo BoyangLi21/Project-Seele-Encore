@@ -18,8 +18,14 @@ public final class NervStaffDialogue
 {
     public static void say(ServerPlayer player,String name,String line)
     {
+        say(player, StaffDialogueCatalogR24.speaker(name), StaffDialogueCatalogR24.component(line));
+    }
+
+    public static void say(ServerPlayer player, Component name, Component line)
+    {
         // Named characters use chat only. Facility PA is a separate sound circuit.
-        player.sendSystemMessage(Component.literal("「"+name+"」 ").withStyle(ChatFormatting.AQUA).append(Component.literal(line).withStyle(ChatFormatting.WHITE)));
+        player.sendSystemMessage(Component.literal("「").append(name).append("」 ").withStyle(ChatFormatting.AQUA)
+                .append(line.copy().withStyle(ChatFormatting.WHITE)));
     }
     public static void reply(ServerPlayer player,NervStaffEntity npc,String line)
     {
@@ -50,6 +56,17 @@ public final class NervStaffDialogue
             case TO_HANGAR->"返回机库";case FILLING->"恢复 LCL";case CANCELLED->"任务已取消，原位停止";
         };
     }
+    public static Component phaseText(String phase)
+    {
+        if ("SERVICE_HOLD".equals(phase)) return Component.translatable("hud.projectseele.phase.service_hold");
+        try
+        {
+            return Component.translatable("hud.projectseele.phase." +
+                    EvaFleetSavedData.Phase.valueOf(phase).name().toLowerCase(java.util.Locale.ROOT));
+        }
+        catch (IllegalArgumentException invalid) { return Component.translatable("hud.projectseele.phase.unknown"); }
+    }
+
     public static boolean authorized(ServerPlayer player)
     {
         if(!player.isSpectator()&&com.projectseele.config.SeeleConfig.ALL_PLAYERS_AUTHORIZED.get())return true;
@@ -70,7 +87,7 @@ public final class NervStaffDialogue
         if(text.startsWith("CAMPAIGN:"))
         {
             if(!StaffAuthorityR25.allows(npc,"campaign") || !authorized(player))
-            {reply(player,npc,"作战安排请联络葛城部长或冬月副司令。");return 0;}
+            {reply(player,npc,"ops.projectseele.nerv.contact_major_katsuragi_or_deputy_commander_fuyutsuki_for");return 0;}
             if(text.startsWith("CAMPAIGN:select:"))
             {
                 int result=com.projectseele.event.TvCampaignDirector.select(player,text.substring("CAMPAIGN:select:".length()));
@@ -91,7 +108,7 @@ public final class NervStaffDialogue
                     int result=com.projectseele.event.TvCampaignDirector.beginFormationR54(player,fields[2],crew,fields[4].equals("rifle"));
                     reply(player,npc,com.projectseele.event.TvCampaignDirector.briefing(player));return result;
                 }
-                catch(IllegalArgumentException invalid){reply(player,npc,"编队或驾驶员选择无效，请重新选择。");return 0;}
+                catch(IllegalArgumentException invalid){reply(player,npc,"ops.projectseele.nerv.invalid_formation_or_pilot_selection_choose_again");return 0;}
             }
             if(text.startsWith("CAMPAIGN:sortie:"))
             {
@@ -101,11 +118,11 @@ public final class NervStaffDialogue
                     var missionLevel=com.projectseele.event.TvCampaignDirector.level(player);
                     var ongoing=missionLevel==null?null:TvCampaignSavedData.get(missionLevel);
                     if(ongoing==null||ongoing.active.isEmpty()){if(com.projectseele.event.TvCampaignDirector.select(player,a[2])==0)return 0;}
-                    else if(!ongoing.active.equals(a[2])){reply(player,npc,"当前作战尚未结束。请选择当前目标，再追加支援机体。");return 0;}
+                    else if(!ongoing.active.equals(a[2])){reply(player,npc,"ops.projectseele.nerv.an_operation_is_already_underway_select_the_current");return 0;}
                     int result=com.projectseele.event.TvCampaignDirector.beginAssigned(player,Integer.parseInt(a[3]),a[4].equals("npc"),a[5].equals("rifle"));
                     reply(player,npc,com.projectseele.event.TvCampaignDirector.briefing(player));return result;
                 }
-                catch(NumberFormatException error){reply(player,npc,"机体编号无效。");return 0;}
+                catch(NumberFormatException error){reply(player,npc,"ops.projectseele.nerv.invalid_unit_number");return 0;}
             }
             int result=switch(text)
             {
@@ -122,7 +139,7 @@ public final class NervStaffDialogue
             {
                 boolean recovery=StaffRecoveryR47.cancel(player,intent.unit());
                 int result=StaffCommandBookR24.cancel(player,npc,intent.unit());
-                if(recovery)reply(player,npc,"后续回收安排已取消。已开始的机械运输会继续到安全位置。");
+                if(recovery)reply(player,npc,"ops.projectseele.nerv.further_recovery_orders_are_canceled_machinery_already_moving");
                 return recovery?1:result;
             }
             case ACTION ->
@@ -130,8 +147,8 @@ public final class NervStaffDialogue
                 if(intent.subject().startsWith("city_"))
                 {
                     if(!authorized(player)||!StaffAuthorityR25.allows(npc,intent.subject()))
-                    {reply(player,npc,"城市升降由冬月副司令操作，请联络他。");return 0;}
-                    if(npc.busy()||StaffCommandBookR24.order(npc)!=null){reply(player,npc,"手上的操作还没结束，稍等一下。");return 0;}
+                    {reply(player,npc,"ops.projectseele.nerv.deputy_commander_fuyutsuki_controls_the_city_lift_contact");return 0;}
+                    if(npc.busy()||StaffCommandBookR24.order(npc)!=null){reply(player,npc,"ops.projectseele.nerv.i_m_still_working_on_the_last_order");return 0;}
                     return beginNativeAction(player,npc,intent.subject(),-1);
                 }
                 if(intent.subject().equals("board"))
@@ -143,9 +160,9 @@ public final class NervStaffDialogue
                 if(intent.subject().equals("support"))
                 {
                     if(!authorized(player)||!StaffAuthorityR25.allows(npc,"campaign"))
-                    {reply(player,npc,"支援编成请联络葛城部长或冬月副司令。");return 0;}
+                    {reply(player,npc,"ops.projectseele.nerv.contact_major_katsuragi_or_deputy_commander_fuyutsuki_to");return 0;}
                     if(TvCampaignSavedData.get(player.serverLevel()).active.isEmpty())
-                    {reply(player,npc,"当前没有已接受的作战。先选择目标并下达首次出击，再追加支援机体。");return 0;}
+                    {reply(player,npc,"ops.projectseele.nerv.no_operation_has_been_accepted_select_a_target");return 0;}
                     return TvSortiesR32.reinforce(player,intent.unit(),true,false);
                 }
                 return StaffCommandBookR24.request(player,npc,intent.subject(),intent.unit());
@@ -153,10 +170,14 @@ public final class NervStaffDialogue
             case INVALID -> { reply(player,npc,intent.subject());return 0; }
             case QUERY ->
             {
-                List<String> lines=new ArrayList<>();
+                var report = Component.empty();
                 for(int v=0;v<3;v++)if(intent.unit()<0||intent.unit()==v)
-                    lines.add(unitName(v)+"："+readinessHint(player.serverLevel(),v,"query"));
-                reply(player,npc,String.join("\n",lines));return 1;
+                    {
+                        if (!report.getSiblings().isEmpty()) report.append("\n");
+                        report.append(Component.translatable("ops.projectseele.un.unit_reply",
+                                TvBriefingText.unit(v), OperationText.read(readinessHint(player.serverLevel(), v, "query"))));
+                    }
+                reply(player,npc,OperationText.encode(report));return 1;
             }
             default ->
             {
@@ -165,9 +186,9 @@ public final class NervStaffDialogue
                     for(int v=0;v<3;v++)
                     {
                         var status=EvaLogisticsDirector.status(player.serverLevel(),v);
-                        reply(player,npc,unitName(v)+"："+stage(status.phase())+"，"+(status.loaded()?"机体信号在线":"等待远端信号")+"。");
+                        reply(player,npc,OperationText.format(status.loaded() ? "ops.projectseele.nerv.online" : "ops.projectseele.nerv.offline", TvBriefingText.unit(v), phaseText(status.phase())));
                     }
-                    var job=StaffCommandBookR24.order(npc);if(job!=null)reply(player,npc,"当前指令："+unitName(job.unit)+" · "+job.message+"。");
+                    var job=StaffCommandBookR24.order(npc);if(job!=null)reply(player,npc,OperationText.format("ops.projectseele.nerv.current_order", TvBriefingText.unit(job.unit), OperationText.read(job.message)));
                 }
                 else if(intent.subject().equals("campaign"))
                     reply(player,npc,StaffAuthorityR25.allows(npc,"campaign")
@@ -213,23 +234,23 @@ public final class NervStaffDialogue
             case "SILO_READY" -> "机体已到发射台，等待发射命令。";
             case "DEPLOYED" -> "机体已经出动。回收时，请回到本机的地表平台停稳。";
             case "PLUG_FAULT" -> "插入栓接入出了故障。先中止接入，再到机库检查。";
-            default -> "正在"+stage(status.phase())+"，请稍等。";
+            default -> OperationText.format("ops.projectseele.nerv.wait_phase", phaseText(status.phase()));
         };
     }
     public static int beginNativeAction(ServerPlayer player,NervStaffEntity npc,String op,int variant)
     {
         if(!StaffAuthorityR25.allows(npc,op)||!authorized(player)||npc.busy())return 0;
         BlockPos control=NervOperationsConsole.staffControl(player.serverLevel(),op,variant);
-        if(control==null||!(player.serverLevel().getBlockState(control).getBlock() instanceof ButtonBlock)){reply(player,npc,"控制台的按钮出了问题，暂时不能操作。");return 0;}
+        if(control==null||!(player.serverLevel().getBlockState(control).getBlock() instanceof ButtonBlock)){reply(player,npc,"ops.projectseele.nerv.the_console_buttons_are_unavailable");return 0;}
         BlockPos approach=approach(npc,control,op.startsWith("city_"));
-        if(approach==null){reply(player,npc,"控制台前面被挡住了。我暂时过不去。");return 0;}
+        if(approach==null){reply(player,npc,"ops.projectseele.nerv.something_is_blocking_the_console_i_can_t");return 0;}
         if(op.startsWith("city_"))
         {
             npc.begin(player.getUUID(),op,variant,control,approach);
             reply(player,npc,"知道了，碇。准备"+(op.equals("city_rise")?"上升城市。":"下降城市。"));return 1;
         }
         EvaLogisticsDirector.loadControlTarget(player.serverLevel(),variant);
-        npc.begin(player.getUUID(),op,variant,control,approach);reply(player,npc,"收到，司令。"+unitName(variant)+(op.equals("prepare")?"准备出击。":op.equals("launch")?"进入发射程序。":"开始回收。请让出运输通道。"));return 1;
+        npc.begin(player.getUUID(),op,variant,control,approach);reply(player,npc,OperationText.format(op.equals("prepare") ? "ops.projectseele.nerv.prepare" : op.equals("launch") ? "ops.projectseele.nerv.launch" : "ops.projectseele.nerv.recover", TvBriefingText.unit(variant)));return 1;
     }
     private static BlockPos approach(NervStaffEntity npc,BlockPos button,boolean city)
     {
@@ -302,7 +323,7 @@ public final class NervStaffDialogue
         var outcome=handled?NervOperationsConsole.lastOutcome(level,player,control):null;
         boolean accepted=outcome!=null&&outcome.accepted();
         if(StaffCommandBookR24.order(npc)==null||accepted&&!operation.equals("launch"))
-            reply(player,npc,accepted?unitName(variant)+"，"+stage(status.phase())+"。":"现在还不能操作。"+readinessHint(level,variant,operation));
+            reply(player,npc,accepted ? OperationText.format("ops.projectseele.un.unit_reply", TvBriefingText.unit(variant), phaseText(status.phase())) : OperationText.format("ops.projectseele.nerv.unavailable", OperationText.read(readinessHint(level, variant, operation))));
         StaffCommandBookR24.pressed(npc,outcome);
         ProjectSeele.LOGGER.info("STAFF CONSOLE actor={} operation={} unit={} button={} requester={} phase={}",npc.memberId(),operation,variant,control,owner,status.phase());npc.finishTask();
     }

@@ -77,14 +77,14 @@ public final class EvaCombatR31
     {
         if(action(e)==HOLD){requestThrow(e);return;}
         if(active(e)||!available(e)||!e.onGround()||e.isPilotProne()||e.isPilotCrouching())return;
-        if(e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS){pilot.displayClientMessage(Component.literal("先收起武器，再用双手抓取。"),true);return;}
+        if(e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS){pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.empty"),true);return;}
         var t=nearest(e,38);
-        if(t==null){pilot.displayClientMessage(Component.literal("靠近使徒，面对它再抓取。"),true);return;}
-        if(AngelGrappleSurfaceR31.contact(t,true,1)==null){pilot.displayClientMessage(Component.literal("这个姿态下没有稳妥的抓取位置。"),true);return;}
+        if(t==null){pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.face"),true);return;}
+        if(AngelGrappleSurfaceR31.contact(t,true,1)==null){pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.pose"),true);return;}
         if(t instanceof SachielEntity s&&s.getAtField()>270)
-        {pilot.displayClientMessage(Component.literal("力场还挡着。先近战削弱，再抓住它。"),true);return;}
+        {pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.field"),true);return;}
         if(grappler(t)!=null||t instanceof FirstBattleSignals.Actor a&&a.firstBattleSignals().active(t))return;
-        if(e.distanceTo(t)>holdDistance(e,t)+8){pilot.displayClientMessage(Component.literal("再靠近一点，抓住它的上身。"),true);return;}
+        if(e.distanceTo(t)>holdDistance(e,t)+8){pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.upper"),true);return;}
         Vec3 direction=t.position().subtract(e.position()).multiply(1,0,1).normalize();
         var destination=t.position().subtract(direction.scale(holdDistance(e,t)));destination=new Vec3(destination.x,e.getY(),destination.z);
         e.getEntityData().set(APPROACH_FROM,e.position().toVector3f());e.getEntityData().set(APPROACH_TO,destination.toVector3f());

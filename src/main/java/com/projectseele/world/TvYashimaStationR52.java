@@ -146,37 +146,37 @@ public final class TvYashimaStationR52
     public static String raise(ServerPlayer commander)
     {
         var level=commander.serverLevel();var data=TvCampaignSavedData.get(level);var p=plan(level).orElse(null);var gun=gun(level);var eva=TvSortiesR32.assignedUnit(level,data,1);
-        if(!authority(commander,data)||p==null||gun==null)return "原固定炮或本场指挥授权未接通。";
+        if(!authority(commander,data)||p==null||gun==null)return "ops.projectseele.yashima.gun.offline";
         if(eva==null||!TvSortiesR32.readyAssigned(level,data.sorties.get(1))
                 ||eva.position().subtract(p.prone()).horizontalDistance()>96||Math.abs(eva.getY()-p.prone().y)>4
-                ||AirCradleClearanceR31.touchdownContact(eva)==null)return "初号机接近炮位后将自动升炮，请继续前往屋岛阵地。";
-        if(!gun.loadedR52()||!TvMissionEquipmentR45.cannonAuthorized(eva))return "原底仓任务炮尚未完成同一货物的预装登记，未补造炮。";
+                ||AirCradleClearanceR31.touchdownContact(eva)==null)return "ops.projectseele.yashima.gun.approach";
+        if(!gun.loadedR52()||!TvMissionEquipmentR45.cannonAuthorized(eva))return "ops.projectseele.yashima.gun.missing_magazine";
         var phase=gun.getPersistentData().getString("LiftPhaseR52");
-        if(phase.equals("ready"))return "原炮已升起；初号机右键接入实际炮位，完成趴姿后使用。";
-        if(Set.of("opening","raising","closing_raised").contains(phase))return "炮台正在展开并关闭井盖，请稍候。";
-        if(Set.of("lowering","closing").contains(phase))return "原炮仍在撤离归仓，请等待完整归仓。";
-        gun.getPersistentData().putString("LiftPhaseR52","opening");return "升炮指令已接受；原盖开启后，炮体沿实际底仓升起。";
+        if(phase.equals("ready"))return "ops.projectseele.yashima.gun.raised";
+        if(Set.of("opening","raising","closing_raised").contains(phase))return "ops.projectseele.yashima.gun.deploying";
+        if(Set.of("lowering","closing").contains(phase))return "ops.projectseele.yashima.gun.retracting";
+        gun.getPersistentData().putString("LiftPhaseR52","opening");return "ops.projectseele.yashima.gun.accepted";
     }
     public static String interact(ServerPlayer player,YashimaCannonEntityR52 gun)
     {
         var level=player.serverLevel();var data=TvCampaignSavedData.get(level);var p=plan(level).orElse(null);var eva=EvaPilotResolver.controlTarget(player);
-        if(p==null||!p.cannon().equals(gun.getUUID())||eva==null||eva!=TvSortiesR32.assignedUnit(level,data,1)||eva.getPilotEntity()!=player)return "请驾驶初号机接入炮位。";
+        if(p==null||!p.cannon().equals(gun.getUUID())||eva==null||eva!=TvSortiesR32.assignedUnit(level,data,1)||eva.getPilotEntity()!=player)return "ops.projectseele.yashima.gun.pilot_only";
         if(player.isShiftKeyDown())
         {
             if(eva.fixedCannonOperatingR52())release(eva,gun);
-            return "已退出炮位，可以自由驾驶。";
+            return "ops.projectseele.yashima.gun.released";
         }
-        if(eva.fixedCannonOperatingR52())return "已接入炮位。按住右键蓄力，松开发射。";
-        if(!at(eva,p))return "请靠近炮台，再右键接入。";
-        if(!gun.readyR52()||!TvMissionEquipmentR45.cannonAuthorized(eva))return "炮台还在展开，请等待井盖关闭。";
+        if(eva.fixedCannonOperatingR52())return "ops.projectseele.yashima.gun.connected";
+        if(!at(eva,p))return "ops.projectseele.yashima.gun.closer";
+        if(!gun.readyR52()||!TvMissionEquipmentR45.cannonAuthorized(eva))return "ops.projectseele.yashima.gun.wait_hatch";
         if(NervTraversalPolicyR53.strict(level))
         {
             Vec3 eye=eva.getPilotCameraSeatPosition(player,1).add(0,player.getEyeHeight(),0);
             var hit=YashimaCannonMeshR52.rayHitR52(gun,eye,eye.add(player.getLookAngle().scale(128)));
             if(hit==null||level.clip(new net.minecraft.world.level.ClipContext(eye,hit,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,player)).getType()!=net.minecraft.world.phys.HitResult.Type.MISS)
-                return "请看向炮身并右键接入。";
+                return "ops.projectseele.yashima.gun.look";
         }
-        bind(eva,gun);return "正在对接炮位。按住右键蓄力，松开发射；Shift＋右键可退出。";
+        bind(eva,gun);return "ops.projectseele.yashima.gun.docking";
     }
     private static void bind(EvaUnit01Entity eva,YashimaCannonEntityR52 gun)
     {gun.getPersistentData().putUUID("OperatingEvaR52",eva.getUUID());eva.bindFixedCannonR52(gun.getId(),true);}
@@ -317,15 +317,15 @@ public final class TvYashimaStationR52
     {
         if(event.getHand()!=InteractionHand.MAIN_HAND||!(event.getEntity() instanceof ServerPlayer player))return;
         var p=plan(player.serverLevel()).orElse(null);if(p==null||!p.control().equals(event.getPos())||player.position().distanceTo(Vec3.atCenterOf(p.control()))>6)return;
-        event.setCanceled(true);event.setCancellationResult(InteractionResult.SUCCESS);player.sendSystemMessage(Component.literal(raise(player)));
+        event.setCanceled(true);event.setCancellationResult(InteractionResult.SUCCESS);player.sendSystemMessage(OperationText.read(raise(player)));
     }
     public static LiteralArgumentBuilder<CommandSourceStack> cannonCommand()
     {
         return Commands.literal("cannon")
-            .then(Commands.literal("raise").executes(c->{var player=c.getSource().getPlayerOrException();player.sendSystemMessage(Component.literal(raise(player)));return 1;}))
+            .then(Commands.literal("raise").executes(c->{var player=c.getSource().getPlayerOrException();player.sendSystemMessage(OperationText.read(raise(player)));return 1;}))
             .then(Commands.literal("release").executes(c->{var player=c.getSource().getPlayerOrException();var eva=EvaPilotResolver.controlTarget(player);var gun=gun(player.serverLevel());
-                if(eva==null||gun==null||boundEva(player.serverLevel(),gun)!=eva){c.getSource().sendFailure(Component.literal("你驾驶的机体没有占用固定炮位。"));return 0;}
-                release(eva,gun);player.sendSystemMessage(Component.literal("已解除固定炮位占用，可以撤离。"));return 1;}));
+                if(eva==null||gun==null||boundEva(player.serverLevel(),gun)!=eva){c.getSource().sendFailure(Component.translatable("message.projectseele.yashima.gun_unclaimed"));return 0;}
+                release(eva,gun);player.sendSystemMessage(Component.translatable("message.projectseele.yashima.gun_released"));return 1;}));
     }
     @SubscribeEvent public static void unloaded(net.minecraftforge.event.level.LevelEvent.Unload event){if(event.getLevel() instanceof ServerLevel level)CACHE.remove(level);}
     private TvYashimaStationR52(){}

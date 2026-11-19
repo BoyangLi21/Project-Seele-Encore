@@ -2,769 +2,769 @@
   "profiles": {
     "misato": {
       "greeting": [
-        "司令，请指示。",
-        "我在听。"
+        "dialogue.projectseele.misato.greeting.0",
+        "dialogue.projectseele.misato.greeting.1"
       ],
       "duty": [
-        "先确认避难和迎击区。我会盯住出动与回收。",
-        "驾驶员的状态也要听他们自己说。检查完了再安排出击。",
-        "通信由日向接手，地面情报交给青叶。律子负责机体检查。"
+        "dialogue.projectseele.misato.duty.0",
+        "dialogue.projectseele.misato.duty.1",
+        "dialogue.projectseele.misato.duty.2"
       ],
       "city": [
-        "城市下降请交给冬月副司令。地面空出来，我们才好迎击。"
+        "dialogue.projectseele.misato.city.0"
       ],
       "sync": [
-        "先听听驾驶员怎么说。数据我会找律子确认。",
-        "检查没结束，先别催他们。"
+        "dialogue.projectseele.misato.sync.0",
+        "dialogue.projectseele.misato.sync.1"
       ],
       "plug": [
-        "我会守着通信。有什么事，让他们直接叫我。",
-        "驾驶员就位以后，我和律子来安排。"
+        "dialogue.projectseele.misato.plug.0",
+        "dialogue.projectseele.misato.plug.1"
       ],
       "power": [
-        "电源不够就先撤回来。我来安排接应。"
+        "dialogue.projectseele.misato.power.0"
       ],
       "campaign": [
-        "司令，目标情报和迎击区已经在核对。请指定出击机体。"
+        "dialogue.projectseele.misato.campaign.0"
       ],
       "greeting_field": [
-        "听得见，司令。请讲。"
+        "dialogue.projectseele.misato.greeting_field.0"
       ],
       "command_denied": [
-        "这项操作先等等。我来确认安排。"
+        "dialogue.projectseele.misato.command_denied.0"
       ],
       "chat_idle": [
-        "司令，休息也该算进日程。孩子们可不是机器。",
-        "真嗣做饭挺认真。别让他把大家的份都揽过去了。",
-        "回家还得收拾屋子……唉，先把这里的事做完。"
+        "dialogue.projectseele.misato.chat_idle.0",
+        "dialogue.projectseele.misato.chat_idle.1",
+        "dialogue.projectseele.misato.chat_idle.2"
       ],
       "chat_busy": [
-        "司令，闲话稍后再说。我先守着驾驶员的通信。",
-        "等大家平安回来，再让他们好好休息。"
+        "dialogue.projectseele.misato.chat_busy.0",
+        "dialogue.projectseele.misato.chat_busy.1"
       ]
     },
     "ritsuko": {
       "greeting": [
-        "司令，请说。",
-        "有什么指示？"
+        "dialogue.projectseele.ritsuko.greeting.0",
+        "dialogue.projectseele.ritsuko.greeting.1"
       ],
       "duty": [
-        "检查还不能省。美里那边，我会解释。",
-        "数据要和驾驶员的反应一起看。"
+        "dialogue.projectseele.ritsuko.duty.0",
+        "dialogue.projectseele.ritsuko.duty.1"
       ],
       "sync": [
-        "先确认连接，再进行下一项检查。",
-        "驾驶员的异常反应也要记录。"
+        "dialogue.projectseele.ritsuko.sync.0",
+        "dialogue.projectseele.ritsuko.sync.1"
       ],
       "plug": [
-        "插入栓锁定前，不要移动机体。",
-        "驾驶员就位后，我来安排连接。"
+        "dialogue.projectseele.ritsuko.plug.0",
+        "dialogue.projectseele.ritsuko.plug.1"
       ],
       "power": [
-        "机体回库后会重新接上电源。固定好了才能注液。"
+        "dialogue.projectseele.ritsuko.power.0"
       ],
       "city": [
-        "城市升降由冬月副司令负责。"
+        "dialogue.projectseele.ritsuko.city.0"
       ],
       "campaign": [
-        "不能只凭上一次的结果判断。先确认这次的目标。"
+        "dialogue.projectseele.ritsuko.campaign.0"
       ],
       "command_denied": [
-        "出动计划请找美里。机体检查交给我。"
+        "dialogue.projectseele.ritsuko.command_denied.0"
       ],
       "chat_idle": [
-        "咖啡又凉了。今天大概还得再泡一杯。",
-        "美里一忙起来，就把自己的事全忘了。",
-        "司令，休息室那边也该让他们有一点自己的时间。"
+        "dialogue.projectseele.ritsuko.chat_idle.0",
+        "dialogue.projectseele.ritsuko.chat_idle.1",
+        "dialogue.projectseele.ritsuko.chat_idle.2"
       ],
       "chat_busy": [
-        "司令，我先看完这一组数据。稍后再谈。",
-        "检查的时候，我宁可多听一句驾驶员怎么说。"
+        "dialogue.projectseele.ritsuko.chat_busy.0",
+        "dialogue.projectseele.ritsuko.chat_busy.1"
       ]
     },
     "fuyutsuki": {
       "greeting": [
-        "碇。",
-        "找我有什么事？"
+        "dialogue.projectseele.fuyutsuki.greeting.0",
+        "dialogue.projectseele.fuyutsuki.greeting.1"
       ],
       "duty": [
-        "避难、城市升降和后方支援，我会让各班保持联络。",
-        "碇，孩子们的情况也听一听吧。"
+        "dialogue.projectseele.fuyutsuki.duty.0",
+        "dialogue.projectseele.fuyutsuki.duty.1"
       ],
       "city": [
-        "碇，城市下降由我来操作。避难完成后再开始。",
-        "上升城市前，先确认地面机体和运输设备已经撤离。"
+        "dialogue.projectseele.fuyutsuki.city.0",
+        "dialogue.projectseele.fuyutsuki.city.1"
       ],
       "campaign": [
-        "准备让哪台出击？"
+        "dialogue.projectseele.fuyutsuki.campaign.0"
       ],
       "sync": [
-        "这一点，问赤木更合适。"
+        "dialogue.projectseele.fuyutsuki.sync.0"
       ],
       "plug": [
-        "驾驶员的事，让葛城去安排吧。"
+        "dialogue.projectseele.fuyutsuki.plug.0"
       ],
       "power": [
-        "我让值班人员确认。"
+        "dialogue.projectseele.fuyutsuki.power.0"
       ],
       "command_denied": [
-        "碇，这项操作先交给对应的值班人员。"
+        "dialogue.projectseele.fuyutsuki.command_denied.0"
       ],
       "chat_idle": [
-        "碇，偶尔离开这张桌子，也不会耽误所有事。",
-        "真嗣若想找你，不妨听他把话说完。",
-        "茶凉了。等下一班接上，我再去换一杯。"
+        "dialogue.projectseele.fuyutsuki.chat_idle.0",
+        "dialogue.projectseele.fuyutsuki.chat_idle.1",
+        "dialogue.projectseele.fuyutsuki.chat_idle.2"
       ],
       "chat_busy": [
-        "碇，后方我会照看。先把孩子们接回来。",
-        "现在还有人守在各个岗位。等交接以后再说吧。"
+        "dialogue.projectseele.fuyutsuki.chat_busy.0",
+        "dialogue.projectseele.fuyutsuki.chat_busy.1"
       ]
     },
     "maya": {
       "greeting": [
-        "司令，请讲。",
-        "司令，我在听。"
+        "dialogue.projectseele.maya.greeting.0",
+        "dialogue.projectseele.maya.greeting.1"
       ],
       "duty": [
-        "我负责同步波形、插入栓信号和生体数据。异常会立即报给赤木博士。",
-        "记录还要与驾驶员的反应对照，不能只看数值。"
+        "dialogue.projectseele.maya.duty.0",
+        "dialogue.projectseele.maya.duty.1"
       ],
       "sync": [
-        "驾驶员的反应也请告诉我。"
+        "dialogue.projectseele.maya.sync.0"
       ],
       "plug": [
-        "收到，我会注意插入栓的信号。"
+        "dialogue.projectseele.maya.plug.0"
       ],
       "command_denied": [
-        "出动安排请联系葛城部长。我负责监视信号。"
+        "dialogue.projectseele.maya.command_denied.0"
       ],
       "chat_idle": [
-        "赤木博士一忙起来，咖啡都顾不上喝。",
-        "休息的时候，我想找一本和工作无关的书。",
-        "司令，您也别总盯着屏幕。"
+        "dialogue.projectseele.maya.chat_idle.0",
+        "dialogue.projectseele.maya.chat_idle.1",
+        "dialogue.projectseele.maya.chat_idle.2"
       ],
       "chat_busy": [
-        "司令，我还在看生体曲线。等这一段结束再聊。"
+        "dialogue.projectseele.maya.chat_busy.0"
       ]
     },
     "commander": {
       "greeting": [
-        "司令，作战值班。请指示。"
+        "dialogue.projectseele.commander.greeting.0"
       ],
       "duty": [
-        "出动安排请联络葛城部长。"
+        "dialogue.projectseele.commander.duty.0"
       ],
       "campaign": [
-        "我把作战记录调出来。"
+        "dialogue.projectseele.commander.campaign.0"
       ],
       "command_denied": [
-        "这项调度请联络葛城部长或冬月副司令。"
+        "dialogue.projectseele.commander.command_denied.0"
       ]
     },
     "operator": {
       "greeting": [
-        "司令，请讲。",
-        "通信接通了。"
+        "dialogue.projectseele.operator.greeting.0",
+        "dialogue.projectseele.operator.greeting.1"
       ],
       "duty": [
-        "出动安排请联系葛城部长。",
-        "我在值守通信，有事请叫我。"
+        "dialogue.projectseele.operator.duty.0",
+        "dialogue.projectseele.operator.duty.1"
       ],
       "command_denied": [
-        "机体调度请找葛城部长。我守着通信。"
+        "dialogue.projectseele.operator.command_denied.0"
       ]
     },
     "guard": {
       "greeting": [
-        "司令，请通行。",
-        "这边是人员通道。"
+        "dialogue.projectseele.guard.greeting.0",
+        "dialogue.projectseele.guard.greeting.1"
       ],
       "duty": [
-        "通行证请随身带好。",
-        "机体调度请联络作战指挥。我负责警戒。"
+        "dialogue.projectseele.guard.duty.0",
+        "dialogue.projectseele.guard.duty.1"
       ],
       "command_denied": [
-        "我负责警戒。机体调度请联络作战指挥。"
+        "dialogue.projectseele.guard.command_denied.0"
       ],
       "chat_idle": [
-        "司令，换班以后我再去吃饭。"
+        "dialogue.projectseele.guard.chat_idle.0"
       ],
       "chat_busy": [
-        "司令，请留意通道。我先继续值守。"
+        "dialogue.projectseele.guard.chat_busy.0"
       ]
     },
     "medic": {
       "greeting": [
-        "哪里不舒服？",
-        "驾驶员回来后，请安排检查。"
+        "dialogue.projectseele.medic.greeting.0",
+        "dialogue.projectseele.medic.greeting.1"
       ],
       "duty": [
-        "头晕、耳鸣也要告诉我。",
-        "受过冲击就来检查，别等到疼了再说。"
+        "dialogue.projectseele.medic.duty.0",
+        "dialogue.projectseele.medic.duty.1"
       ],
       "command_denied": [
-        "我负责医疗。出击安排请找葛城部长。"
+        "dialogue.projectseele.medic.command_denied.0"
       ],
       "chat_idle": [
-        "司令，记得按时吃饭。忙起来也不能省。"
+        "dialogue.projectseele.medic.chat_idle.0"
       ],
       "chat_busy": [
-        "这里还有人需要照看，稍后再聊吧。"
+        "dialogue.projectseele.medic.chat_busy.0"
       ]
     },
     "un_guard": {
       "greeting": [
-        "请走人员入口。",
-        "通行证，请出示一下。"
+        "dialogue.projectseele.un_guard.greeting.0",
+        "dialogue.projectseele.un_guard.greeting.1"
       ],
       "duty": [
-        "舱门附近请勿停留。",
-        "机体出动由 NERV 安排，请联系作战指挥。"
+        "dialogue.projectseele.un_guard.duty.0",
+        "dialogue.projectseele.un_guard.duty.1"
       ],
       "command_denied": [
-        "我负责入口警戒。出动请联系 NERV 指挥。"
+        "dialogue.projectseele.un_guard.command_denied.0"
       ]
     },
     "un_crew": {
       "greeting": [
-        "勤务组在。司令，您有什么事？",
-        "设备检修请先停车。机体出动请联络 NERV。"
+        "dialogue.projectseele.un_crew.greeting.0",
+        "dialogue.projectseele.un_crew.greeting.1"
       ],
       "duty": [
-        "检修时先别启动设备。",
-        "车辆用完后，请停回指定车位。"
+        "dialogue.projectseele.un_crew.duty.0",
+        "dialogue.projectseele.un_crew.duty.1"
       ],
       "power": [
-        "需要补给的话，先把车停稳。"
+        "dialogue.projectseele.un_crew.power.0"
       ],
       "command_denied": [
-        "机体调度由 NERV 下令。勤务组只负责接应。"
+        "dialogue.projectseele.un_crew.command_denied.0"
       ]
     },
     "technician": {
       "greeting": [
-        "请注意脚下。",
-        "有什么事？",
-        "设备有异常的话，请告诉我。"
+        "dialogue.projectseele.technician.greeting.0",
+        "dialogue.projectseele.technician.greeting.1",
+        "dialogue.projectseele.technician.greeting.2"
       ],
       "duty": [
-        "这一处我再检查一下。",
-        "工具请放回原处。",
-        "经过轨道时，请走人员通道。"
+        "dialogue.projectseele.technician.duty.0",
+        "dialogue.projectseele.technician.duty.1",
+        "dialogue.projectseele.technician.duty.2"
       ],
       "sync": [
-        "驾驶时不对劲的话，请联系赤木博士。"
+        "dialogue.projectseele.technician.sync.0"
       ],
       "plug": [
-        "登机桥在上面，别从轨道上过去。"
+        "dialogue.projectseele.technician.plug.0"
       ],
       "power": [
-        "先把设备停稳。电源检修要在机库安排。"
+        "dialogue.projectseele.technician.power.0"
       ],
       "city": [
-        "路口的牌子写着楼层。换层请走电梯。"
+        "dialogue.projectseele.technician.city.0"
       ],
       "campaign": [
-        "作战记录在指挥室，我这里查不到。"
+        "dialogue.projectseele.technician.campaign.0"
       ],
       "command_denied": [
-        "机体出动请联系葛城部长。这里负责检修。"
+        "dialogue.projectseele.technician.command_denied.0"
       ],
       "chat_idle": [
-        "换班以后，终于能坐下来喝口水了。",
-        "司令，值班室里还有热水。"
+        "dialogue.projectseele.technician.chat_idle.0",
+        "dialogue.projectseele.technician.chat_idle.1"
       ],
       "chat_busy": [
-        "司令，这边还在忙。我先把手上的事做完。"
+        "dialogue.projectseele.technician.chat_busy.0"
       ]
     },
     "shinji": {
       "route_blocked": [
-        "通道走不通……我先停在这里。"
+        "dialogue.projectseele.shinji.route_blocked.0"
       ],
       "standby": [
-        "爸爸……找我有事吗？",
-        "我在这里等着。",
-        "现在还不用出击，对吗？"
+        "dialogue.projectseele.shinji.standby.0",
+        "dialogue.projectseele.shinji.standby.1",
+        "dialogue.projectseele.shinji.standby.2"
       ],
       "boarding": [
-        "知道了。我这就过去。",
-        "嗯……我去初号机那里。"
+        "dialogue.projectseele.shinji.boarding.0",
+        "dialogue.projectseele.shinji.boarding.1"
       ],
       "plug": [
-        "坐好了。能听见吗？",
-        "还是不太习惯这个味道……"
+        "dialogue.projectseele.shinji.plug.0",
+        "dialogue.projectseele.shinji.plug.1"
       ],
       "link": [
-        "听得见……连接还没好，对吗？",
-        "律子小姐，我等着。",
-        "嗯，我不动。"
+        "dialogue.projectseele.shinji.link.0",
+        "dialogue.projectseele.shinji.link.1",
+        "dialogue.projectseele.shinji.link.2"
       ],
       "transfer": [
-        "开始动了……",
-        "美里小姐，能听见吗？"
+        "dialogue.projectseele.shinji.transfer.0",
+        "dialogue.projectseele.shinji.transfer.1"
       ],
       "ready": [
-        "初号机准备好了。",
-        "爸爸……我准备好了。"
+        "dialogue.projectseele.shinji.ready.0",
+        "dialogue.projectseele.shinji.ready.1"
       ],
       "launch": [
-        "唔……！",
-        "好！"
+        "dialogue.projectseele.shinji.launch.0",
+        "dialogue.projectseele.shinji.launch.1"
       ],
       "field": [
-        "我在。美里小姐，请继续说。",
-        "初号机这边能听见。"
+        "dialogue.projectseele.shinji.field.0",
+        "dialogue.projectseele.shinji.field.1"
       ],
       "hit": [
-        "啊！……还能动。",
-        "好痛……",
-        "对不起，刚才没躲开。"
+        "dialogue.projectseele.shinji.hit.0",
+        "dialogue.projectseele.shinji.hit.1",
+        "dialogue.projectseele.shinji.hit.2"
       ],
       "low_power": [
-        "时间快到了……怎么办？",
-        "电源快没了！美里小姐！"
+        "dialogue.projectseele.shinji.low_power.0",
+        "dialogue.projectseele.shinji.low_power.1"
       ],
       "return": [
-        "知道了……我等着。",
-        "现在可以松口气了吗……"
+        "dialogue.projectseele.shinji.return.0",
+        "dialogue.projectseele.shinji.return.1"
       ],
       "fault": [
-        "怎么停了？",
-        "有人听得见吗？"
+        "dialogue.projectseele.shinji.fault.0",
+        "dialogue.projectseele.shinji.fault.1"
       ],
       "greeting": [
-        "爸爸……你找我？",
-        "我在。"
+        "dialogue.projectseele.shinji.greeting.0",
+        "dialogue.projectseele.shinji.greeting.1"
       ],
       "weapon_approach": [
-        "知道了，我去拿武器。"
+        "dialogue.projectseele.shinji.weapon_approach.0"
       ],
       "weapon_acquired": [
-        "拿到了。",
-        "好，拿稳了。"
+        "dialogue.projectseele.shinji.weapon_acquired.0",
+        "dialogue.projectseele.shinji.weapon_acquired.1"
       ],
       "enroute": [
-        "我这就过去。",
-        "知道了。"
+        "dialogue.projectseele.shinji.enroute.0",
+        "dialogue.projectseele.shinji.enroute.1"
       ],
       "evade": [
-        "它过来了！",
-        "快躲开……！"
+        "dialogue.projectseele.shinji.evade.0",
+        "dialogue.projectseele.shinji.evade.1"
       ],
       "ranged": [
-        "在那里……！",
-        "给我打中啊！"
+        "dialogue.projectseele.shinji.ranged.0",
+        "dialogue.projectseele.shinji.ranged.1"
       ],
       "close_in": [
-        "要靠过去吗……",
-        "好，我上了！"
+        "dialogue.projectseele.shinji.close_in.0",
+        "dialogue.projectseele.shinji.close_in.1"
       ],
       "melee": [
-        "啊——！",
-        "这次……！"
+        "dialogue.projectseele.shinji.melee.0",
+        "dialogue.projectseele.shinji.melee.1"
       ],
       "finale_spacing": [
-        "等一下……它还在动！"
+        "dialogue.projectseele.shinji.finale_spacing.0"
       ],
       "returning": [
-        "嗯，我会回去的。",
-        "美里小姐，听得见吗？"
+        "dialogue.projectseele.shinji.returning.0",
+        "dialogue.projectseele.shinji.returning.1"
       ],
       "air_transport": [
-        "我不动。",
-        "这个……不会掉下去吧？"
+        "dialogue.projectseele.shinji.air_transport.0",
+        "dialogue.projectseele.shinji.air_transport.1"
       ],
       "disembark": [
-        "……总算出来了。",
-        "我先回去待命。"
+        "dialogue.projectseele.shinji.disembark.0",
+        "dialogue.projectseele.shinji.disembark.1"
       ],
       "mission_return": [
-        "知道了……我这就回去。"
+        "dialogue.projectseele.shinji.mission_return.0"
       ],
       "pickup_request": [
-        "美里小姐，太远了，我走不回去。能派运输机来吗？"
+        "dialogue.projectseele.shinji.pickup_request.0"
       ],
       "back_in_bay": [
-        "爸爸……我回来了。"
+        "dialogue.projectseele.shinji.back_in_bay.0"
       ],
       "chat_idle": [
-        "爸爸……你今天也一直待在这里吗？",
-        "学校的作业还有一点。我想等安静下来再做。",
-        "美里小姐总说，吃饭要按时。爸爸，你吃过了吗？",
-        "我带着随身听。戴上耳机的时候，就没那么紧张了。"
+        "dialogue.projectseele.shinji.chat_idle.0",
+        "dialogue.projectseele.shinji.chat_idle.1",
+        "dialogue.projectseele.shinji.chat_idle.2",
+        "dialogue.projectseele.shinji.chat_idle.3"
       ],
       "chat_busy": [
-        "爸爸，我在听……现在先把眼前的事做好。",
-        "我有点紧张。等这次结束了，可以再和你说几句话吗？"
+        "dialogue.projectseele.shinji.chat_busy.0",
+        "dialogue.projectseele.shinji.chat_busy.1"
       ],
       "chat_return": [
-        "爸爸……我回去以后，你还在指挥室吗？",
-        "等下机以后，我想先洗个澡。身上还是LCL的味道。"
+        "dialogue.projectseele.shinji.chat_return.0",
+        "dialogue.projectseele.shinji.chat_return.1"
       ]
     },
     "rei": {
       "route_blocked": [
-        "通道受阻。我在原地等待。"
+        "dialogue.projectseele.rei.route_blocked.0"
       ],
       "standby": [
-        "我在等命令。",
-        "……是。",
-        "碇司令。"
+        "dialogue.projectseele.rei.standby.0",
+        "dialogue.projectseele.rei.standby.1",
+        "dialogue.projectseele.rei.standby.2"
       ],
       "boarding": [
-        "是。",
-        "现在过去。"
+        "dialogue.projectseele.rei.boarding.0",
+        "dialogue.projectseele.rei.boarding.1"
       ],
       "plug": [
-        "准备好了。",
-        "听得见。"
+        "dialogue.projectseele.rei.plug.0",
+        "dialogue.projectseele.rei.plug.1"
       ],
       "link": [
-        "收到。等连接完成。",
-        "是。"
+        "dialogue.projectseele.rei.link.0",
+        "dialogue.projectseele.rei.link.1"
       ],
       "transfer": [
-        "收到。",
-        "我不动。"
+        "dialogue.projectseele.rei.transfer.0",
+        "dialogue.projectseele.rei.transfer.1"
       ],
       "ready": [
-        "零号机，准备完毕。",
-        "可以出发。"
+        "dialogue.projectseele.rei.ready.0",
+        "dialogue.projectseele.rei.ready.1"
       ],
       "launch": [
-        "零号机，出动。",
-        "是。",
-        "收到。"
+        "dialogue.projectseele.rei.launch.0",
+        "dialogue.projectseele.rei.launch.1",
+        "dialogue.projectseele.rei.launch.2"
       ],
       "field": [
-        "零号机在线。",
-        "听得见。请继续。"
+        "dialogue.projectseele.rei.field.0",
+        "dialogue.projectseele.rei.field.1"
       ],
       "hit": [
-        "……没事。",
-        "还能继续。"
+        "dialogue.projectseele.rei.hit.0",
+        "dialogue.projectseele.rei.hit.1"
       ],
       "low_power": [
-        "电源快用完了。",
-        "需要回收。"
+        "dialogue.projectseele.rei.low_power.0",
+        "dialogue.projectseele.rei.low_power.1"
       ],
       "return": [
-        "是。",
-        "我等着。"
+        "dialogue.projectseele.rei.return.0",
+        "dialogue.projectseele.rei.return.1"
       ],
       "fault": [
-        "停止了。",
-        "请指示。"
+        "dialogue.projectseele.rei.fault.0",
+        "dialogue.projectseele.rei.fault.1"
       ],
       "greeting": [
-        "碇司令。",
-        "……是。"
+        "dialogue.projectseele.rei.greeting.0",
+        "dialogue.projectseele.rei.greeting.1"
       ],
       "weapon_approach": [
-        "去取武器。"
+        "dialogue.projectseele.rei.weapon_approach.0"
       ],
       "weapon_acquired": [
-        "拿到了。"
+        "dialogue.projectseele.rei.weapon_acquired.0"
       ],
       "enroute": [
-        "正在接近。"
+        "dialogue.projectseele.rei.enroute.0"
       ],
       "evade": [
-        "避开。"
+        "dialogue.projectseele.rei.evade.0"
       ],
       "ranged": [
-        "射击。"
+        "dialogue.projectseele.rei.ranged.0"
       ],
       "close_in": [
-        "我过去。"
+        "dialogue.projectseele.rei.close_in.0"
       ],
       "melee": [
-        "我来处理。"
+        "dialogue.projectseele.rei.melee.0"
       ],
       "returning": [
-        "返回回收口。"
+        "dialogue.projectseele.rei.returning.0"
       ],
       "air_transport": [
-        "我不动。",
-        "听得见。"
+        "dialogue.projectseele.rei.air_transport.0",
+        "dialogue.projectseele.rei.air_transport.1"
       ],
       "disembark": [
-        "我去待命。"
+        "dialogue.projectseele.rei.disembark.0"
       ],
       "finale_spacing": [
-        "还没有结束。"
+        "dialogue.projectseele.rei.finale_spacing.0"
       ],
       "mission_return": [
-        "收到，返回。"
+        "dialogue.projectseele.rei.mission_return.0"
       ],
       "pickup_request": [
-        "无法自行返回。请求接应。"
+        "dialogue.projectseele.rei.pickup_request.0"
       ],
       "back_in_bay": [
-        "回到机库了。"
+        "dialogue.projectseele.rei.back_in_bay.0"
       ],
       "chat_idle": [
-        "碇司令。你找我，有别的事吗？",
-        "我在看书。还没有读完。",
-        "这里很安静。我不讨厌。",
-        "如果不用出击，我会在这里。"
+        "dialogue.projectseele.rei.chat_idle.0",
+        "dialogue.projectseele.rei.chat_idle.1",
+        "dialogue.projectseele.rei.chat_idle.2",
+        "dialogue.projectseele.rei.chat_idle.3"
       ],
       "chat_busy": [
-        "碇司令，我听得见。请先处理作战。",
-        "现在需要我做什么？"
+        "dialogue.projectseele.rei.chat_busy.0",
+        "dialogue.projectseele.rei.chat_busy.1"
       ],
       "chat_return": [
-        "碇司令。我会按指示回去。",
-        "回去以后，我去接受检查。"
+        "dialogue.projectseele.rei.chat_return.0",
+        "dialogue.projectseele.rei.chat_return.1"
       ]
     },
     "asuka": {
       "route_blocked": [
-        "这边走不通。我等通道恢复。"
+        "dialogue.projectseele.asuka.route_blocked.0"
       ],
       "standby": [
-        "有出击命令了吗？",
-        "有事就叫我。",
-        "还要等多久？"
+        "dialogue.projectseele.asuka.standby.0",
+        "dialogue.projectseele.asuka.standby.1",
+        "dialogue.projectseele.asuka.standby.2"
       ],
       "boarding": [
-        "知道了，我这就过去。",
-        "美里，我去二号机了。"
+        "dialogue.projectseele.asuka.boarding.0",
+        "dialogue.projectseele.asuka.boarding.1"
       ],
       "plug": [
-        "我这边好了。",
-        "听得见。"
+        "dialogue.projectseele.asuka.plug.0",
+        "dialogue.projectseele.asuka.plug.1"
       ],
       "link": [
-        "好，我等着。别漏了检查。",
-        "美里，连接好了再叫我。"
+        "dialogue.projectseele.asuka.link.0",
+        "dialogue.projectseele.asuka.link.1"
       ],
       "transfer": [
-        "好，我不动。",
-        "美里，听得见吧？"
+        "dialogue.projectseele.asuka.transfer.0",
+        "dialogue.projectseele.asuka.transfer.1"
       ],
       "ready": [
-        "二号机准备完毕！",
-        "这边好了。什么时候出发？"
+        "dialogue.projectseele.asuka.ready.0",
+        "dialogue.projectseele.asuka.ready.1"
       ],
       "launch": [
-        "二号机，出击！",
-        "来了！"
+        "dialogue.projectseele.asuka.launch.0",
+        "dialogue.projectseele.asuka.launch.1"
       ],
       "field": [
-        "二号机在。美里，接下来呢？",
-        "听得见，继续说。"
+        "dialogue.projectseele.asuka.field.0",
+        "dialogue.projectseele.asuka.field.1"
       ],
       "hit": [
-        "可恶！",
-        "我还没输呢！",
-        "别管我，还能动！"
+        "dialogue.projectseele.asuka.hit.0",
+        "dialogue.projectseele.asuka.hit.1",
+        "dialogue.projectseele.asuka.hit.2"
       ],
       "low_power": [
-        "电源快没了！接电点呢？",
-        "啧，偏偏这时候……"
+        "dialogue.projectseele.asuka.low_power.0",
+        "dialogue.projectseele.asuka.low_power.1"
       ],
       "return": [
-        "知道了，我等着。",
-        "美里，可以动了再叫我。"
+        "dialogue.projectseele.asuka.return.0",
+        "dialogue.projectseele.asuka.return.1"
       ],
       "fault": [
-        "怎么回事？",
-        "美里，听得见吗？到底怎么了？"
+        "dialogue.projectseele.asuka.fault.0",
+        "dialogue.projectseele.asuka.fault.1"
       ],
       "greeting": [
-        "司令，您找我？",
-        "有出击命令吗？"
+        "dialogue.projectseele.asuka.greeting.0",
+        "dialogue.projectseele.asuka.greeting.1"
       ],
       "weapon_approach": [
-        "先拿武器。"
+        "dialogue.projectseele.asuka.weapon_approach.0"
       ],
       "weapon_acquired": [
-        "好，拿到了！"
+        "dialogue.projectseele.asuka.weapon_acquired.0"
       ],
       "enroute": [
-        "我过去了！"
+        "dialogue.projectseele.asuka.enroute.0"
       ],
       "evade": [
-        "别想打中我！"
+        "dialogue.projectseele.asuka.evade.0"
       ],
       "ranged": [
-        "给我倒下！"
+        "dialogue.projectseele.asuka.ranged.0"
       ],
       "close_in": [
-        "那就靠近一点！"
+        "dialogue.projectseele.asuka.close_in.0"
       ],
       "melee": [
-        "还没完呢！",
-        "给我让开！"
+        "dialogue.projectseele.asuka.melee.0",
+        "dialogue.projectseele.asuka.melee.1"
       ],
       "returning": [
-        "知道了，我回去。",
-        "美里，回收准备好了吗？"
+        "dialogue.projectseele.asuka.returning.0",
+        "dialogue.projectseele.asuka.returning.1"
       ],
       "air_transport": [
-        "行了，我不动。",
-        "抓稳一点啊。"
+        "dialogue.projectseele.asuka.air_transport.0",
+        "dialogue.projectseele.asuka.air_transport.1"
       ],
       "disembark": [
-        "哈……闷死了。",
-        "我去找美里。"
+        "dialogue.projectseele.asuka.disembark.0",
+        "dialogue.projectseele.asuka.disembark.1"
       ],
       "finale_spacing": [
-        "还想干什么？"
+        "dialogue.projectseele.asuka.finale_spacing.0"
       ],
       "mission_return": [
-        "美里，回收准备好了吗？我回去了。"
+        "dialogue.projectseele.asuka.mission_return.0"
       ],
       "pickup_request": [
-        "美里，这里太远了。派运输机来接我。"
+        "dialogue.projectseele.asuka.pickup_request.0"
       ],
       "back_in_bay": [
-        "二号机回库了。记得检查机体。"
+        "dialogue.projectseele.asuka.back_in_bay.0"
       ],
       "chat_idle": [
-        "司令，偶尔也来看看我们的训练嘛。光看报告多没意思。",
-        "这里的功课倒不难。就是有些字写起来真麻烦。",
-        "美里又想把做饭的事推给真嗣。至少让她自己洗碗吧。",
-        "我还想再练一会儿。总不能让身体闲下来。"
+        "dialogue.projectseele.asuka.chat_idle.0",
+        "dialogue.projectseele.asuka.chat_idle.1",
+        "dialogue.projectseele.asuka.chat_idle.2",
+        "dialogue.projectseele.asuka.chat_idle.3"
       ],
       "chat_busy": [
-        "司令，我可还在忙。闲聊等结束以后再说。",
-        "听见了。让我先专心把这边处理好。"
+        "dialogue.projectseele.asuka.chat_busy.0",
+        "dialogue.projectseele.asuka.chat_busy.1"
       ],
       "chat_return": [
-        "回去以后我要洗澡。今天可别再安排一堆检查了。",
-        "司令，刚才的表现你看到了吧？回去再好好说。"
+        "dialogue.projectseele.asuka.chat_return.0",
+        "dialogue.projectseele.asuka.chat_return.1"
       ]
     },
     "hyuga": {
       "greeting": [
-        "司令，作战通信在线。"
+        "dialogue.projectseele.hyuga.greeting.0"
       ],
       "duty": [
-        "我负责出动通道、电源状态与回收联络。异常会报给葛城部长。"
+        "dialogue.projectseele.hyuga.duty.0"
       ],
       "campaign": [
-        "目标与迎击区情报正在汇总，出击指令请交给葛城部长。"
+        "dialogue.projectseele.hyuga.campaign.0"
       ],
       "command_denied": [
-        "机体调度请联络葛城部长。我负责传达和核对通信。"
+        "dialogue.projectseele.hyuga.command_denied.0"
       ],
       "chat_idle": [
-        "司令，换班后我想出去透透气。",
-        "葛城部长忙起来，连便当都放凉了。"
+        "dialogue.projectseele.hyuga.chat_idle.0",
+        "dialogue.projectseele.hyuga.chat_idle.1"
       ],
       "chat_busy": [
-        "司令，通信不能漏。我先把这一班守好。"
+        "dialogue.projectseele.hyuga.chat_busy.0"
       ]
     },
     "aoba": {
       "greeting": [
-        "司令，地面监视在线。"
+        "dialogue.projectseele.aoba.greeting.0"
       ],
       "duty": [
-        "我负责外部雷达、目标轨迹和地面观测。",
-        "监视班会持续确认避难区域与目标位置。"
+        "dialogue.projectseele.aoba.duty.0",
+        "dialogue.projectseele.aoba.duty.1"
       ],
       "campaign": [
-        "目标轨迹还在更新。我会把最新观测送到战术屏。"
+        "dialogue.projectseele.aoba.campaign.0"
       ],
       "command_denied": [
-        "出击由葛城部长指挥。我负责监视和情报。"
+        "dialogue.projectseele.aoba.command_denied.0"
       ],
       "chat_idle": [
-        "休息的时候，我会练一会儿吉他。",
-        "司令，地面上也有不少人在等着回家。"
+        "dialogue.projectseele.aoba.chat_idle.0",
+        "dialogue.projectseele.aoba.chat_idle.1"
       ],
       "chat_busy": [
-        "司令，我先盯住地面情况。等交班再聊。"
+        "dialogue.projectseele.aoba.chat_busy.0"
       ]
     },
     "scientist": {
       "greeting": [
-        "实验班在。请注意隔离线。"
+        "dialogue.projectseele.scientist.greeting.0"
       ],
       "duty": [
-        "我负责实验设备和同步数据。受试者须实际入舱，我在本槽控制台操作。",
-        "设备开盖、回到干台后才能离舱。测试不改变你的同步率。"
+        "dialogue.projectseele.scientist.duty.0",
+        "dialogue.projectseele.scientist.duty.1"
       ],
       "sync": [
-        "请实际坐入本槽实验栓，再用 /seele synch start 联络值班技师。",
-        "我会在控制台完成关盖和十二秒测量。中止可用 /seele synch abort，离舱请按V等设备返回。"
+        "dialogue.projectseele.scientist.sync.0",
+        "dialogue.projectseele.scientist.sync.1"
       ],
       "plug": [
-        "请先确认插入栓固定与通信，再开始实验。"
+        "dialogue.projectseele.scientist.plug.0"
       ],
       "power": [
-        "实验设备在断电检修前必须解除负载。"
+        "dialogue.projectseele.scientist.power.0"
       ],
       "command_denied": [
-        "实验班负责检查与记录。机体出击请联系葛城部长。"
+        "dialogue.projectseele.scientist.command_denied.0"
       ],
       "chat_idle": [
-        "离开仪器一会儿，眼睛也舒服些。"
+        "dialogue.projectseele.scientist.chat_idle.0"
       ],
       "chat_busy": [
-        "司令，我先记完这一组结果。"
+        "dialogue.projectseele.scientist.chat_busy.0"
       ]
     },
     "civilian": {
       "greeting": [
-        "你好。",
-        "请走人行道。"
+        "dialogue.projectseele.civilian.greeting.0",
+        "dialogue.projectseele.civilian.greeting.1"
       ],
       "duty": [
-        "警报响起时，我们按路牌去避难入口。",
-        "道路有施工时，我会绕开设备区。"
+        "dialogue.projectseele.civilian.duty.0",
+        "dialogue.projectseele.civilian.duty.1"
       ],
       "city": [
-        "城市升降时请留意避难广播。"
+        "dialogue.projectseele.civilian.city.0"
       ],
       "command_denied": [
-        "我不是NERV工作人员，请联系值班人员。"
+        "dialogue.projectseele.civilian.command_denied.0"
       ],
       "chat_idle": [
-        "天气好的时候，我喜欢沿着街道走走。"
+        "dialogue.projectseele.civilian.chat_idle.0"
       ],
       "chat_busy": [
-        "我先留意广播。等安静下来再聊吧。"
+        "dialogue.projectseele.civilian.chat_busy.0"
       ]
     },
     "yashima_power": {
       "greeting": [
-        "这里是屋岛电力监测岗。请沿后勤路通行。"
+        "dialogue.projectseele.yashima_power.greeting.0"
       ],
       "duty": [
-        "我负责监测馈线和接地。送电指令由指挥部下达。",
-        "负载变化会记录在这里，设备检修前请先停电。"
+        "dialogue.projectseele.yashima_power.duty.0",
+        "dialogue.projectseele.yashima_power.duty.1"
       ],
       "power": [
-        "请先确认实际电网接入。看到设备就绪，不代表炮已经供电。"
+        "dialogue.projectseele.yashima_power.power.0"
       ],
       "campaign": [
-        "射击和掩护由葛城部长协调，我只报告电力状态。"
+        "dialogue.projectseele.yashima_power.campaign.0"
       ],
       "command_denied": [
-        "我负责电力监测，机体出动请联系指挥部。"
+        "dialogue.projectseele.yashima_power.command_denied.0"
       ]
     },
     "restroom_security": {
       "greeting": [
-        "这里是驾驶员休息室门岗。请保持门口通行。"
+        "dialogue.projectseele.restroom_security.greeting.0"
       ],
       "duty": [
-        "我负责本房门口值守和警铃联络。",
-        "驾驶员休息时，请先说明来意。"
+        "dialogue.projectseele.restroom_security.duty.0",
+        "dialogue.projectseele.restroom_security.duty.1"
       ],
       "campaign": [
-        "出动指令由作战指挥确认。房里的电话可以联络葛城部长。"
+        "dialogue.projectseele.restroom_security.campaign.0"
       ],
       "plug": [
-        "登机通道请按本机导向牌走，机体整备由值班班组负责。"
+        "dialogue.projectseele.restroom_security.plug.0"
       ],
       "command_denied": [
-        "本岗没有机体整备或发射权限。请用房内电话联系作战指挥。"
+        "dialogue.projectseele.restroom_security.command_denied.0"
       ]
     }
   }

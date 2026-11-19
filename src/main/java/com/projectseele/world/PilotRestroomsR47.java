@@ -219,7 +219,7 @@ public final class PilotRestroomsR47
         if(room==null)return false;
         if(player.isSpectator()||!NervStaffDialogue.authorized(player)
                 ||player.distanceToSqr(Vec3.atCenterOf(room.doorLower))>36)
-        {player.displayClientMessage(net.minecraft.network.chat.Component.literal("驾驶员休息室需要NERV通行权限。"),true);return true;}
+        {player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.projectseele.doors.lounge_access"),true);return true;}
         var expected=TvPersonnelPlatformRecipeR44.parse(room.doorState);
         for(var q:List.of(room.doorLower,room.doorLower.above()))
         {
@@ -228,7 +228,7 @@ public final class PilotRestroomsR47
                     ||actual.getValue(DoorBlock.FACING)!=expected.getValue(DoorBlock.FACING)
                     ||actual.getValue(DoorBlock.HINGE)!=expected.getValue(DoorBlock.HINGE)
                     ||actual.getValue(DoorBlock.HALF)!=(q.equals(room.doorLower)?net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER:net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER))
-            {player.displayClientMessage(net.minecraft.network.chat.Component.literal("休息室完整门框未就绪。"),true);return true;}
+            {player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.projectseele.lounge.frame"),true);return true;}
         }
         var block=level.getBlockState(room.doorLower);boolean opening=!block.getValue(DoorBlock.OPEN);
         if(opening)
@@ -239,14 +239,14 @@ public final class PilotRestroomsR47
             if(fleet.isEmpty()||fleet.get().phase()!=EvaFleetSavedData.Phase.PARKED
                     ||!TrainingPilotDirector.safeActualFeetR47(level,room.outsideDoor)
                     ||!level.noCollision(player,player.getDimensions(net.minecraft.world.entity.Pose.STANDING).makeBoundingBox(room.outsideDoor)))
-            {player.displayClientMessage(net.minecraft.network.chat.Component.literal("门外平台或登机桥尚未停稳，请等待。"),true);return true;}
+            {player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.projectseele.lounge.bridge"),true);return true;}
             MANUAL_DOOR_HOLDS_R48.computeIfAbsent(level,key->new HashMap<>()).put(room.variant,level.getGameTime()+100);
         }
         else
         {
             if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
                     new AABB(room.doorLower).expandTowards(0,1,0).inflate(.15),e->e.isAlive()&&!e.isSpectator()).isEmpty())
-            {player.displayClientMessage(net.minecraft.network.chat.Component.literal("门口有人，请先让出门扇。"),true);return true;}
+            {player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.projectseele.lounge.doorway"),true);return true;}
             var holds=MANUAL_DOOR_HOLDS_R48.get(level);if(holds!=null)holds.remove(room.variant);
         }
         ((DoorBlock)block.getBlock()).setOpen(player,level,block,room.doorLower,opening);return true;

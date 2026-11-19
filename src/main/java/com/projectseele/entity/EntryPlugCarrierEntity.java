@@ -994,8 +994,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                 || (stage != STAGE_SUSPENDED && stage != STAGE_FIELD_LANDED)
                 || this.isVehicle() || player.isPassenger())
         {
-            player.displayClientMessage(Component.literal(
-                    "Entry-plug hatch is sealed or under crane control."), true);
+            player.displayClientMessage(Component.translatable("message.projectseele.plug.sealed"), true);
             return InteractionResult.CONSUME;
         }
         Vec3 eye = player.getEyePosition();
@@ -1010,8 +1009,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                 || direction.normalize().dot(player.getViewVector(1.0F))
                         < 0.35D)
         {
-            player.displayClientMessage(Component.literal(
-                    "Stand on the boarding bridge and face the entry-plug hatch."),
+            player.displayClientMessage(Component.translatable("message.projectseele.plug.face_hatch"),
                     true);
             return InteractionResult.CONSUME;
         }
@@ -1021,8 +1019,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         if (hit.getType() != HitResult.Type.MISS
                 && hit.getLocation().distanceToSqr(hatch) > 3.0D * 3.0D)
         {
-            player.displayClientMessage(Component.literal(
-                    "Entry-plug hatch is obstructed."), true);
+            player.displayClientMessage(Component.translatable("message.projectseele.plug.obstructed"), true);
             return InteractionResult.CONSUME;
         }
         return this.boardPassenger(player)
@@ -1038,8 +1035,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         }
         if (this.getInsertionStage() == STAGE_INSERTING)
         {
-            player.displayClientMessage(Component.literal(
-                    "Entry plug is already under crane control."), true);
+            player.displayClientMessage(Component.translatable("message.projectseele.plug.crane"), true);
             return InteractionResult.CONSUME;
         }
         Entity occupant = this.getFirstPassenger();

@@ -35,8 +35,7 @@ public class NervConstructionKitItem extends Item
         {
             if (context.getPlayer() != null)
             {
-                context.getPlayer().displayClientMessage(Component.literal(
-                        "Not enough vertical space for the NERV launch complex."), true);
+                context.getPlayer().displayClientMessage(Component.translatable("message.projectseele.construction.height"), true);
             }
             return InteractionResult.FAIL;
         }
@@ -47,8 +46,7 @@ public class NervConstructionKitItem extends Item
         {
             if (context.getPlayer() != null)
             {
-                context.getPlayer().displayClientMessage(Component.literal(
-                        "A NERV launch complex already occupies this area."), true);
+                context.getPlayer().displayClientMessage(Component.translatable("message.projectseele.construction.occupied"), true);
             }
             return InteractionResult.FAIL;
         }

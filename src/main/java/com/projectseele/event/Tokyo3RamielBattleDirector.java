@@ -140,8 +140,7 @@ public final class Tokyo3RamielBattleDirector
         AngelAlarmSystem.disengage(level.getServer(), battle.ramiel());
         data.remove(origin);
         Tokyo3RetractionDirector.request(level, origin, false);
-        broadcast(level, origin, Component.literal(
-                "OPERATION YASHIMA ABORTED — Tokyo-3 restoration requested."));
+        broadcast(level, origin, Component.translatable("message.projectseele.yashima.aborted"));
         ProjectSeele.LOGGER.info(
                 "Operation Yashima aborted: ramiel={} origin={}",
                 battle.ramiel(), origin.toShortString());
@@ -196,8 +195,7 @@ public final class Tokyo3RamielBattleDirector
             data.remove(battle.origin());
             AngelAlarmSystem.disengage(level.getServer(), battle.ramiel());
             Tokyo3RetractionDirector.request(level, battle.origin(), false);
-            broadcast(level, battle.origin(), Component.literal(
-                    "RAMIEL ELIMINATED — all-clear; Tokyo-3 restoration initiated."));
+            broadcast(level, battle.origin(), Component.translatable("message.projectseele.yashima.victory"));
             ProjectSeele.LOGGER.info(
                     "Operation Yashima complete: ramiel={} origin={} clearDelay={}",
                     battle.ramiel(), battle.origin().toShortString(),

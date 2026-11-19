@@ -406,8 +406,7 @@ public class GameEvents
                             .isCabinBackingControl(
                                     player.serverLevel(), event.getPos()))
                     {
-                        player.displayClientMessage(Component.literal(
-                                "SELECT FLOOR ON THE PANEL ABOVE"), true);
+                        player.displayClientMessage(Component.translatable("message.projectseele.lift.choose"), true);
                         event.setCanceled(true);
                         event.setCancellationResult(
                                 InteractionResult.SUCCESS);

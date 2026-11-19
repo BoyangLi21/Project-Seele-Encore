@@ -159,7 +159,7 @@ public final class SeeleConferenceAccessR47
             return true;
         }
         if (leased(player)) return true;
-        player.displayClientMessage(Component.literal("SEELE 会议室需先刷最高权限卡；请使用本层读卡器。"), true);
+        player.displayClientMessage(Component.translatable("message.projectseele.seele.swipe"), true);
         return false;
     }
 
@@ -203,7 +203,7 @@ public final class SeeleConferenceAccessR47
         if (!highest(player, hand))
         {
             visual(player.serverLevel(), event.getPos(), -1, 3, 0);
-            player.displayClientMessage(Component.literal("权限不足：需要最高权限NERV卡。"), true);
+            player.displayClientMessage(Component.translatable("message.projectseele.seele.clearance"), true);
             return;
         }
         var pending = SWIPES.computeIfAbsent(player.serverLevel().getServer(), ignored -> new HashMap<>());

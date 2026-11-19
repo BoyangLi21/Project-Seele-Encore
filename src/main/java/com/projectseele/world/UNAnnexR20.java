@@ -66,26 +66,26 @@ public final class UNAnnexR20
     private static boolean occupied(ServerLevel l){if(!NervTraversalPolicyR53.strict(l))return false;return !l.getEntities((net.minecraft.world.entity.Entity)null,UNHangarDimensionsR31.sweep(l,1),e->e.isAlive()&&!e.isSpectator()&&!(e instanceof NervHangarDoorEntity)&&!(e instanceof NervCarrierPlatformEntity)).isEmpty();}
     public static String request(ServerLevel l,String action,Player p)
     {
-        if(!installed(l))return "此存档未安装 EVA-UN-01 试验舱";if(!card(p))return "需要工作人员身份卡";State s=state(l);
+        if(!installed(l))return "ops.projectseele.bay01.not_installed";if(!card(p))return "ops.projectseele.bay01.card_required";State s=state(l);
         var repairId=UNRecoveryR22.identity(l,1);
-        if(repairId!=null&&l.getEntity(repairId) instanceof EvaUnit01Entity repairing&&EvaBayRepairR33.active(repairing))return "机体正在检修，请等待机械臂撤回。";
+        if(repairId!=null&&l.getEntity(repairId) instanceof EvaUnit01Entity repairing&&EvaBayRepairR33.active(repairing))return "ops.projectseele.bay01.repairing";
         switch(action)
         {
-            case "drain" -> {if(s.phase!=MilitaryR07Director.Phase.WET&&s.phase!=MilitaryR07Director.Phase.FILLING)return "当前无需排液";s.phase=MilitaryR07Director.Phase.DRAINING;s.cursor=0;}
+            case "drain" -> {if(s.phase!=MilitaryR07Director.Phase.WET&&s.phase!=MilitaryR07Director.Phase.FILLING)return "ops.projectseele.bay01.drain_unneeded";s.phase=MilitaryR07Director.Phase.DRAINING;s.cursor=0;}
             case "door" ->
             {
                 if(s.phase==MilitaryR07Director.Phase.DRY){s.phase=MilitaryR07Director.Phase.OPENING;s.cursor=0;}
-                else if(s.phase==MilitaryR07Director.Phase.OPEN){if(occupied(l))return "舱门区域有人员或载具";s.phase=MilitaryR07Director.Phase.CLOSING;}
-                else return "请等待排液或舱门动作完成";
+                else if(s.phase==MilitaryR07Director.Phase.OPEN){if(occupied(l))return "ops.projectseele.bay01.door_obstructed";s.phase=MilitaryR07Director.Phase.CLOSING;}
+                else return "ops.projectseele.bay01.wait_machinery";
             }
-            case "fill" -> {if(s.phase!=MilitaryR07Director.Phase.DRY)return "请先关闭舱门";var unit=airframe(l);if(modelsInstalled(l)&&(unit==null||unit.position().distanceTo(UNRecoveryR22.home(l,1))>3||unit.isVehicle()))return "EVA-UN-01 须归位并解除驾驶";if(!l.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(l,1),q->!q.isSpectator()).isEmpty())return "请先离开 LCL 试验区";s.phase=MilitaryR07Director.Phase.FILLING;s.cursor=0;}
+            case "fill" -> {if(s.phase!=MilitaryR07Director.Phase.DRY)return "ops.projectseele.bay01.close_door";var unit=airframe(l);if(modelsInstalled(l)&&(unit==null||unit.position().distanceTo(UNRecoveryR22.home(l,1))>3||unit.isVehicle()))return "ops.projectseele.bay01.park_uncrewed";if(!l.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(l,1),q->!q.isSpectator()).isEmpty())return "ops.projectseele.bay01.clear_test_area";s.phase=MilitaryR07Director.Phase.FILLING;s.cursor=0;}
             default -> {return status(s);}
         }
         s.setDirty();return status(s);
     }
     public static String status(State s)
     {
-        String label=switch(s.phase){case WET->"LCL 保管";case DRAINING->"排液中";case DRY->"干燥，舱门关闭";case OPENING->"舱门开启中";case OPEN->"允许进出";case CLOSING->"舱门关闭中";case FILLING->"注液中";};return "EVA-UN-01 试验舱 · "+label;
+        String label=switch(s.phase){case WET->"ops.projectseele.bay01.stored";case DRAINING->"ops.projectseele.bay01.draining";case DRY->"ops.projectseele.bay01.dry";case OPENING->"ops.projectseele.bay01.opening_state";case OPEN->"ops.projectseele.bay01.access_clear";case CLOSING->"ops.projectseele.bay01.closing";case FILLING->"ops.projectseele.bay01.filling";};return OperationText.format("ops.projectseele.bay01.state", OperationText.read(label));
     }
     private static void tickets(ServerLevel l,boolean enabled)
     {
@@ -150,7 +150,7 @@ public final class UNAnnexR20
     @SubscribeEvent public static void interact(PlayerInteractEvent.RightClickBlock e)
     {
         if(!(e.getLevel() instanceof ServerLevel l)||!installed(l))return;
-        for(int i=0;i<BUTTONS.length;i++)if(e.getPos().equals(FacilitySites.un(l,BUTTONS[i]))){e.setCanceled(true);e.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);if(e.getHand()==net.minecraft.world.InteractionHand.MAIN_HAND)e.getEntity().displayClientMessage(Component.literal(request(l,new String[]{"drain","door","fill"}[i],e.getEntity())),true);return;}
+        for(int i=0;i<BUTTONS.length;i++)if(e.getPos().equals(FacilitySites.un(l,BUTTONS[i]))){e.setCanceled(true);e.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);if(e.getHand()==net.minecraft.world.InteractionHand.MAIN_HAND)e.getEntity().displayClientMessage(OperationText.read(request(l,new String[]{"drain","door","fill"}[i],e.getEntity())),true);return;}
     }
     private UNAnnexR20(){}
 }

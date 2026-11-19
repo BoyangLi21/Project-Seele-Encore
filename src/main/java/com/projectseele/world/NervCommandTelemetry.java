@@ -278,7 +278,7 @@ public final class NervCommandTelemetry
                                 ? ChatFormatting.RED : ChatFormatting.LIGHT_PURPLE);
         if (unit == null)
         {
-            return result.append(Component.literal("\nLINK OFFLINE\nNO AIRFRAME DATA")
+            return result.append(Component.translatable("message.projectseele.telemetry.no_data")
                     .withStyle(ChatFormatting.DARK_RED));
         }
 
@@ -345,8 +345,7 @@ public final class NervCommandTelemetry
             }
         }
 
-        MutableComponent result = Component.literal(
-                "NERV / MAGI LIVE TACTICAL NETWORK")
+        MutableComponent result = Component.translatable("message.projectseele.telemetry.network")
                 .withStyle(ChatFormatting.GOLD);
         if (ramiel != null)
         {
@@ -404,8 +403,7 @@ public final class NervCommandTelemetry
         }
         else
         {
-            result.append(Component.literal(
-                            "\nPILOT SENSOR FEED: NO ACTIVE ENTRY PLUG LINK")
+            result.append(Component.translatable("message.projectseele.telemetry.no_sensor")
                     .withStyle(ChatFormatting.DARK_GRAY));
         }
         result.append(Component.literal("\nGEOFRONT > TOKYO-3 PHYSICAL ROUTE: "
@@ -445,8 +443,7 @@ public final class NervCommandTelemetry
         EvaUnit01Entity feed = units.stream()
                 .filter(unit -> activePilot(unit) != null)
                 .findFirst().orElse(null);
-        MutableComponent result = Component.literal(
-                "ENTRY PLUG / LIVE OPTICAL SENSOR")
+        MutableComponent result = Component.translatable("message.projectseele.telemetry.optical")
                 .withStyle(ChatFormatting.GOLD);
         LivingEntity pilot = activePilot(feed);
         if (feed == null || pilot == null)

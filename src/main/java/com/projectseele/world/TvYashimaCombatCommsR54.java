@@ -1,5 +1,6 @@
 package com.projectseele.world;
 
+import net.minecraft.network.chat.Component;
 import com.projectseele.entity.RamielEntity;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.event.TvEncounterDirectorR45;
@@ -45,13 +46,17 @@ public final class TvYashimaCombatCommsR54
             for(var sortie:data.sorties.values())
             {if(sortie.commander!=null)recipients.add(sortie.commander);if(!sortie.npc&&sortie.pilotR45!=null)recipients.add(sortie.pilotR45);}
         }
-        String unit=switch(eva.getUnitVariant()){case 0->"零号机";case 1->"初号机";case 2->"二号机";default->"EVA";};
-        String speaker=eva.getPilotEntity() instanceof com.projectseele.entity.TrainingPilotEntity
-                ?switch(eva.getUnitVariant()){case 0->"绫波丽";case 1->"碇真嗣";case 2->"明日香";default->"驾驶员";}:"伊吹摩耶";
+        int variant = eva.getUnitVariant();
+        Component unit = variant >= 0 && variant <= 2
+                ? Component.translatable("entity.projectseele.eva_unit0" + variant) : Component.literal("EVA");
+        Component speaker = eva.getPilotEntity() instanceof com.projectseele.entity.TrainingPilotEntity
+                ? variant >= 0 && variant <= 2 ? StaffDialogueCatalogR24.pilotName(variant)
+                        : Component.translatable("radio.projectseele.yashima.pilot")
+                : Component.translatable("hud.projectseele.chat.name.maya");
         for(var id:recipients)
         {
             var player=level.getServer().getPlayerList().getPlayer(id);if(player==null||player.level()!=level)continue;
-            NervStaffDialogue.say(player,speaker+" · 作战通信",unit+"，AT 力场展开。");
+            NervStaffDialogue.say(player,Component.translatable("radio.projectseele.yashima.combat_channel", speaker), Component.translatable("radio.projectseele.yashima.field_up", unit));
             if(player.getEyePosition().distanceToSqr(eva.position().add(0,eva.getBbHeight()*.55D,0))>40*40)
             {
                 var ear=player.getEyePosition();player.connection.send(new ClientboundSoundPacket(
@@ -62,14 +67,14 @@ public final class TvYashimaCombatCommsR54
 
     enum ShotResult
     {
-        UNCONFIRMED("弹道前方地形尚未加载，未确认命中。保持瞄准，重新充能。"),
-        MISS("炮击未命中拉米尔。修正瞄准，等待下一次核心暴露。"),
-        CORE_CLOSED("命中外壳，但核心尚未开放，未造成核心损伤。等核心暴露再射击。"),
-        AT_BLOCKED("命中外壳，核心尚未开放，A.T. 力场仍在，炮击未造成核心损伤。"),
-        CORE_MISSED("击中外壳，弹道偏离了暴露的核心。调整瞄准，准备下一发。"),
-        NO_DAMAGE("弹道触及核心，但未确认有效损伤。重新充能，继续观察核心。"),
-        CORE_HIT("确认核心命中，目标受到有效损伤！重新充能，保持瞄准。"),
-        CORE_DESTROYED("确认核心命中，目标生命反应归零。保持警戒，等待战果确认。");
+        UNCONFIRMED("radio.projectseele.yashima.shot.unconfirmed"),
+        MISS("radio.projectseele.yashima.shot.miss"),
+        CORE_CLOSED("radio.projectseele.yashima.shot.core_closed"),
+        AT_BLOCKED("radio.projectseele.yashima.shot.at_blocked"),
+        CORE_MISSED("radio.projectseele.yashima.shot.core_missed"),
+        NO_DAMAGE("radio.projectseele.yashima.shot.no_damage"),
+        CORE_HIT("radio.projectseele.yashima.shot.core_hit"),
+        CORE_DESTROYED("radio.projectseele.yashima.shot.core_destroyed");
 
         final String line;
         ShotResult(String line){this.line=line;}
@@ -100,7 +105,7 @@ public final class TvYashimaCombatCommsR54
         // The lethal shot can already have changed the mission to victory.
         // Keep its real result even though the boss is no longer alive.
         var result=!traceComplete?ShotResult.UNCONFIRMED:shotResult(hit==boss,exposed,atField,coreShot,accepted,healthBefore,healthAfter);
-        report(boss,data,result==ShotResult.MISS||result==ShotResult.CORE_MISSED?"葛城美里":"赤木律子",result.line,false);
+        report(boss,data,result==ShotResult.MISS||result==ShotResult.CORE_MISSED?Component.translatable("hud.projectseele.chat.name.misato"):Component.translatable("hud.projectseele.chat.name.ritsuko"),Component.translatable(result.line),false);
     }
 
     static final class Pulse
@@ -169,7 +174,7 @@ public final class TvYashimaCombatCommsR54
         return data;
     }
 
-    private static void report(RamielEntity boss, TvCampaignSavedData data, String speaker, String line, boolean alarm)
+    private static void report(RamielEntity boss, TvCampaignSavedData data, Component speaker, Component line, boolean alarm)
     {
         var level = (ServerLevel) boss.level();
         var recipients = new LinkedHashSet<UUID>();
@@ -184,7 +189,7 @@ public final class TvYashimaCombatCommsR54
         {
             var player = level.getServer().getPlayerList().getPlayer(id);
             if (player == null || player.level() != level) continue;
-            NervStaffDialogue.say(player, speaker + " · 指挥通信", line);
+            NervStaffDialogue.say(player, Component.translatable("radio.projectseele.yashima.command_channel", speaker), line);
             // Deliver the emplacement warning into each nearby participant's
             // headset; an EVA cockpit sits beyond a ground sound's audible radius.
             if (cannon != null && player.position().distanceToSqr(cannon) <= 128 * 128)
@@ -202,7 +207,7 @@ public final class TvYashimaCombatCommsR54
     {
         var data = mission(boss);
         if (data == null || !PULSES.computeIfAbsent(boss, key -> new Pulse()).charge(totalTicks)) return;
-        report(boss, data, "伊吹摩耶", "高能反应上升！预计" + seconds(totalTicks) + "秒后开火，各机准备！", true);
+        report(boss, data, Component.translatable("hud.projectseele.chat.name.maya"), Component.translatable("radio.projectseele.yashima.charge", seconds(totalTicks)), true);
     }
 
     /** Pass the effective remaining charge, including any real-time minimum. */
@@ -214,9 +219,9 @@ public final class TvYashimaCombatCommsR54
         if (cue == 0) return;
         var data = mission(boss);
         if (data == null) return;
-        report(boss, data, "葛城美里", cue == 3
-                ? "还有约3秒！零号机保持掩护。初号机瞄准核心！"
-                : "核心已经暴露，约1秒后发射光束！初号机，可以射击！", false);
+        report(boss, data, Component.translatable("hud.projectseele.chat.name.misato"), cue == 3
+                ? Component.translatable("radio.projectseele.yashima.three_seconds")
+                : Component.translatable("radio.projectseele.yashima.one_second"), false);
     }
 
     /** Call only after the actual beam state has been committed. */
@@ -225,7 +230,7 @@ public final class TvYashimaCombatCommsR54
         var data = mission(boss);
         if (data == null || boss.getBeamTicks() <= 0
                 || !PULSES.computeIfAbsent(boss, key -> new Pulse()).fire()) return;
-        report(boss, data, "葛城美里", "光束来了！核心暴露约"+seconds(boss.getBeamDurationR54())+"秒，初号机开火！", false);
+        report(boss, data, Component.translatable("hud.projectseele.chat.name.misato"), Component.translatable("radio.projectseele.yashima.fire", seconds(boss.getBeamDurationR54())), false);
     }
 
     /** Call when the actual beam changes from one remaining tick to zero. */
@@ -235,8 +240,10 @@ public final class TvYashimaCombatCommsR54
         if (pulse == null || boss.getBeamTicks() != 0) return;
         var data = mission(boss);
         if (data == null || !pulse.end()) return;
-        String recovery = cooldownTicks > 0 ? "目标还需约" + seconds(cooldownTicks) + "秒恢复。" : "";
-        report(boss, data, "赤木律子", "核心闭合，射击窗口结束。" + recovery + "重新充能，等待下一次光束。", false);
+        Component line = cooldownTicks > 0
+                ? Component.translatable("radio.projectseele.yashima.recovering", seconds(cooldownTicks))
+                : Component.translatable("radio.projectseele.yashima.closed");
+        report(boss, data, Component.translatable("hud.projectseele.chat.name.ritsuko"), line, false);
     }
 
     /** A stopped goal without a committed shot must not announce firing or cooling. */
@@ -246,7 +253,7 @@ public final class TvYashimaCombatCommsR54
         if (pulse == null) return;
         var data = mission(boss);
         if (data == null || !pulse.cancel()) return;
-        report(boss, data, "伊吹摩耶", "目标中止蓄力。保持警戒，等待下一次高能反应。", false);
+        report(boss, data, Component.translatable("hud.projectseele.chat.name.maya"), Component.translatable("radio.projectseele.yashima.cancel"), false);
     }
 
     private static int seconds(int ticks) { return Math.max(1, (int) Math.ceil(ticks / 20.0)); }

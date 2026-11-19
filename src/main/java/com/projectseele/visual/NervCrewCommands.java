@@ -147,8 +147,7 @@ public final class NervCrewCommands
         NervCrewSavedData data = NervCrewSavedData.get(source.getServer());
         if (!data.setReady(player.getUUID(), ready))
         {
-            source.sendFailure(Component.literal(
-                    "请先认领岗位：/seele crew claim <岗位>"));
+            source.sendFailure(Component.translatable("message.projectseele.crew.claim"));
             return 0;
         }
         Station station = data.stationFor(player.getUUID()).orElseThrow();
@@ -166,7 +165,7 @@ public final class NervCrewCommands
                 .release(player.getUUID());
         if (released.isEmpty())
         {
-            source.sendFailure(Component.literal("你还没有认领岗位。"));
+            source.sendFailure(Component.translatable("message.projectseele.crew.no_post"));
             return 0;
         }
         source.sendSuccess(() -> Component.literal(
@@ -245,8 +244,7 @@ public final class NervCrewCommands
                 .withStyle(ChatFormatting.GOLD), false);
         if (level == null)
         {
-            source.sendFailure(Component.literal(
-                    "GeoFront 维度未加载，请检查模组和数据包是否正常加载。"));
+            source.sendFailure(Component.translatable("message.projectseele.crew.no_geofront"));
             return 0;
         }
         // The current world retires the old map's installation receipt on purpose, so reading it
@@ -295,8 +293,7 @@ public final class NervCrewCommands
                         crew.assigned(), crew.online(), crew.onlineReady()))
                 .withStyle(crew.allAssignedOnlineReady()
                         ? ChatFormatting.GREEN : ChatFormatting.YELLOW), false);
-        source.sendSuccess(() -> Component.literal(
-                "出击前的有界检查用 /seele admin server audit，不会重建整张地图。")
+        source.sendSuccess(() -> Component.translatable("message.projectseele.crew.audit")
                 .withStyle(ChatFormatting.GRAY), false);
         return installed ? 1 : 0;
     }
@@ -306,7 +303,7 @@ public final class NervCrewCommands
         ServerLevel level = source.getServer().getLevel(GeoFrontCommands.GEOFRONT);
         if (level == null)
         {
-            source.sendFailure(Component.literal("GeoFront 维度未加载。"));
+            source.sendFailure(Component.translatable("message.projectseele.geofront_unloaded"));
             return 0;
         }
         IntegratedNervMapBuilder.RuntimeAudit audit =

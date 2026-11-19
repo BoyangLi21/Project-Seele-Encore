@@ -124,8 +124,7 @@ public final class CoastalSeedScoutCommands
     {
         if (!RUNNING.compareAndSet(false, true))
         {
-            source.sendFailure(Component.literal(
-                    "A coastal seed survey is already running."));
+            source.sendFailure(Component.translatable("message.projectseele.scout.running"));
             return 0;
         }
         MinecraftServer server = source.getServer();
@@ -207,8 +206,7 @@ public final class CoastalSeedScoutCommands
         catch (IOException | RuntimeException exception)
         {
             ProjectSeele.LOGGER.error("Coastal anchor search failed", exception);
-            server.execute(() -> source.sendFailure(Component.literal(
-                    "Coastal anchor search failed; inspect the server log.")));
+            server.execute(() -> source.sendFailure(Component.translatable("message.projectseele.scout.anchor_failed")));
         }
         finally
         {
@@ -304,8 +302,7 @@ public final class CoastalSeedScoutCommands
     {
         if (!RUNNING.compareAndSet(false, true))
         {
-            source.sendFailure(Component.literal(
-                    "A coastal seed survey is already running."));
+            source.sendFailure(Component.translatable("message.projectseele.scout.running"));
             return 0;
         }
         MinecraftServer server = source.getServer();
@@ -375,8 +372,7 @@ public final class CoastalSeedScoutCommands
         catch (IOException | RuntimeException exception)
         {
             ProjectSeele.LOGGER.error("Coastal seed survey failed", exception);
-            server.execute(() -> source.sendFailure(Component.literal(
-                    "Coastal seed survey failed; inspect the server log.")));
+            server.execute(() -> source.sendFailure(Component.translatable("message.projectseele.scout.survey_failed")));
         }
         finally
         {

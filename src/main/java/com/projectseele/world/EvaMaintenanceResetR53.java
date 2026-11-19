@@ -28,7 +28,7 @@ public final class EvaMaintenanceResetR53
             }
             PENDING.computeIfAbsent(level,l->new LinkedHashMap<>()).put(variant,source);accepted++;
         }
-        if(PENDING.containsKey(level))source.sendSuccess(()->Component.literal("复位请求已保留，场地加载完成后自动执行。"),false);
+        if(PENDING.containsKey(level))source.sendSuccess(()->Component.translatable("message.projectseele.maintenance.queued"),false);
         return accepted;
     }
     private static void reset(CommandSourceStack source,ServerLevel level,int variant)

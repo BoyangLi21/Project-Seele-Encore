@@ -185,7 +185,7 @@ public final class NervRootAssemblyInstallationR52
     public static LiteralArgumentBuilder<CommandSourceStack> installCancelCommand()
     {
         return Commands.literal("install_cancel").executes(context->{
-            var source=context.getSource();var saved=NervRouteRuntimeR52.installationStateR52(source.getLevel());if(saved==null||saved.pendingInstallationR52()==null){source.sendFailure(Component.literal("没有待推进的地图安装。"));return 0;}
+            var source=context.getSource();var saved=NervRouteRuntimeR52.installationStateR52(source.getLevel());if(saved==null||saved.pendingInstallationR52()==null){source.sendFailure(Component.translatable("message.projectseele.facility.no_install"));return 0;}
             saved.pauseInstallationR52("管理员已取消自动安装推进；原实体、任务及已验证安装凭证保留。再次安装同一凭证可继续。");PENDING_TICKETS.remove(source.getLevel());TICKET_REFRESH.remove(source.getLevel());restoreHoldR52(source.getLevel(),saved.pendingInstallationHoldR52());source.sendSuccess(()->Component.literal(saved.pendingInstallationHoldR52()),true);return 1;
         });
     }

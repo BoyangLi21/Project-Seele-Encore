@@ -92,8 +92,7 @@ public final class ThirdTokyoCommands
         ServerPlayer player = source.getPlayerOrException();
         if (player.isPassenger())
         {
-            source.sendFailure(Component.literal(
-                    "Dismount before constructing the Tokyo-3 sortie district."));
+            source.sendFailure(Component.translatable("message.projectseele.city.dismount"));
             return 0;
         }
         if (GeoFrontCommands.setup(source) != 1)
@@ -196,7 +195,7 @@ public final class ThirdTokyoCommands
                 status.targetDepth())), false);
         if (status.phase().contains("FAULT"))
         {
-            source.sendSuccess(() -> Component.literal("升降被中断后停在故障状态：用 /seele city recover 从中断的那一步重做。"), false);
+            source.sendSuccess(() -> Component.translatable("message.projectseele.city.recover"), false);
         }
         return 1;
     }
@@ -212,8 +211,7 @@ public final class ThirdTokyoCommands
         ServerLevel level = player.serverLevel();
         if (!level.dimension().equals(GeoFrontCommands.GEOFRONT))
         {
-            source.sendFailure(Component.literal(
-                    "Enter the integrated GeoFront/Tokyo-3 dimension first."));
+            source.sendFailure(Component.translatable("message.projectseele.city.enter_dimension"));
             return 0;
         }
         IntegratedNervMapBuilder.RuntimeAudit audit =
@@ -306,8 +304,7 @@ public final class ThirdTokyoCommands
         BlockPos origin = findOrigin(player);
         player.stopRiding();
         teleportOverview(player, origin);
-        source.sendSuccess(() -> Component.literal(
-                "Tokyo-3 skyline observation deck."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.city.observation"), false);
         return 1;
     }
 
@@ -349,8 +346,7 @@ public final class ThirdTokyoCommands
         return Tokyo3RetractionSavedData.get(player.serverLevel())
                 .nearest(player.blockPosition(), 320.0D)
                 .map(Tokyo3RetractionSavedData.StoredDistrict::origin)
-                .orElseThrow(() -> new SimpleCommandExceptionType(Component.literal(
-                        "附近 320 格内没有已登记的第三新东京市街区，请到城区再试。")).create());
+                .orElseThrow(() -> new SimpleCommandExceptionType(Component.translatable("message.projectseele.city.no_blocks")).create());
     }
 
     private static TokyoAudit inspect(ServerLevel level, BlockPos origin, int depth,

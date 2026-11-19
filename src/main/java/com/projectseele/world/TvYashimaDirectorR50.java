@@ -320,12 +320,12 @@ public final class TvYashimaDirectorR50
             if(data.angel!=null&&level.getEntity(data.angel) instanceof RamielEntity original&&TvEncounterDirectorR45.owned(original,data))
             {original.setNoAi(true);original.setTarget(null);original.missionDrillR50(false,0);}
             NervArmorColumnR50.pause(level);TvEncounterRulesR45.pauseFire(level,data);
-            data.notice="原屋岛阵地或炮务配置暂不可用，原目标与钻进暂停。";bar.setName(Component.literal(data.notice));return;
+            data.notice="原屋岛阵地或炮务配置暂不可用，原目标与钻进暂停。";bar.setName(OperationText.read(data.notice));return;
         }
         if(data.phase.equals("failure")||data.targetDeathConfirmedR45)
-        {TvYashimaFirelineR53.clear(level);bar.setName(Component.literal(data.notice));TvEncounterRulesR45.stopEquipment(level,data);return;}
+        {TvYashimaFirelineR53.clear(level);bar.setName(OperationText.read(data.notice));TvEncounterRulesR45.stopEquipment(level,data);return;}
         if(data.angel==null)begin(level,data);
-        if(data.angel==null){bar.setName(Component.literal(data.notice));return;}
+        if(data.angel==null){bar.setName(OperationText.read(data.notice));return;}
         retain(level,data.lastPosition==null?BlockPos.containing(site.angel()):data.lastPosition);
         if(!(level.getEntity(data.angel) instanceof RamielEntity boss)||!TvEncounterDirectorR45.owned(boss,data))
         {if(level.isPositionEntityTicking(data.lastPosition==null?BlockPos.containing(site.angel()):data.lastPosition)
@@ -338,7 +338,7 @@ public final class TvYashimaDirectorR50
             boss.setNoAi(true);boss.setTarget(null);boss.missionDrillR50(false,0);TvEncounterRulesR45.pauseFire(level,data);
             NervArmorColumnR50.pause(level);
             data.notice=!valid?"原阵地配置已变化，目标与钻进暂停。":"司令离线或离开本维度，原目标与钻进暂停。";
-            bar.setName(Component.literal(data.notice));return;
+            bar.setName(OperationText.read(data.notice));return;
         }
         bar.addPlayer(owner);
         for(var sortie:data.sorties.values())
@@ -378,8 +378,13 @@ public final class TvYashimaDirectorR50
         if(!service.fireControlLocked&&!setup.isEmpty())blocked=setup;
         if(blocked.isEmpty()&&shooter!=null)blocked=cannonBlocker(shooter);
         String breach=NervArmorColumnR50.geofrontBreached(level)?"GeoFront入口已贯穿；总部与终端尚未失守 · ":"";
-        data.notice="屋岛作战 · "+breach+"装甲贯穿 "+NervArmorColumnR50.penetratedLayers(level)+" 层 · "+(blocked.isEmpty()?"炮位就绪，确认核心后炮击。":blocked);
-        bar.setName(Component.literal(data.notice));bar.setProgress(Math.max(0,Math.min(1,boss.getHealth()/boss.getMaxHealth())));
+        int layers = NervArmorColumnR50.penetratedLayers(level);
+        data.notice="屋岛作战 · "+breach+"装甲贯穿 "+layers+" 层 · "+(blocked.isEmpty()?"炮位就绪，确认核心后炮击。":blocked);
+        bar.setName(Component.translatable("ops.projectseele.yashima.status",
+                breach.isEmpty() ? Component.empty() : Component.translatable("ops.projectseele.yashima.entrance_breached"),
+                layers, blocked.isEmpty()
+                        ? Component.translatable("ops.projectseele.yashima.gun_ready") : OperationText.read(blocked)));
+        bar.setProgress(Math.max(0,Math.min(1,boss.getHealth()/boss.getMaxHealth())));
     }
     public static void clearSession(ServerLevel level){TvYashimaFirelineR53.clear(level);CONTROLS.remove(level);TvYashimaArrivalR50.clear(level);}
     private TvYashimaDirectorR50(){}

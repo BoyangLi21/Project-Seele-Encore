@@ -1,5 +1,6 @@
 package com.projectseele.client.render;
 
+import net.minecraft.client.resources.language.I18n;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.projectseele.world.StationDepartureBoardBlock;
@@ -40,7 +41,7 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
                 poses.popPose();return;
             }
             boolean lift=!board.rows().isEmpty()&&board.rows().stream().allMatch(s->s.endsWith(" · 直梯"));
-            line(lift?"エレベーター乗換|乘电梯换层|Change by lift":board.station(),0,0xffedbd55,width,poses,buffers);
+            line(lift?I18n.get("sign.projectseele.lift_transfer"):board.station(),0,0xffedbd55,width,poses,buffers);
             // a small "Chinese · English" line under each row needs the rows a little higher to clear the panel's lower edge
             boolean split=board.rows().stream().anyMatch(s->s.indexOf(SPLIT)>0);
             for(int i=0;i<Math.min(3,board.rows().size());i++)line(compactDestination(board.rows().get(i),lift),split?17+i*15:18+i*16,
@@ -85,7 +86,7 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
         poses.translate(0,0,rear?.145:.205);
         String service=board.title().strip().split("\\s+",2)[0];
         int routeColor=routeColor(service);
-        physicalLine(service+"  路線図",0,0,.021F,2.60F,routeColor,poses,buffers);
+        physicalLine(I18n.get("sign.projectseele.route_map", service),0,0,.021F,2.60F,routeColor,poses,buffers);
         physicalLine(currentStation(board.station()),0,.22F,.017F,2.60F,0xffe9efde,poses,buffers);
         if(stops.size()<=4)
         {
@@ -118,7 +119,7 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
             // Order follows the real service, while the physical departure
             // arrow below changes on the rear. Do not invent station numbers
             // that would change when the opposite service reverses its list.
-            physicalLine("続く →",0,1.015F,.008F,.24F,routeColor,poses,buffers);
+            physicalLine(I18n.get("sign.projectseele.continued"),0,1.015F,.008F,.24F,routeColor,poses,buffers);
         }
         var footer=board.rows().stream().filter(s->!s.startsWith("│")&&!s.startsWith("●")).toList();
         if(!footer.isEmpty())physicalLine(rear?reversePhysicalDirection(footer.get(0)):footer.get(0),0,1.12F,.014F,2.60F,0xffa9d9ae,poses,buffers);
@@ -127,15 +128,18 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
     }
     private static String stopName(String source)
     {
-        // stops on a diagram show the Japanese name only; the multilingual name is on the station's own boards
         String name=source.substring(1).replace("本站","").strip();
-        int split=name.indexOf(SPLIT);
-        return split>0?name.substring(0,split).strip():name;
+        String[] names=name.split("\\|",-1);
+        String language=net.minecraft.client.Minecraft.getInstance().getLanguageManager().getSelected();
+        int index=language.startsWith("en_")?2:language.startsWith("zh_")?1:0;
+        return index<names.length&&!names[index].isBlank()?names[index].strip():names[0].strip();
     }
     private static String currentStation(String station)
     {
         int split=station.indexOf(SPLIT);
-        return split>0?station.substring(0,split)+"  当駅"+station.substring(split):station+"  当駅";
+        String name = split > 0 ? station.substring(0, split) : station;
+        String here = I18n.get("sign.projectseele.current_stop", name);
+        return split > 0 ? here + station.substring(split) : here;
     }
     private static int routeColor(String service)
     {

@@ -95,9 +95,9 @@ public final class PilotRestroomServicesR47
         var room=PilotRestroomsR47.plans(level).stream().filter(row->row.phone().equals(root)).findFirst().orElse(null);
         if(room==null)return false; // Other street/public phones keep their original behavior.
         if(player.isSpectator()||!NervStaffDialogue.authorized(player))
-        {player.sendSystemMessage(Component.literal("房内指挥电话需要NERV通行权限。"));return true;}
+        {player.sendSystemMessage(Component.translatable("message.projectseele.lounge.phone_access"));return true;}
         if(player.distanceToSqr(Vec3.atCenterOf(root))>36||!completePhone(level,root))
-        {player.sendSystemMessage(Component.literal("本房电话线路或完整设备尚未接通。"));return true;}
+        {player.sendSystemMessage(Component.translatable("message.projectseele.lounge.phone_disconnected"));return true;}
         CALLS.put(player,new PhoneCall(level,room.id(),root,level.getGameTime()+PHONE_TICKS));
         StaffConversationR24.contact(player,"美里");return true;
     }
@@ -169,14 +169,14 @@ public final class PilotRestroomServicesR47
         var room=PilotRestroomsR47.plans(level).stream().filter(row->row.button().equals(event.getPos())).findFirst().orElse(null);
         if(room==null)return;
         if(player.isSpectator()||!NervStaffDialogue.authorized(player)||player.distanceToSqr(Vec3.atCenterOf(room.button()))>36)
-        {event.setCanceled(true);event.setCancellationResult(InteractionResult.FAIL);player.sendSystemMessage(Component.literal("本房警铃需要NERV值班权限。"));return;}
+        {event.setCanceled(true);event.setCancellationResult(InteractionResult.FAIL);player.sendSystemMessage(Component.translatable("message.projectseele.lounge.alarm_access"));return;}
         var hardware=level.getBlockState(room.button());
         if(!hardware.is(Blocks.POLISHED_BLACKSTONE_BUTTON)||hardware.getValue(ButtonBlock.FACE)!=AttachFace.WALL
                 ||hardware.getValue(ButtonBlock.FACING)!=Direction.WEST||hardware.getValue(ButtonBlock.POWERED)
                 ||!hardware.canSurvive(level,room.button()))return;
         var state=state(level);var alarm=state.alarms.computeIfAbsent(room.variant(),key->new Alarm());
         if(!ring(level,room,state,alarm,"本房警铃已按下"))
-        {event.setCanceled(true);event.setCancellationResult(InteractionResult.FAIL);player.sendSystemMessage(Component.literal("本房警铃仍在冷却，或设备未接通。"));}
+        {event.setCanceled(true);event.setCancellationResult(InteractionResult.FAIL);player.sendSystemMessage(Component.translatable("message.projectseele.lounge.alarm_cooldown"));}
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {

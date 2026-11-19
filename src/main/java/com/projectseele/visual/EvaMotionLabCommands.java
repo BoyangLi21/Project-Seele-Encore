@@ -80,8 +80,7 @@ public final class EvaMotionLabCommands
         ServerLevel level = source.getLevel();
         if (!EvaMotionLabDirector.setup(level, force))
         {
-            source.sendFailure(Component.literal(
-                    "This command is restricted to SEELE_EVA_MOTION_LAB."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.lab_only"));
             return 0;
         }
         if (source.getEntity() instanceof ServerPlayer player)
@@ -102,8 +101,7 @@ public final class EvaMotionLabCommands
         if (variant < 0 || !EvaMotionLabDirector.enter(
                 source.getPlayerOrException(), variant))
         {
-            source.sendFailure(Component.literal(
-                    "Motion-lab EVA boarding failed."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.board_failed"));
             return 0;
         }
         source.sendSuccess(() -> Component.literal(String.format(
@@ -121,12 +119,10 @@ public final class EvaMotionLabCommands
                 || !EvaMotionLabDirector.selectWeapon(source.getLevel(),
                 variant, weapon))
         {
-            source.sendFailure(Component.literal(
-                    "Motion-lab weapon selection failed."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.weapon_failed"));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Motion-lab loadout changed."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.motion.loadout"), false);
         return 1;
     }
 
@@ -135,8 +131,7 @@ public final class EvaMotionLabCommands
     {
         if (!EvaMotionLabDirector.enterUnR63(source.getPlayerOrException(), serial))
         {
-            source.sendFailure(Component.literal(
-                    "Motion-lab UN boarding failed."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.un_board_failed"));
             return 0;
         }
         source.sendSuccess(() -> Component.literal(
@@ -151,12 +146,10 @@ public final class EvaMotionLabCommands
                 ? EvaMotionLabDirector.unUnitR63(source.getLevel()) : null;
         if (weapon < 0 || eva == null || !eva.selectMotionLabWeapon(weapon))
         {
-            source.sendFailure(Component.literal(
-                    "Motion-lab weapon selection failed."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.weapon_failed"));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Motion-lab loadout changed."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.motion.loadout"), false);
         return 1;
     }
 
@@ -166,8 +159,7 @@ public final class EvaMotionLabCommands
         ServerPlayer player = source.getPlayerOrException();
         if (!EvaMotionLabDirector.isMotionLab(player.serverLevel()))
         {
-            source.sendFailure(Component.literal(
-                    "This command is restricted to SEELE_EVA_MOTION_LAB."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.lab_only"));
             return 0;
         }
         if (player.isPassenger())

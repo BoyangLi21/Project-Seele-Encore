@@ -2217,8 +2217,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.enforceLaunchLock();
         if (occupant instanceof ServerPlayer pilot)
         {
-            pilot.displayClientMessage(Component.literal(
-                    "NERV command has authorized catapult release."), true);
+            pilot.displayClientMessage(Component.translatable("message.projectseele.launch.released"), true);
         }
         ProjectSeele.LOGGER.info(
                 "NERV remote launch release: eva={} pilot={} bed={}",
@@ -2289,7 +2288,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         if(this.isExperimentalUnit())
         {
-            pilot.displayClientMessage(Component.literal("试验机使用地表格纳库出舱控制"),true);
+            pilot.displayClientMessage(Component.translatable("message.projectseele.un.surface_controls"),true);
             return;
         }
         if (!(this.level() instanceof net.minecraft.server.level.ServerLevel serverLevel))
@@ -4708,7 +4707,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 ||!com.projectseele.world.TvEncounterRulesR45.cannonPermissionR50(this)))return;
         if(this.getWeapon()==WEAPON_CANNON&&!this.missionCannonRayClearR50(pilot))
         {
-            if(pilot instanceof ServerPlayer player)player.sendSystemMessage(Component.literal("阳电子炮真实火线被己方盾面挡住，等待盾机侧移后再充能起射。"));
+            if(pilot instanceof ServerPlayer player)player.sendSystemMessage(Component.translatable("message.projectseele.yashima.shield_blocks"));
             return;
         }
         if (this.isPilotControlLocked() || !full || this.getWeapon() != WEAPON_CANNON
@@ -4973,7 +4972,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             {
                 if(!EntryPlugDirector.ejectPilotToPlug(
                         serverLevel,this.getUnitVariant(),this,pilot))
-                    pilot.displayClientMessage(Component.literal("插入栓脱离条件未满足，请保持原位并联系整备部。"),true);
+                    pilot.displayClientMessage(Component.translatable("message.projectseele.plug.cannot_detach"),true);
                 // A rejected physical extraction is not permission to perform
                 // an unrelated vanilla dismount and abandon the launch support.
                 return;
@@ -5542,7 +5541,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaBerserkMotionR34.begin(this,0,null);
         if (pilot != null)
         {
-            pilot.displayClientMessage(Component.literal("律子：主电源切断。初号机停止活动。"), false);
+            pilot.displayClientMessage(Component.translatable("message.projectseele.shutdown.radio"), false);
         }
         ProjectSeele.LOGGER.warn(
                 "EVA Unit-01 berserk: eva={} synchronization={} durationTicks={}",
@@ -6544,8 +6543,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             if (this.getControllingPassenger() instanceof ServerPlayer pilot)
             {
-                pilot.displayClientMessage(Component.literal(
-                        "NERV launch inhibited: the physical shaft or surface exit is obstructed."),
+                pilot.displayClientMessage(Component.translatable("message.projectseele.launch.obstructed"),
                         true);
             }
             ProjectSeele.LOGGER.error(
@@ -6684,8 +6682,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             {
                 if (this.getControllingPassenger() instanceof ServerPlayer pilot)
                 {
-                    pilot.displayClientMessage(Component.literal(
-                            "NERV emergency stop: an obstruction entered the launch shaft."),
+                    pilot.displayClientMessage(Component.translatable("message.projectseele.launch.obstruction_entered"),
                             true);
                 }
                 ProjectSeele.LOGGER.error(
@@ -7036,8 +7033,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             if (pilot != null)
             {
-                pilot.displayClientMessage(Component.literal(
-                        "NERV sortie link unavailable; completing launch inside GeoFront."), true);
+                pilot.displayClientMessage(Component.translatable("message.projectseele.launch.no_link"), true);
             }
             ProjectSeele.LOGGER.error(
                     "NERV cross-dimension sortie refused: eva={} dimension={} bed={}",
@@ -7059,8 +7055,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             {
                 if (pilot != null)
                 {
-                    pilot.displayClientMessage(Component.literal(
-                            "NERV launch origin was lost during surface hand-off."),
+                    pilot.displayClientMessage(Component.translatable("message.projectseele.launch.lost_origin"),
                             true);
                 }
                 ProjectSeele.LOGGER.error(
@@ -7082,8 +7077,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.beginContinuousSurfaceArrival(arrivalYaw);
             if (pilot != null)
             {
-                pilot.displayClientMessage(Component.literal(
-                        "TOKYO-3 SURFACE CLEAR - physical shaft sortie complete"), true);
+                pilot.displayClientMessage(Component.translatable("message.projectseele.launch.shaft_clear"), true);
             }
             sourceLevel.sendParticles(ParticleTypes.CLOUD,
                     arrival.x, arrival.y, arrival.z,
@@ -7113,8 +7107,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
         if (!isSortieShaftClear(destination, destinationBed))
         {
-            pilot.displayClientMessage(Component.literal(
-                    "Legacy destination shaft is obstructed; using the local emergency deck."), true);
+            pilot.displayClientMessage(Component.translatable("message.projectseele.launch.alternate"), true);
             return false;
         }
 
@@ -7150,8 +7143,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     "NERV sortie arrived but pilot remount failed: eva={} pilot={}",
                     relocated.getStringUUID(), pilot.getGameProfile().getName());
         }
-        pilot.displayClientMessage(Component.literal(
-                "TOKYO-3 SURFACE CLEAR — EVA sortie complete"), true);
+        pilot.displayClientMessage(Component.translatable("message.projectseele.launch.surface_clear"), true);
         destination.sendParticles(ParticleTypes.CLOUD, arrival.x, arrival.y, arrival.z,
                 90, 5.0D, 0.8D, 5.0D, 0.14D);
         destination.sendParticles(ParticleTypes.ELECTRIC_SPARK,

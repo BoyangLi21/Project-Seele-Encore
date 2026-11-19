@@ -68,7 +68,7 @@ public final class NervNpcResetR53
             }
         }
         batch.remaining=count;final int queued=count;
-        if(count==0)source.sendFailure(Component.literal("没有匹配的已登记 NPC，或重置已经在进行。"));
+        if(count==0)source.sendFailure(Component.translatable("message.projectseele.staff.reset_busy"));
         else source.sendSuccess(()->Component.literal("正在恢复 "+queued+" 个已登记 NPC；分批恢复岗位区块，完成后汇总。"),false);
         return count;
     }

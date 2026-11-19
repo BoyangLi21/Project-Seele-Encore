@@ -23,8 +23,7 @@ import net.minecraft.server.level.ServerPlayer;
 public final class FacilityV2Commands
 {
     private static final SimpleCommandExceptionType GEOFRONT_UNAVAILABLE =
-            new SimpleCommandExceptionType(Component.literal(
-                    "GeoFront dimension is unavailable"));
+            new SimpleCommandExceptionType(Component.translatable("message.projectseele.facility.no_geofront"));
 
     private FacilityV2Commands() {}
 

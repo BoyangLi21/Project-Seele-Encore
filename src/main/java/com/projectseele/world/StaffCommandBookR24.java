@@ -78,7 +78,7 @@ public final class StaffCommandBookR24
         var level=(ServerLevel)npc.level();
         if(!job.mission.isEmpty()&&!job.operation.equals("recover")&&!job.mission.equals(AutoSortieR32.missionToken(level)))
         {
-            failed(npc,"作战已经取消或变更，后续整备与发射按键未执行。");npc.finishTask();return false;
+            failed(npc,"ops.projectseele.orders.the_operation_changed_or_was_canceled_no");npc.finishTask();return false;
         }
         if(!job.automatic)return true;
         if(AutoSortieR32.automaticAllowed(level,job.unit))return true;
@@ -104,7 +104,7 @@ public final class StaffCommandBookR24
         var orders = ORDERS.computeIfAbsent(level, key -> new LinkedHashMap<>());
         if (npc.busy() || order(npc) != null || orders.values().stream().anyMatch(job -> job.unit == unit))
         {
-            NervStaffDialogue.reply(player, npc, "司令，我这边或机体还有一道操作没结束。可以等它完成，也可以取消后续安排。");
+            NervStaffDialogue.reply(player, npc, "ops.projectseele.orders.commander_the_unit_or_my_station_still");
             return 0;
         }
         if (npc.skin().equals("fuyutsuki"))
@@ -117,14 +117,14 @@ public final class StaffCommandBookR24
             var identity = post == null ? null : NervStaffSavedData.get(level).identity(post.id());
             if (identity == null || !(level.getEntity(identity) instanceof NervStaffEntity operator))
             {
-                NervStaffDialogue.reply(player, npc, "机体操作岗位暂时没有接通信号，这项指令尚未执行。");
+                NervStaffDialogue.reply(player, npc, "ops.projectseele.orders.the_unit_control_station_is_offline_the");
                 return 0;
             }
             int accepted = request(player, operator, operation, unit);
             if (accepted > 0)
             {
                 order(operator).contact = npc.getUUID();
-                NervStaffDialogue.reply(player, npc, "已交给" + operator.getName().getString() + "在机体控制台执行，进度会保持联络。");
+                NervStaffDialogue.reply(player, npc, OperationText.format("ops.projectseele.orders.delegated", StaffDialogueCatalogR24.speaker(operator.getName().getString())));
             }
             return accepted;
         }
@@ -144,16 +144,16 @@ public final class StaffCommandBookR24
         UUID owner = job == null ? npc.requester() : job.owner;
         if (owner != null && !owner.equals(player.getUUID()) && !player.hasPermissions(2))
         {
-            NervStaffDialogue.reply(player, npc, "请由下达这项指令的人取消，或联系值班指挥。"); return 0;
+            NervStaffDialogue.reply(player, npc, "ops.projectseele.orders.ask_the_person_who_issued_the_order"); return 0;
         }
         if (job != null && unit >= 0 && unit != job.unit)
         {
-            NervStaffDialogue.reply(player, npc, "当前待执行指令属于另一台机体，没有取消它。"); return 0;
+            NervStaffDialogue.reply(player, npc, "ops.projectseele.orders.the_pending_order_is_for_another_unit"); return 0;
         }
         var pilotCancellation=StaffPilotOrdersR25.cancel(player,npc,unit);
         if(pilotCancellation==StaffPilotOrdersR25.Cancellation.DENIED)
         {
-            NervStaffDialogue.reply(player,npc,"请由下达这项指令的人取消，或联系值班指挥。");return 0;
+            NervStaffDialogue.reply(player,npc,"ops.projectseele.orders.ask_the_person_who_issued_the_order");return 0;
         }
         if (job != null)
         {
@@ -163,7 +163,7 @@ public final class StaffCommandBookR24
         if(NervStaffDialogue.authorized(player)&&StaffAuthorityR25.commandContact(npc))
             AutoSortieR32.cancel(player,job==null?unit:job.unit);
         npc.finishTask();
-        NervStaffDialogue.reply(player, npc, "后续按键操作已取消。已经开始的机械运输会继续运行到安全位置。");
+        NervStaffDialogue.reply(player, npc, "ops.projectseele.orders.further_button_operations_canceled_machinery_already_moving");
         return 1;
     }
 
@@ -182,7 +182,7 @@ public final class StaffCommandBookR24
         var owner = level.getServer().getPlayerList().getPlayer(job.owner);
         if (outcome == null || !outcome.accepted())
         {
-            failed(npc, "联锁没有接受这次操作。" + NervStaffDialogue.readinessHint(level, job.unit, job.operation));
+            failed(npc, OperationText.format("ops.projectseele.orders.interlock", OperationText.read(NervStaffDialogue.readinessHint(level, job.unit, job.operation))));
             return;
         }
         if(job.automatic)
@@ -191,8 +191,8 @@ public final class StaffCommandBookR24
             if(airframe!=null)airframe.getPersistentData().putString("R32AutoStep",job.operation+"_accepted");
             ORDERS.get(level).remove(npc.getUUID());
             if(owner!=null)NervStaffDialogue.reply(owner,npc,job.operation.equals("prepare")
-                ?NervStaffDialogue.unitName(job.unit)+"驾驶员就位。开始整备，美里，等机体到发射台后交给你。"
-                :NervStaffDialogue.unitName(job.unit)+"，发射！到地面后保持通信。");
+                ?OperationText.format("ops.projectseele.orders.pilot_ready", TvBriefingText.unit(job.unit))
+                :OperationText.format("ops.projectseele.orders.launch", TvBriefingText.unit(job.unit)));
             return;
         }
         switch (job.operation)
@@ -202,7 +202,7 @@ public final class StaffCommandBookR24
             default ->
             {
                 job.step = Step.LAUNCHING; job.message = "弹射程序进行中";
-                if (owner != null) NervStaffDialogue.reply(owner, npc, "发射联锁通过。保持联络，运输和弹射由发射系统继续完成。");
+                if (owner != null) NervStaffDialogue.reply(owner, npc, "ops.projectseele.orders.launch_interlock_cleared_keep_the_channel_open");
             }
         }
     }
@@ -231,41 +231,41 @@ public final class StaffCommandBookR24
                 if(!validateAutomatic(npc))continue;
                 if (owner == null || owner.level() != level || !NervStaffDialogue.authorized(owner) || level.getGameTime() > job.deadline)
                 {
-                    failed(npc, "待执行指令已取消：通讯中断、权限改变或等待超时。已开始的运输继续按安全流程运行。"); npc.finishTask(); continue;
+                    failed(npc, "ops.projectseele.orders.pending_orders_canceled_after_loss_of_contact"); npc.finishTask(); continue;
                 }
                 var status = EvaLogisticsDirector.status(level, job.unit);
                 if (status.phase().equals("CANCELLED"))
-                { failed(npc, "出动指令已取消，机体在原位停止。可下达回收指令。"); npc.finishTask(); continue; }
+                { failed(npc, "ops.projectseele.orders.the_sortie_order_was_canceled_the_unit"); npc.finishTask(); continue; }
                 if (status.phase().equals("PLUG_FAULT"))
-                { failed(npc, "插入栓接入出现故障，后续发射已取消。请到机库检查。"); npc.finishTask(); continue; }
+                { failed(npc, "ops.projectseele.orders.entry_plug_insertion_failed_further_launch_orders"); npc.finishTask(); continue; }
                 if (job.step == Step.PRESS)
                 {
-                    if (!npc.busy()) failed(npc, "按键操作没有完成，待执行指令已停止。");
+                    if (!npc.busy()) failed(npc, "ops.projectseele.orders.the_button_operation_did_not_complete_pending");
                     continue;
                 }
                 if (job.step == Step.LAUNCHING)
                 {
                     if (status.phase().equals("DEPLOYED"))
-                    { jobs.remove(job.actor); NervStaffDialogue.reply(owner, npc, "机体已抵达地表，操纵权交还驾驶员。保持联络。"); }
+                    { jobs.remove(job.actor); NervStaffDialogue.reply(owner, npc, "ops.projectseele.orders.the_unit_has_reached_the_surface_pilot"); }
                     else if (Set.of("PARKED", "DESCENDING", "TO_HANGAR", "FILLING").contains(status.phase()))
-                        failed(npc, "出动状态已改变，后续指令已停止。请确认当前机体位置。");
+                        failed(npc, "ops.projectseele.orders.deployment_status_changed_further_orders_stopped_verify");
                     continue;
                 }
                 if (job.step == Step.PREPARING)
                 {
                     if(status.phase().equals("DEPLOYED")&&job.requested.startsWith("deploy_"))
-                    {jobs.remove(job.actor);NervStaffDialogue.reply(owner,npc,"机体已抵达所选出口，操纵权交还驾驶员。");continue;}
+                    {jobs.remove(job.actor);NervStaffDialogue.reply(owner,npc,"ops.projectseele.orders.the_unit_reached_the_selected_exit_control");continue;}
                     if (Set.of("PARKED", "PLUG_ABORT_RETURNING", "PLUG_ABORT_DOCKED", "DEPLOYED").contains(status.phase()))
-                    { failed(npc, "整备状态已被其他操作改变，后续发射已取消。请重新核对机体状态。"); continue; }
+                    { failed(npc, "ops.projectseele.orders.another_operation_changed_readiness_further_launch_orders"); continue; }
                     if (!status.phase().equals("SILO_READY")) continue;
                     String next=StaffUndergroundChoiceR52.readyContinuation(job.requested,status.phase());
                     if(next.equals("underground")){dispatchUndergroundR52(owner,npc,job);continue;}
                     if (next.equals("launch")) { job.operation = "launch"; job.step = Step.SIGNAL; }
-                    else { jobs.remove(job.actor); NervStaffDialogue.reply(owner, npc, "整备完成，机体已到达发射台。等待你的发射指令。"); continue; }
+                    else { jobs.remove(job.actor); NervStaffDialogue.reply(owner, npc, "ops.projectseele.orders.preparation_complete_the_unit_is_on_the"); continue; }
                 }
                 if (job.step == Step.RECOVERING)
                 {
-                    if (status.phase().equals("PARKED")) { jobs.remove(job.actor); NervStaffDialogue.reply(owner, npc, "机体已返回机库，湿舱恢复完成。"); }
+                    if (status.phase().equals("PARKED")) { jobs.remove(job.actor); NervStaffDialogue.reply(owner, npc, "ops.projectseele.orders.the_unit_is_back_in_the_hangar"); }
                     continue;
                 }
                 if (!status.loaded())
@@ -279,10 +279,10 @@ public final class StaffCommandBookR24
                     String next=StaffUndergroundChoiceR52.readyContinuation(job.requested,status.phase());
                     if(next.equals("underground")){dispatchUndergroundR52(owner,npc,job);continue;}
                     if (next.equals("launch")) job.operation = "launch";
-                    else if (!status.phase().equals("PARKED")) { failed(npc, "机体尚未回到整备待命状态。当前：" + NervStaffDialogue.stage(status.phase()) + "。"); continue; }
+                    else if (!status.phase().equals("PARKED")) { failed(npc, OperationText.format("ops.projectseele.orders.not_standby", NervStaffDialogue.phaseText(status.phase()))); continue; }
                     else if (!NervStaffDialogue.boarded(level, job.unit))
                     {
-                        if (job.step != Step.PILOT) NervStaffDialogue.reply(owner, npc, "我会等驾驶员进入对应机库的悬挂插入栓，再继续整备。你可以离开指挥台前往登机桥。");
+                        if (job.step != Step.PILOT) NervStaffDialogue.reply(owner, npc, "ops.projectseele.orders.i_ll_wait_until_the_pilot_enters");
                         job.step = Step.PILOT; job.message = "等待驾驶员登机"; continue;
                     }
                 }
@@ -291,7 +291,7 @@ public final class StaffCommandBookR24
                 { failed(npc, NervStaffDialogue.readinessHint(level, job.unit, job.operation)); continue; }
                 job.step = Step.PRESS; job.message = "前往控制台操作按键";
                 if (NervStaffDialogue.beginNativeAction(owner, npc, job.operation, job.unit) == 0)
-                    failed(npc, "未能抵达对应控制按键，指令已停止。");
+                    failed(npc, "ops.projectseele.orders.unable_to_reach_the_control_button_order");
             }
         }
     }

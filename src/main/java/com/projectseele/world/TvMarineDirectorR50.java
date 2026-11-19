@@ -113,7 +113,7 @@ public final class TvMarineDirectorR50
         for(var sortie:campaign.sorties.values()){var p=level.getServer().getPlayerList().getPlayer(sortie.commander);if(p!=null&&p.level()==level)bar.addPlayer(p);}
         var entity=state.boss==null?null:level.getEntity(state.boss);
         if(campaign.phase.equals("failure")||state.phase.equals("failure"))
-        {freeze(level,campaign);bar.setName(Component.literal(campaign.notice+" · 机体回收后可重试"));return;}
+        {freeze(level,campaign);bar.setName(Component.translatable("ops.projectseele.campaign.marine_retry", OperationText.read(campaign.notice)));return;}
         if(commander==null||commander.level()!=level)
         {freeze(level,campaign);state.notice=campaign.notice="指挥员离线或离开本战区维度，海战与倒计时暂停。";return;}
         if(campaign.phase.equals("alert")&&TvMissionAlertR30.tick(level,campaign,commander))
@@ -173,7 +173,7 @@ public final class TvMarineDirectorR50
         {fail(level,campaign,state,"原二号机失去战斗能力，请先回收整备。");return;}
         state.notice="美里：二号机，把它引到舰炮正前方，再撑住嘴。 · 舰桥电源"+(supply?"接通":"断开")+" · 一炮"+cannonStatusR50(state,0)+" / 二炮"+cannonStatusR50(state,1)+" · 拦截余"+Math.max(0,(site.deadline()-state.elapsed)/20)+"秒";
         if(boss.mouthHeldR50())state.notice+=" · 真实口部接触稳定，请在6秒内完成双炮";
-        campaign.notice=state.notice;bar.setName(Component.literal(state.notice));bar.setProgress(Math.max(0,Math.min(1,boss.getHealth()/boss.getMaxHealth())));state.setDirty();
+        campaign.notice=state.notice;bar.setName(OperationText.read(state.notice));bar.setProgress(Math.max(0,Math.min(1,boss.getHealth()/boss.getMaxHealth())));state.setDirty();
     }
     private static void freeze(ServerLevel level,TvCampaignSavedData campaign)
     {if(campaign.angel!=null&&level.getEntity(campaign.angel) instanceof GaghielEntity boss&&TvEncounterDirectorR45.owned(boss,campaign)){boss.setNoAi(true);boss.holdMouthR50(null);}}

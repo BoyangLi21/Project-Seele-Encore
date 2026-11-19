@@ -1,5 +1,6 @@
 package com.projectseele.visual;
 
+import com.projectseele.world.OperationText;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -39,7 +40,7 @@ public final class NervStaffCommands
                         .executes(c ->
                         {
                             var player = c.getSource().getPlayerOrException();
-                            player.sendSystemMessage(Component.literal(NervWayfindingR24.start(player,
+                            player.sendSystemMessage(OperationText.read(NervWayfindingR24.start(player,
                                     StringArgumentType.getString(c, "destination"))));
                             return 1;
                         }));

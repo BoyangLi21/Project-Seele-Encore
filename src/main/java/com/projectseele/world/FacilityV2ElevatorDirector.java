@@ -390,15 +390,13 @@ public final class FacilityV2ElevatorDirector
                 level, manifest, PUBLIC_LIFT_ID, "PUBLIC_LIFT_SHAFT");
         if (cabin == null)
         {
-            player.displayClientMessage(Component.literal(
-                    "H-01 LIFT  CABIN IDENTITY UNAVAILABLE")
+            player.displayClientMessage(Component.translatable("message.projectseele.lift.cabin_missing")
                     .withStyle(ChatFormatting.RED), true);
             return true;
         }
         if (!cabin.isPersistentLiftIdle())
         {
-            player.displayClientMessage(Component.literal(
-                    "H-01 LIFT  IN TRANSIT")
+            player.displayClientMessage(Component.translatable("message.projectseele.lift.in_transit")
                     .withStyle(ChatFormatting.GOLD), true);
             return true;
         }
@@ -428,8 +426,7 @@ public final class FacilityV2ElevatorDirector
 
         if (!cabin.beginPersistentLiftTravel(requestedY))
         {
-            player.displayClientMessage(Component.literal(
-                    "H-01 LIFT  CABIN READY AT THIS LANDING")
+            player.displayClientMessage(Component.translatable("message.projectseele.lift.ready")
                     .withStyle(ChatFormatting.YELLOW), true);
             return true;
         }

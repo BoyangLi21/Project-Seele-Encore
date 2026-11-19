@@ -46,7 +46,7 @@ public final class NervAccessReaderEntityR44 extends BlockEntity
     {return linked&&gate.equals(expectedGate)&&exit.equals(BlockPos.ZERO)&&width==3&&height==3&&alongX&&clearance==3;}
     public void present(Player player,InteractionHand hand,int tier)
     {
-        if(!linked){player.displayClientMessage(Component.literal("读卡器未连接门体。"),true);return;}
+        if(!linked){player.displayClientMessage(Component.translatable("message.projectseele.doors.reader_unlinked"),true);return;}
         if(swipeAt>=0&&level.getGameTime()-swipeAt<12)return;
         swipeAt=level.getGameTime();presented=tier;presentedHand=hand;user=player.getUUID();status=1;indicateUntil=swipeAt+32;chamberDecision=false;sync();
     }

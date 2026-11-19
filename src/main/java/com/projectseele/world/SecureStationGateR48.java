@@ -85,7 +85,7 @@ public final class SecureStationGateR48
         InteractionHand hand=event.getHand();
         if(!card(player,hand)&&card(player,InteractionHand.OFF_HAND))hand=InteractionHand.OFF_HAND;
         if(!card(player,hand))
-        {player.displayClientMessage(net.minecraft.network.chat.Component.literal("请手持NERV通行证刷卡。"),true);return;}
+        {player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.projectseele.gate.nerv_card"),true);return;}
         if(state.swipe==null)
         {
             state.swipe=new Swipe(player.getUUID(),hand,level.getGameTime());

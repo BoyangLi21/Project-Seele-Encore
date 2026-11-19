@@ -40,7 +40,7 @@ public final class LaunchSiloCommands
         ServerLevel level = player.serverLevel();
         if (player.isPassenger())
         {
-            source.sendFailure(Component.literal("Dismount before constructing a launch complex."));
+            source.sendFailure(Component.translatable("message.projectseele.silo.dismount"));
             return 0;
         }
         int minSurface = level.getMinBuildHeight() + 52;
@@ -48,7 +48,7 @@ public final class LaunchSiloCommands
         int maxSurface = level.getMaxBuildHeight() - 72;
         if (maxSurface < minSurface)
         {
-            source.sendFailure(Component.literal("This dimension is too shallow for the launch complex."));
+            source.sendFailure(Component.translatable("message.projectseele.silo.too_shallow"));
             return 0;
         }
         int surfaceY = Math.max(minSurface, Math.min(maxSurface, player.blockPosition().getY() - 1));
@@ -58,8 +58,7 @@ public final class LaunchSiloCommands
                 unit -> unit.isAlive() && unit.findLaunchBed() != null).isEmpty();
         if (existingComplex)
         {
-            source.sendFailure(Component.literal(
-                    "A launch complex already exists here; move at least 60 blocks before setup."));
+            source.sendFailure(Component.translatable("message.projectseele.silo.nearby"));
             return 0;
         }
         NervConstructionKitItem.buildComplex(level, origin);
@@ -77,8 +76,7 @@ public final class LaunchSiloCommands
         // gantry, not at the launch bed forty-five blocks below ground.
         player.teleportTo(level, origin.getX() + 0.5D, origin.getY() + 4.0D,
                 origin.getZ() + 14.5D, 180.0F, 16.0F);
-        source.sendSuccess(() -> Component.literal(
-                "NERV launch complex ready. Use /seele dev silo board to start insertion."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.silo.ready"), false);
         return 1;
     }
 
@@ -88,7 +86,7 @@ public final class LaunchSiloCommands
         ServerPlayer player = source.getPlayerOrException();
         if (player.isPassenger())
         {
-            source.sendFailure(Component.literal("Already riding an entity; dismount before silo boarding."));
+            source.sendFailure(Component.translatable("message.projectseele.silo.already_riding"));
             return 0;
         }
         EvaUnit01Entity unit = nearestCagedUnit(player);
@@ -107,11 +105,10 @@ public final class LaunchSiloCommands
         unit.tryEnterFromPlug(player, false);
         if (player.getVehicle() != unit)
         {
-            source.sendFailure(Component.literal("Entry-plug boarding failed; check the gantry and launch bed."));
+            source.sendFailure(Component.translatable("message.projectseele.silo.cannot_board"));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Entry plug inserted. Catapult launches after the synchronization sequence."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.silo.plug_inserted"), false);
         return 1;
     }
 

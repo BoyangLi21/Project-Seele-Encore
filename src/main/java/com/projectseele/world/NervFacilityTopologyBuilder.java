@@ -273,8 +273,7 @@ public final class NervFacilityTopologyBuilder
                     }
                     if(lift==CAGE_LIFT&&NervLegacyGenerationGuardR52.retired(level))
                     {
-                        player.displayClientMessage(Component.literal(
-                                "R52 EVA ACCESS  DECLARED FACILITY REQUIRED")
+                        player.displayClientMessage(Component.translatable("message.projectseele.access.facility")
                                 .withStyle(ChatFormatting.RED),true);
                         return true;
                     }
@@ -293,8 +292,7 @@ public final class NervFacilityTopologyBuilder
                     if (ACTIVE_RIDES.containsKey(player.getUUID())
                             || liftIsBusy(lift))
                     {
-                        player.displayClientMessage(Component.literal(
-                                "NERV ELEVATOR  TRANSIT ALREADY ACTIVE")
+                        player.displayClientMessage(Component.translatable("message.projectseele.lift.active")
                                 .withStyle(ChatFormatting.RED), true);
                         return true;
                     }

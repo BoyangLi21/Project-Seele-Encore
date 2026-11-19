@@ -140,11 +140,11 @@ public final class RegionalGatewayDirector
         ServerLevel level = player.serverLevel();
         if (!validCard(player.getMainHandItem()) && !validCard(player.getOffhandItem()))
         {
-            player.displayClientMessage(Component.literal("NERV：请手持职员证刷卡 / CARD REQUIRED"), true);
+            player.displayClientMessage(Component.translatable("message.projectseele.gate.show_card"), true);
             return false;
         }
         RUNTIMES.get(level).gateUntil = level.getGameTime() + 160;
-        player.displayClientMessage(Component.literal("NERV：权限确认，请进入 / ACCESS GRANTED"), true);
+        player.displayClientMessage(Component.translatable("message.projectseele.gate.access_granted"), true);
         return true;
     }
 

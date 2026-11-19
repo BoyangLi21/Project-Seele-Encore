@@ -171,7 +171,7 @@ public final class ArmamentStationCommands
         if (station.towerR64() >= 0)
         {
             // A tower's station is recorded by the world and never made twice: it is not removed by hand.
-            context.getSource().sendFailure(Component.literal("这是备用武器楼的站，不能用这个指令删除。"));
+            context.getSource().sendFailure(Component.translatable("message.projectseele.armament.reserve_station"));
             return 0;
         }
         station.discard();

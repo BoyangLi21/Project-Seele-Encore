@@ -1,5 +1,6 @@
 package com.projectseele.client.cockpit;
 
+import com.projectseele.world.OperationText;
 import com.projectseele.ProjectSeele;
 import com.projectseele.client.AircraftRenderClockR21;
 import com.projectseele.client.ClientForgeEvents;
@@ -670,7 +671,7 @@ public final class PlugCannonSightR64
         // of the screen, which is behind the sight's shell: its last clause is said here, along the window's top.
         if (told != null && !told.notice().isEmpty())
         {
-            String rest = told.notice();
+            String rest = OperationText.read(told.notice()).getString();
             for (int row = 0, y = w[1] + 6; row < 2 && !rest.isEmpty() && y < cy - 30 * unit; row++, y += 10)
             {
                 String part = font.plainSubstrByWidth(rest, w[2] - w[0] - 40);

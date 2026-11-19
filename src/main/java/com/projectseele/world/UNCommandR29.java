@@ -24,7 +24,7 @@ import java.util.*;
 /** UN authority is carried by the UN handset or the actual UN pilot, not NERV staff roles. */
 public final class UNCommandR29
 {
-    private static final SimpleCommandExceptionType UNKNOWN_UNIT=new SimpleCommandExceptionType(Component.literal("UN 机体请用 un0 或 un1。"));
+    private static final SimpleCommandExceptionType UNKNOWN_UNIT=new SimpleCommandExceptionType(Component.translatable("message.projectseele.un.unit_argument"));
     private static final Map<ServerPlayer,Integer> LAST=new WeakHashMap<>();
     private static final Map<ServerPlayer,Integer> LAST_QUERY=new WeakHashMap<>();
     private static final TicketType<ChunkPos> RADIO=TicketType.create("seele_un_radio",Comparator.comparingLong(ChunkPos::toLong),100);
@@ -48,27 +48,27 @@ public final class UNCommandR29
     public static String status(ServerLevel l,int serial)
     {
         var eva=unit(l,serial);
-        return Unit03SourceRigR53.displayName(serial)+" · 核能 · "+(eva==null?"远端信号接入中":eva.isUNFlying()?(eva.isUNLanding()?"自动降落":"飞行中"):eva.getPilotEntity()==null?"无人驾驶":"驾驶员已接入")+"\n"+UNAirLiftR29.status(l,serial);
+        return OperationText.format("ops.projectseele.un.unit_status", Unit03SourceRigR53.displayName(serial), OperationText.read(eva==null?"ops.projectseele.un.connecting_to_remote_unit":eva.isUNFlying()?(eva.isUNLanding()?"ops.projectseele.un.automatic_landing":"ops.projectseele.un.in_flight"):eva.getPilotEntity()==null?"ops.projectseele.un.uncrewed":"ops.projectseele.un.pilot_connected"), OperationText.read(UNAirLiftR29.status(l,serial)));
     }
     private static String board(ServerPlayer p,int serial)
     {
-        var l=p.serverLevel();var eva=unit(l,serial);if(eva==null)return "正在加载机体，请稍后重试。";
-        if(p.isPassenger())return "你已经在载具内，请先离开当前座舱。";
-        if(UNAirLiftR29.ownsMotion(l,serial)||eva.isUNFlying()||eva.isNervLogisticsLocked())return "请等机体落地、夹具释放，并确认舱门已开启后再接入。";
-        if(p.distanceToSqr(eva)>90*90)return "请先走到 "+Unit03SourceRigR53.displayName(serial)+" 附近，再请求接入。";
-        var plug=UNPlugDirector.capsule(eva);if(plug==null)return "插入栓仍在加载，请稍后重试。";
-        if(plug.isVehicle()||eva.getPilotEntity()!=null)return "驾驶舱已有乘员。";
+        var l=p.serverLevel();var eva=unit(l,serial);if(eva==null)return "ops.projectseele.un.loading_unit_please_try_again";
+        if(p.isPassenger())return "ops.projectseele.un.leave_your_current_seat_before_boarding";
+        if(UNAirLiftR29.ownsMotion(l,serial)||eva.isUNFlying()||eva.isNervLogisticsLocked())return "ops.projectseele.un.wait_for_landing_clamp_release_and_the_hatch";
+        if(p.distanceToSqr(eva)>90*90)return OperationText.format("ops.projectseele.un.approach", Unit03SourceRigR53.displayName(serial));
+        var plug=UNPlugDirector.capsule(eva);if(plug==null)return "ops.projectseele.un.loading_the_entry_plug_please_try_again";
+        if(plug.isVehicle()||eva.getPilotEntity()!=null)return "ops.projectseele.un.the_cockpit_is_occupied";
         if(plug.isLockedToEva())
         {
-            if(!p.startRiding(plug,true)||!eva.bindEntryPlug(plug,EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT)){p.stopRiding();return "驾驶连接未被接受。";}
-            plug.syncPilotPositionNow();l.getChunkSource().move(p);return "已接入插入栓，正在完成同步。";
+            if(!p.startRiding(plug,true)||!eva.bindEntryPlug(plug,EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT)){p.stopRiding();return "ops.projectseele.un.pilot_link_rejected";}
+            plug.syncPilotPositionNow();l.getChunkSource().move(p);return "ops.projectseele.un.entry_plug_connected_synchronizing";
         }
-        return plug.boardPassenger(p)?"已进入插入栓，等待吊机把插入栓接入机体。":"插入栓当前不可登机。";
+        return plug.boardPassenger(p)?"ops.projectseele.un.you_are_in_the_plug_waiting_for_the":"ops.projectseele.un.the_entry_plug_cannot_be_boarded_now";
     }
     public static void receive(ServerPlayer p,String action,int serial,int x,int z)
     {
         if(serial<0||serial>1||!authorized(p))return;
-        if(!p.serverLevel().dimension().equals(FacilitySchemaV2.DIMENSION)){p.sendSystemMessage(Component.literal("请进入第三新东京市所在的项目世界后使用 UN 指挥通信。"));return;}
+        if(!p.serverLevel().dimension().equals(FacilitySchemaV2.DIMENSION)){p.sendSystemMessage(Component.translatable("message.projectseele.un.radio_dimension"));return;}
         int tick=p.server.getTickCount();
         if(action.equals("status"))
         {
@@ -83,7 +83,7 @@ public final class UNCommandR29
         var l=p.serverLevel();String reply="";
         switch(action)
         {
-            case "open" -> reply="选择机体并填写投放 X、Z。运输机会寻找该位置附近可承载机体的地面。";
+            case "open" -> reply="ops.projectseele.un.choose_a_unit_and_enter_drop_coordinates_x";
             case "status" -> {}
             case "deliver" -> reply=UNAirLiftR29.request(p,serial,false,x,z);
             case "recover" -> reply=UNAirLiftR29.request(p,serial,true,x,z);
@@ -93,7 +93,7 @@ public final class UNCommandR29
             case "drain","door","fill" ->
             {
                 unit(l,serial);
-                reply=UNAirLiftR29.active(l,serial)?"运输任务正在使用机库，请先完成或取消运输。":serial==0?MilitaryR07Director.request(l,action,null):UNAnnexR20.request(l,action,null);
+                reply=UNAirLiftR29.active(l,serial)?"ops.projectseele.un.transport_is_using_the_hangar_complete_or_cancel":serial==0?MilitaryR07Director.request(l,action,null):UNAnnexR20.request(l,action,null);
             }
             default -> {return;}
         }
@@ -109,7 +109,7 @@ public final class UNCommandR29
     {
         var un=Commands.literal("un");
         un.then(Commands.literal("phone").executes(c->{receive(c.getSource().getPlayerOrException(),"open",0,0,0);return 1;}));
-        un.then(Commands.literal("status").executes(c->{var p=c.getSource().getPlayerOrException();p.sendSystemMessage(Component.literal(status(p.serverLevel(),0)+"\n"+status(p.serverLevel(),1)));return 1;}));
+        un.then(Commands.literal("status").executes(c->{var p=c.getSource().getPlayerOrException();p.sendSystemMessage(Component.empty().append(OperationText.read(status(p.serverLevel(),0))).append("\n").append(OperationText.read(status(p.serverLevel(),1))));return 1;}));
         un.then(Commands.literal("deliver").then(unitArgument().then(Commands.argument("x",IntegerArgumentType.integer(-29999000,29999000)).then(Commands.argument("z",IntegerArgumentType.integer(-29999000,29999000))
                 .executes(c->transport(c,"deliver",IntegerArgumentType.getInteger(c,"x"),IntegerArgumentType.getInteger(c,"z")))))));
         // One recovery for everyone: it docks a unit already at the receiving apron and otherwise calls the aircraft.
@@ -121,14 +121,14 @@ public final class UNCommandR29
         un.then(Commands.literal("reset").requires(s->s.hasPermission(2)).then(unitArgument().executes(c->UNRecoveryR22.request(c.getSource(),unit(c),true))));
         for(String toggle:new String[]{"defense","power"})un.then(Commands.literal(toggle).requires(s->s.hasPermission(2)).executes(c->{
             var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return 0;
-            String message=MilitaryR07Director.request(l,toggle,c.getSource().getPlayerOrException());c.getSource().sendSuccess(()->Component.literal(message),false);return 1;
+            String message=MilitaryR07Director.request(l,toggle,c.getSource().getPlayerOrException());c.getSource().sendSuccess(()->OperationText.read(message),false);return 1;
         }));
         return un;
     }
     private static int transport(CommandContext<CommandSourceStack> c,String action,int x,int z)throws CommandSyntaxException
     {
         var p=c.getSource().getPlayerOrException();int serial=unit(c);
-        if(!p.serverLevel().dimension().equals(FacilitySchemaV2.DIMENSION)){c.getSource().sendFailure(Component.literal("请进入第三新东京市所在的项目世界后再联络 UN 运输。"));return 0;}
+        if(!p.serverLevel().dimension().equals(FacilitySchemaV2.DIMENSION)){c.getSource().sendFailure(Component.translatable("message.projectseele.un.transport_dimension"));return 0;}
         String reply=switch(action)
         {
             case "deliver" -> UNAirLiftR29.request(p,serial,false,x,z);
@@ -136,17 +136,17 @@ public final class UNCommandR29
             case "cancel" -> UNAirLiftR29.cancel(p,serial);
             default -> board(p,serial);
         };
-        c.getSource().sendSuccess(()->Component.literal(Unit03SourceRigR53.displayName(serial)+"："+reply),false);return 1;
+        c.getSource().sendSuccess(()->Component.translatable("ops.projectseele.un.unit_reply", Unit03SourceRigR53.displayName(serial), OperationText.read(reply)),false);return 1;
     }
     /** The wet cell of un0 or un1: the same interlock as the handset, answered in chat. */
     public static int hangar(CommandSourceStack source,String action,int serial)throws CommandSyntaxException
     {
         var p=source.getPlayerOrException();var l=p.serverLevel();
-        if(!l.dimension().equals(FacilitySchemaV2.DIMENSION)){source.sendFailure(Component.literal("请进入第三新东京市所在的项目世界后再操作 UN 机库。"));return 0;}
+        if(!l.dimension().equals(FacilitySchemaV2.DIMENSION)){source.sendFailure(Component.translatable("message.projectseele.un.hangar_dimension"));return 0;}
         unit(l,serial);
-        String reply=!action.equals("status")&&UNAirLiftR29.active(l,serial)?"运输任务正在使用机库，请先完成或取消运输。"
+        String reply=!action.equals("status")&&UNAirLiftR29.active(l,serial)?"ops.projectseele.un.transport_is_using_the_hangar_complete_or_cancel"
                 :serial==0?MilitaryR07Director.request(l,action,null):UNAnnexR20.request(l,action,null);
-        source.sendSuccess(()->Component.literal(reply),false);return 1;
+        source.sendSuccess(()->OperationText.read(reply),false);return 1;
     }
     private static RequiredArgumentBuilder<CommandSourceStack,String> unitArgument()
     {

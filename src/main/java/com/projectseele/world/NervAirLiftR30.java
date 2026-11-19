@@ -71,9 +71,9 @@ public final class NervAirLiftR30
     public static String status(ServerLevel l)
     {
         if(NervRouteRuntimeR52.claimed(l))return NervAirTransportRuntimeR52.status(l);
-        var s=state(l);String surface=s.forceRecovery?s.last:s.job==null?s.last:NervStaffDialogue.unitName(s.job.variant)+"："+s.job.note;
+        var s=state(l);String surface=s.forceRecovery?s.last:s.job==null?s.last:OperationText.format("ops.projectseele.un.unit_reply", TvBriefingText.unit(s.job.variant), OperationText.read(s.job.note));
         String underground=NervUndergroundTransportSiteR50.get(l)==null?"GeoFront 地下机场尚未开放":NervUndergroundAirLiftR50.status(l);
-        return "地表运输："+surface+" ｜ 地下运输："+underground;
+        return OperationText.format("ops.projectseele.flight.overview", OperationText.read(surface), OperationText.read(underground));
     }
     public static String forceRecover(ServerLevel level)
     {
@@ -84,8 +84,8 @@ public final class NervAirLiftR30
     public static com.mojang.brigadier.builder.LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> transportCommand()
     {
         return net.minecraft.commands.Commands.literal("transport")
-                .then(net.minecraft.commands.Commands.literal("status").executes(c->{var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return 0;c.getSource().sendSuccess(()->Component.literal(status(l)),false);return 1;}))
-                .then(net.minecraft.commands.Commands.literal("force_recover").executes(c->{var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return 0;String reply=forceRecover(l);c.getSource().sendSuccess(()->Component.literal(reply),true);return 1;}));
+                .then(net.minecraft.commands.Commands.literal("status").executes(c->{var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return 0;c.getSource().sendSuccess(()->OperationText.read(status(l)),false);return 1;}))
+                .then(net.minecraft.commands.Commands.literal("force_recover").executes(c->{var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return 0;String reply=forceRecover(l);c.getSource().sendSuccess(()->OperationText.read(reply),true);return 1;}));
     }
     private static void completeForcedRecovery(ServerLevel l,State s)
     {
@@ -206,7 +206,7 @@ public final class NervAirLiftR30
         if(job.nextReport==0||job.nextReport>now+10000){job.nextReport=now+10000;return;}
         if(now<job.nextReport)return;job.nextReport=now+10000;
         var owner=level.getServer().getPlayerList().getPlayer(job.owner);
-        if(owner!=null)owner.sendSystemMessage(Component.literal("[NERV 运输管制] "+BlockPos.containing(s.aircraftAt).toShortString()+" · "+job.note));
+        if(owner!=null)owner.sendSystemMessage(Component.translatable("ops.projectseele.flight.report_position", BlockPos.containing(s.aircraftAt).toShortString(), OperationText.read(job.note)));
     }
     public static String request(ServerPlayer p,int variant,boolean returning,int x,int z)
     {
@@ -224,7 +224,7 @@ public final class NervAirLiftR30
         }
         if(roofBlocksSurfaceFlightR50(l,original))return "此位置没有连通的地下航线，起吊通道也不通往地表；机体保持当前位置。";
         if(!Files.isRegularFile(l.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_transport_r30.json")))return "机场重型运输区尚未开放。";
-        var s=state(l);if(s.job!=null)return "运输机已有任务："+s.job.note;
+        var s=state(l);if(s.job!=null)return OperationText.format("ops.projectseele.flight.busy", OperationText.read(s.job.note));
         var receipt=EvaFleetSavedData.get(l.getServer()).entry(variant).orElse(null);
         if(receipt==null)return "未找到这台机体的登记。";
         if(receipt.phase()!=EvaFleetSavedData.Phase.DEPLOYED)return "地下机库与发射井禁止直接起吊。请先完成正常发射，让机体抵达地表。";
@@ -293,7 +293,7 @@ public final class NervAirLiftR30
     private static int duration(Vec3 a,Vec3 b){return AirRouteR39.duration(a,b);}
     private static boolean movingCargo(Phase p){return Set.of(Phase.ASCEND,Phase.CRUISE,Phase.DESCEND).contains(p);}
     private static void note(ServerLevel l,Job j,String text)
-    {if(j.note.equals(text))return;j.note=text;var p=l.getServer().getPlayerList().getPlayer(j.owner);if(p!=null)p.sendSystemMessage(Component.literal("[NERV 运输管制] "+text));}
+    {if(j.note.equals(text))return;j.note=text;var p=l.getServer().getPlayerList().getPlayer(j.owner);if(p!=null)p.sendSystemMessage(Component.translatable("ops.projectseele.flight.report", OperationText.read(text)));}
     private static void lock(EvaUnit01Entity e){e.setNervLogisticsLocked(true);e.setNoGravity(true);e.setDeltaMovement(Vec3.ZERO);}
     private static void begin(ServerLevel l,Job j,Phase phase,Vec3 a,Vec3 b,int ticks,EvaUnit01Entity e)
     {
