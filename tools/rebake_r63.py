@@ -1192,6 +1192,8 @@ def step_report(a):
         cmd += ['--client-template', str(a.client_template)]
     if a.compare_build:
         cmd += ['--compare-build', str(a.compare_build)]
+    if a.release_source:
+        cmd += ['--release-source', str(a.release_source)]
     if a.logged_world_folder:
         cmd += ['--logged-world-folder', a.logged_world_folder]
     save('report', dict(check_first=subprocess.list2cmdline(cmd + ['--check', str(WORK / 'logs/package-check.json')]),
@@ -1224,6 +1226,7 @@ def main():
     p.add_argument('--batch', type=int, help='mirror: the batch the formal world should be at; refuse if the batch table says otherwise')
     p.add_argument('--client-template', type=Path, help='report: PCL ZIP to pass to the packager')
     p.add_argument('--compare-build', type=Path, help='report: compiled jar to pass to the packager')
+    p.add_argument('--release-source', type=Path, help='report: source checkout matching the jar to be packaged')
     p.add_argument('--logged-world-folder', help='report: source folder name in the shipped client DH logs for renamed mirrors')
     p.add_argument('--source-world', type=Path, default=FORMAL, help='Stopped world used for checks and every mirror')
     p.add_argument('--source-client', type=Path, default=SHIP, help='Client instance supplying the exact jar and assets to ship')

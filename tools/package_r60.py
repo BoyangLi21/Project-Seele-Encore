@@ -371,7 +371,8 @@ def config_spec(source=ROOT / 'src/main/java/com/projectseele/config/SeeleConfig
     text = source.read_text('utf8')
     files = {'common': 'config/projectseele-common.toml', 'client': 'config/projectseele-client.toml'}
     stacks, builder, spec = {'common': [], 'client': []}, None, {}
-    token = re.compile(r'\b(common|client)\.(push|pop)\(\s*(?:"([^"]+)")?\s*\)|\b(common|client)\.|\.define(?:InRange)?\(\s*"([^"]+)"\s*,\s*([^,)]+)')
+    token = re.compile(r'\b(common|client)\.(push|pop)\(\s*(?:"([^"]+)")?\s*\)|\b(common|client)\.'
+                       r'|\.define(?:InRange|InList)?\(\s*"([^"]+)"\s*,\s*("(?:\\.|[^"\\])*"|[^,)]+)')
     for m in token.finditer(text):
         if m[2] == 'push':
             builder = m[1]
@@ -382,24 +383,34 @@ def config_spec(source=ROOT / 'src/main/java/com/projectseele/config/SeeleConfig
         elif m[4]:
             builder = m[4]
         elif m[5] and builder:
-            raw = m[6].strip().rstrip('DdFf')
-            value = raw == 'true' if raw in ('true', 'false') else float(raw)
+            raw = m[6].strip()
+            value = json.loads(raw) if raw.startswith('"') or raw in ('true', 'false') else float(raw.rstrip('DdFf'))
             spec[(files[builder], '.'.join(stacks[builder]), m[5])] = value
     return spec
 
 
-def config_report(client):
+def config_report(client, release_source=ROOT):
     """Shipped config files against the code's defaults. Missing keys get their defaults on first start."""
-    spec, shipped = config_spec(), {}
+    spec, shipped = config_spec(release_source / 'src/main/java/com/projectseele/config/SeeleConfig.java'), {}
+    def collect(name, nodes, section=''):
+        for key, value in nodes.items():
+            if isinstance(value, dict):
+                collect(name, value, section + '.' + key if section else key)
+            else:
+                shipped[(name, section, key)] = value
+
+    def matches(default, actual):
+        if isinstance(default, float):
+            return type(actual) in (int, float) and abs(actual - default) <= 1e-9
+        return type(actual) is type(default) and actual == default
+
     for name in sorted({f for f, _, _ in spec}):
         path = client / name
         if not gate(path.is_file(), 'Config file missing: ' + name):
             continue
-        for section, values in tomllib.loads(path.read_text('utf8')).items():
-            for key, value in (values.items() if isinstance(values, dict) else []):
-                shipped[(name, section, key)] = value
+        collect(name, tomllib.loads(path.read_text('utf8')))
     differ = [dict(file=f, key=s + '.' + k, shipped=shipped[(f, s, k)], default=v) for (f, s, k), v in sorted(spec.items())
-              if (f, s, k) in shipped and (shipped[(f, s, k)] != v if isinstance(v, bool) else abs(float(shipped[(f, s, k)]) - v) > 1e-9)]
+              if (f, s, k) in shipped and not matches(v, shipped[(f, s, k)])]
     missing = [dict(file=f, key=s + '.' + k, default=v) for (f, s, k), v in sorted(spec.items()) if (f, s, k) not in shipped]
     stale = [dict(file=f, key=s + '.' + k) for (f, s, k) in sorted(shipped) if (f, s, k) not in spec]
     return dict(keys_in_code=len(spec), differ_from_default=differ, missing_filled_on_first_start=missing, not_in_code=stale)
@@ -434,7 +445,7 @@ def build_inputs(a, work):
     client_lod, world_lod, lod_details = distant_caches(world, seed, a.pack, work, a.geofront_lod and a.geofront_lod.resolve())
     gate(a.geofront_lod, VERSION + ' needs --geofront-lod: the formal world still has the R62 far view (tools/rebake_r63.py core)')
     jar = jar_report(client / MAIN_JAR, a.compare_build)
-    config = config_report(client)
+    config = config_report(client, a.release_source)
 
     current = {p.relative_to(client).as_posix(): p for tree in CLIENT_TREES for p in files(client / tree)}
     for name in list(current):
@@ -534,8 +545,8 @@ def build_inputs(a, work):
                  acceptance='Friends test package; content and archive integrity checked, not verified in game')
     for payload, prefix in ((server, ''), (pcl, 'overrides/')):
         payload[prefix + JIT] = client / JIT
-        payload[prefix + VERSION + '_QUICKSTART.zh.md'] = ROOT / f'docs/{VERSION}_QUICKSTART.zh.md'
-        payload[prefix + VERSION + '_RELEASE.zh.md'] = ROOT / f'docs/{VERSION}_RELEASE.zh.md'
+        payload[prefix + VERSION + '_QUICKSTART.zh.md'] = a.release_source / f'docs/{VERSION}_QUICKSTART.zh.md'
+        payload[prefix + VERSION + '_RELEASE.zh.md'] = a.release_source / f'docs/{VERSION}_RELEASE.zh.md'
         payload[prefix + VERSION + '_BATCH.json'] = json_bytes(batch)
         absent = sorted(name for name, value in payload.items() if isinstance(value, Path) and not value.is_file())
         gate(not absent, ('Payload file missing', absent[:10]))
@@ -598,6 +609,7 @@ def main():
     p.add_argument('--xaero-map', type=Path, help='xaero/world-map/WORLD/projectseele$geofront written by a -Dprojectseele.xaeroBake=true run on a copy of --world')
     p.add_argument('--geofront-lod', type=Path, help='GeoFront DistantHorizons.sqlite from tools/rebake_r63.py (WORK/out/geofront_lod.sqlite)')
     p.add_argument('--compare-build', type=Path, help='A jar built from current main: every com/projectseele class of the shipped jar must match it')
+    p.add_argument('--release-source', type=Path, default=ROOT, help='Matching source checkout for config defaults and the two release documents')
     p.add_argument('--logged-world-folder', help='Original folder of a renamed world copy, as recorded in the source client DH logs')
     p.add_argument('--server-template', type=Path, help='Server ZIP supplying Forge libraries and startup files')
     p.add_argument('--client-template', type=Path, help='Client PCL ZIP supplying the manifest')
@@ -625,7 +637,7 @@ def main():
         report = dict(version=VERSION, date=a.date, pack_written=False, actual_world=str(d['world']), manifest_name=NAME,
                       server_world_directory=SERVER_WORLD, map_state=a.map_note, dh=d['lod'], dh_key=d['dh_key'],
                       dh_identifier_source=d['dh_source'], server_mods=d['server_mods'], client_contains_save=False,
-                      main_jar=d['jar'], config=d['config'], minimap_region_zips=d['minimap_region_zips'],
+                      main_jar=d['jar'], release_source=str(a.release_source.resolve()), config=d['config'], minimap_region_zips=d['minimap_region_zips'],
                       raw_bytes=dict(server=size(d['server']), client=size(d['pcl'])), jit_directive=JVM,
                       compression='Already compressed media stored; everything else DEFLATE, client level 9, server level 3')
         print(json.dumps({k: report[k] for k in ('dh', 'dh_key', 'raw_bytes', 'minimap_region_zips')}, ensure_ascii=False), flush=True)
