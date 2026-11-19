@@ -1110,25 +1110,84 @@ def step_fill(a):
         raise SystemExit('Fill did not pass its gate')
 
 
+def resume_xaero_strips(a, game, name):
+    import runpy
+    audit = runpy.run_path(str(Path(__file__).with_name('xaero_chunk_status.py')))
+    bounds = audit['chunk_bounds'](a.xaero_pregen)
+    region = game / 'saves' / name / GEO / 'region'
+    prior_mask, baseline = audit['scan'](FORMAL / GEO / 'region', bounds)
+    mask, saved = audit['scan'](region, bounds)
+    if not all(old <= now for old, now in zip(prior_mask, mask)):
+        raise SystemExit('An original FULL chunk is missing from the stopped Xaero world')
+    strips = list(audit['incomplete_strips'](mask, bounds, a.pregen_strip_chunks))
+    receipt = dict(bounds=list(bounds), source=baseline, at_resume=saved, strips=[])
+    save('xaero-strip-progress', receipt)
+    native_total = 0
+    for i, (x0, z0, x1, z1) in enumerate(strips, 1):
+        expected = (x1 - x0 + 1) * (z1 - z0 + 1)
+        block_bounds = '%d,%d,%d,%d' % (x0 * 16, z0 * 16, x1 * 16 + 15, z1 * 16 + 15)
+        tag = 'xaero-strip-%02d-%d' % (i, time.time())
+        args = client_args(game, {'projectseele.xaeroBakePregen': block_bounds}, tag + '.args', a.heap, world=name)
+        started = time.time()
+        result = run_client(args, a.pregen_minutes, 'Xaero pregeneration strip %d of %d' % (i, len(strips)), a.exclusive, game=game)
+        native = guard(WORK / 'logs' / (tag + '.log'))
+        shutil.copyfile(game / 'logs/latest.log', native)
+        text = native.read_text('utf8', 'replace')
+        done = re.search(r'Xaero bake pregeneration finished: (\d+) chunks in (\d+) s', text)
+        if (result != 'exit=0' or not done or int(done[1]) != expected or not client_log(game)['ok']
+                or 'All dimensions are saved' not in text):
+            raise SystemExit('Xaero strip did not finish and save normally; inspect ' + str(native))
+        _, verify = audit['scan'](region, (x0, z0, x1, z1))
+        if verify['full'] != expected:
+            raise SystemExit('A completed Xaero strip contains non-FULL chunks: ' + str(verify))
+        native_total += expected
+        receipt['strips'].append(dict(index=i, started=started, finished=time.time(), native_seconds=int(done[2]),
+                                      visited=expected, saved=verify, native_log=str(native)))
+        save('xaero-strip-progress', receipt)
+    _, final = audit['scan'](region, bounds)
+    receipt['final'] = final
+    save('xaero-strip-progress', receipt)
+    if final['full'] != final['coordinates'] or final['coordinates'] != a.pregen_chunks:
+        raise SystemExit('Final region files do not contain every requested FULL chunk: ' + str(final))
+    return dict(expected=a.pregen_chunks, generated=final['full'], seconds=sum(s['native_seconds'] for s in receipt['strips']),
+                log=str(log_path('xaero-strip-progress')), full_in_source=baseline['full'], full_before_resume=saved['full'],
+                new_full=final['full'] - baseline['full'], resumed_native_visits=native_total, final_scan=final)
+
+
 def step_xaero(a):
     # Its own mirror, so a minimap redo never wipes the prepared LOD database in MAP_REVIEW.
     game = WORK / 'client'
-    starts = {'mirror': time.time()}
+    starts = {'resume_check' if a.resume_pregen else 'mirror': time.time()}
     name = XAERO_COPY
     if a.city_raised:
         # The map probe only opens MAP_REVIEW. Give Xaero its own client and canonical review save.
         game = guard(WORK / 'xaero-client')
-        wait_no_exclusive('copying the Xaero client')
-        robocopy(WORK / 'client', game, '/E', '/XD', *INSTANCE_SKIP, '/XF', 'session.lock', '*.log')
+        if not a.resume_pregen:
+            wait_no_exclusive('copying the Xaero client')
+            robocopy(WORK / 'client', game, '/E', '/XD', *INSTANCE_SKIP, '/XF', 'session.lock', '*.log')
         name = COPY
-    info = mirror_world(name=name, game=game, label=XAERO_COPY)
-    info.pop('region_fingerprint')
+    if a.resume_pregen:
+        old = json.loads(log_path('xaero').read_bytes())
+        info = old['mirror']
+        native = (WORK / 'logs/xaero-pregen-native.log').read_text('utf8', 'replace')
+        world = game / 'saves' / name
+        original_args = (WORK / 'logs/xaero-pregen.args').read_text('ascii')
+        if (Path(info['target']).resolve() != world.resolve() or not world_lock_free(world) or not world_unchanged_since_mirror()
+                or info['sha256_all_files'] != json.loads(log_path('mirror').read_bytes())['sha256_all_files']
+                or not (WORK / 'logs/manifest-R63_XAERO.json').is_file() or 'All dimensions are saved' not in native
+                or '"-Dprojectseele.xaeroBakePregen=%s"' % a.xaero_pregen not in original_args):
+            raise SystemExit('Cannot prove this is the stopped Xaero mirror of the requested world and bounds')
+    else:
+        info = mirror_world(name=name, game=game, label=XAERO_COPY)
+        info.pop('region_fingerprint')
     raised = None
     if a.city_raised:
         # The minimap shows the same city as the far view.
         starts['raise_city'] = time.time()
+        if a.resume_pregen and city_state(game / 'saves' / name) != {'Depth': 0, 'Target': 0, 'Phase': 'IDLE'}:
+            raise SystemExit('The resumed Xaero city is not raised and idle')
         raised = raise_city(name, a.raise_heap, a.exclusive, game=game, label=XAERO_COPY)
-        if (game / 'logs/latest.log').is_file():
+        if not a.resume_pregen and (game / 'logs/latest.log').is_file():
             shutil.copyfile(game / 'logs/latest.log', guard(WORK / 'logs/xaero-raise-native.log'))
         if not (raised.get('ok') or raised.get('skipped')):
             save('xaero', dict(ok=False, raise_city=raised, mirror=info))
@@ -1142,7 +1201,11 @@ def step_xaero(a):
     pregen = None
     pregen_result = None
     try:
-        if a.xaero_pregen:
+        if a.resume_pregen:
+            starts['pregen'] = time.time()
+            pregen_result = resume_xaero_strips(a, game, name)
+            pregen = 'verified-from-region-files'
+        elif a.xaero_pregen:
             # The outer ring was never saved as chunks; generate them on this mirror only, in a run of its own.
             starts['pregen'] = time.time()
             args = client_args(game, {'projectseele.xaeroBakePregen': a.xaero_pregen}, 'xaero-pregen.args', world=name)
@@ -1237,7 +1300,11 @@ def main():
     p.add_argument('--slot-name', help='slot.py name for the client runs (default r63-pack; trial runs by another session use their own)')
     p.add_argument('--xaero-pregen', help='check, xaero: inclusive x0,z0,x1,z1 block bounds to pregenerate (outer ring: -6464,-5408,7584,5920)')
     p.add_argument('--pregen-minutes', type=int, default=360, help='xaero --xaero-pregen: client time limit for the pregeneration run (the R64 outer ring takes over four hours)')
+    p.add_argument('--resume-pregen', action='store_true', help='xaero: resume a normally saved pregeneration on its existing, verified mirror')
+    p.add_argument('--pregen-strip-chunks', type=int, default=80000, help='xaero --resume-pregen: approximate maximum number of distinct chunk positions per new client')
     a = p.parse_args()
+    if a.resume_pregen and (a.step != 'xaero' or not a.xaero_pregen or not a.city_raised or a.pregen_strip_chunks < 1):
+        p.error('--resume-pregen requires xaero --city-raised, the original --xaero-pregen bounds and positive strip size')
     if a.segment_minutes is not None and a.segment_minutes < 1:
         p.error('--segment-minutes must be at least 1')
     if a.commit_floor_gib <= 0:

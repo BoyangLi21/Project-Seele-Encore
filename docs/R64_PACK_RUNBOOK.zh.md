@@ -35,6 +35,8 @@
 
 小地图启用 `--city-raised` 时会另建 `WORK/xaero-client/saves/MAP_REVIEW`。升城探针只接受已标记的审图世界或这个固定存档名。核心和小地图各用自己客户端里的审图存档，双方校验清单分别保留为 `manifest-MAP_REVIEW.json` 和 `manifest-R63_XAERO.json`。小地图成品统一导出至 `WORK/out/xaero`。
 
+小地图长客户端如需正常保存退出，等日志出现全部维度已保存、进程退出后，在同一 WORK 下执行 `tools/rebake_r63.py xaero --city-raised --xaero-pregen=-6464,-5408,7584,5920 --resume-pregen --pregen-strip-chunks 80000 --heap 8G`，沿用原有输入、槽位和路径参数。工具核对世界镜像、原始边界、升城状态及停机日志，从区域文件的每个区块槽位读取顶层 Status。整行已为 FULL 的部分可以跳过，剩余行分为互不重叠、含首尾的条带。每条使用一次短客户端，分别核验游戏完成计数、正常保存及该条带存盘后的全部 FULL。随后逐格复核整个矩形并烘焙地表及完整洞穴层。源世界原有 FULL、恢复前 FULL、分段访问数、最终新增 FULL 和各段时间见 `WORK/logs/xaero-strip-progress.json` 与 `WORK/logs/xaero.json`。
+
 第 14 步换进去的库是按城市升起烘的；正式世界里城市现在是降下的（Depth 312），所以在正式世界里从远处看到的是升起的城市，走近后显示真实区块。
 
 ## 2026-11-18 远景压缩测试（map-edges）
