@@ -39,6 +39,7 @@ import subprocess
 import sys
 import time
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 
 ROOT = Path(__file__).resolve().parents[1]
 FORMAL = Path('F:/eva/artifacts/r53_repair_20261015/client/saves/HOTFIX_20261025')
@@ -598,7 +599,9 @@ def step_check(a):
     ring_want = {(x, z) for x in range(-6464 // 64, 7584 // 64 + 1) for z in range(-5408 // 64, 5920 // 64 + 1)
                  if classify(0, x, z, sg) == 'ring'}
     core_minutes = sum(min(25, max(6, math.ceil(c / SECTIONS_PER_MINUTE) + 2)) for _, _, c in points) + CLIENT_START_MIN
-    stages = dict(mirror_min=8, prepare_min=3, core_client_min=core_minutes, fill_pass_min=25,
+    # The four-reader R64 manifest checked 80,724 files in 307 s. Each mirror checks source and copy.
+    mirror_minutes = 2 + math.ceil(2 * world_files / 15750)
+    stages = dict(mirror_min=mirror_minutes, xaero_mirror_min=mirror_minutes, prepare_min=3, core_client_min=core_minutes, fill_pass_min=25,
                   city_raises_min=16 if a.city_raised else 0, xaero_min=12,
                   xaero_pregen_min=math.ceil(a.pregen_chunks / 42 / 60), pack_min=5)
     estimate = dict(
@@ -749,14 +752,19 @@ def latest_batch():
 def manifest(root):
     """sha256 of every file the mirror copies, and one digest over all of them (sorted paths)."""
     import hashlib
+    def fail(error):
+        raise error
+
+    root = Path(root)
+    paths = sorted(Path(base) / name for base, _, names in os.walk(root, onerror=fail) for name in names
+                   if name not in MIRROR_SKIP and not name.endswith('.sqlite-shm'))
     files = {}
-    for path in sorted(Path(root).rglob('*')):
-        if path.is_file() and path.name not in MIRROR_SKIP and not path.name.endswith('.sqlite-shm'):
-            digest = hashlib.sha256()
-            with path.open('rb') as handle:
-                for block in iter(lambda: handle.read(1 << 20), b''):
-                    digest.update(block)
-            files[path.relative_to(root).as_posix()] = digest.hexdigest()
+    # R64 has over 75,000 tiny rigid-city files. Overlap their opens while preserving the original digest order.
+    with ThreadPoolExecutor(max_workers=4) as readers:
+        for start in range(0, len(paths), 512):
+            batch = paths[start:start + 512]
+            for path, digest in zip(batch, readers.map(sha256_file, batch)):
+                files[path.relative_to(root).as_posix()] = digest
     whole = hashlib.sha256(''.join(f'{k}\t{v}\n' for k, v in files.items()).encode()).hexdigest()
     region = hashlib.sha256(''.join(f'{k}\t{v}\n' for k, v in files.items() if k.startswith(GEO + '/region/')).encode()).hexdigest()
     return files, whole, region
@@ -782,6 +790,7 @@ def mirror_world(locked=True, name=COPY):
         src, whole, region = manifest(FORMAL) if locked else ({}, None, None)
         fingerprint = region_fingerprint(FORMAL)
         newest = max(p.stat().st_mtime for p in (FORMAL / GEO / 'region').glob('*.mca'))
+        locked_seconds = round(time.time() - t) if locked else 0
     if locked:
         dst, mirror_whole, _ = manifest(target)
         if dst != src:
@@ -789,7 +798,7 @@ def mirror_world(locked=True, name=COPY):
             raise SystemExit('Mirror differs from the formal world in %d files, e.g. %s' % (len(differ), differ[:5]))
         json.dump(dict(files=src), guard(WORK / 'logs' / ('manifest-%s.json' % name)).open('w'), indent=0)
     return dict(target=str(target), robocopy=tail, files=len(src), sha256_all_files=whole, sha256_geofront_regions=region,
-                region_fingerprint=fingerprint, recorded_batch=latest_batch(), seconds_locked=round(time.time() - t),
+                region_fingerprint=fingerprint, recorded_batch=latest_batch(), seconds_locked=locked_seconds, seconds_total=round(time.time() - t),
                 formal_newest_region=datetime.datetime.fromtimestamp(newest).isoformat(timespec='seconds'))
 
 
@@ -1027,11 +1036,13 @@ def step_fill(a):
 def step_xaero(a):
     # Its own mirror, so a minimap redo never wipes the prepared LOD database in MAP_REVIEW.
     game = WORK / 'client'
+    starts = {'mirror': time.time()}
     info = mirror_world(name=XAERO_COPY)
     info.pop('region_fingerprint')
     raised = None
     if a.city_raised:
         # The minimap shows the same city as the far view.
+        starts['raise_city'] = time.time()
         raised = raise_city(XAERO_COPY, a.raise_heap, a.exclusive)
         if not (raised.get('ok') or raised.get('skipped')):
             save('xaero', dict(ok=False, raise_city=raised, mirror=info))
@@ -1047,6 +1058,7 @@ def step_xaero(a):
     try:
         if a.xaero_pregen:
             # The outer ring was never saved as chunks; generate them on this mirror only, in a run of its own.
+            starts['pregen'] = time.time()
             args = client_args(game, {'projectseele.xaeroBakePregen': a.xaero_pregen}, 'xaero-pregen.args', world=XAERO_COPY)
             pregen = run_client(args, a.pregen_minutes, 'Xaero bake outer ring pregeneration', a.exclusive)
             native_log = WORK / 'logs/xaero-pregen-native.log'
@@ -1058,6 +1070,7 @@ def step_xaero(a):
             if pregen_result['generated'] != a.pregen_chunks or not client_log()['ok'] or pregen != 'exit=0':
                 save('xaero', dict(ok=False, pregen=pregen, pregen_result=pregen_result, pregen_finished=False, mirror=info))
                 raise SystemExit('Outer ring pregeneration did not finish')
+        starts['bake_maps'] = time.time()
         args = client_args(game, {'projectseele.xaeroBake': 'true'}, 'xaero.args', world=XAERO_COPY)
         result = run_client(args, 25 if not a.xaero_pregen else 90, 'R63 Xaero minimap bake', a.exclusive)
     finally:
@@ -1073,9 +1086,12 @@ def step_xaero(a):
         if out.exists():
             shutil.rmtree(guard(out))
         shutil.copytree(baked, guard(out))
+    start_times = list(starts.values())
+    phases = {name: dict(start=start, end=end, seconds=round(end - start, 1))
+              for (name, start), end in zip(starts.items(), start_times[1:] + [time.time()])}
     save('xaero', dict(ok=finished and bool(zips), client=result, pregen=pregen, finished=finished, region_zips=len(zips), held_mods=moved,
                        pregen_result=pregen_result, surface_region_zips=surface, cave_region_zips=caves,
-                       mirror=info, raise_city=raised, output=str(out)))
+                       mirror=info, raise_city=raised, phases=phases, output=str(out)))
     if not (finished and zips):
         raise SystemExit('Minimap bake did not finish')
 

@@ -16,7 +16,7 @@
 | 1 | 只读检查：世界锁、Java、变动区块、估时 | `tools/rebake_r63.py check --city-raised --xaero-pregen=-6464,-5408,7584,5920` | 1–2 分钟，按第 9 步范围给出串行总时 | — |
 | 2 | **外圈远景重烘（用 R64 的生成器）** | **已完成（2026-11-17）**：39,160 段全齐，库在 `D:/eva-ringbake/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite`（`prepare` 的默认 `--ring-db`）。外圈生成器（`OuterBoundaryTerrain`、`outer_edge.bin.gz`）改了才要重烘 | 已完成 | 3.63 GB（LZ4，保留；见下文压缩测试） |
 | 3 | 烘焙实例 | `tools/rebake_r63.py instance` | 2 分钟 | E 0.8 GB |
-| 4 | 镜像正式世界（持锁） | `tools/rebake_r63.py mirror --batch N` | 8 分钟 | E 1.6 GB |
+| 4 | 镜像正式世界（持锁） | `tools/rebake_r63.py mirror --batch N` | 第 646 批共 80,724 个受检文件。四路逐文件 SHA 单端实测 5 分 7 秒，另计复制和目标端核验；第 9 步还要再做一份镜像 | E 1.6 GB |
 | 5 | 远景起点换成 R63r 的 | 从上述 R63r Fix1 服务端 zip 取 `SEELE_R53_WORLD/dimensions/projectseele/geofront/data/DistantHorizons.sqlite`，覆盖 `WORK/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite` | 1 分钟 | E 0.9 GB |
 | 5b | **把镜像里的城市升起来**（远景按城市升起的状态烘） | `tools/rebake_r63.py raise`：短客户端，视距 2、不带 DH，以玩家身份 `/seele city raise`，等 R45 升到 Depth 0 再存盘退出；城市已升起就跳过。只改镜像 | 约 8 分钟（含进世界） | — |
 | 6 | 合并外圈、删变动行，并做 V6 | `tools/rebake_r63.py prepare --v6`：升起后的楼和正式世界不同，算作变动区块，它们的旧行被删、由第 8 步按升起状态重建；`--v6` 接着对重建清单跑 `dh_v6_prepare.py` | 4 分钟 | — |
