@@ -571,6 +571,108 @@ R61 在这些改动之前打包（第 334 批）。之后按授权完成了下�
 | 544 | 屋岛零号机等待点的树（map-buildings yashima-shield-trees）：等待点 12 格内高过平台的两棵云杉整棵去掉，树干底下泥土改草；预检逐格对上，1 个区域文件，读回 0 错 | 220 |
 | 545 | 旧步枪站一带的坑（perf pit_fill_rows_unprotected）：北沟、北门槽、东缝、南门槽、南沟和两个单格洞照两侧原样补上，只替换空气和植物，通 GeoFront 的 13 列缝只铺甲板面；加 `--refresh-heightmaps`。x 95 那 6 列在零号机出口保护空间里，没写（pit_fill_rows_x95_protected.json 留着）。预检逐格对上，r.0.-1 一个区域文件，读回 0 错 | 22,007 |
 | 546 | 街道设施表去掉 61 格冲突（perf）：拿着会话锁把世界根目录 battlefield_r21.json 换成 36,874 格的新表（换前 md5 f03bb4e4 即第 537 批那份，核对过；换后 ddfe1aea），去掉的 61 格都在原来 5,066 格里，路缘斜块和草不动；城市保持降下、设施收起。旧表备份在 batch-546-r21-table | 0 |
+| 547 | 道路端点二审核准（r.-5.-3），清单 MD5 `1f43d1870af9c715ecbc5a31cfefa96c`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 21 个 | 1,118 |
+| 548 | 道路端点二审核准（r.-4.0），清单 MD5 `07a2902630f679107bf19ce6fa479e15`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 286 |
+| 549 | 道路端点二审核准（r.-4.1），清单 MD5 `c91cfcf155acb958c0887fcc27ff9bbc`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 10 个 | 1,200 |
+| 550 | 道路端点二审核准（r.-3.0），清单 MD5 `739f5692f411824bd20d089c650a833a`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 199 |
+| 551 | 道路端点二审核准（r.-3.1），清单 MD5 `1dc6bd1717ce897a46a76104359c8656`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 5,384 |
+| 552 | 道路端点二审核准（r.-3.2），清单 MD5 `968652e6c62c2b35e2d21acd2ecae451`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 307 |
+| 553 | 道路端点二审核准（r.-2.-2），清单 MD5 `c85e5ae7e6a530b7b823cf38602b118f`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,970 |
+| 554 | 道路端点二审核准（r.-2.-1），清单 MD5 `25e8a786eeb799164e4023547215ad64`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 2,565 |
+| 555 | 道路端点二审核准（r.-2.0），清单 MD5 `4dc85f772bc90413a06dfac0f94297b4`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,165 |
+| 556 | 道路端点二审核准（r.-2.1），清单 MD5 `ef79cce210049b718a060811c2ab549b`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 2,850 |
+| 557 | 道路端点二审核准（r.-2.2），清单 MD5 `5ffbf403a5ae1a7d2fb85971dddd4710`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 2,587 |
+| 558 | 道路端点二审核准（r.-1.-1），清单 MD5 `02c007026d84cc9742a9b787a25cb7ab`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 2,262 |
+| 559 | 道路端点二审核准（r.-1.0），清单 MD5 `f9f99452195a3c7b3801364054cec1c2`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 4,001 |
+| 560 | 道路端点二审核准（r.-1.1），清单 MD5 `a467efd9dce0dfd7adb59f328f546343`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 2,349 |
+| 561 | 道路端点二审核准（r.0.-2），清单 MD5 `8304f07f64ec6426706ba343e61f1643`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 9,668 |
+| 562 | 道路端点二审核准（r.0.-1），清单 MD5 `1f286c87656b63b40b8b120ade05b1d7`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 2,915 |
+| 563 | 道路端点二审核准（r.0.0），清单 MD5 `ff133d23c11cb2dcb6384a7768fc85d6`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 28 个 | 12,768 |
+| 564 | 道路端点二审核准（r.0.1），清单 MD5 `1f8f60f33072ca11356c80f7f9dcf909`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 5 个 | 2,247 |
+| 565 | 道路端点二审核准（r.0.3），清单 MD5 `b4b7e830c89928c0cb7cfba9916323cb`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 47 个 | 980 |
+| 566 | 道路端点二审核准（r.0.4），清单 MD5 `39dbef0509d371ed62ba9a560eca3f1d`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 26 个 | 2,496 |
+| 567 | 道路端点二审核准（r.1.0），清单 MD5 `343708b4bd9d94073af38b7e09d12953`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,070 |
+| 568 | 道路端点二审核准（r.1.1），清单 MD5 `d62b36f72da49806157945e914a30181`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 108 个 | 11,783 |
+| 569 | 道路端点二审核准（r.1.2），清单 MD5 `e788585f341a27c91360c76bc26c8bc5`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,468 |
+| 570 | 道路端点二审核准（r.1.3），清单 MD5 `df69d4f00bf9b143655d1590c4fa3a63`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 4,178 |
+| 571 | 道路端点二审核准（r.1.4），清单 MD5 `58712cacee9ed17071ce21f7c78904e8`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 6,424 |
+| 572 | 道路端点二审核准（r.2.1），清单 MD5 `3742d80995bdd1147e2a8ff40d094610`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 5 个 | 2,925 |
+| 573 | 道路端点二审核准（r.3.2），清单 MD5 `9d36b4f9827ec21919e1483f7e2a8632`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 3,856 |
+| 574 | 道路端点二审核准（r.4.0），清单 MD5 `0c935ef092734d4e0660086834855d94`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 276 |
+| 575 | 道路端点二审核准（r.4.1），清单 MD5 `f306fe396de604a891c6c8e8be37c5f8`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 2,003 |
+| 576 | 道路端点二审核准（r.4.2），清单 MD5 `e2c8a78fcac05315bbec385a7b822c9d`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 63 个 | 4,306 |
+| 577 | 道路端点二审核准（r.5.-3），清单 MD5 `cf57f6b887504caf9d6583e6fb2eacf2`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 331 |
+| 578 | 道路端点二审核准（r.5.-2），清单 MD5 `bac9f133828e9aef3ac8a9361ca2cbbf`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 13 个 | 156 |
+| 579 | 道路端点二审核准（r.5.1），清单 MD5 `afc46778c675ae940bf59ff828942adf`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 38 个 | 1,921 |
+| 580 | 道路端点二审核准（r.5.2），清单 MD5 `16469258ad6a5172872dc2a98f05b6cd`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,458 |
+| 581 | 道路端点二审核准（r.5.3），清单 MD5 `ebe016825c8b7e4a0b28286f57b3cd47`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 186 |
+| 582 | 道路端点二审核准（r.6.-3），清单 MD5 `472de069b616a077fd2bfcc2d3f5a447`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 3 |
+| 583 | 道路端点二审核准（r.6.-1），清单 MD5 `6cd1c137515590e8aab29f8a2ddb5dfe`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 165 |
+| 584 | 道路端点二审核准（r.6.1），清单 MD5 `94cc4f6b68809855289427bdbf85bc00`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0；写回 TrafficCraft 标线实体 10 个 | 239 |
+| 585 | 道路端点二审核准（r.8.0），清单 MD5 `204257f535e25e05f5b383dd2ee0a32e`，参数 `--refresh-heightmaps --allow-block-entities`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 639 |
+| 586 | 陆地边界渐变（r.-7.-3），清单 MD5 `3495a0fcdf52c2860a660583d01b3c98`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 2,420 |
+| 587 | 陆地边界渐变（r.-7.-2），清单 MD5 `45b0bcfde9a632d4c767e464ab8577b3`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 14,367 |
+| 588 | 陆地边界渐变（r.-6.-3），清单 MD5 `65ce68e92b7d090e3ae67e6d55d488a5`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 841 |
+| 589 | 陆地边界渐变（r.-6.-2），清单 MD5 `a4466e249749bc4d8db4989979c6bd79`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 28,583 |
+| 590 | 陆地边界渐变（r.-6.0），清单 MD5 `153e8d0a0f6acfe41d353cf5e758e328`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 49,999 |
+| 591 | 陆地边界渐变（r.-6.1），清单 MD5 `81ca0a15ce0d6376c6cf011a12d73d42`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 46,439 |
+| 592 | 陆地边界渐变（r.-5.-3），清单 MD5 `ba8a00dbe4e697c6857b9554e7d28b81`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 10,535 |
+| 593 | 陆地边界渐变（r.-5.-2），清单 MD5 `143d0f077e3a48e66dc342a2363c8a13`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 26,691 |
+| 594 | 陆地边界渐变（r.-5.-1），清单 MD5 `03c1d80a24a8c3ee4accb72ce1aba186`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 13,056 |
+| 595 | 陆地边界渐变（r.-5.0），清单 MD5 `6212e14a9df842e4f95f05163931fb4f`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 39,468 |
+| 596 | 陆地边界渐变（r.-5.1），清单 MD5 `2018abc3b38af491cd1cb24cc97dc499`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 40,724 |
+| 597 | 陆地边界渐变（r.-5.2），清单 MD5 `dc236cc5b9ac63446bcf2b7b0d5912df`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 11,093 |
+| 598 | 陆地边界渐变（r.-4.-4），清单 MD5 `9f43abff5f8b349c1d6efd76e03e6b28`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 15,355 |
+| 599 | 陆地边界渐变（r.-4.-3），清单 MD5 `7382996d1fc03004575e92b357bd92c1`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 3,848 |
+| 600 | 陆地边界渐变（r.-4.-2），清单 MD5 `fe09a2dc72cf7e30ff13bb63fae4b6cf`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,221 |
+| 601 | 陆地边界渐变（r.-4.0），清单 MD5 `8b04c26ec9e5c24ed58dd7602a7668c7`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 14,793 |
+| 602 | 陆地边界渐变（r.-4.1），清单 MD5 `3697e82048271684bc28c812ddf17df0`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 8,574 |
+| 603 | 陆地边界渐变（r.-4.2），清单 MD5 `10478393abdd079288de8308bc463437`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 242 |
+| 604 | 陆地边界渐变（r.-3.-5），清单 MD5 `3feb6100df375f788895a2ac4feb08d2`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 5,311 |
+| 605 | 陆地边界渐变（r.-3.-4），清单 MD5 `5b888246f71300eeda6922b6e33fd27a`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 12 |
+| 606 | 陆地边界渐变（r.-3.3），清单 MD5 `a1b76196cff0bf128c2054bcd5470459`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 3,886 |
+| 607 | 陆地边界渐变（r.-3.4），清单 MD5 `fc0c3df5e34e3463c0d4de891b402eee`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 28,257 |
+| 608 | 陆地边界渐变（r.-2.-4），清单 MD5 `9ca09e164acc47ee6b3690fba6cd4079`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 19,028 |
+| 609 | 陆地边界渐变（r.-2.-3），清单 MD5 `c23cb7d4fd9ecb0df95bc7e0c637efb0`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 378 |
+| 610 | 陆地边界渐变（r.-2.4），清单 MD5 `f5f9fe2cace74744aa18981b056d9817`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 39,885 |
+| 611 | 陆地边界渐变（r.-1.-4），清单 MD5 `6b42871da6cf0beddfcbad5230a3d894`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 6,860 |
+| 612 | 陆地边界渐变（r.-1.-3），清单 MD5 `f5882d8416601c561c68d132ffa63b3b`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 7,981 |
+| 613 | 陆地边界渐变（r.-1.4），清单 MD5 `8a33255a920d6c719edeedaac27de2d2`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 10,642 |
+| 614 | 陆地边界渐变（r.0.4），清单 MD5 `b9344b40ca15a715d3e469c13f58012a`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 605 |
+| 615 | 陆地边界渐变（r.1.-4），清单 MD5 `c9776132b4981341f8a538bb5102570f`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 18,067 |
+| 616 | 陆地边界渐变（r.1.-3），清单 MD5 `dd865b6b4d53770e875ed877a7870145`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 25,447 |
+| 617 | 陆地边界渐变（r.1.4），清单 MD5 `c4f827113e76fbbedafcef5147efd9f2`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 4,560 |
+| 618 | 陆地边界渐变（r.2.-4），清单 MD5 `d0ff87444d0442b55f62cc67e7c0a25d`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 13,915 |
+| 619 | 陆地边界渐变（r.2.-3），清单 MD5 `523b09d31de566b795f50cce18e3efb2`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 12,427 |
+| 620 | 陆地边界渐变（r.3.-4），清单 MD5 `395d377595ee88c45552c29c87c11c2d`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 37,473 |
+| 621 | 陆地边界渐变（r.3.-3），清单 MD5 `4ab70b924082d78d5dad5e5926578d9f`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,144 |
+| 622 | 陆地边界渐变（r.3.1），清单 MD5 `8249af34a06ae4736922619e827b3755`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 4 |
+| 623 | 陆地边界渐变（r.4.-5），清单 MD5 `473e70ec95de637e2bb24c0a62022065`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 36,598 |
+| 624 | 陆地边界渐变（r.4.-4），清单 MD5 `1fe0ad5a32388e5631914750a7be187c`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 53,500 |
+| 625 | 陆地边界渐变（r.4.-3），清单 MD5 `21564835df530bf4f1a99fb6688c62c4`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 8,870 |
+| 626 | 陆地边界渐变（r.4.-1），清单 MD5 `bf4c1dac2dd4bfa6d252a30eec2e0644`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 142 |
+| 627 | 陆地边界渐变（r.4.0），清单 MD5 `434ae0a9f2131b8ae6a598e8329eee3d`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,182 |
+| 628 | 陆地边界渐变（r.4.1），清单 MD5 `a4fb250d46381600f98052756d5c6fe3`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 689 |
+| 629 | 陆地边界渐变（r.5.-5），清单 MD5 `96eebbe89871acff0ef5febc34cd87e7`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 28,625 |
+| 630 | 陆地边界渐变（r.5.-4），清单 MD5 `5f72748001ed60cf9f6df2220a73d96a`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 30,246 |
+| 631 | 陆地边界渐变（r.5.-3），清单 MD5 `80a76b5910c80f632eff4468e029b4cb`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 935 |
+| 632 | 陆地边界渐变（r.6.-5），清单 MD5 `b70fc324c66bd1059876f7548f8d4b81`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 32,021 |
+| 633 | 陆地边界渐变（r.6.-4），清单 MD5 `38878a0748a774fa3d559a6774cfb7b6`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 48,110 |
+| 634 | 陆地边界渐变（r.6.-3），清单 MD5 `a934a521240bdea94fd8ef9020c9f71b`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,252 |
+| 635 | 陆地边界渐变（r.7.-5），清单 MD5 `37cf740ae48669e4cac228676dcaa9fa`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 10,634 |
+| 636 | 陆地边界渐变（r.7.-3），清单 MD5 `2a687e2d560b5062ed38f7969860eca2`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 4,330 |
+| 637 | 陆地边界渐变（r.8.-3），清单 MD5 `4ec034890655410c60fdbf92c2d3aa08`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 33,839 |
+| 638 | 陆地边界渐变（r.8.-2），清单 MD5 `7ce650ef7fbd7b584749d15c49cc1593`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 26,165 |
+| 639 | 陆地边界渐变（r.8.-1），清单 MD5 `29f6952d18b7e0d694a06ed357e36a44`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 1,405 |
+| 640 | 陆地边界渐变（r.-1.-3），清单 MD5 `0a7dd699dbc63f5ccda20c695279da60`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 570 |
+| 641 | 陆地边界渐变（r.2.-3），清单 MD5 `8294136c377b6a6e22ddd35522754b92`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 4 |
+| 642 | 陆地边界渐变（r.4.-3），清单 MD5 `d2ac75f2301ce7f933fd308d048c85bd`，参数 `--refresh-heightmaps`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 4 |
+| 643 | 弹射隧道墙面（r.-1.0, r.0.0），清单 MD5 `d6b819c3a85a21ba112895f5085098d2`，参数 `--allow-launch-repaint`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0。使用 8a7b3e09 的限墙材重涂检查 | 192,761 |
+| 644 | 弹射隧道墙面（r.-1.-1, r.-1.0, r.0.-1, r.0.0），清单 MD5 `6dda8f68af07faf3af27d37fe3cd26fb`，参数 `--allow-launch-repaint`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0。使用 8a7b3e09 的限墙材重涂检查 | 165,100 |
+| 645 | 弹射隧道墙面（r.-3.-4, r.-3.-3, r.-2.-3, r.-2.-2, r.-1.-2, r.-1.-1, r.-1.0, r.0.-1, r.0.0），清单 MD5 `596d0bf9ec5108f624c9e29fbef41c40`，参数 `--allow-launch-repaint`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0。使用 8a7b3e09 的限墙材重涂检查 | 1,023,358 |
+| 646 | 仙石原式草原余下 16 片（r.-6.-2, r.-5.-2, r.-5.-1, r.-5.0, r.-2.2, r.-1.4, r.0.0, r.0.4, r.1.0, r.1.3, r.1.4, r.2.3），清单 MD5 `61adcea232e3f65c6c5c2903f7445596`，参数 `默认保护`。关服预检与写前备份完成，逐格读回 0 错、计划外变更 0 | 134,298 |
+
+第 547–646 批共 2,501,473 格。道路、边界及其增补、三个隧道出口、草原清单分别按 XYZ 联合查重，交集为零。完整写前冷备份在 `D:/eva-formal-backup-20261119`，每批区域备份、进程号和逐格写后回执在 `D:/eva-codex-writer`。第 533 批保留为空。
 | 396 | E4：游船改成 3 艘中型船连挂，共 15 格，只改 MTR 车库的车辆配置 | 1 份 |
 | 397–403 | E7：UN 旧址拆掉全部建筑方块，原有楼和路的位置按四周地面高度插值填平；原基地草坪等天然地面保留；复查旧址建筑方块 0、实体 0 | 2,066,622 |
 | 404 | E4：三个港栈桥贴着航线的最外一排换成 MTR 站台半砖（台面 y100.5）。MTR 的船只有车门 1 格内有站台方块才开门，车门高度比原来的木板台面低一格多；新副本上已从栈桥上船并坐船开出 | 94 |
