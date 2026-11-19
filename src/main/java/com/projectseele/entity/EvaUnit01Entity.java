@@ -5040,7 +5040,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             {
                 if(!EntryPlugDirector.ejectPilotToPlug(
                         serverLevel,this.getUnitVariant(),this,pilot))
-                    pilot.displayClientMessage(Component.literal("插入栓脱离条件未满足，请保持原位并联系整备部。"),true);
+                    pilot.displayClientMessage(Component.translatable("hud.projectseele.plug.extraction_interlock"),true);
                 // A rejected physical extraction is not permission to perform
                 // an unrelated vanilla dismount and abandon the launch support.
                 return;

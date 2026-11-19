@@ -1,4 +1,5 @@
 {
+  "hud.projectseele.plug.extraction_interlock": "Entry plug interlocked. Hold position and contact maintenance.",
   "hud.projectseele.plug.offline": "POWER OFFLINE",
   "hud.projectseele.plug.external": "EXTERNAL POWER",
   "hud.projectseele.plug.internal": "INTERNAL POWER",
