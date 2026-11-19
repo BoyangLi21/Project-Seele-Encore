@@ -49,7 +49,15 @@ public final class NervSharedSpaceReservationsR54Test
         }
         field(d,"epoch",7L);field(d,"installed",true);field(d,"fingerprint","synthetic-reservation-identity");
         field(d,"units",units);field(d,"nodes",nodes);field(d,"resources",resources);field(d,"legs",legs);field(d,"routes",routes);
-        field(d,"dynamicSpaces",NervDynamicAirspaceR52.parse(new JsonObject()));return d;
+        field(d,"dynamicSpaces",NervDynamicAirspaceR52.parse(new JsonObject()));
+        var index=NervRouteDirectoryR52.class.getDeclaredMethod("indexRouteResources");
+        index.setAccessible(true);
+        field(d,"routeResources",index.invoke(d));
+        Set<String> all=d.resources(routes.get("depart0"));
+        check(all==d.resources(routes.get("depart0")) && all.contains("shared"),"Canonical route set must be reusable and complete");
+        check(!d.ownershipCandidates(all).contains("shared") && d.ownershipCandidates(all).contains("DOOR0"),"Only declared mechanisms require exclusive ownership");
+        check(d.ownershipCandidates(new HashSet<>(all)).contains("shared"),"Arbitrary request sets still require ID validation");
+        return d;
     }
     private static void sharedSpaceProgresses()throws Exception
     {
