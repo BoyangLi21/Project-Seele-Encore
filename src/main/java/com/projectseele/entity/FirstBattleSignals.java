@@ -18,6 +18,24 @@ public final class FirstBattleSignals
     private static final java.util.Map<Entity,FirstBattleClock> CLIENT_CLOCKS=new java.util.WeakHashMap<>();
     public static void beginClientFrame(long now,boolean paused){clientFrameNanos=now;clientPaused=paused;}
     public static long clientFrameTime(){return clientFrameNanos==0?System.nanoTime():clientFrameNanos;}
+    private static double clientTickFrame=Double.NaN,clientTickAt=Double.NaN;
+    /**
+     * R64 (flow, "step"), client, at the head of each client tick: the stamp of the frame this tick is made in, and
+     * that frame's place between two ticks. A frame is drawn at its stamp, with what a tick has moved laid between
+     * that tick's place and the one before by the frame's part of a tick; so a tick's own time on the frame clock
+     * is the stamp of a frame less that frame's part of a tick. Ticks are one apart: where a frame makes several,
+     * the earlier ones are counted on from the last tick's time.
+     */
+    public static void beginClientTick(long frameNanos,float partial)
+    {
+        clientTickFrame=frameNanos/5.0e7D;
+        double last=clientTickFrame-partial,next=clientTickAt+1;
+        clientTickAt=next<=last+1.0e-3&&next>=last-10.5?next:last;
+    }
+    /** Client, in a tick: the time (in ticks) the frame now being made is drawn at. */
+    public static double clientTickFrame(){return Double.isNaN(clientTickFrame)?System.nanoTime()/5.0e7D:clientTickFrame;}
+    /** Client, in a tick: this tick's own time (in ticks) on the clock the frames are drawn by. */
+    public static double clientTickTime(){return Double.isNaN(clientTickAt)?System.nanoTime()/5.0e7D:clientTickAt;}
     private static float clientTime(Entity entity,int age)
     {
         long now=clientFrameNanos==0?System.nanoTime():clientFrameNanos;FirstBattleClock clock=CLIENT_CLOCKS.get(entity);

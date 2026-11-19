@@ -277,6 +277,7 @@ public final class ClientForgeEvents
         while(Keybinds.UN_EYE_LASER.consumeClick())if(eva instanceof com.projectseele.entity.EvaPrototypeEntity)send(ServerboundEvaControlPacket.ACTION_UN_EYE_LASER);
         while(Keybinds.UN_FLIGHT.consumeClick())if(eva instanceof com.projectseele.entity.EvaPrototypeEntity)send(ServerboundEvaControlPacket.ACTION_UN_FLIGHT);
         while(Keybinds.EVA_GRAPPLE.consumeClick())if(eva!=null)send(ServerboundEvaControlPacket.ACTION_GRAPPLE);
+        while(Keybinds.EVA_GRAB.consumeClick())if(eva!=null)send(ServerboundEvaControlPacket.ACTION_GRAPPLE);
         while (Keybinds.COMMANDER_POSE.consumeClick())
         {
             if (player.isPassenger())
@@ -568,6 +569,13 @@ public final class ClientForgeEvents
                     }
                 }
             }
+            return;
+        }
+        if(event.isPickBlock()&&Keybinds.EVA_GRAB.getKey().equals(Minecraft.getInstance().options.keyPickItem.getKey()))
+        {
+            // The shared mouse button picks blocks on foot and grabs from the plug.
+            event.setCanceled(true);
+            event.setSwingHand(false);
             return;
         }
         if (event.isAttack())

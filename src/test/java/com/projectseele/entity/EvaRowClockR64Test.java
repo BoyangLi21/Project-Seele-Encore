@@ -76,6 +76,8 @@ public final class EvaRowClockR64Test
         fades();
         leaves();
         kick();
+        hardKick();
+        body();
         System.out.println("EvaRowClockR64Test: "+rows+" rows' curves, a view at 24 to 144 frames a second with and without a hit, a blow out of another, a row left, and the kick's clip against its row");
     }
 
@@ -242,6 +244,61 @@ public final class EvaRowClockR64Test
      * KICK: the kick's clip (tools/finale/kick.py) is laid on its frames for the row that plays it. A row whose
      * ticks or live part have been changed plays it at other paces than it was written with: write it again.
      */
+    /**
+     * R64 (flow, "body"): the Unit's own bare-handed blows (tools/finale/unarmed.py) against their rows. A clip is
+     * laid on its row's curve, so the row it was made for is the row the table has; its live part lies inside it;
+     * the body is never carried back, and its stride is made by the end of its live ticks; a foot is on the ground
+     * at every frame but in the knee's spring and the charge's leap.
+     */
+    private static void body()
+    {
+        try(var stream=EvaRowClockR64Test.class.getResourceAsStream("/assets/projectseele/motion/eva_unarmed_r64.json"))
+        {
+            check(stream!=null,"the bare-handed blows' clips come with the mod");
+            var doc=com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            for(String name:new String[]{"pounce","knee","charge"})
+            {
+                Row row=EvaMoveTableR64.get(name);
+                check(row!=null&&row.kind()==EvaMoveTableR64.PUNCH,name+" is a row of the table, in a punch's place");
+                var clip=doc.getAsJsonObject("clips").getAsJsonObject("r32_"+name+"_r64");
+                check(clip!=null,name+" has its clip");
+                if(name.equals("knee")||name.equals("charge"))
+                {
+                    float modelX=clip.getAsJsonArray("contact_point_model").get(0).getAsFloat();
+                    check(name.equals("knee")?modelX<0:modelX>0,name+": authored contact stays on the striking side after the model X mirror");
+                }
+                var made=clip.getAsJsonObject("row");
+                check(made.get("startup").getAsInt()==row.startup()&&made.get("live").getAsInt()==row.active()&&made.get("recovery").getAsInt()==row.recovery()
+                        &&Math.abs(made.get("lead").getAsFloat()-row.lead())<1.0e-6F&&Math.abs(made.get("tail").getAsFloat()-row.tail())<1.0e-6F,
+                        name+"'s clip was made for the row the table has");
+                float contact=clip.get("contact_phase").getAsFloat();
+                check(contact-row.lead()>.02F&&contact+row.tail()<.98F,name+"'s live part lies inside its clip");
+                check(Math.abs(clip.get("duration_seconds").getAsFloat()-row.total()/20F)<1.0e-4F,name+"'s clip is as long as its row");
+                var frames=clip.getAsJsonArray("frames");var path=clip.getAsJsonArray("trajectory_m");
+                int bones=clip.getAsJsonArray("bones").size(),close=Math.round((contact+row.tail())*(frames.size()-1));
+                check(frames.size()>=40&&path.size()==frames.size()&&clip.has("contact_bone"),name+" has its frames, a place for each, and a bone its mark is on");
+                double ahead=0,last=-path.get(frames.size()-1).getAsJsonArray().get(2).getAsDouble();
+                for(int i=0;i<frames.size();i++)
+                {
+                    var frame=frames.get(i).getAsJsonObject();var feet=frame.getAsJsonArray("foot_contact");
+                    check(frame.getAsJsonArray("rotation_delta_wxyz").size()==bones,name+": every frame turns every bone the clip names");
+                    check(feet.get(0).getAsBoolean()||feet.get(1).getAsBoolean()||!name.equals("pounce"),name+": a foot is on the ground at every frame");
+                    double now=-path.get(i).getAsJsonArray().get(2).getAsDouble();
+                    check(now>=ahead-1.0e-6,name+": the body is never carried back");ahead=now;
+                    if(i>=close)check(Math.abs(now-last)<1.0e-6,name+": its stride is made by the end of its live part");
+                }
+                check(ahead>.05,name+" has a stride");
+                var first=frames.get(0).getAsJsonObject().getAsJsonArray("foot_contact");var end=frames.get(frames.size()-1).getAsJsonObject().getAsJsonArray("foot_contact");
+                check(first.get(0).getAsBoolean()&&first.get(1).getAsBoolean()&&end.get(0).getAsBoolean()&&end.get(1).getAsBoolean(),name+" begins and ends on both feet");
+            }
+            check(EvaMoveTableR64.get("pounce").light().equals("knee")&&EvaMoveTableR64.get("knee").light().equals("slam"),"the string is pounce, knee, slam");
+            check(EvaMoveTableR64.opener(0,false,false,false,true,false).name().equals("pounce")&&EvaMoveTableR64.opener(0,false,false,false,true,true).name().equals("charge")
+                    &&EvaMoveTableR64.opener(0,false,false,false,false,true).name().equals("jab")&&EvaMoveTableR64.opener(0,true,false,false,true,true).name().equals("kick"),
+                    "the light press is the pounce, out of a run the charge, the jab where the switch has not the Unit's own blows; the heavy press is the kick");
+        }
+        catch(java.io.IOException e){throw new IllegalStateException(e);}
+    }
+
     private static void kick()
     {
         Row row=EvaMoveTableR64.get("kick");
@@ -253,22 +310,89 @@ public final class EvaRowClockR64Test
             check(made.get("startup").getAsInt()==row.startup()&&made.get("live").getAsInt()==row.active()&&made.get("recovery").getAsInt()==row.recovery()
                     &&Math.abs(made.get("lead").getAsFloat()-row.lead())<1.0e-4F&&Math.abs(made.get("tail").getAsFloat()-row.tail())<1.0e-4F,
                     "the kick's clip was written for the kick's row as the table has it (run tools/finale/kick.py again)");
-            var clip=doc.getAsJsonObject("clips").getAsJsonObject("r32_kick_r64");
+            for(String name:new String[]{"r32_kick_r64","r32_kick_step_r64"})
+            {
+                boolean step=name.contains("step");
+                var clip=doc.getAsJsonObject("clips").getAsJsonObject(name);
+                check(clip!=null,name+" is in the kick's file");
+                float contact=clip.get("contact_phase").getAsFloat();
+                check(contact-row.lead()>.02F&&contact+row.tail()<.98F,"the row's live part lies inside the kick's clip");
+                var frames=clip.getAsJsonArray("frames");var path=clip.getAsJsonArray("trajectory_m");
+                int bones=clip.getAsJsonArray("bones").size(),air=0,open=Math.round((contact-row.lead())*(frames.size()-1));
+                check(frames.size()>=40&&path.size()==frames.size(),"the kick has its frames and a place for each");
+                double ahead=0;
+                for(int i=0;i<frames.size();i++)
+                {
+                    var frame=frames.get(i).getAsJsonObject();var feet=frame.getAsJsonArray("foot_contact");
+                    check(frame.getAsJsonArray("rotation_delta_wxyz").size()==bones,"every frame turns every bone the clip names");
+                    check(feet.get(0).getAsBoolean()||feet.get(1).getAsBoolean(),"a foot is on the ground at every frame");
+                    // In place the standing foot never leaves the ground; with the step in it is set down before the live part.
+                    check(feet.get(1).getAsBoolean()||step&&i<open,"the standing foot is on the ground through the kick");
+                    if(!feet.get(0).getAsBoolean())air++;
+                    else check(air==0||i>frames.size()/2,"the kicking foot leaves the ground once");
+                    double now=-path.get(i).getAsJsonArray().get(2).getAsDouble();
+                    check(now>=ahead-1.0e-6,"the body is never carried back");ahead=now;
+                    // (.004 of a metre is a seventh of a block)
+                    if(step&&i<=Math.floor(EvaRowClockR64.STEP_IN*(contact-row.lead())*(frames.size()-1)))
+                        check(now<.004,"the stride begins after the pose has come out of the stand");
+                    if(i>=open)check(Math.abs(now-(-path.get(frames.size()-1).getAsJsonArray().get(2).getAsDouble()))<1.0e-6,"the step is made before the live part");
+                }
+                check(step?ahead>.1:ahead==0,step?"the step in carries the body ahead":"the kick in place carries the body nowhere");
+                check(frames.get(0).getAsJsonObject().getAsJsonArray("foot_contact").get(0).getAsBoolean()
+                        &&frames.get(frames.size()-1).getAsJsonObject().getAsJsonArray("foot_contact").get(0).getAsBoolean()&&air>frames.size()/3,
+                        "the kick begins and ends on both feet, and is off one of them for a good part between");
+            }
+        }
+        catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}
+    }
+
+    /**
+     * STEP without KICK: the hard kick (tools/finale/hardkick.py) is the captured kick laid on the kick's row. Its
+     * frames are written whole; its body's path is the capture's own, with the stride of the step in beside it.
+     */
+    private static void hardKick()
+    {
+        Row row=EvaMoveTableR64.get("kick");
+        try(var stream=EvaRowClockR64Test.class.getResourceAsStream("/assets/projectseele/motion/eva_kick_hard_r64.json"))
+        {
+            check(stream!=null,"the hard kick's clip comes with the mod");
+            var doc=com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            var made=doc.getAsJsonObject("row");
+            check(made.get("startup").getAsInt()==row.startup()&&made.get("live").getAsInt()==row.active()&&made.get("recovery").getAsInt()==row.recovery()
+                    &&Math.abs(made.get("lead").getAsFloat()-row.lead())<1.0e-4F&&Math.abs(made.get("tail").getAsFloat()-row.tail())<1.0e-4F,
+                    "the hard kick's clip was written for the kick's row as the table has it (run tools/finale/hardkick.py again)");
+            var clip=doc.getAsJsonObject("clips").getAsJsonObject("r32_kick_hard_r64");
+            check(clip!=null,"r32_kick_hard_r64 is in the hard kick's file");
             float contact=clip.get("contact_phase").getAsFloat();
-            check(contact-row.lead()>.02F&&contact+row.tail()<.98F,"the row's live part lies inside the kick's clip");
-            var frames=clip.getAsJsonArray("frames");int bones=clip.getAsJsonArray("bones").size(),air=0;
-            check(frames.size()>=40&&clip.getAsJsonArray("trajectory_m").size()==frames.size(),"the kick has its frames and a place for each");
-            for(int i=0;i<frames.size();i++)
+            check(contact-row.lead()>.02F&&contact+row.tail()<.98F,"the row's live part lies inside the hard kick's clip");
+            var frames=clip.getAsJsonArray("frames");var path=clip.getAsJsonArray("trajectory_m");var stride=clip.getAsJsonArray("stride_m");
+            int bones=clip.getAsJsonArray("bones").size(),last=frames.size()-1;
+            int open=Math.round((contact-row.lead())*last),close=Math.round((contact+row.tail())*last);
+            check(frames.size()>=40&&path.size()==frames.size()&&stride.size()==frames.size(),"the hard kick has its frames, and a place and a stride for each");
+            double whole=-stride.get(last).getAsJsonArray().get(2).getAsDouble(),before=0;
+            check(Math.abs(whole*EvaRootClosureR63.blocks(1)-doc.get("stride_blocks").getAsDouble())<.05,"the stride is as long as the file says");
+            int air=0;
+            for(int i=0;i<=last;i++)
             {
                 var frame=frames.get(i).getAsJsonObject();var feet=frame.getAsJsonArray("foot_contact");
-                check(frame.getAsJsonArray("rotation_delta_wxyz").size()==bones,"every frame turns every bone the clip names");
-                check(feet.get(1).getAsBoolean(),"the standing foot is on the ground at every frame");
-                if(!feet.get(0).getAsBoolean())air++;
-                else check(air==0||i>frames.size()/2,"the kicking foot leaves the ground once");
+                check(frame.getAsJsonArray("rotation_wxyz").size()==bones&&frame.getAsJsonArray("root_m").size()==3,"every frame is written whole");
+                // the standing foot is set down before the live part and stays down until the kicking foot is on the ground again
+                if(i>=open&&i<=close)check(feet.get(1).getAsBoolean()&&!feet.get(0).getAsBoolean(),"through the live part the Unit stands on its right foot and kicks with its left");
+                if(!feet.get(0).getAsBoolean()&&!feet.get(1).getAsBoolean())air++;
+                double now=-stride.get(i).getAsJsonArray().get(2).getAsDouble();
+                check(now>=before-1.0e-6,"the stride never carries the body back");before=now;
+                if(i<=Math.floor(EvaRowClockR64.STEP_IN*(contact-row.lead())*last))
+                    check(now<.004&&Math.abs(path.get(i).getAsJsonArray().get(2).getAsDouble())<.004,"the body is carried nowhere before the pose has come out of the stand");
+                if(i>=open)check(Math.abs(now-whole)<1.0e-6,"the stride is made before the live part");
             }
-            check(frames.get(0).getAsJsonObject().getAsJsonArray("foot_contact").get(0).getAsBoolean()
-                    &&frames.get(frames.size()-1).getAsJsonObject().getAsJsonArray("foot_contact").get(0).getAsBoolean()&&air>frames.size()/3,
-                    "the kick begins and ends on both feet, and is off one of them for a good part between");
+            // (the feet are changed one after the other: both are off the ground only as the one is set down and the other leaves)
+            check(air<=3,"the Unit is never off both feet for longer than a twentieth of a second");
+            for(int i:new int[]{0,last})
+            {
+                var feet=frames.get(i).getAsJsonObject().getAsJsonArray("foot_contact");
+                check(feet.get(0).getAsBoolean()&&feet.get(1).getAsBoolean(),"the hard kick begins and ends on both feet");
+            }
+            check(Math.abs(path.get(0).getAsJsonArray().get(0).getAsDouble())<1.0e-6&&Math.abs(path.get(0).getAsJsonArray().get(2).getAsDouble())<1.0e-6,"the body's path begins where the Unit stands");
         }
         catch(java.io.IOException error){throw new java.io.UncheckedIOException(error);}
     }

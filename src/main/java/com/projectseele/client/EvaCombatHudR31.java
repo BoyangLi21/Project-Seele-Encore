@@ -103,7 +103,7 @@ public final class EvaCombatHudR31
 
     private static String actionHint(Minecraft mc,EvaUnit01Entity eva)
     {
-        String key=Keybinds.EVA_GRAPPLE.getTranslatedKeyMessage().getString();
+        String key=(Keybinds.EVA_GRAB.isUnbound()?Keybinds.EVA_GRAPPLE:Keybinds.EVA_GRAB).getTranslatedKeyMessage().getString();
         String radio=Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString();
         if(EvaAirTransportR31.active(eva))return "运输中  /  "+radio+" 指挥通信";
         if(EvaShutdownR30.disabled(eva))return "呼叫回收  /  "+radio+" 指挥通信";
@@ -111,7 +111,9 @@ public final class EvaCombatHudR31
         return switch(EvaCombatR31.action(eva))
         {
             case EvaCombatR31.REACH -> "双手接近";
-            case EvaCombatR31.HOLD -> key+" / "+mc.options.keyAttack.getTranslatedKeyMessage().getString()+" 投掷";
+            case EvaCombatR31.HOLD -> com.projectseele.entity.EvaGameplayMotionR32.bodyReadyR64(eva)
+                    ?mc.options.keyAttack.getTranslatedKeyMessage().getString()+" 捶击  /  "+key+" / "+mc.options.keyUse.getTranslatedKeyMessage().getString()+" 投掷"
+                    :key+" / "+mc.options.keyAttack.getTranslatedKeyMessage().getString()+" 投掷";
             case EvaCombatR31.THROW -> "投掷";
             case EvaCombatR31.AIR_STRIKE -> "跳击";
             case EvaCombatR31.AIR_SLAM -> com.projectseele.entity.EvaGameplayMotionR32.ready(eva)?"下踢":"下砸";

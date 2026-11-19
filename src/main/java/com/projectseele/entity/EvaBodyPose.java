@@ -996,8 +996,21 @@ public final class EvaBodyPose
             if(lowest<floor){pose.positions.get("root").y+=.006F+floor-lowest;pose.dirty();}
             return;
         }
-        if(Float.isFinite(lowest)){pose.positions.get("root").y+=(.006F-lowest)*(1-gaitFlight(e,partial));pose.dirty();}
+        if(Float.isFinite(lowest))
+        {
+            float set=(.006F-lowest)*(1-gaitFlight(e,partial));
+            // R64 (flow, "body"): a blow's leap is drawn as high as it is written. Stood on its lower foot like every
+            // other frame, a blow that springs off the ground stayed on it: the knee, written to go in at the
+            // chest's height 6.5 blocks up, went in under its mark. While neither foot of its clip is on the
+            // ground the body is set by what set it as it left the ground. (Not by nothing: a clip's own height is
+            // some blocks off the ground's, which this setting always took up; left out, the leap was drawn eight
+            // blocks lower than the stand.)
+            if(EvaGameplayMotionR32.flownR64(e,partial)){Float left=LEAP_SET_R64.get(e);if(left!=null)set=left;}
+            else LEAP_SET_R64.put(e,set);
+            pose.positions.get("root").y+=set;pose.dirty();
+        }
     }
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,Float> LEAP_SET_R64=new com.projectseele.util.WeakIdentityMap<>();
     /** The run clip's stance soles sit this far below its zero (model units); the dash clip's are on it. */
     private static final float RUN_CLEARANCE=.18F;
     /** How much of the stride's own height stands: 0 walking or acting, 1 running on the flat. */

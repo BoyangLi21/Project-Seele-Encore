@@ -2474,6 +2474,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
          */
         int steps = this.isNervLogisticsLocked() || this.isLaunchSequenceActive()
                 ? 2 : lerpSteps;
+        // R64 (flow, "step"): through a kick's step in the body is carried by the row's clock (stepRootR64); the
+        // server's packet gives its height and its turn. (A packet that sets the body down at once is not obeyed
+        // either: the server has the body a tick or two behind in the stride, and the stride's ticks to come are
+        // added to wherever it stands. Whatever it is off by is made up when the stride is over.)
+        if (this.stepRootActiveR64)
+        {
+            this.stepRootServerXR64 = x; this.stepRootServerZR64 = z;
+            super.lerpTo(this.getX(), y, this.getZ(), yRot, xRot, steps, false);
+            return;
+        }
         super.lerpTo(x, y, z, yRot, xRot, steps, teleport);
     }
 
@@ -3173,6 +3183,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     /** R64 (flow), client: the row in hand as this client plays it. Created when first asked for (a check builds a Unit bare). */
     private EvaRowClockR64.View rowViewR64;
+    /** R64 (flow, "step"), either side: the row in hand takes a stride over the ground (its clock says where from). */
+    public boolean rowStridesR64(){return EvaCombatModelR64.flowStep(this)&&EvaRowClockR64.stepFrom(this)!=null;}
+    /** R64 (flow, "step"): the share of its stride the kick in hand takes over the ground, or the last one took (EvaRowClockR64.step). */
+    float rowStepShareR64;
     private float rowPhaseDrawnR64()
     {
         if(!EvaCombatModelR64.flowClock(this))return -1;
@@ -4221,7 +4235,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         EvaMovementSounds.swing(this,row.kind()==EvaMoveTableR64.SLAM?2.8F:row.kind()==EvaMoveTableR64.KICK?2.4F:2.1F);
         // R64 (flow, "kick"): where the foot is as the live ticks begin, so that the first of them has a sweep.
-        if(row.kind()==EvaMoveTableR64.KICK&&EvaCombatModelR64.flowKick(this)&&EvaGameplayMotionR32.kickReady(this))
+        if(row.kind()==EvaMoveTableR64.KICK&&EvaCombatModelR64.flowKickClip(this)&&EvaGameplayMotionR32.kickReady(this))
             this.kickPreviousFootR60=this.kickFootR64();
     }
     /**
@@ -4241,7 +4255,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             // blow is held there and pushed on from there. The leg's length, tried first, landed at the tick's
             // end: against a body twenty blocks off the leg was out at its full thirty through it, and stood so
             // for the hold (measured: 3.5 ticks all but still at its length, the "踢过去卡一下" again).
-            if(EvaCombatModelR64.flowKick(this))
+            if(EvaCombatModelR64.flowKickClip(this))
             {
                 this.combatR64().sweeps(true);
                 try{if(this.strikeZoneR32(pilot,new AABB(previous,foot).inflate(radius),damage,row.knock(),foot,previous,radius,true))return true;}
@@ -4250,7 +4264,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.strikeAngelsOnlyR60=true;
             try{if(this.strikeZoneR32(pilot,new AABB(hip,foot).inflate(radius),damage,row.knock(),foot,hip,radius,true))return true;}
             finally{this.strikeAngelsOnlyR60=false;}
-            if(EvaCombatModelR64.flowKick(this))return false;
+            if(EvaCombatModelR64.flowKickClip(this))return false;
             this.combatR64().sweeps(true);
             try{return this.strikeZoneR32(pilot,new AABB(previous,foot).inflate(radius),damage,row.knock(),foot,previous,radius,true);}
             finally{this.combatR64().sweeps(false);}
@@ -4376,6 +4390,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             float at=this.combatR64().phase(elapsed,Mth.clamp(elapsed/duration,0,1));
             authored = EvaGameplayMotionR32.ready(this)?EvaGameplayMotionR32.root(this,EvaGameplayMotionR32.ordinary(this.ordinaryAttackRootStage),at)
                     :EvaLiveCombatMotion.ordinary(this.ordinaryAttackRootStage,at);
+            // R64 (flow, "body"): a blow's stride is as long as its mark is far (EvaCombatMachineR64.start).
+            if(EvaCombatModelR64.flowStep(this)&&EvaGameplayMotionR32.ready(this))authored=authored.scale(EvaRowClockR64.stride(this));
         }
         else
         {
@@ -4385,6 +4401,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             float at=this.combatR64().phase(elapsed,Mth.clamp(elapsed/duration,0,1));
             authored = EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.root(this,"kick",at)
                     :EvaLiveCombatMotion.kick(at);
+            // R64 (flow, "step"): the step in is as long as the mark is far (EvaCombatMachineR64.start).
+            if(EvaCombatModelR64.flowStep(this)&&EvaGameplayMotionR32.kickReady(this))authored=this.kickStrideR64(authored,at);
         }
         this.entityData.set(DATA_LIVE_ACTION_PHASE, this.combatR64().phase(elapsed,Mth.clamp(elapsed / duration, 0.0F, 1.0F)));
         this.applyAuthoredRootDelta(authored,elapsed==1);
@@ -4544,10 +4562,27 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
     }
 
+    /**
+     * R64 (flow, "step"): the kick's path with its step in. A clip written with its stride beside its path (the
+     * hard kick) has the share of the stride added to the path; the kick written as one whole stride is scaled.
+     */
+    private Vec3 kickStrideR64(Vec3 root,float phase)
+    {
+        Vec3 stride=EvaGameplayMotionR32.strideR64(this,"kick",phase);
+        return stride!=null?root.add(stride.scale(EvaRowClockR64.step(this))):root.scale(EvaRowClockR64.step(this));
+    }
     private Vec3 actionRootSample(int family, float phase)
     {
-        if(EvaGameplayMotionR32.ready(this)&&(family>=0&&family<4||family==7))return EvaGameplayMotionR32.root(this,family==7?"heavy":EvaGameplayMotionR32.ordinary(family),phase);
-        if(family==4&&EvaGameplayMotionR32.kickReady(this))return EvaGameplayMotionR32.root(this,"kick",phase);
+        if(EvaGameplayMotionR32.ready(this)&&(family>=0&&family<4||family==7))
+        {
+            Vec3 root=EvaGameplayMotionR32.root(this,family==7?"heavy":EvaGameplayMotionR32.ordinary(family),phase);
+            return family!=7&&EvaCombatModelR64.flowStep(this)?root.scale(EvaRowClockR64.stride(this)):root;
+        }
+        if(family==4&&EvaGameplayMotionR32.kickReady(this))
+        {
+            Vec3 root=EvaGameplayMotionR32.root(this,"kick",phase);
+            return EvaCombatModelR64.flowStep(this)?this.kickStrideR64(root,phase):root;
+        }
         if((family==5||family==6)&&EvaGameplayMotionR32.knifeReady(this))return EvaGameplayMotionR32.root(this,family==6?"knife_reverse":"knife_forward",phase);
         // R64: the knife's cuts are families 8 and 9 (7 is the slam).
         if(family>=8&&EvaGameplayMotionR32.knifeReady(this))return EvaGameplayMotionR32.root(this,EvaGameplayMotionR32.knifeClip(family-6),phase);
@@ -4556,6 +4591,86 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 : EvaLiveCombatMotion.knife(family == 6, phase);
     }
 
+    /**
+     * R64 (flow, "step"), any client: the body is carried through a kick's step in by the row's own clock.
+     * <p>
+     * A blow's travel is the server's (CombatBodyDynamics.ownsGroundAction: no client moves the Unit in a blow),
+     * and a client had it from the server's packets, each laid over the ticks after it: the body was drawn two
+     * to three and a half ticks behind the pose, which the row's clock plays on time. Measured in a kick with a
+     * step in (2026-11-18): the legs had made the whole stride when the body had gone half of it, so both feet
+     * were dragged over the ground under a body that had yet to set off. Here the body goes where the row's
+     * clock has the pose a tick from now (what a tick moves is drawn between that tick's place and the one
+     * before); the server's packets give only its height and its turn until the stride is made and three ticks
+     * more, by when the server has made it too. Both come to the same place: the same path, the same share of
+     * it, the same stop at the mark's body; what they are still apart by then is made up to the place the
+     * server sent last.
+     */
+    private int stepRootSerialR64=-1,stepRootHoldR64;
+    private float stepRootAheadR64;
+    /** Where the stride has the body over the ground (x, z), counted on from where the server had it as the row began. */
+    private double stepRootTrackXR64,stepRootTrackZR64,stepRootServerXR64=Double.NaN,stepRootServerZR64;
+    private boolean stepRootActiveR64;
+    /** Where the stride of the row in hand has the body at a phase of its clip (the clip's own frame, metres). */
+    private Vec3 stepRootSampleR64(String clip,float phase)
+    {
+        Vec3 root=EvaGameplayMotionR32.root(this,clip,phase);
+        // (the hard kick's stride is written beside its path, and is added to it)
+        return clip.equals("kick")?this.kickStrideR64(root,phase):root.scale(EvaRowClockR64.stride(this));
+    }
+    private void stepRootOverR64()
+    {
+        if(this.stepRootActiveR64&&!Double.isNaN(this.stepRootServerXR64))
+            super.lerpTo(this.stepRootServerXR64,this.lerpY,this.stepRootServerZR64,(float)this.lerpYRot,(float)this.lerpXRot,3,false);
+        this.stepRootActiveR64=false;this.stepRootServerXR64=Double.NaN;
+    }
+    private void stepRootR64()
+    {
+        if(!EvaCombatModelR64.flowStep(this)||this.isControlledByLocalInstance()){this.stepRootSerialR64=-1;this.stepRootOverR64();return;}
+        if(this.rowViewR64==null)this.rowViewR64=new EvaRowClockR64.View();
+        this.rowViewR64.frame(this,FirstBattleSignals.clientTickFrame());
+        double[] from=EvaRowClockR64.stepFrom(this);
+        String clip=this.rowViewR64.clip();
+        float ahead=from!=null&&clip!=null&&EvaRowClockR64.stride(this)>0&&EvaGameplayMotionR32.ready(this)&&EvaGameplayMotionR32.hasClip(this,clip)
+                ?this.rowViewR64.ahead(FirstBattleSignals.clientTickTime()+1):-1;
+        if(ahead<0){this.stepRootSerialR64=-1;this.stepRootOverR64();return;}
+        if(this.rowViewR64.serial()!=this.stepRootSerialR64)
+        {
+            this.stepRootSerialR64=this.rowViewR64.serial();this.clientRootPrevious=this.stepRootSampleR64(clip,0);this.stepRootAheadR64=0;this.stepRootHoldR64=3;
+            // The stride is counted on from where the server had the body as the row began: not from where this
+            // client has it (a tick or two behind in a kick out of a walk), nor from where the last packet had
+            // it (which may have the first of the stride in it already: that was then made twice).
+            this.stepRootTrackXR64=from[0];this.stepRootTrackZR64=from[1];
+            this.stepRootServerXR64=Double.NaN;
+        }
+        ahead=this.stepRootAheadR64=Math.max(this.stepRootAheadR64,ahead);
+        Vec3 root=this.stepRootSampleR64(clip,ahead),delta=root.subtract(this.clientRootPrevious);
+        this.clientRootPrevious=root;
+        if(root.distanceToSqr(this.stepRootSampleR64(clip,1))<1.0e-10&&this.stepRootHoldR64--<=0){this.stepRootOverR64();return;}
+        // What the body is off the stride's place by is halved each tick; this tick's part of the stride is made whole.
+        double offX=this.stepRootTrackXR64-this.getX(),offZ=this.stepRootTrackZR64-this.getZ();
+        Vec3 forward=this.getForward().multiply(1.0D,0.0D,1.0D);
+        if(forward.lengthSqr()<1.0e-8D)return;
+        forward=forward.normalize();
+        double blocks=112.0D*EvaScale.RENDER_SCALE/16.0D,stepX=(forward.z*delta.x-forward.x*delta.z)*blocks,stepZ=(-forward.x*delta.x-forward.z*delta.z)*blocks;
+        this.stepRootTrackXR64+=stepX;this.stepRootTrackZR64+=stepZ;
+        Vec3 movement=new Vec3(stepX+.5*offX,0,stepZ+.5*offZ);
+        if(movement.horizontalDistanceSqr()>1.0e-8D&&movement.horizontalDistanceSqr()<32*32)
+        {
+            // (as moveAuthoredRootDelta: in pieces through the world's collision, stopped at a body in the way;
+            // and a move over the ground is not a take-off, or the feet's places are not held for these ticks)
+            boolean supported=this.onGround();
+            int steps=Math.max(1,(int)Math.ceil(movement.horizontalDistance()/6));Vec3 step=movement.scale(1D/steps);
+            for(int i=0;i<steps;i++)this.move(MoverType.SELF,CombatSpacingR32.clipAuthoredAdvance(this,step));
+            if(supported)
+            {
+                AABB b=this.getBoundingBox();
+                AABB sole=new AABB(b.minX+.1,b.minY-.10,b.minZ+.1,b.maxX-.1,b.minY+.01,b.maxZ-.1);
+                if(this.level().getBlockCollisions(this,sole).iterator().hasNext())this.setOnGround(true);
+            }
+        }
+        this.lerpX=this.getX();this.lerpZ=this.getZ();
+        this.stepRootActiveR64=true;
+    }
     private void predictAuthoritativeActionRoot()
     {
         int stage = this.getOrdinaryAttackStage();
@@ -4727,7 +4842,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         return anyHit;
     }
 
-    private float getMeleeMultiplier()
+    float getMeleeMultiplier()
     {
         return switch (this.getUnitVariant())
         {
@@ -6023,6 +6138,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         float preservedYaw = this.getYRot();
         float preservedPitch = this.getXRot();
         super.aiStep();
+        if (this.level().isClientSide) this.stepRootR64();
         EvaTerrainSupport.tick(this);
         if (this.isNervLogisticsLocked())
         {

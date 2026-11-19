@@ -30,7 +30,9 @@ public final class EvaCombatModelR64
      * stands; it takes no guard (the owner, 2026-11-17: an EVA has no boxing guard, and no stance of any kind:
      * "剧中eva也就是…正常站着吧平常？").
      */
-    public static final byte FLOW_CLOCK=1,FLOW_STOP=2,FLOW_CURVE=4,FLOW_FADE=8,FLOW_STAND=16,FLOW_KICK=32,FLOW_ALL=63;
+    public static final byte FLOW_CLOCK=1,FLOW_STOP=2,FLOW_CURVE=4,FLOW_FADE=8,FLOW_STAND=16,FLOW_KICK=32,FLOW_STEP=64,FLOW_BODY=(byte)128;
+    /** "on": every part but KICK, which is asked for by name (see flowKick). */
+    public static final byte FLOW_ALL=(byte)(255&~FLOW_KICK);
     private static final EntityDataAccessor<Byte> FLOW=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BYTE);
     /** Review only: -Dprojectseele.combatFlowR64=on, off, or parts by name (clock,stop,curve,fade) stands in for the config. */
     private static final String REVIEW_FLOW=System.getProperty("projectseele.combatFlowR64");
@@ -48,7 +50,7 @@ public final class EvaCombatModelR64
         byte parts=0;
         for(String part:value.toLowerCase(java.util.Locale.ROOT).split("[,\\s]+"))
             parts|=switch(part){case "on","all" -> FLOW_ALL;case "clock" -> FLOW_CLOCK;case "stop" -> FLOW_STOP;case "curve" -> FLOW_CURVE;case "fade" -> FLOW_FADE;
-                case "stand" -> FLOW_STAND;case "kick" -> FLOW_KICK;default -> 0;};
+                case "stand" -> FLOW_STAND;case "kick" -> FLOW_KICK;case "step" -> FLOW_STEP;case "body" -> FLOW_BODY;default -> 0;};
         return parts;
     }
 
@@ -66,6 +68,14 @@ public final class EvaCombatModelR64
     }
 
     private static boolean flow(EvaUnit01Entity e,byte part){return frames(e)&&e.getEntityData().hasItem(FLOW)&&(e.getEntityData().get(FLOW)&part)!=0;}
+    /**
+     * BODY: bare hands are the Unit's own blows in place of a boxer's (tools/finale/unarmed.py): the light press is
+     * the pounce, then the knee, then the two-fisted slam; out of a run it is the charge; a held Angel is beaten on
+     * with the free hand. The jab and the cross stay in the table for the switch to go back to. The clips come out
+     * of the stand and are laid on their rows' curves, with strides the row's clock carries: with STAND, CURVE,
+     * CLOCK and STEP.
+     */
+    public static boolean flowBody(EvaUnit01Entity e){return flow(e,FLOW_BODY)&&flow(e,FLOW_STAND)&&flow(e,FLOW_CURVE)&&flow(e,FLOW_CLOCK)&&flow(e,FLOW_STEP);}
     public static boolean flowClock(EvaUnit01Entity e){return flow(e,FLOW_CLOCK);}
     public static boolean flowStop(EvaUnit01Entity e){return flow(e,FLOW_STOP)&&tiered(e);}
     public static boolean flowCurve(EvaUnit01Entity e){return flow(e,FLOW_CURVE);}
@@ -75,8 +85,25 @@ public final class EvaCombatModelR64
      * KICK: the kick is this project's own clip (tools/finale/kick.py), one motion from a stand and back to it, in
      * place of the old live-combat kick (a hop and a leg thrown to the height of the head). Its frames are laid on
      * the clip for the row's curve, so it goes with CURVE.
+     * It is not part of "on": the owner, 2026-11-18, having played it: "右键腿击现在像只抬了一下腿，不如之前那一脚硬踹"
+     * ("on,kick" has it, to set the two beside each other).
      */
     public static boolean flowKick(EvaUnit01Entity e){return flow(e,FLOW_KICK)&&flow(e,FLOW_CURVE);}
+    /**
+     * STEP: the kick is made with a step in: the right foot is set forward and the body comes over it, as far as
+     * brings the mark to the leg's length and no further than a stride, and the left leg comes through from
+     * behind into the kick. (Made in place, the kick reached 30 blocks; the old one, which slid the body forward
+     * on one leg, some 43.) And a foot that is let go of its place in a strike is eased out of it: the step is
+     * as long as the mark is far, the clip is written for a whole stride, and the foot was put where the clip
+     * has it within one frame. It goes with CURVE and CLOCK (the clients are told how long the step is).
+     * Without KICK it is the hard kick that is stepped into: the captured kick the Unit has always had, laid on its
+     * row with an entry from the stand, its feet held where they stand, and a landing (tools/finale/hardkick.py).
+     */
+    public static boolean flowStep(EvaUnit01Entity e){return flow(e,FLOW_STEP)&&flow(e,FLOW_CURVE)&&flow(e,FLOW_CLOCK);}
+    /** The kick is the hard kick on its row (STEP without KICK). */
+    public static boolean flowHardKick(EvaUnit01Entity e){return flowStep(e)&&!flowKick(e);}
+    /** The kick is drawn from a clip of the new pipeline, either of them: the limb's own sweep is what lands it. */
+    public static boolean flowKickClip(EvaUnit01Entity e){return flowKick(e)||flowStep(e);}
 
     /** The new core is this Unit's: asked for, and a Unit it is built for (Unit-01 until the others' tables are written). */
     public static boolean frames(EvaUnit01Entity e)

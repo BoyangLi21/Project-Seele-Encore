@@ -71,6 +71,17 @@ public final class EvaMoveTableR64
         row(new Row("cross", PUNCH,1,  4, 3, 12, .091F,.047F, 20, 3.2F,1.1, LIGHT,   3,  .014F, 8,    2,    8,  12, 7,  10, 12,  3,10,   0,  false, "jab2",  "kick"));
         row(new Row("jab2",  PUNCH,0,  4, 3, 10, .066F,.093F, 20, 3.2F,1.1, MEDIUM,  4,  .018F, 7,    2,    8,  12, 7,  10, 12,  3,10,   0,  false, "slam",  "kick"));
         row(new Row("slam",  SLAM, 0,  9, 4, 25, .030F,.055F, 35, 4F,  2.0, FINISHER,8,  .030F, 5,    4,    -1, -1, 18, 22, 24,  5,13,   0,  true,  null,    null));
+        // R64 (flow, "body"): the Unit's own bare hands (tools/finale/unarmed.py), which the light press goes to in
+        // place of the jab where the switch has them. In the original Unit-01 does not box: it throws itself on an
+        // Angel, drives a knee into it, takes hold of it. The string is pounce, knee, slam: three presses for the
+        // former four. Pounce and knee retain the damage and cooldown of the two light attacks they replace.
+        // The charge is also a light opener and shares its damage and cooldown. It is selected out
+        // of a run. They play in the punches' three places (stage 0, 1, 2), so whatever goes by a punch's stage
+        // goes on as it did.
+        //      name     kind  st  su ac rec  lead   tail   dmg  rad  knock level    stop push   track feint cH  cW  eH  eW  move armor    cd  slow   light    heavy
+        row(new Row("pounce",PUNCH,0,  6, 3, 12, .030F,.100F, 20, 3.2F,1.1, LIGHT,   2,  .012F, 9,    2,    10, 12, 9,  11, 11,  2,9,    0,  false, "knee",  "kick"));
+        row(new Row("knee",  PUNCH,1,  6, 3, 13, .030F,.090F, 20, 3.2F,1.1, LIGHT,   3,  .014F, 8,    2,    10, 13, 9,  11, 12,  3,10,   0,  false, "slam",  "kick"));
+        row(new Row("charge",PUNCH,2,  4, 6, 12, .030F,.230F, 20, 3.2F,1.1, LIGHT,   2,  .012F, 6,    0,    -1, -1, 12, 14, 14,  2,10,    0, false,  null,    null));
         // (The kick's recovery was 7 ticks: the leg came back from its highest to the ground in 10, and the owner
         // said after his second play that it comes back too fast. 13: the same part of the clip at a little over
         // half its captured pace, 15 ticks to the ground. An evade or a step still leaves it from the ticks they did.)
@@ -116,11 +127,13 @@ public final class EvaMoveTableR64
      * @param cuts the Unit has the knife's cuts (EvaGameplayMotionR32.knifeCutsReadyR64); without them the knife is
      *             as it was, the thrust on the light press and the reverse grip on the heavy
      */
-    public static Row opener(int weapon,boolean heavy,boolean afterEvade,boolean cuts)
+    public static Row opener(int weapon,boolean heavy,boolean afterEvade,boolean cuts){return opener(weapon,heavy,afterEvade,cuts,false,false);}
+    /** body: the Unit's own bare hands stand in for the punches; running: the press comes out of a run. */
+    public static Row opener(int weapon,boolean heavy,boolean afterEvade,boolean cuts,boolean body,boolean running)
     {
         if(weapon==EvaUnit01Entity.WEAPON_KNIFE)
             return get(cuts?heavy?"knife_slash":afterEvade?"knife_counter":"knife_cut":heavy?"knife_reverse":afterEvade?"knife_counter":"knife_slash");
-        return get(heavy?"kick":"jab");
+        return get(heavy?"kick":body?running?"charge":"pounce":"jab");
     }
 
     private EvaMoveTableR64(){}

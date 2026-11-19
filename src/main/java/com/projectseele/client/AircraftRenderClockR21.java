@@ -29,6 +29,8 @@ public final class AircraftRenderClockR21
      * the evenly interpolated body, a visible judder in every walk.
      */
     public static void stampFrame(){stamped=System.nanoTime();}
+    /** The stamp of the frame now being made: what frameNanos() is to be once its client ticks are done. */
+    public static long stampedNanos(){return stamped>frameStarted?stamped:frameNanos();}
     public static long simulationMillis()
     {
         if(nativeFrame==frame){duplicateMtrPasses++;return 0;}

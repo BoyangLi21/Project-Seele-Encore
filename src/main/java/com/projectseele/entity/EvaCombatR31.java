@@ -30,7 +30,48 @@ public final class EvaCombatR31
     private static final EntityDataAccessor<org.joml.Vector3f> APPROACH_TO=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.VECTOR3);
     private static final EntityDataAccessor<Float> FACING=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
     private static final WeakIdentityMap<EvaUnit01Entity,Runtime> STATES=new WeakIdentityMap<>();
-    private static final class Runtime {boolean contact,airborne;Vec3 previousContact;int cooldown;}
+    private static final class Runtime {boolean contact,airborne,pounded;Vec3 previousContact;int cooldown;}
+    /**
+     * R64 (flow, "body"): a held Angel is beaten on with the free hand, the left keeping its hold: the light press
+     * raises the right fist and brings it down on the Angel's core (in the original Unit-01 holds the Third Angel
+     * and beats on its core). POUND_TICKS from one blow to the next, the fist landing at POUND_HIT; the heavy press
+     * and the grab's own key throw as they did. A hold lasts ninety ticks whatever is done in it: seven blows at
+     * the most.
+     */
+    public static final int POUND_TICKS=12,POUND_HIT=5;
+    private static void pound(EvaUnit01Entity e)
+    {
+        float since=strokeAge(e,0);
+        if(since>=0&&since<POUND_TICKS)return;
+        e.getEntityData().set(STROKE,e.level().getGameTime());
+        var s=STATES.get(e);if(s!=null)s.pounded=false;
+        e.playSound(ModSounds.EVA_SWING.get(),1.8F,.85F);
+    }
+    /** Client: how far a blow on a held Angel has got, 0 to 1, or -1 with none in hand. */
+    public static float pounding(EvaUnit01Entity e,float partial)
+    {
+        if(action(e)!=HOLD)return -1;
+        float since=strokeAge(e,partial);
+        return since>=0&&since<POUND_TICKS?since/POUND_TICKS:-1;
+    }
+    /**
+     * Where a hand is on a held Angel as it is drawn: its hold (grip), but for the right hand through a blow, which
+     * goes up over the shoulder, comes down on the core, and goes back to its hold.
+     */
+    public static Vec3 hand(EvaUnit01Entity e,LivingEntity t,boolean left,float partial)
+    {
+        Vec3 hold=grip(e,t,left,partial);float at=left?-1:pounding(e,partial);
+        if(at<0)return hold;
+        Vec3 f=forward(e),r=f.cross(new Vec3(0,1,0));
+        Vec3 raised=e.getPosition(partial).add(0,e.getBbHeight()*1.12,0).add(f.scale(3)).add(r.scale(7));
+        Vec3 core=t.getPosition(partial).add(0,t.getBbHeight()*.6,0).subtract(f.scale(t.getBbWidth()*.5-1.5));
+        float hit=POUND_HIT/(float)POUND_TICKS;
+        // up in the first three fifths of the way to the hit, down in the rest (a fist gathers speed coming down), then back
+        if(at<hit*.6F)return hold.lerp(raised,CombatMotionR29.ease(at/(hit*.6F)));
+        if(at<hit){double u=(at-hit*.6F)/(hit*.4F);return raised.lerp(core,u*u);}
+        if(at<hit+.12F)return core;
+        return core.lerp(hold,CombatMotionR29.ease((at-hit-.12F)/(1-hit-.12F)));
+    }
     public static boolean bootstrap(){return true;}
     public static void define(SynchedEntityData d){d.define(ACTION,NONE);d.define(SINCE,0L);d.define(STROKE,-1L);d.define(TARGET,-1);d.define(APPROACH_FROM,new org.joml.Vector3f());d.define(APPROACH_TO,new org.joml.Vector3f());d.define(FACING,0F);}
     public static float strokeAge(EvaUnit01Entity e,float partial){long t=e.getEntityData().get(STROKE);return t<0?-1:e.level().getGameTime()-t+partial;}
@@ -63,7 +104,7 @@ public final class EvaCombatR31
     {return !e.level().isClientSide&&!e.isPilotControlLocked()&&!e.isFirstBattleActive()&&!CombatFeelR31.restrained(e)&&e.getPilotEntity()!=null;}
     public static boolean attack(EvaUnit01Entity e,boolean heavy)
     {
-        if(action(e)==HOLD){requestThrow(e);return true;}
+        if(action(e)==HOLD){if(!heavy&&EvaGameplayMotionR32.bodyReadyR64(e))pound(e);else requestThrow(e);return true;}
         if(active(e))return true;
         // Horizontal authored root motion can clear vanilla's onGround bit.
         // An aerial action needs the same confirmed jump/fall state as the body.
@@ -200,6 +241,18 @@ public final class EvaCombatR31
             if(allowed.subtract(delta).lengthSqr()>.02){clear(e);return;}
             victim.move(MoverType.SELF,delta);victim.setDeltaMovement(Vec3.ZERO);victim.resetFallDistance();
             float yaw=Mth.approachDegrees(victim.yBodyRot,(float)Math.toDegrees(Math.atan2(f.x,-f.z)),6);victim.setYRot(yaw);victim.yBodyRot=victim.yHeadRot=yaw;victim.hurtMarked=true;
+            if(a==HOLD)
+            {
+                float stroke=strokeAge(e,0);
+                if(stroke>=POUND_HIT&&stroke<POUND_TICKS&&!s.pounded)
+                {
+                    s.pounded=true;
+                    Vec3 at=victim.position().add(0,victim.getBbHeight()*.6,0).subtract(f.scale(victim.getBbWidth()*.5-1.5));
+                    float damage=EvaMoveTableR64.get("jab").damage()*e.getMeleeMultiplier();
+                    if(EvaHitFeedback.hurt(victim,e.damageSources().mobAttack(e),damage,at,f))
+                        CombatFoleyR36.impact(e,victim,at,false,false);
+                }
+            }
             if(a==HOLD&&age>90){clear(e);return;}
         }
         if(a==THROW&&age>=16&&!s.contact)

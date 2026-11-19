@@ -17,6 +17,21 @@ public final class EvaCombatSupportR33
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,Vec3[]> TARGETS=new com.projectseele.util.WeakIdentityMap<>();
     /** Blocks from the body's axis beyond which a planted foot has been left behind. */
     private static final double STRAY_R63=22;
+    /**
+     * R64 (flow, "step"): ticks in which a foot let go of its place in a strike comes to where the clip has it. Half
+     * the three ticks a stepping foot is in the air: at three the foot was still short of its place as it was set
+     * down. (At a low frame rate the frame the foot is let go in can be most of a tick after the clip lifted it, the
+     * clip's foot by then blocks on its way: measured at 25 frames a second, five.)
+     */
+    private static final float OFF_EASE_R64=1.5F;
+    /**
+     * A foot that was let go was this far (blocks, over the ground) from where the clip had it in the first frame
+     * drawn after that, which was at this time of the frame clock.
+     */
+    private record OffEase(double x,double z,long began){}
+    /** A client's own account of each foot through a strike: whether the last frame drawn held it, where, and its ease once let go. */
+    private static final class OffFeet{final boolean[] held=new boolean[2];final double[] x=new double[2],z=new double[2];final OffEase[] ease=new OffEase[2];}
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,OffFeet> OFF_R64=new com.projectseele.util.WeakIdentityMap<>();
     private record FootFrame(long tick,Vec3[] feet){}
     private record ReleaseFrame(long signal,long start,Vec3[] feet){}
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,FootFrame> FINAL_FEET=new com.projectseele.util.WeakIdentityMap<>();
@@ -328,6 +343,18 @@ public final class EvaCombatSupportR33
     {return e.onGround()&&!e.isVisuallyAirborneForRender()&&EvaGameplayMotionR32.airAge(e,0)<0;}
     public static void release(EvaUnit01Entity e)
     {if(!e.level().isClientSide)e.getEntityData().set(CONTACTS,new CompoundTag());TARGETS.remove(e);CLIENT_RELEASES.remove(e);}
+    /** Review (-Dprojectseele.combatDiagR64=true): why the last solve of a Unit's feet was not made. */
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,String> WHY_R64=Boolean.getBoolean("projectseele.combatDiagR64")?new com.projectseele.util.WeakIdentityMap<>():null;
+    /** Review: what the Unit carries of its feet's places (+ stood on, - let go, the place over the ground), and whether the last solve held them. */
+    public static String diagR64(EvaUnit01Entity e)
+    {
+        var t=e.getEntityData().get(CONTACTS);
+        if(t.isEmpty())return "none";
+        var held=TARGETS.get(e);
+        return String.format(java.util.Locale.ROOT,"l%s %.1f %.1f%s r%s %.1f %.1f%s%s%s %s",t.getBoolean("lactive")?"+":"-",t.getDouble("lx"),t.getDouble("lz"),"",
+                t.getBoolean("ractive")?"+":"-",t.getDouble("rx"),t.getDouble("rz"),"",t.contains("release")?" release":"",t.getBoolean("locomotion_r44")?" gait":"",
+                held==null?"unsolved"+(WHY_R64==null?"":": "+WHY_R64.get(e)):"solved");
+    }
     public static void tick(EvaUnit01Entity e)
     {
         if(e.level().isClientSide||!ready(e))return;
@@ -439,8 +466,10 @@ public final class EvaCombatSupportR33
     public static void apply(EvaUnit01Entity e,EvaBodyPose.Sample p,float partial)
     {
         if(Unit03SourceRigR53.sharesGroundActions(e)&&e.rifleMoveBlend(partial)>.08F)
-        {TARGETS.remove(e);CLIENT_RELEASES.remove(e);return;}
+        {TARGETS.remove(e);CLIENT_RELEASES.remove(e);if(WHY_R64!=null)WHY_R64.put(e,"walking");return;}
         TARGETS.remove(e);
+        if(WHY_R64!=null)WHY_R64.put(e,CombatReactionsR36.active(e)?"reaction":!supported(e)?"off the ground"+(e.onGround()?"":" (onGround)")+(e.isVisuallyAirborneForRender()?" (airborne)":"")
+                :!EvaGameplayMotionR32.owns(e,partial)?"pose not the clip's":e.getEntityData().get(CONTACTS).isEmpty()?"no places":"");
         if(CombatReactionsR36.active(e))return;
         if(!ready(e)||!supported(e)||!EvaGameplayMotionR32.owns(e,partial)||e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e))return;
         var beat=CombatFeelR31.beat(e);if(beat!=null&&(beat.kind()==CombatFeelR31.DOWN||beat.kind()==CombatFeelR31.THROWN))return;
@@ -459,17 +488,51 @@ public final class EvaCombatSupportR33
         boolean[] supportActive=new boolean[2];
         for(int i=0;i<2;i++)supportActive[i]=e.level().isClientSide&&t.getBoolean("locomotion_r44")&&!t.contains("release")
                 ?EvaBodyPose.locomotionPlantedR44(e,sides[i],partial):t.getBoolean(sides[i]+"active");
+        // R64 (flow, "step"), client. A foot is let go of its place when this client's own clip lifts it, not when
+        // the server is heard to have let it go: that is a tick or two later (the server's tick, then the packet),
+        // and the client plays the row by its own clock besides. Measured in a kick with a step in: the stepping
+        // foot stood where it had stood until the clip had it three and a half blocks ahead and nearly three up,
+        // and was then eased after it; it came down four blocks short and slid to its place.
+        // What a foot is off by as it is let go (where it was held, against where the clip has it in the first
+        // frame drawn after) is taken out over OFF_EASE_R64 ticks of the frame clock, over the ground only: its
+        // height is the clip's from the first. (A step in cut short by its mark leaves the foot short of where the
+        // clip, written for the whole stride, has it.) A pose asked for at a tick's end is not a frame drawn: the
+        // body is then where the tick has just put it, and measures a tick's travel that no frame showed.
+        boolean easedR64=EvaCombatModelR64.flowStep(e)&&e.level().isClientSide&&EvaGameplayMotionR32.directed(e)&&strike(e)&&!t.getBoolean("locomotion_r44");
+        boolean drawnR64=partial>0&&partial<1;
+        var feetR64=easedR64?OFF_R64.computeIfAbsent(e,k->new OffFeet()):null;
+        if(!easedR64)OFF_R64.remove(e);
         for(int i=0;i<2;i++)
         {
             String s=sides[i];
             String foot="foot_"+s;var orientation=p.matrix(foot).getUnnormalizedRotation(new Quaternionf());
+            if(easedR64&&supportActive[i]&&!EvaGameplayMotionR32.planted(e,s,partial))supportActive[i]=false;
             if(EvaGameplayMotionR32.directed(e)&&!supportActive[i])
             {
+                if(easedR64)
+                {
+                    float turn=(180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD;
+                    var world=p.matrix(foot).transformPosition(new Vector3f(p.rig.get(foot).pivot()).add(toe(e,s))).mul(EvaScale.RENDER_SCALE).rotateY(turn);
+                    var ease=feetR64.ease[i];
+                    if(feetR64.held[i])ease=new OffEase(feetR64.x[i]-origin.x-world.x,feetR64.z[i]-origin.z-world.z,FirstBattleSignals.clientFrameTime());
+                    if(drawnR64){feetR64.ease[i]=ease;feetR64.held[i]=false;}
+                    float along=ease==null?1:(FirstBattleSignals.clientFrameTime()-ease.began())/(OFF_EASE_R64*5.0e7F);
+                    if(along>=0&&along<1)
+                    {
+                        float left=1-along*along*(3-2*along);
+                        world.add((float)ease.x()*left,0,(float)ease.z()*left);
+                        worldTargets[i]=origin.add(world.x,world.y,world.z);
+                        var target=world.rotateY(-turn).div(EvaScale.RENDER_SCALE);
+                        target.sub(orientation.transform(toe(e,s)));
+                        targets[i]=target;orientations[i]=orientation;supportActive[i]=true;continue;
+                    }
+                }
                 targets[i]=point(p,foot);orientations[i]=orientation;continue;
             }
             // A boot rolls on its real sole, not on an abstract marker floating
             // inside the mesh. Keep X/Z planted while its support patch changes.
             var planted=plantTarget(e,t,s,partial,EvaBodyPose.soleBelowToeR33(e,s,orientation,toe(e,s)));worldTargets[i]=planted;
+            if(easedR64&&drawnR64){feetR64.held[i]=true;feetR64.x[i]=planted.x;feetR64.z[i]=planted.z;feetR64.ease[i]=null;}
             var target=new Vector3f((float)(planted.x-origin.x),(float)(planted.y-origin.y),(float)(planted.z-origin.z))
                     .rotateY(-(180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD).div(EvaScale.RENDER_SCALE);
             if(t.contains("release"))
@@ -485,7 +548,11 @@ public final class EvaCombatSupportR33
                 float step=Mth.clamp((ticks-i*4)/4F,0,1);
                 float u=step*step*step*(10+step*(-15+6*step));
                 var free=p.matrix(foot).transformPosition(new Vector3f(p.rig.get(foot).pivot()).add(toe(e,s)));
-                target.lerp(free,u).add(0,(float)Math.sin(step*Math.PI)*.25F,0);
+                // R64 (flow, "stand"): a foot that is let go where it already stands is not lifted: a blow that
+                // ends on its feet where the Unit stands (the hard kick) was followed by each foot coming up a
+                // block and going down again on the spot. The lift is whole from two blocks to go.
+                float lift=EvaCombatModelR64.flowStand(e)?Mth.clamp(target.distance(free)/.4F,0,1):1;
+                target.lerp(free,u).add(0,(float)Math.sin(step*Math.PI)*.25F*lift,0);
                 var world=new Vector3f(target).mul(EvaScale.RENDER_SCALE).rotateY((180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD);
                 worldTargets[i]=origin.add(world.x,world.y,world.z);
             }

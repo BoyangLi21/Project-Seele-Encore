@@ -172,6 +172,7 @@ public class ClientEvents
         event.register(Keybinds.UN_EYE_LASER);
         event.register(Keybinds.UN_FLIGHT);
         event.register(Keybinds.EVA_GRAPPLE);
+        event.register(Keybinds.EVA_GRAB);
         event.register(Keybinds.ULTRAMAN_TRANSFORM);
     }
 

@@ -28,7 +28,7 @@ public final class EvaCombatCommandsR64
             stop.then(Commands.literal(name).executes(context -> set(context.getSource(), null, name)));
         }
         var flow = Commands.literal("flow");
-        for (String name : new String[] {"on", "off", "clock", "stop", "curve", "fade", "stand", "kick"})
+        for (String name : new String[] {"on", "off", "clock", "stop", "curve", "fade", "stand", "kick", "step", "body"})
         {
             flow.then(Commands.literal(name).executes(context -> flow(context.getSource(), name)));
         }
@@ -41,7 +41,7 @@ public final class EvaCombatCommandsR64
                 + ", hit-stop " + SeeleConfig.EVA_HIT_STOP.get()
                 + ", flow " + SeeleConfig.EVA_COMBAT_FLOW.get()
                 + " (frames is Unit-01 with bare hands or the knife for now; /seele combat legacy|frames, /seele combat hitstop tiered|flat,"
-                + " /seele combat flow on|off, or clock|stop|curve|fade|stand|kick to turn one part)"), false);
+                + " /seele combat flow on|off, or clock|stop|curve|fade|stand|kick|step|body to turn one part)"), false);
         return 1;
     }
 
@@ -55,7 +55,7 @@ public final class EvaCombatCommandsR64
         }
         var parts = new java.util.LinkedHashSet<String>();
         byte now = com.projectseele.entity.EvaCombatModelR64.flowParts(SeeleConfig.EVA_COMBAT_FLOW.get());
-        for (String part : new String[] {"clock", "stop", "curve", "fade", "stand", "kick"})
+        for (String part : new String[] {"clock", "stop", "curve", "fade", "stand", "kick", "step", "body"})
         {
             boolean has = (now & com.projectseele.entity.EvaCombatModelR64.flowParts(part)) != 0;
             if (has != part.equals(name))
@@ -63,7 +63,8 @@ public final class EvaCombatCommandsR64
                 parts.add(part);
             }
         }
-        SeeleConfig.EVA_COMBAT_FLOW.set(parts.isEmpty() ? "off" : parts.size() == 6 ? "on" : String.join(",", parts));
+        // "on" is every part but the kick written in the hard kick's place
+        SeeleConfig.EVA_COMBAT_FLOW.set(parts.isEmpty() ? "off" : parts.size() == 7 && !parts.contains("kick") ? "on" : String.join(",", parts));
         return status(source);
     }
 
