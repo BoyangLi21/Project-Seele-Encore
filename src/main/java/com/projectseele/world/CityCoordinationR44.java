@@ -138,7 +138,7 @@ public final class CityCoordinationR44
             var actual=actualBinding(level,unit,parts[2],person);
             if(actual==null)return "ops.projectseele.city.no_unit_or_pilot_signal_yet_check_again";
             if(!data.bind(expected,actual))return "ops.projectseele.city.the_pilot_has_another_assignment_or_the_current";
-            return OperationText.format("ops.projectseele.city.assigned", TvBriefingText.unit(unit));
+            return OperationText.format("ops.projectseele.city.assigned", OperationText.unit(unit));
         }
         if(action.equals("finish"))
         {

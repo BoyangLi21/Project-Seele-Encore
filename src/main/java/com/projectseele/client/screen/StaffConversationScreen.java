@@ -1,6 +1,5 @@
 package com.projectseele.client.screen;
 
-import com.projectseele.world.TvBriefingText;
 import com.projectseele.world.OperationText;
 import com.projectseele.world.StaffDialogueCatalogR24;
 import net.minecraft.client.resources.language.I18n;
@@ -424,7 +423,7 @@ public final class StaffConversationScreen extends Screen
     }
     private static String unitName(int unit)
     {
-        return TvBriefingText.unit(unit).getString();
+        return OperationText.unit(unit).getString();
     }
 
     private static String unitStatus(String row)

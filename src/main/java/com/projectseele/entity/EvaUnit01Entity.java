@@ -2300,7 +2300,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                         ? com.projectseele.world.NervRouteRuntimeR52.pilotAbortR55(serverLevel,
                                 this.getUnitVariant(), pilot.getUUID())
                         : EvaLogisticsDirector.requestCancel(serverLevel, this.getUnitVariant());
-        pilot.displayClientMessage(Component.literal(result.message())
+        pilot.displayClientMessage(com.projectseele.world.OperationText.read(result.message()).copy()
                 .withStyle(result.accepted()
                         ? ChatFormatting.GREEN : ChatFormatting.RED), true);
     }
@@ -4954,7 +4954,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                         held, this.getUnitVariant(), pilot.getUUID());
                 if (way != null)
                 {
-                    pilot.displayClientMessage(Component.literal(way.message())
+                    pilot.displayClientMessage(com.projectseele.world.OperationText.read(way.message()).copy()
                             .withStyle(way.accepted() ? ChatFormatting.GREEN : ChatFormatting.RED), true);
                     return;
                 }

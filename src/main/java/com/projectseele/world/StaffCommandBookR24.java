@@ -191,8 +191,8 @@ public final class StaffCommandBookR24
             if(airframe!=null)airframe.getPersistentData().putString("R32AutoStep",job.operation+"_accepted");
             ORDERS.get(level).remove(npc.getUUID());
             if(owner!=null)NervStaffDialogue.reply(owner,npc,job.operation.equals("prepare")
-                ?OperationText.format("ops.projectseele.orders.pilot_ready", TvBriefingText.unit(job.unit))
-                :OperationText.format("ops.projectseele.orders.launch", TvBriefingText.unit(job.unit)));
+                ?OperationText.format("ops.projectseele.orders.pilot_ready", OperationText.unit(job.unit))
+                :OperationText.format("ops.projectseele.orders.launch", OperationText.unit(job.unit)));
             return;
         }
         switch (job.operation)

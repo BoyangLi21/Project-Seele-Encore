@@ -71,7 +71,7 @@ public final class NervAirLiftR30
     public static String status(ServerLevel l)
     {
         if(NervRouteRuntimeR52.claimed(l))return NervAirTransportRuntimeR52.status(l);
-        var s=state(l);String surface=s.forceRecovery?s.last:s.job==null?s.last:OperationText.format("ops.projectseele.un.unit_reply", TvBriefingText.unit(s.job.variant), OperationText.read(s.job.note));
+        var s=state(l);String surface=s.forceRecovery?s.last:s.job==null?s.last:OperationText.format("ops.projectseele.un.unit_reply", OperationText.unit(s.job.variant), OperationText.read(s.job.note));
         String underground=NervUndergroundTransportSiteR50.get(l)==null?"GeoFront 地下机场尚未开放":NervUndergroundAirLiftR50.status(l);
         return OperationText.format("ops.projectseele.flight.overview", OperationText.read(surface), OperationText.read(underground));
     }

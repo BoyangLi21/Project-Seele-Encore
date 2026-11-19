@@ -34,10 +34,30 @@ public record TvBriefingText(String chapter, String activity, boolean central, i
         return OperationText.read(text);
     }
 
-    public static Component unit(int slot)
+    // R64's sight extracts the final clause from this established saved notice. Read its
+    // measured layer count without changing the saved format, including notices from older saves.
+    private static Component dispatch(String value)
     {
-        return slot < 3 ? Component.translatable("entity.projectseele.eva_unit0" + slot)
-                : Component.literal("EVA-UN-0" + (slot - 3));
+        String prefix = "屋岛作战 · ";
+        if (!value.startsWith(prefix)) return OperationText.read(value);
+        String body = value.substring(prefix.length());
+        String breach = "GeoFront入口已贯穿；总部与终端尚未失守 · ";
+        boolean breached = body.startsWith(breach);
+        if (breached) body = body.substring(breach.length());
+        String armor = "装甲贯穿 ", split = " 层 · ";
+        int end = body.indexOf(split);
+        if (body.startsWith(armor) && end > armor.length())
+        {
+            try
+            {
+                int layers = Integer.parseInt(body.substring(armor.length(), end));
+                return Component.translatable("ops.projectseele.yashima.status", breached
+                        ? Component.translatable("ops.projectseele.yashima.entrance_breached") : Component.empty(),
+                        layers, OperationText.read(body.substring(end + split.length())));
+            }
+            catch (NumberFormatException ignored) {}
+        }
+        return OperationText.read(value);
     }
 
     private Component display()
@@ -57,7 +77,7 @@ public record TvBriefingText(String chapter, String activity, boolean central, i
                 boolean npc = crew[i] < 0;
                 int slot = npc ? -crew[i] - 1 : crew[i];
                 Component pilot = npc ? StaffDialogueCatalogR24.pilotName(slot) : Component.translatable(KEY + "human");
-                roster.append(Component.translatable(KEY + "crew", unit(slot), pilot));
+                roster.append(Component.translatable(KEY + "crew", OperationText.unit(slot), pilot));
             }
             result.append("\n").append(Component.translatable(KEY + "formation", roster));
         }
@@ -65,7 +85,7 @@ public record TvBriefingText(String chapter, String activity, boolean central, i
         result.append("\n\n").append(Component.translatable(KEY + "objective", Component.translatable(mission + "objective", zone)));
         if (!coordinates.isEmpty()) result.append("\n").append(Component.translatable(KEY + "cannon", coordinates));
         if (!blocker.isBlank()) result.append("\n\n").append(Component.translatable(KEY + "pending", OperationText.read(blocker)));
-        if (!notice.isBlank()) result.append("\n\n").append(Component.translatable(KEY + "dispatch", OperationText.read(notice)));
+        if (!notice.isBlank()) result.append("\n\n").append(Component.translatable(KEY + "dispatch", dispatch(notice)));
         if (activity.equals("idle")) result.append("\n\n").append(Component.translatable(KEY + "replay"));
         else if (activity.equals("alert") || activity.equals("approach") || activity.equals("combat"))
             result.append("\n\n").append(Component.translatable(KEY + "reinforce"));

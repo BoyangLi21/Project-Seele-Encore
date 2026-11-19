@@ -95,7 +95,7 @@ public final class NervAirTransportRuntimeR52
                     .filter(a -> a.entity().equals(job.aircraft())).findFirst().orElse(null);
             if (!message.getSiblings().isEmpty()) message.append(" | ");
             message.append(Component.translatable("ops.projectseele.airroutes.status",
-                    aircraft == null ? "" : String.valueOf(aircraft.serial()), TvBriefingText.unit(job.original().variant()),
+                    aircraft == null ? "" : String.valueOf(aircraft.serial()), OperationText.unit(job.original().variant()),
                     OperationText.read(phaseLabelR52(job.phase())), OperationText.read(humanWaitingR52(job.waiting()))));
         }
         return OperationText.encode(message);
@@ -509,7 +509,7 @@ public final class NervAirTransportRuntimeR52
                 }
                 var key=StringTag.valueOf(note);
                 owner.sendSystemMessage(Component.translatable("ops.projectseele.airroutes.report",
-                        aircraft.serial(), plane.blockPosition().toShortString(), TvBriefingText.unit(j.original().variant()),
+                        aircraft.serial(), plane.blockPosition().toShortString(), OperationText.unit(j.original().variant()),
                         OperationText.read(phaseLabelR52(j.phase())), OperationText.read(humanWaitingR52(j.waiting()))));
                 reported.add(key);data.put("ReportSeenR54",reported);
                 data.putLong("ReportAtR53",now);data.putString("ReportNoteR53",note);

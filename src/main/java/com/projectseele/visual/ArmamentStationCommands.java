@@ -62,12 +62,18 @@ public final class ArmamentStationCommands
         {
             // A tower called while the city moves does not start: the call is kept until the city rests.
             boolean kept=deploy&&station.getStationState()==NervArmamentStationEntity.STOWED;
-            context.getSource().sendSuccess(()->Component.literal("备用武器楼（"+station.towerR64()+" 号楼）"
-                    +(kept?"已记下请求，城市停稳后展开":deploy?"正在展开":"正在收回")+"："+station.blockPosition().toShortString()),false);return 1;
+            String key = kept ? "message.projectseele.station.tower_kept"
+                    : deploy ? "message.projectseele.station.tower_deploy" : "message.projectseele.station.tower_recall";
+            context.getSource().sendSuccess(() -> Component.translatable(key, station.towerR64(),
+                    station.blockPosition().toShortString()), false);
+            return 1;
         }
-        String cargo=payload==7?"零号机专用盾牌":payload==6?"二号机专用长剑":"步枪";
-        context.getSource().sendSuccess(()->Component.literal(cargo+"武器井"+(deploy?"正在升起":"正在收回")+"："
-                +station.blockPosition().toShortString()),false);return 1;
+        Component cargo = Component.translatable(payload == 7 ? "message.projectseele.station.shield"
+                : payload == 6 ? "message.projectseele.station.sword" : "message.projectseele.station.rifle");
+        context.getSource().sendSuccess(() -> Component.translatable(deploy
+                ? "message.projectseele.station.well_deploy" : "message.projectseele.station.well_recall",
+                cargo, station.blockPosition().toShortString()), false);
+        return 1;
     }
 
     private static int spawnHere(CommandContext<CommandSourceStack> context)
@@ -133,29 +139,30 @@ public final class ArmamentStationCommands
                     "msg.projectseele.armament_missing"));
             return 0;
         }
-        context.getSource().sendSuccess(() -> Component.literal(
-                (station.towerR64() >= 0 ? "最近的备用武器楼（" + station.towerR64() + " 号楼）：" : "最近的兵装升降站：")
-                        + stateName(station.stateName())
-                        + "，" + (station.isStocked() ? "已装填" : "空载")
-                        + "，位置 " + station.blockPosition().toShortString()),
-                false);
+        Component label = station.towerR64() >= 0
+                ? Component.translatable("message.projectseele.station.tower", station.towerR64())
+                : Component.translatable("message.projectseele.station.well");
+        context.getSource().sendSuccess(() -> Component.translatable("message.projectseele.station.status",
+                label, stateName(station.stateName()), Component.translatable(station.isStocked()
+                        ? "message.projectseele.station.loaded" : "message.projectseele.station.empty"),
+                station.blockPosition().toShortString()), false);
         return 1;
     }
 
-    private static String stateName(String state)
+    private static Component stateName(String state)
     {
         return switch (state)
         {
-            case "OPENING" -> "井盖开启中";
-            case "RISING" -> "上升中";
-            case "READY" -> "已升起";
-            case "EMPTY" -> "已取走武器";
-            case "LOWERING" -> "下降中";
-            case "CLOSING" -> "井盖关闭中";
-            case "DOOR_OPENING" -> "舱门开启中";
-            case "DOOR_CLOSING" -> "舱门关闭中";
-            case "STOWED" -> "收纳";
-            default -> state;
+            case "OPENING" -> Component.translatable("message.projectseele.station.opening");
+            case "RISING" -> Component.translatable("message.projectseele.station.rising");
+            case "READY" -> Component.translatable("message.projectseele.station.ready");
+            case "EMPTY" -> Component.translatable("message.projectseele.station.collected");
+            case "LOWERING" -> Component.translatable("message.projectseele.station.lowering");
+            case "CLOSING" -> Component.translatable("message.projectseele.station.closing");
+            case "DOOR_OPENING" -> Component.translatable("message.projectseele.station.door_opening");
+            case "DOOR_CLOSING" -> Component.translatable("message.projectseele.station.door_closing");
+            case "STOWED" -> Component.translatable("message.projectseele.station.stowed");
+            default -> Component.literal(state);
         };
     }
 

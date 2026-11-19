@@ -78,6 +78,9 @@ public final class StaffDialogueCatalogR24
         String name = split < 0 ? label : label.substring(0, split);
         String key = switch (name)
         {
+            case "碇源堂" -> "hud.projectseele.chat.name.gendo";
+            case "加持良治" -> "hud.projectseele.chat.name.kaji";
+            case "渚薰" -> "hud.projectseele.chat.name.kaworu";
             case "葛城美里" -> "hud.projectseele.chat.name.misato";
             case "赤木律子" -> "hud.projectseele.chat.name.ritsuko";
             case "伊吹摩耶" -> "hud.projectseele.chat.name.maya";

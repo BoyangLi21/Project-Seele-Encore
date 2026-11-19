@@ -57,7 +57,7 @@ public final class TvSortiesR32
             boolean same=current.npc==npc&&(npc||caller.getUUID().equals(current.commander));
             caller.sendSystemMessage(Component.translatable(same ? "ops.projectseele.sortie.already_assigned"
                     : current.npc ? "ops.projectseele.sortie.npc_assigned"
-                    : "ops.projectseele.sortie.other_pilot", TvBriefingText.unit(unit)));
+                    : "ops.projectseele.sortie.other_pilot", OperationText.unit(unit)));
             return same?1:0;
         }
         var e=unit(l,unit);
@@ -67,7 +67,7 @@ public final class TvSortiesR32
         {caller.sendSystemMessage(Component.translatable("message.projectseele.sortie.occupied"));return 0;}
         d.assign(unit,caller.getUUID(),npc,rifle&&npc);
         stampCommanderR55(l,d.sorties.get(unit));
-        NervStaffDialogue.say(caller,"葛城美里 · 作战通信",OperationText.format("ops.projectseele.sortie.reinforcement", TvBriefingText.unit(unit)));
+        NervStaffDialogue.say(caller,"葛城美里 · 作战通信",OperationText.format("ops.projectseele.sortie.reinforcement", OperationText.unit(unit)));
         return 1;
     }
     /** Each accepted operation re-stamps its parked originals, so an

@@ -986,7 +986,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         if(com.projectseele.world.NervOriginalActorsR52.managed(this)&&!com.projectseele.world.NervOriginalActorsR52.boardingAllowed((ServerLevel)this.level(),this,player))
         {
             boolean ready=com.projectseele.world.NervRouteRuntimeR52.ready((ServerLevel)this.level());
-            player.displayClientMessage(Component.literal(ready?"当前插入栓尚未恢复到登机停靠位，请使用 /seele eva reset all。":"机库系统仍在加载，完成后即可登机。"),true);
+            player.displayClientMessage(com.projectseele.world.OperationText.read(ready?"当前插入栓尚未恢复到登机停靠位，请使用 /seele eva reset all。":"机库系统仍在加载，完成后即可登机。"),true);
             return InteractionResult.CONSUME;
         }
         int stage = this.getInsertionStage();

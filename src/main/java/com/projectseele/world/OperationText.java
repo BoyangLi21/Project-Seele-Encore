@@ -16,6 +16,12 @@ public final class OperationText
 
     private OperationText() {}
 
+    public static Component unit(int slot)
+    {
+        return slot < 3 ? Component.translatable("entity.projectseele.eva_unit0" + slot)
+                : Component.literal("EVA-UN-0" + (slot - 3));
+    }
+
     public static String format(String key, Object... arguments)
     {
         return encode(Component.translatable(key, arguments));

@@ -145,7 +145,7 @@ public class ServerboundEvaControlPacket
                 // but may still abort the dock preparation.
                 var result = com.projectseele.world.NervRouteRuntimeR52.pilotAbortR55(
                         sender.serverLevel(), plug.getAssignedVariant(), sender.getUUID());
-                sender.displayClientMessage(net.minecraft.network.chat.Component.literal(result.message())
+                sender.displayClientMessage(com.projectseele.world.OperationText.read(result.message()).copy()
                         .withStyle(result.accepted() ? net.minecraft.ChatFormatting.GREEN
                                 : net.minecraft.ChatFormatting.RED), true);
             }

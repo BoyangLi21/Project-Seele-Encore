@@ -1,5 +1,6 @@
 package com.projectseele.visual;
 
+import com.projectseele.world.OperationText;
 import java.util.List;
 import java.util.Locale;
 
@@ -143,7 +144,7 @@ public final class ThirdTokyoCommands
         BlockPos origin = findOrigin(player);
         RequestResult result = Tokyo3RetractionDirector.request(
                 player.serverLevel(), origin, retract);
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return result.accepted() ? 1 : 0;
     }
 
@@ -176,7 +177,7 @@ public final class ThirdTokyoCommands
         BlockPos origin = findOrigin(player);
         RequestResult result = Tokyo3RetractionDirector.forceDepth(
                 player.serverLevel(), origin, retract);
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return result.accepted() ? 1 : 0;
     }
     private static int status(CommandSourceStack source) throws CommandSyntaxException
@@ -188,11 +189,8 @@ public final class ThirdTokyoCommands
         ServerPlayer player = source.getPlayerOrException();
         BlockPos origin = findOrigin(player);
         Status status = Tokyo3RetractionDirector.status(player.serverLevel(), origin);
-        source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                "%s 城市状态=%s，事务终点=%d/%d，目标终点=%d（终点编号不代表实际米数）。",
-                status.motionReport(),
-                status.phase(), status.depth(), status.maximumDepth(),
-                status.targetDepth())), false);
+        source.sendSuccess(() -> Component.translatable("ops.projectseele.motion.summary",
+                OperationText.read(status.motionReport()), status.phase(), status.depth(), status.maximumDepth(), status.targetDepth()), false);
         if (status.phase().contains("FAULT"))
         {
             source.sendSuccess(() -> Component.translatable("message.projectseele.city.recover"), false);
@@ -227,10 +225,10 @@ public final class ThirdTokyoCommands
                 IntegratedNervMapBuilder.tokyo3Origin(level), player);
         if (!result.accepted())
         {
-            source.sendFailure(Component.literal(result.message()));
+            source.sendFailure(com.projectseele.world.OperationText.read(result.message()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return 1;
     }
 
@@ -262,10 +260,10 @@ public final class ThirdTokyoCommands
                         player.serverLevel()));
         if (!result.accepted())
         {
-            source.sendFailure(Component.literal(result.message()));
+            source.sendFailure(com.projectseele.world.OperationText.read(result.message()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return 1;
     }
 
@@ -287,10 +285,10 @@ public final class ThirdTokyoCommands
                 player.serverLevel(), player.blockPosition());
         if (!result.accepted())
         {
-            source.sendFailure(Component.literal(result.message()));
+            source.sendFailure(com.projectseele.world.OperationText.read(result.message()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return 1;
     }
 

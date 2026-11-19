@@ -376,7 +376,7 @@ public final class FacilityV2Commands
                 FacilityV2BootstrapDirector.start(level);
         if (!result.accepted())
         {
-            source.sendFailure(Component.literal(result.message()));
+            source.sendFailure(com.projectseele.world.OperationText.read(result.message()));
             return 0;
         }
         source.sendSuccess(() -> Component.literal(

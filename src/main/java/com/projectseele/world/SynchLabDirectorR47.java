@@ -130,7 +130,7 @@ public final class SynchLabDirectorR47
         if(s!=null&&!s.phase.equals("IDLE"))return "本槽实验仍在进行。请保持连接，等设备返回并开盖后再离舱。";
         if(s==null||s.samples==0)return "本槽还没有完整读取记录。请实际进舱，再用 /seele synch start 联络本槽实验技师。";
         if(!s.completed)return "上次测试已经中止，没有记为完整测量。";
-        return String.format(Locale.ROOT,"本槽最近记录：%s，同步率 %.1f%%，读取均值 %.1f%%。",s.subjectName,s.last,s.sum/s.samples);
+        return OperationText.format("ops.projectseele.lab.last_result", s.subjectName, String.format(Locale.ROOT,"%.1f",s.last), String.format(Locale.ROOT,"%.1f",s.sum/s.samples));
     }
 
     private static Vec3 vec(com.google.gson.JsonArray a)
@@ -242,7 +242,7 @@ public final class SynchLabDirectorR47
             s.capsule=id;state.setDirty();
         }
         cap=ModEntities.ENTRY_PLUG_CARRIER.get().create(level);if(cap==null)return null;
-        cap.setUUID(s.capsule);cap.configureLaboratoryR47(p.slot,p.variant,dock(p));cap.setCustomName(Component.literal("同步实验栓 "+(p.slot+1)));
+        cap.setUUID(s.capsule);cap.configureLaboratoryR47(p.slot,p.variant,dock(p));cap.setCustomName(Component.translatable("ops.projectseele.lab.plug", p.slot+1));
         if(!level.addFreshEntity(cap))return null;s.materialized=true;state.setDirty();return cap;
     }
 
@@ -311,7 +311,7 @@ public final class SynchLabDirectorR47
         var requests=RESEARCH_REQUESTS.computeIfAbsent(level,key->new HashMap<>());
         if(requests.containsKey(p.slot)||npc.activity()==2)return "实验技师正在操作，请等本次按键完成。";
         requests.put(p.slot,new ResearchRequest(player.getUUID(),npc.getUUID(),abort,level.getGameTime()+100));
-        return "["+npc.getName().getString()+"] 收到。我在本槽控制台"+(abort?"中止测试，请等待设备返回。":"启动测试，请留在舱内。");
+        return OperationText.format(abort ? "ops.projectseele.lab.ack_abort" : "ops.projectseele.lab.ack_start", StaffDialogueCatalogR24.speaker(npc.getName().getString()));
     }
     private static void researchTick(ServerLevel level,Plan p,State state,Slot s,EntryPlugCarrierEntity cap)
     {
@@ -342,16 +342,16 @@ public final class SynchLabDirectorR47
         var hardware=level.getBlockState(p.lever);
         hardware.use(level,caller,InteractionHand.MAIN_HAND,new net.minecraft.world.phys.BlockHitResult(
                 Vec3.atCenterOf(p.lever),net.minecraft.core.Direction.UP,p.lever,false));
-        caller.sendSystemMessage(Component.literal("["+npc.getName().getString()+"] "+operate(level,p,state,s,cap,caller,request.abort,npc.getUUID())));
+        caller.sendSystemMessage(Component.translatable("ops.projectseele.lab.reply", StaffDialogueCatalogR24.speaker(npc.getName().getString()), OperationText.read(operate(level,p,state,s,cap,caller,request.abort,npc.getUUID()))));
         npc.finishTask();
     }
     public static LiteralArgumentBuilder<CommandSourceStack> synchCommand()
     {
         return Commands.literal("synch")
                 .then(Commands.literal("start").executes(context->{var player=context.getSource().getPlayerOrException();
-                    player.sendSystemMessage(Component.literal(requestResearch(player,false)));return 1;}))
+                    player.sendSystemMessage(OperationText.read(requestResearch(player,false)));return 1;}))
                 .then(Commands.literal("abort").executes(context->{var player=context.getSource().getPlayerOrException();
-                    player.sendSystemMessage(Component.literal(requestResearch(player,true)));return 1;}));
+                    player.sendSystemMessage(OperationText.read(requestResearch(player,true)));return 1;}));
     }
     @SubscribeEvent public static void use(PlayerInteractEvent.RightClickBlock event)
     {
@@ -363,8 +363,8 @@ public final class SynchLabDirectorR47
             if(!NervStaffDialogue.authorized(player)||player.distanceToSqr(Vec3.atCenterOf(event.getPos()))>36)
             {player.sendSystemMessage(Component.translatable("message.projectseele.sync.clearance"));return;}
             var state=state(level);var s=state.slots.computeIfAbsent(p.slot,k->new Slot());var cap=capsule(level,s);
-            if(cap==null){player.sendSystemMessage(Component.literal(s.materialized?"原实验栓信号尚未接通，请由实验班核对设备状态。":"实验栓正在接入。请等待设备就位，再由受试者实际进舱。"));return;}
-            player.sendSystemMessage(Component.literal(operate(level,p,state,s,cap,player,!s.phase.equals("IDLE"),null)));return;
+            if(cap==null){player.sendSystemMessage(OperationText.read(s.materialized?"原实验栓信号尚未接通，请由实验班核对设备状态。":"实验栓正在接入。请等待设备就位，再由受试者实际进舱。"));return;}
+            player.sendSystemMessage(OperationText.read(operate(level,p,state,s,cap,player,!s.phase.equals("IDLE"),null)));return;
         }
     }
     public static void requestExit(ServerPlayer player)
@@ -451,7 +451,7 @@ public final class SynchLabDirectorR47
                     if(cap.getFirstPassenger()!=null)break;
                     landPendingExit(level,p,state,s,cap);
                     if(s.pendingExit!=null)break;
-                    if(s.completed)note(level,s,Component.translatable("msg.projectseele.synch_test_result",String.format(Locale.ROOT,"实验槽%d · %s：%.1f%%（读取均值 %.1f%%）",p.slot+1,s.subjectName,s.last,s.sum/s.samples)));
+                    if(s.completed)note(level,s,Component.translatable("msg.projectseele.synch_test_result",Component.translatable("ops.projectseele.lab.test_result", p.slot+1, s.subjectName, String.format(Locale.ROOT,"%.1f",s.last), String.format(Locale.ROOT,"%.1f",s.sum/s.samples))));
                     else note(level,s,Component.translatable("message.projectseele.sync.reset"));
                     var lever=level.getBlockState(p.lever);if(lever.is(Blocks.LEVER))level.setBlock(p.lever,lever.setValue(BlockStateProperties.POWERED,false),3);
                     cap.configureLaboratoryR47(p.slot,p.variant,dock(p));s.phase="IDLE";s.age=0;s.subject=null;s.operator=null;

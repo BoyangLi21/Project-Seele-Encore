@@ -513,7 +513,7 @@ public final class NervOperationsConsole
             {
                 var result=NervOutletControlsR53.request(player,outlet);
                 LAST_OUTCOMES.put(level,new ControlOutcome(level.getGameTime(),player.getUUID(),position,result.accepted(),result.message()));
-                player.displayClientMessage(Component.literal("[NERV] "+result.message()),false);
+                player.displayClientMessage(Component.translatable("ops.projectseele.logistics.console", OperationText.read(result.message())),false);
                 return true;
             }
             var frame=NervHeadquartersFrameR52.frame(level);if(frame==null)return false;
@@ -575,8 +575,7 @@ public final class NervOperationsConsole
             ActionResult result = new ActionResult(false,
                     readiness.faultCode() + ": " + readiness.message());
             record(level, IDS[action] + ": " + result.message());
-            player.displayClientMessage(Component.literal(
-                    "[NERV] " + result.message())
+            player.displayClientMessage(Component.translatable("ops.projectseele.logistics.console", OperationText.read(result.message()))
                     .withStyle(ChatFormatting.RED), false);
             ProjectSeele.LOGGER.info(
                     "Retired NERV console rejected action: player={} action={} "
@@ -598,7 +597,7 @@ public final class NervOperationsConsole
             default -> new ActionResult(false, "Unknown MAGI control address.");
         };
         record(level, IDS[action] + ": " + result.message());
-        player.displayClientMessage(Component.literal("[NERV] " + result.message())
+        player.displayClientMessage(Component.translatable("ops.projectseele.logistics.console", OperationText.read(result.message()))
                 .withStyle(result.accepted()
                         ? ChatFormatting.GREEN : ChatFormatting.RED), false);
         ProjectSeele.LOGGER.info(

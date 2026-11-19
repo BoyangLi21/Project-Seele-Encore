@@ -82,7 +82,7 @@ public final class NervUndergroundAirLiftR50
                 &&!EvaGroundReceiverR50.active(eva);
     }
     public static boolean busy(ServerLevel level){if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.busy(level);return state(level).job!=null;}
-    public static String status(ServerLevel level){if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.status(level);var s=state(level);return s.job==null?s.last:NervStaffDialogue.unitName(s.job.variant)+"："+s.job.note;}
+    public static String status(ServerLevel level){if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.status(level);var s=state(level);return s.job==null?s.last:OperationText.format("ops.projectseele.un.unit_reply", OperationText.unit(s.job.variant), OperationText.read(s.job.note));}
     public static boolean directReceiver(ServerLevel level,int variant,EvaUnit01Entity eva)
     {
         if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.atReceiver(level,eva);
@@ -173,7 +173,7 @@ public final class NervUndergroundAirLiftR50
     private static void note(ServerLevel level,State s,Job j,String message)
     {
         if(message.equals(j.note))return;j.note=message;s.last=message;s.setDirty();var caller=level.getServer().getPlayerList().getPlayer(j.owner);
-        if(caller!=null)caller.sendSystemMessage(net.minecraft.network.chat.Component.literal("[地下运输管制] "+message));
+        if(caller!=null)caller.sendSystemMessage(net.minecraft.network.chat.Component.translatable("ops.projectseele.logistics.radio.underground", OperationText.read(message)));
     }
     private static boolean loaded(ServerLevel level,AABB body)
     {

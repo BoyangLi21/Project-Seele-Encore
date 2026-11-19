@@ -175,7 +175,7 @@ public final class NervStaffDialogue
                     {
                         if (!report.getSiblings().isEmpty()) report.append("\n");
                         report.append(Component.translatable("ops.projectseele.un.unit_reply",
-                                TvBriefingText.unit(v), OperationText.read(readinessHint(player.serverLevel(), v, "query"))));
+                                OperationText.unit(v), OperationText.read(readinessHint(player.serverLevel(), v, "query"))));
                     }
                 reply(player,npc,OperationText.encode(report));return 1;
             }
@@ -186,9 +186,9 @@ public final class NervStaffDialogue
                     for(int v=0;v<3;v++)
                     {
                         var status=EvaLogisticsDirector.status(player.serverLevel(),v);
-                        reply(player,npc,OperationText.format(status.loaded() ? "ops.projectseele.nerv.online" : "ops.projectseele.nerv.offline", TvBriefingText.unit(v), phaseText(status.phase())));
+                        reply(player,npc,OperationText.format(status.loaded() ? "ops.projectseele.nerv.online" : "ops.projectseele.nerv.offline", OperationText.unit(v), phaseText(status.phase())));
                     }
-                    var job=StaffCommandBookR24.order(npc);if(job!=null)reply(player,npc,OperationText.format("ops.projectseele.nerv.current_order", TvBriefingText.unit(job.unit), OperationText.read(job.message)));
+                    var job=StaffCommandBookR24.order(npc);if(job!=null)reply(player,npc,OperationText.format("ops.projectseele.nerv.current_order", OperationText.unit(job.unit), OperationText.read(job.message)));
                 }
                 else if(intent.subject().equals("campaign"))
                     reply(player,npc,StaffAuthorityR25.allows(npc,"campaign")
@@ -199,8 +199,8 @@ public final class NervStaffDialogue
                     var origin=IntegratedNervMapBuilder.tokyo3Origin(player.serverLevel());
                     String motion=Tokyo3RetractionDirector.status(player.serverLevel(),origin).motionReport();
                     reply(player,npc,npc.skin().equals("fuyutsuki")
-                            ?"碇，"+motion+"你要上升，还是下降？"
-                            :motion+"升降请联络冬月副司令。");
+                            ? OperationText.format("ops.projectseele.motion.choice", OperationText.read(motion))
+                            : OperationText.format("ops.projectseele.motion.contact", OperationText.read(motion)));
                     if(npc.skin().equals("fuyutsuki"))CityMotionReportsR49.watch(player,npc,origin);
                 }
                 else if(intent.subject().equals("directions"))
@@ -247,10 +247,10 @@ public final class NervStaffDialogue
         if(op.startsWith("city_"))
         {
             npc.begin(player.getUUID(),op,variant,control,approach);
-            reply(player,npc,"知道了，碇。准备"+(op.equals("city_rise")?"上升城市。":"下降城市。"));return 1;
+            reply(player,npc,op.equals("city_rise") ? "ops.projectseele.motion.requested_rise" : "ops.projectseele.motion.requested_lower");return 1;
         }
         EvaLogisticsDirector.loadControlTarget(player.serverLevel(),variant);
-        npc.begin(player.getUUID(),op,variant,control,approach);reply(player,npc,OperationText.format(op.equals("prepare") ? "ops.projectseele.nerv.prepare" : op.equals("launch") ? "ops.projectseele.nerv.launch" : "ops.projectseele.nerv.recover", TvBriefingText.unit(variant)));return 1;
+        npc.begin(player.getUUID(),op,variant,control,approach);reply(player,npc,OperationText.format(op.equals("prepare") ? "ops.projectseele.nerv.prepare" : op.equals("launch") ? "ops.projectseele.nerv.launch" : "ops.projectseele.nerv.recover", OperationText.unit(variant)));return 1;
     }
     private static BlockPos approach(NervStaffEntity npc,BlockPos button,boolean city)
     {
@@ -314,7 +314,7 @@ public final class NervStaffDialogue
         if(city)
         {
             var result=handled?NervOperationsConsole.lastOutcome(level,player,control):null;
-            reply(player,npc,result!=null&&result.accepted()?"碇，控制台已收到"+(operation.equals("city_rise")?"上升":"下降")+"指令。":"城市还不能升降。"+(result==null?"控制台没有响应。":result.message()));
+            reply(player,npc,result != null && result.accepted() ? (operation.equals("city_rise") ? "ops.projectseele.motion.accepted_rise" : "ops.projectseele.motion.accepted_lower") : OperationText.format("ops.projectseele.motion.declined", OperationText.read(result == null ? "控制台没有响应。" : result.message())));
             if(result!=null&&result.accepted())CityMotionReportsR49.watch(player,npc,IntegratedNervMapBuilder.tokyo3Origin(level));
             ProjectSeele.LOGGER.info("STAFF CITY actor={} operation={} button={} accepted={}",npc.memberId(),operation,control,result!=null&&result.accepted());
             npc.finishTask();return;
@@ -323,7 +323,7 @@ public final class NervStaffDialogue
         var outcome=handled?NervOperationsConsole.lastOutcome(level,player,control):null;
         boolean accepted=outcome!=null&&outcome.accepted();
         if(StaffCommandBookR24.order(npc)==null||accepted&&!operation.equals("launch"))
-            reply(player,npc,accepted ? OperationText.format("ops.projectseele.un.unit_reply", TvBriefingText.unit(variant), phaseText(status.phase())) : OperationText.format("ops.projectseele.nerv.unavailable", OperationText.read(readinessHint(level, variant, operation))));
+            reply(player,npc,accepted ? OperationText.format("ops.projectseele.un.unit_reply", OperationText.unit(variant), phaseText(status.phase())) : OperationText.format("ops.projectseele.nerv.unavailable", OperationText.read(readinessHint(level, variant, operation))));
         StaffCommandBookR24.pressed(npc,outcome);
         ProjectSeele.LOGGER.info("STAFF CONSOLE actor={} operation={} unit={} button={} requester={} phase={}",npc.memberId(),operation,variant,control,owner,status.phase());npc.finishTask();
     }

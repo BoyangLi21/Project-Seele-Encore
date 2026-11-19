@@ -659,7 +659,7 @@ public final class UndergroundSortieR48
         return net.minecraft.commands.Commands.literal("recover")
                 .then(net.minecraft.commands.Commands.argument("unit",com.mojang.brigadier.arguments.IntegerArgumentType.integer(0,2)).executes(context->{
                     var caller=context.getSource().getPlayerOrException();var action=requestRecoveryR48(caller,com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(context,"unit"));
-                    caller.sendSystemMessage(net.minecraft.network.chat.Component.literal(action.message()));return action.accepted()?1:0;
+                    caller.sendSystemMessage(com.projectseele.world.OperationText.read(action.message()));return action.accepted()?1:0;
                 }));
     }
     private UndergroundSortieR48() { }

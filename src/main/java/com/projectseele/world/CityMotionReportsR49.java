@@ -26,7 +26,7 @@ public final class CityMotionReportsR49
         var state=CityMotionReportSavedDataR49.get(caller.serverLevel());
         if(settled(status)){state.remove(caller.getUUID());return;}
         if(!state.bind(caller.getUUID(),operator.getUUID(),origin,status.motionReport(),caller.serverLevel().getGameTime()))
-            NervStaffDialogue.reply(caller,operator,"城市进度联络名额已满，请稍后再查询。");
+            NervStaffDialogue.reply(caller,operator,"ops.projectseele.motion.radio_busy");
     }
 
     private static boolean settled(Tokyo3RetractionDirector.Status status)
@@ -69,7 +69,7 @@ public final class CityMotionReportsR49
             String report = status.motionReport();
             if(watch.suspended||!report.equals(watch.previous))
             {
-                NervStaffDialogue.reply(caller,operator,"碇，"+(watch.suspended?"通信已恢复。":"")+report);
+                NervStaffDialogue.reply(caller,operator,OperationText.format(watch.suspended ? "ops.projectseele.motion.resumed" : "ops.projectseele.motion.report", OperationText.read(report)));
                 watch.previous=report;state.setDirty();
             }
             watch.suspended=false;watch.next=level.getGameTime()+200;

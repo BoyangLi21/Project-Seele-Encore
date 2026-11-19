@@ -137,7 +137,7 @@ public final class NervHangarControlsR53
         }
         var result = selected == Decision.PREPARE ? NervRouteRuntimeR52.prepare(level, variant)
                 : NervRouteRuntimeR52.cancel(level, variant);
-        player.displayClientMessage(Component.literal("[NERV 机库] " + result.message())
+        player.displayClientMessage(Component.translatable("ops.projectseele.logistics.radio.hangar", OperationText.read(result.message()))
                 .withStyle(result.accepted() ? ChatFormatting.GREEN : ChatFormatting.RED), false);
         return 1;
     }

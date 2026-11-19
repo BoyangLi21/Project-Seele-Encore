@@ -126,11 +126,11 @@ public final class TvCampaignDirector
                 return message(commander,"ops.projectseele.campaign.human_pilots_must_be_online_in_this_operation",false);
             if(!data.active.isEmpty()&&!choice.npc()&&data.sorties.values().stream().anyMatch(s->s.unit!=choice.unit()&&!s.npc&&s.commander.equals(choice.pilot())))
                 return message(commander,"ops.projectseele.campaign.this_pilot_is_already_flying_another_unit_in",false);
-            if(StaffRecoveryR47.pending(level,choice.unit())||PilotReturnR39.pending(level,choice.unit()))return message(commander,OperationText.format("ops.projectseele.campaign.s_is_still_completing_its_hangar_handover", TvBriefingText.unit(choice.unit())),false);
+            if(StaffRecoveryR47.pending(level,choice.unit())||PilotReturnR39.pending(level,choice.unit()))return message(commander,OperationText.format("ops.projectseele.campaign.s_is_still_completing_its_hangar_handover", OperationText.unit(choice.unit())),false);
             var eva=TvSortiesR32.unit(level,choice.unit());
             if(eva!=null&&(TvMissionEquipmentR45.awaitingPhysicalReturn(eva)||eva.getPilotEntity()!=null
                     &&(choice.npc()?!(eva.getPilotEntity() instanceof TrainingPilotEntity npcPilot&&npcPilot.getAssignedVariant()==choice.unit()):eva.getPilotEntity()!=pilot)))
-                return message(commander,OperationText.format("ops.projectseele.campaign.s_is_waiting_for_a_pilot_or_equipment", TvBriefingText.unit(choice.unit())),false);
+                return message(commander,OperationText.format("ops.projectseele.campaign.s_is_waiting_for_a_pilot_or_equipment", OperationText.unit(choice.unit())),false);
             String blocker=TvEncounterRulesR45.formationSlotBlockerR47(level,mission,choice.unit());
             if(!blocker.isEmpty())return message(commander,blocker,false);
         }
@@ -185,7 +185,7 @@ public final class TvCampaignDirector
         player.getPersistentData().putString("SeeleMissionChoiceR30",chapter.id());
         data.generationR43++;
         data.episodeStateR45="";data.equipmentReturnedR45=false;data.targetDeathConfirmedR45=false;
-        data.owner = player.getUUID(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = OperationText.format("ops.projectseele.briefing.initial_crew", TvBriefingText.unit(variant), npc ? StaffDialogueCatalogR24.pilotName(variant) : Component.literal(player.getGameProfile().getName())); data.angel = null; data.lastPosition = null; data.setDirty();
+        data.owner = player.getUUID(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = OperationText.format("ops.projectseele.briefing.initial_crew", OperationText.unit(variant), npc ? StaffDialogueCatalogR24.pilotName(variant) : Component.literal(player.getGameProfile().getName())); data.angel = null; data.lastPosition = null; data.setDirty();
         if(formation!=null)for(var choice:formation)data.assign(choice.unit(),choice.npc()?player.getUUID():choice.pilot(),choice.npc(),choice.npc()&&rifle);
         else data.assign(variant,player.getUUID(),npc,npc&&rifle);
         if(chapter.id().equals("ramiel")&&formation==null)
@@ -205,11 +205,11 @@ public final class TvCampaignDirector
     {
         for(int unit:new int[]{0,1})if(unit!=selected)
         {
-            if(StaffRecoveryR47.pending(level,unit)||PilotReturnR39.pending(level,unit))return OperationText.format("ops.projectseele.campaign.s_is_being_recovered_wait_for_the_pilot", TvBriefingText.unit(unit));
+            if(StaffRecoveryR47.pending(level,unit)||PilotReturnR39.pending(level,unit))return OperationText.format("ops.projectseele.campaign.s_is_being_recovered_wait_for_the_pilot", OperationText.unit(unit));
             var eva=TvSortiesR32.unit(level,unit);
             if(eva!=null&&(TvMissionEquipmentR45.awaitingPhysicalReturn(eva)
                     ||eva.getPilotEntity()!=null&&!(eva.getPilotEntity() instanceof TrainingPilotEntity p&&p.getAssignedVariant()==unit)))
-                return OperationText.format("ops.projectseele.campaign.s_has_outstanding_equipment_or_a_pilot_mismatch", TvBriefingText.unit(unit));
+                return OperationText.format("ops.projectseele.campaign.s_has_outstanding_equipment_or_a_pilot_mismatch", OperationText.unit(unit));
         }
         return "";
     }
@@ -348,12 +348,12 @@ public final class TvCampaignDirector
             // otherwise a saved, seated pilot outside the player's chunks can never be archived.
             if(sortie.npc&&sortie.unit<3)TrainingPilotDirector.retainOriginalPilotR47(level,sortie.unit);
             var pilot=sortie.npc?level.getEntity(sortie.pilotR45):level.getServer().getPlayerList().getPlayer(sortie.pilotR45);
-            if(sortie.npc&&pilot==null)return OperationText.format("ops.projectseele.campaign.the_standby_area_for_the_pilot_of_s", TvBriefingText.unit(sortie.unit));
+            if(sortie.npc&&pilot==null)return OperationText.format("ops.projectseele.campaign.the_standby_area_for_the_pilot_of_s", OperationText.unit(sortie.unit));
             if(pilot==null||!pilot.isAlive()||pilot.level()!=level||sortie.npc&&!(pilot instanceof TrainingPilotEntity npc&&npc.getAssignedVariant()==sortie.unit)||pilot.getVehicle()==eva
                     ||pilot instanceof net.minecraft.world.entity.LivingEntity living&&living.getVehicle() instanceof EntryPlugCarrierEntity plug&&plug.getLinkedEva()==eva)
-                return OperationText.format("ops.projectseele.campaign.the_pilot_of_s_has_not_completed_handover", TvBriefingText.unit(sortie.unit));
+                return OperationText.format("ops.projectseele.campaign.the_pilot_of_s_has_not_completed_handover", OperationText.unit(sortie.unit));
             if(sortie.npc&&!TrainingPilotDirector.atOriginalStandbyR47(level,sortie.unit))
-                return OperationText.format("ops.projectseele.campaign.the_pilot_of_s_is_returning_to_standby", TvBriefingText.unit(sortie.unit));
+                return OperationText.format("ops.projectseele.campaign.the_pilot_of_s_is_returning_to_standby", OperationText.unit(sortie.unit));
             if(recordVictory&&!data.recordOriginalRecovery(data.owner,data.generationR43,sortie.unit,eva.getUUID(),pilot.getUUID()))return "机体和驾驶员的交接信息对不上，暂时无法结束行动。请联系整备部。";
         }return "";
     }

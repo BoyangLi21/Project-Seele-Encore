@@ -152,8 +152,7 @@ public final class EvaLogisticsCommands
                     ? EvaLogisticsDirector.requestPrepare(level, variant)
                     : NervRouteRuntimeR52.prepare(level, variant, destination);
             int current = variant;
-            source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d：%s", current, result.message())), false);
+            source.sendSuccess(() -> Component.translatable("ops.projectseele.un.unit_reply", String.format(Locale.ROOT, "EVA-%02d", current), com.projectseele.world.OperationText.read(result.message())), false);
             if (result.accepted())
             {
                 accepted++;
@@ -173,8 +172,7 @@ public final class EvaLogisticsCommands
             if (requested >= 0 && requested != variant) continue;
             ActionResult result = EvaLogisticsDirector.requestCancel(level, variant);
             int current = variant;
-            source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d：%s", current, result.message())), false);
+            source.sendSuccess(() -> Component.translatable("ops.projectseele.un.unit_reply", String.format(Locale.ROOT, "EVA-%02d", current), com.projectseele.world.OperationText.read(result.message())), false);
             if (result.accepted()) accepted++;
         }
         return accepted;
@@ -200,7 +198,7 @@ public final class EvaLogisticsCommands
             }
             EvaUnit01Entity unit;
             try{unit=EvaLogisticsDirector.forceReset(level,variant);}
-            catch(IllegalStateException held){source.sendFailure(Component.literal(held.getMessage()));continue;}
+            catch(IllegalStateException held){source.sendFailure(com.projectseele.world.OperationText.read(held.getMessage()));continue;}
             int current = variant;
             source.sendSuccess(() -> Component.translatable("message.projectseele.eva_reset", String.format(Locale.ROOT, "EVA-%02d", current)), false);
             reset++;
@@ -237,8 +235,7 @@ public final class EvaLogisticsCommands
                     ? EvaLogisticsDirector.requestLaunch(level, variant)
                     : EvaLogisticsDirector.requestRecovery(level, variant);
             int current = variant;
-            source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d：%s", current, result.message())), false);
+            source.sendSuccess(() -> Component.translatable("ops.projectseele.un.unit_reply", String.format(Locale.ROOT, "EVA-%02d", current), com.projectseele.world.OperationText.read(result.message())), false);
             if (result.accepted())
             {
                 accepted++;
@@ -259,7 +256,7 @@ public final class EvaLogisticsCommands
         }
         TrainingPilotDirector.ActionResult result =
                 TrainingPilotDirector.start(level, variant);
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return result.accepted() ? 1 : 0;
     }
 
