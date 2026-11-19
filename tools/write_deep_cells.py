@@ -224,7 +224,23 @@ def apply(a):
         from map_pipeline.lift_protection import load as lift_protection
         lift_protection(a.world).assert_positions(positions)
     from map_pipeline.launch_protection import load as launch_protection
-    launch_protection(a.world, allow_air_shaft=a.allow_air_shaft).assert_positions(positions)
+    launch = launch_protection(a.world, allow_air_shaft=a.allow_air_shaft)
+    if a.allow_launch_repaint:
+        # Launch tunnel walls lie inside the launch space volumes. A repaint may change their colour only: wall block
+        # to wall block, never air, a hatch seal or a guide rail anchor (whose exact state the rail renderer checks).
+        from plan_launch_tunnel_skin import anchors as rail_anchors, PAINTABLE
+        inside = launch.inside(positions)
+        anchor_cells = rail_anchors(a.world)
+        allowed = PAINTABLE | {'projectseele:nerv_strip_light', 'projectseele:nerv_machine_edge'}
+        for x, y, z, before, after in rows:
+            if (x, y, z) not in inside:
+                continue
+            if (x, y, z) in anchor_cells:
+                raise SystemExit(f'{(x, y, z)}: guide rail anchor in the launch space, never repainted')
+            if before.split('[')[0] not in allowed or after.split('[')[0] not in allowed:
+                raise SystemExit(f'{(x, y, z)}: launch space repaint must stay wall block to wall block ({before} -> {after})')
+        positions = [p for p in positions if p not in inside]
+    launch.assert_positions(positions)
     folder = a.world / REGION
     if given:
         # Rows that bring their own paint replace marked blocks; any other replaced block entity goes with its block.
@@ -385,5 +401,7 @@ if __name__ == '__main__':
     parser.add_argument('--allow-block-entities', action='store_true',
                         help='let rows replace blocks that carry a block entity (chests, signs, machines) and drop that entity; off by default')
     parser.add_argument('--campfire-entities', action='store_true', help='give every campfire a row places its (empty) block entity, so it smokes')
+    parser.add_argument('--allow-launch-repaint', action='store_true',
+                        help='launch tunnel walls: rows inside the launch space may only turn one wall block into another (no air, seals or rail anchors)')
     parser.add_argument('--refresh-heightmaps', action='store_true', help='drop the stored heightmaps of touched chunks, for terrain cut or raised')
     apply(parser.parse_args())
