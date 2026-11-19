@@ -4,6 +4,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.projectseele.entity.NervArmamentStationEntity;
 import com.projectseele.registry.ModEntities;
+import com.projectseele.world.EvaPilotResolver;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -125,8 +126,12 @@ public final class ArmamentStationCommands
     private static int status(CommandContext<CommandSourceStack> context)
             throws com.mojang.brigadier.exceptions.CommandSyntaxException
     {
-        NervArmamentStationEntity station = nearest(
-                context.getSource().getPlayerOrException());
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        var eva = EvaPilotResolver.controlTarget(player);
+        // The pilot's seat can sit above the station search's vertical reach.
+        Vec3 centre = eva == null ? player.position() : eva.position();
+        NervArmamentStationEntity station = NervArmamentStationEntity.nearest(
+                player.level(), centre, COMMAND_RANGE, false);
         if (station == null)
         {
             context.getSource().sendFailure(Component.translatable(
