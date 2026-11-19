@@ -407,6 +407,10 @@ public final class EvaMechanicalFrameR52
     /** EVA, original capsule and original carrier consume this same received curve window. */
     public static boolean continuousWindowR52(EvaUnit01Entity eva)
     {return active(eva)&&eva.getEntityData().get(SAMPLE).contains("ContinuousWindowR52",net.minecraft.nbt.Tag.TAG_COMPOUND);}
+    public static long continuousSequenceR52(EvaUnit01Entity eva)
+    {
+        return eva.getEntityData().get(SAMPLE).getLong("ContinuousSequenceR52");
+    }
     private static com.projectseele.world.NervMechanicalTravelR52.ContinuousProfile continuousProfileR52(CompoundTag tag)
     {return new com.projectseele.world.NervMechanicalTravelR52.ContinuousProfile(tag.getDouble("FromMetres"),tag.getDouble("ToMetres"),tag.getDouble("CruiseMps"),tag.getDouble("AccelerationMps2"),tag.getDouble("DecelerationMps2"),tag.getDouble("InitialMps"));}
     private static RigidTransform continuousFrameR52(EvaUnit01Entity eva,CompoundTag sample,RigidTransform current,float partial)

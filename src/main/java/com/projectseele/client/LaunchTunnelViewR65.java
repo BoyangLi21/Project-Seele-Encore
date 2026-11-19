@@ -28,15 +28,21 @@ public final class LaunchTunnelViewR65
 {
     private static ClientLevel level;
     private static ClientboundLaunchRideR65 ride;
-    private static long received;
+    private static EvaUnit01Entity carrier;
+    private static long epoch;
+    private static long receivedSequence;
 
     public static void receive(ClientboundLaunchRideR65 packet)
     {
         var mc = Minecraft.getInstance();
-        if (mc.level == null) return;
+        if (mc.level == null || mc.player == null) return;
+        var eva = EvaPilotResolver.controlTarget(mc.player);
+        if (eva == null || eva.getId() != packet.eva() || !EvaMechanicalFrameR52.active(eva)) return;
         level = mc.level;
         ride = packet;
-        received = level.getGameTime();
+        carrier = eva;
+        epoch = EvaMechanicalFrameR52.epoch(eva);
+        receivedSequence = EvaMechanicalFrameR52.continuousSequenceR52(eva);
     }
 
     @SubscribeEvent
@@ -44,6 +50,7 @@ public final class LaunchTunnelViewR65
     {
         ride = null;
         level = null;
+        carrier = null;
     }
 
     private static float strength(Camera camera, float partial)
@@ -52,9 +59,14 @@ public final class LaunchTunnelViewR65
         if (ride == null || level != mc.level || mc.player == null || mc.getCameraEntity() != mc.player
                 || camera.getFluidInCamera() != FogType.NONE) return 0;
         EvaUnit01Entity eva = EvaPilotResolver.controlTarget(mc.player);
-        if (eva == null || eva.getId() != ride.eva() || !EvaMechanicalFrameR52.active(eva)
+        if (eva == null || eva != carrier || EvaMechanicalFrameR52.epoch(eva) != epoch
+                || !EvaMechanicalFrameR52.continuousWindowR52(eva)
                 || EvaMechanicalFrameR52.detachedCarrierR52(eva)) return 0;
-        double age = level.getGameTime() - received + partial;
+        // A stalled server freezes the vehicle in the shaft. Only accepted movement
+        // samples can age its shutter packet while the client keeps drawing frames.
+        long steps = EvaMechanicalFrameR52.continuousSequenceR52(eva) - receivedSequence;
+        if (steps < 0) return 0;
+        double age = steps + Mth.clamp(partial, 0, 1);
         double inside = (ride.exitY() - camera.getPosition().y) / 32;
         return (float)Mth.clamp(Math.min(inside, (14 - age) / 6), 0, 1);
     }
