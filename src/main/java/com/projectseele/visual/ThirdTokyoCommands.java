@@ -102,9 +102,7 @@ public final class ThirdTokyoCommands
         }
         teleportOverview(player,
                 IntegratedNervMapBuilder.tokyo3Origin(player.serverLevel()));
-        source.sendSuccess(() -> Component.literal(
-                "Tokyo-3 skyline ready above the same GeoFront dimension. "
-                        + "Run /seele dev geofront link, then board from the lower gantry."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.third_tokyo_commands.tokyo_3_skyline_ready_above_the_same"), false);
         return 1;
     }
 
@@ -218,9 +216,7 @@ public final class ThirdTokyoCommands
                 IntegratedNervMapBuilder.prepareRuntime(level);
         if (!audit.valid())
         {
-            source.sendFailure(Component.literal(
-                    "Operation Yashima refused: live sortie route failed: "
-                            + audit.summary()));
+            source.sendFailure(Component.translatable("message.projectseele.third_tokyo_commands.operation_yashima_refused_live_sortie_route_failed", audit.summary()));
             return 0;
         }
         BattleResult result = Tokyo3RamielBattleDirector.start(level,

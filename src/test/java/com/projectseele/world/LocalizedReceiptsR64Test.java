@@ -59,6 +59,7 @@ public final class LocalizedReceiptsR64Test
         String displayed = Component.Serializer.toJson(TvBriefingText.read(encoded));
         check(displayed.contains("mission.projectseele.ramiel.objective") && displayed.contains("100 / 25 / -7")
                 && displayed.contains(aircraft) && displayed.contains("Pilot 7 — 100%"), "Briefing lost its fields");
+        check(OperationText.read(null).getString().isEmpty(), "A missing operational detail must be safe to display");
         String legacy = "屋岛作战 · GeoFront入口已贯穿；总部与终端尚未失守 · 装甲贯穿 3 层 · 炮位就绪，确认核心后炮击。";
         var oldBriefing = new TvBriefingText("ramiel", "combat", true, new int[0], "", "", legacy);
         String oldDisplay = Component.Serializer.toJson(TvBriefingText.read(oldBriefing.encode()));

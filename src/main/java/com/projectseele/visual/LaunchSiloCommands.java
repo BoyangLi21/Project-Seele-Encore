@@ -66,9 +66,7 @@ public final class LaunchSiloCommands
         logAudit("setup", setupAudit);
         if (!setupAudit.valid())
         {
-            source.sendFailure(Component.literal(
-                    "Launch complex was built but failed its structural audit: "
-                            + setupAudit.summary()));
+            source.sendFailure(Component.translatable("message.projectseele.launch_silo_commands.launch_complex_was_built_but_failed_its", setupAudit.summary()));
             return 0;
         }
 

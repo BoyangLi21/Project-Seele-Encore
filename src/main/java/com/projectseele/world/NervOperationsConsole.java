@@ -797,8 +797,7 @@ public final class NervOperationsConsole
         LAST_OUTCOMES.put(level, new ControlOutcome(level.getGameTime(), player.getUUID(),
                 position.immutable(), result.accepted(), result.message()));
         record(level, id + ": " + result.message());
-        if(!STAFF_REPORT.get())player.displayClientMessage(Component.literal(
-                        "[NERV S20] " + result.message())
+        if(!STAFF_REPORT.get())player.displayClientMessage(Component.translatable("message.projectseele.nerv_operations_console.nerv_s20_s", com.projectseele.world.OperationText.read(result.message()))
                 .withStyle(result.accepted()
                         ? ChatFormatting.GREEN : ChatFormatting.RED), false);
         ProjectSeele.LOGGER.info(

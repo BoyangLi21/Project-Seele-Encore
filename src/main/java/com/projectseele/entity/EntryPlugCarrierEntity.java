@@ -1044,11 +1044,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
             // A seated pilot is invisible — they are inside the capsule — so
             // naming the occupant is the only way to tell a boarded plug from
             // one that is wrongly reporting itself full.
-            player.displayClientMessage(Component.literal(
-                    "Entry plug is already occupied by "
-                            + occupant.getName().getString()
-                            + (com.projectseele.visual.DevelopmentCommandsR43.enabled()
-                                    ? " (/seele dev eva dummy stop to clear)." : ".")), true);
+            player.displayClientMessage(Component.translatable(com.projectseele.visual.DevelopmentCommandsR43.enabled()
+                        ? "message.projectseele.entry_plug_carrier_entity.occupied_by_s_run_seele_dev_eva" : "message.projectseele.entry_plug_carrier_entity.entry_plug_is_already_occupied_by_s", occupant.getName()), true);
             return InteractionResult.CONSUME;
         }
         return this.tryBoardFromHatch(player);

@@ -23,11 +23,11 @@ public final class NervTransitRecoveryR53
         try
         {
             Object simulator=RegionalNativeTransitInspection.simulator();
-            if(simulator==null){message(source,"MTR 尚未加载 GeoFront 交通数据。",true);return 0;}
+            if(simulator==null){message(source,"ops.projectseele.transit.not_loaded",true);return 0;}
             simulator.getClass().getMethod("run",Runnable.class).invoke(simulator,(Runnable)()->inspect(source,simulator,resume));
             return 1;
         }
-        catch(ReflectiveOperationException e){message(source,"MTR 操作失败："+e.getClass().getSimpleName(),true);return 0;}
+        catch(ReflectiveOperationException e){message(source,OperationText.format("ops.projectseele.transit.native_failure", e.getClass().getSimpleName()),true);return 0;}
     }
     @SuppressWarnings("unchecked") private static void inspect(CommandSourceStack source,Object simulator,boolean resume)
     {
@@ -53,24 +53,24 @@ public final class NervTransitRecoveryR53
                         if(Boolean.TRUE.equals(vehicle.getClass().getMethod("getIsOnRoute").invoke(vehicle)))active++;else parked++;
                 }
                 String status=depot.getClass().getMethod("getLastGeneratedStatus").invoke(depot).toString();
-                report.add(line+"：线路列车 "+active+"，车库列车 "+parked+"，路径 "+status);
+                report.add(OperationText.format("ops.projectseele.transit.line", line, active, parked, status));
                 if(resume&&active==0&&status.equals("SUCCESSFUL"))restart.add(depot);
             }
-            if(found==0){message(source,"未找到已登记的 S1/R1 线路；未生成新线路。",true);return;}
+            if(found==0){message(source,"ops.projectseele.transit.no_lines",true);return;}
             if(!restart.isEmpty())
             {
                 simulator.getClass().getMethod("instantDeployDepots",listType).invoke(simulator,restart);
-                report.add("已调用 MTR 原生发车恢复，处理 "+restart.size()+" 条空线路。");
+                report.add(OperationText.format("ops.projectseele.transit.resumed", restart.size()));
             }
-            else if(resume)report.add("未重置运行中的列车；现有数量见上。若画面仍无车，需要检查客户端同步/渲染。");
+            else if(resume)report.add("ops.projectseele.transit.active");
             for(String text:report)message(source,text,false);
         }
-        catch(ReflectiveOperationException|RuntimeException e){message(source,"MTR 操作失败："+e.getClass().getSimpleName()+" "+e.getMessage(),true);}
+        catch(ReflectiveOperationException|RuntimeException e){message(source,OperationText.format("ops.projectseele.transit.native_failure", e.getClass().getSimpleName()+" "+e.getMessage()),true);}
     }
     private static void message(CommandSourceStack source,String text,boolean error)
     {
         ProjectSeele.LOGGER.info("Transit recovery: {}",text);
-        source.getServer().execute(()->{if(error)source.sendFailure(Component.literal(text));else source.sendSuccess(()->Component.literal(text),false);});
+        source.getServer().execute(()->{if(error)source.sendFailure(OperationText.read(text));else source.sendSuccess(()->OperationText.read(text),false);});
     }
     private NervTransitRecoveryR53() { }
 }

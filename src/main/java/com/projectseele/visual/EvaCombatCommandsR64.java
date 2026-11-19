@@ -37,11 +37,8 @@ public final class EvaCombatCommandsR64
 
     private static int status(CommandSourceStack source)
     {
-        source.sendSuccess(() -> Component.literal("EVA combat: " + SeeleConfig.EVA_COMBAT_MODEL.get()
-                + ", hit-stop " + SeeleConfig.EVA_HIT_STOP.get()
-                + ", flow " + SeeleConfig.EVA_COMBAT_FLOW.get()
-                + " (frames is Unit-01 with bare hands or the knife for now; /seele combat legacy|frames, /seele combat hitstop tiered|flat,"
-                + " /seele combat flow on|off, or clock|stop|curve|fade|stand|kick to turn one part)"), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.eva_combat_commands_r64.eva_combat_s_hit_stop_s_flow",
+                        SeeleConfig.EVA_COMBAT_MODEL.get(), SeeleConfig.EVA_HIT_STOP.get(), SeeleConfig.EVA_COMBAT_FLOW.get()), false);
         return 1;
     }
 

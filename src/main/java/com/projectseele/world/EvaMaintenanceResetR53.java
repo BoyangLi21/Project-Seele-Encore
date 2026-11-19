@@ -46,7 +46,7 @@ public final class EvaMaintenanceResetR53
             for(var entry:new ArrayList<>(pending.entrySet()))
             {
                 try { reset(entry.getValue(),level,entry.getKey()); }
-                catch(IllegalStateException held) { entry.getValue().sendFailure(Component.literal("复位未完成："+held.getMessage())); }
+                catch(IllegalStateException held) { entry.getValue().sendFailure(Component.translatable("message.projectseele.eva_maintenance_reset_r53.reset_incomplete_s", com.projectseele.world.OperationText.read(held.getMessage()))); }
                 pending.remove(entry.getKey());
             }
             if(pending.isEmpty())PENDING.remove(level);

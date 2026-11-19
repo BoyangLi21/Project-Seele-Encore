@@ -34,6 +34,7 @@ public final class OperationText
 
     public static Component read(String value)
     {
+        if (value == null) return Component.empty();
         if (value.startsWith(PREFIX)) return Component.translatable(value);
         if (value.startsWith(COMPONENT))
         {

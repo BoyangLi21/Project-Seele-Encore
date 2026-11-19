@@ -292,11 +292,11 @@ public final class EvaLogisticsCommands
                     pilot.getVehicle() == null ? "none"
                             : pilot.getVehicle().getStringUUID(),
                     pilot.blockPosition().toShortString())), false);
-            source.sendSuccess(()->Component.literal("DUMMY PATH "+TrainingPilotDirector.routeTraceR47(level,pilot)),false);
+            source.sendSuccess(()->Component.translatable("message.projectseele.eva_logistics_commands.dummy_path_s", TrainingPilotDirector.routeTraceR47(level,pilot)),false);
             String fault=pilot.getPersistentData().getString("SeelePilotLastRouteFaultR47");
-            if(!fault.isEmpty())source.sendSuccess(()->Component.literal("DUMMY LAST FAULT "+fault),false);
+            if(!fault.isEmpty())source.sendSuccess(()->Component.translatable("message.projectseele.eva_logistics_commands.dummy_last_fault_s", fault),false);
             String nativeFault=pilot.getPersistentData().getString("SeelePilotNativePathFailureR47");
-            if(!nativeFault.isEmpty())source.sendSuccess(()->Component.literal("DUMMY LAST NATIVE PATH "+nativeFault),false);
+            if(!nativeFault.isEmpty())source.sendSuccess(()->Component.translatable("message.projectseele.eva_logistics_commands.dummy_last_native_path_s", nativeFault),false);
             count++;
         }
         if (count == 0)

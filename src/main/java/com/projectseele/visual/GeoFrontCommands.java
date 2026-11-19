@@ -150,10 +150,7 @@ public final class GeoFrontCommands
             }
             else
             {
-                player.displayClientMessage(Component.literal(
-                        "Retired GeoFront position is unsafe and no loaded safe "
-                                + "cell is available; an administrator must "
-                                + "commission FacilitySchema v2."), false);
+                player.displayClientMessage(Component.translatable("message.projectseele.geo_front_commands.retired_geofront_position_is_unsafe_and_no"), false);
             }
             return;
         }
@@ -174,9 +171,7 @@ public final class GeoFrontCommands
         }
         else
         {
-            player.displayClientMessage(Component.literal(
-                    "FacilitySchema v2 is not commissioned. Login will not "
-                            + "build or repair the retired GeoFront."), false);
+            player.displayClientMessage(Component.translatable("message.projectseele.geo_front_commands.facilityschema_v2_is_not_commissioned_login_will"), false);
         }
     }
 
@@ -227,16 +222,12 @@ public final class GeoFrontCommands
         logIntegratedAudit("setup", result);
         if (!result.valid())
         {
-            source.sendFailure(Component.literal(
-                    "The connected Tokyo-3 / GeoFront map failed audit: "
-                            + result.summary()));
+            source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.the_connected_tokyo_3_geofront_map_failed", result.summary()));
             return 0;
         }
         teleportOverview(player, level);
-        source.sendSuccess(() -> Component.literal(
-                "Connected Tokyo-3 / GeoFront map ready: three physical "
-                        + IntegratedNervMapBuilder.ascentDistance() + "-block shafts. "
-                        + "Run /seele dev geofront link to prepare Unit-00/01/02."),
+        source.sendSuccess(() -> Component.translatable("message.projectseele.geo_front_commands.connected_tokyo_3_geofront_map_ready_three",
+                        IntegratedNervMapBuilder.ascentDistance()),
                 false);
         return 1;
     }
@@ -264,9 +255,7 @@ public final class GeoFrontCommands
             return 0;
         }
         saveReturn(player);
-        source.sendSuccess(() -> Component.literal(
-                "Forcing a complete GeoFront rebuild (LCL fill, hangar stairs, "
-                        + "gallery concourse, cavern shell). This can take a moment..."),
+        source.sendSuccess(() -> Component.translatable("message.projectseele.geo_front_commands.forcing_a_complete_geofront_rebuild_lcl_fill"),
                 false);
         IntegratedAudit result = IntegratedNervMapBuilder.build(level);
         Tokyo3RetractionDirector.register(level,
@@ -274,14 +263,11 @@ public final class GeoFrontCommands
         logIntegratedAudit("rebuild", result);
         if (!result.valid())
         {
-            source.sendFailure(Component.literal(
-                    "Rebuild finished but the map audit still failed: " + result.summary()));
+            source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.rebuild_finished_but_the_map_audit_still", result.summary()));
             return 0;
         }
         teleportOverview(player, level);
-        source.sendSuccess(() -> Component.literal(
-                "GeoFront fully rebuilt: LCL, hangar stairs, gallery concourse and "
-                        + "cavern shell refreshed."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.geo_front_commands.geofront_fully_rebuilt_lcl_hangar_stairs_gallery"), false);
         return 1;
     }
 
@@ -301,9 +287,7 @@ public final class GeoFrontCommands
         }
         if (!IntegratedNervMapBuilder.isInstalled(level))
         {
-            source.sendFailure(Component.literal(
-                    "The connected map is not installed. "
-                            + "Run /seele dev geofront setup first."));
+            source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.the_connected_map_is_not_installed_run"));
             return 0;
         }
         saveReturn(player);
@@ -336,9 +320,7 @@ public final class GeoFrontCommands
                 IntegratedNervMapBuilder.tokyo3Origin(geoFront));
         if (!mapAudit.launchReady())
         {
-            source.sendFailure(Component.literal(
-                    "Connected sortie route failed its runtime gate: "
-                            + mapAudit.summary()));
+            source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.connected_sortie_route_failed_its_runtime_gate", mapAudit.summary()));
             return 0;
         }
         List<EvaUnit01Entity> linked;
@@ -363,8 +345,7 @@ public final class GeoFrontCommands
         logSortieAudit("link", result);
         if (!result.valid())
         {
-            source.sendFailure(Component.literal(
-                    "Physical sortie link failed audit: " + result.summary()));
+            source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.physical_sortie_link_failed_audit_s", result.summary()));
             return 0;
         }
 
@@ -377,11 +358,8 @@ public final class GeoFrontCommands
         player.teleportTo(geoFront, centralTerminal.getX() + 0.5D,
                 centralTerminal.getY() + 27.0D,
                 centralTerminal.getZ() + 6.5D, 180.0F, -8.0F);
-        source.sendSuccess(() -> Component.literal(
-                "Physical sortie ready: Unit-00/01/02 are registered in their individual wet cages. "
-                        + "Launch travels the same "
-                        + IntegratedNervMapBuilder.ascentDistance()
-                        + "-block shaft into Tokyo-3; no portal or EVA teleport."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.geo_front_commands.physical_sortie_ready_unit_00_01_02",
+                        IntegratedNervMapBuilder.ascentDistance()), false);
         return 1;
     }
 
@@ -526,9 +504,7 @@ public final class GeoFrontCommands
                 surfaceOrigin.getZ()
                         + ThirdTokyoSurfaceBuilder.OBSERVATION_Z + 0.5D,
                 180.0F, 18.0F);
-        source.sendSuccess(() -> Component.literal(
-                "Tokyo-3 skyline deck. Normal EVA sorties reach this surface through "
-                        + "the physical shaft; this command is only a developer camera shortcut."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.geo_front_commands.tokyo_3_skyline_deck_normal_eva_sorties"), false);
         return 1;
     }
 
@@ -545,9 +521,7 @@ public final class GeoFrontCommands
         ServerPlayer player = source.getPlayerOrException();
         if (!FacilityWorldPolicy.isS22Coastal(source.getServer()))
         {
-            source.sendFailure(Component.literal(
-                    "Coastal review shortcuts are available only in "
-                            + "SEELE_S22_COASTAL."));
+            source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.coastal_review_shortcuts_are_available_only_in"));
             return 0;
         }
         ServerLevel level = geoFront(player);
@@ -565,15 +539,12 @@ public final class GeoFrontCommands
         restoreManualPlayerPhysics(player);
         if (!teleportToLoadedSafeCell(player, level, feet))
         {
-            source.sendFailure(Component.literal(
-                    "S22 review landing is no longer safe at "
-                            + feet.toShortString() + "; no blocks were changed."));
+            source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.s22_review_landing_is_no_longer_safe", feet.toShortString()));
             return 0;
         }
         player.setYRot(yaw);
         player.setXRot(pitch);
-        source.sendSuccess(() -> Component.literal(
-                "S22 visual review: " + label + "."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.geo_front_commands.s22_visual_review_s", label), false);
         return 1;
     }
 
@@ -680,9 +651,7 @@ public final class GeoFrontCommands
                 NervOperationsCentreBuilder.repairRuntimeAccess(level, origin);
         if (!result.runtimePhysicalValid())
         {
-            source.sendFailure(Component.literal(
-                    "NERV operations centre failed its structural audit: "
-                            + result.summary()));
+            source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.nerv_operations_centre_failed_its_structural_audit", result.summary()));
             return 0;
         }
         if (!player.serverLevel().dimension().equals(GEOFRONT))
@@ -715,9 +684,8 @@ public final class GeoFrontCommands
         GeoFrontAudit result = GeoFrontBuilder.inspect(level, origin);
         if (!result.terminalDogma().valid())
         {
-            source.sendFailure(Component.literal(
-                    "Terminal Dogma failed its physical-route audit: "
-                            + result.terminalDogma().summary()));
+            source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.terminal_dogma_failed_its_physical_route_audit",
+                        result.terminalDogma().summary()));
             return 0;
         }
         if (!player.serverLevel().dimension().equals(GEOFRONT))
@@ -730,10 +698,7 @@ public final class GeoFrontCommands
                         + TerminalDogmaBuilder.OBSERVATION_Y + 1.0D,
                 origin.getZ() + TerminalDogmaBuilder.OBSERVATION_Z + 0.5D,
                 180.0F, 0.0F);
-        source.sendSuccess(() -> Component.literal(
-                "Terminal Dogma observation gallery. This is a developer camera shortcut; "
-                        + "the real route begins at the east end of the NERV lower concourse "
-                        + "and descends the physical Central Dogma ladder shaft."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.geo_front_commands.terminal_dogma_observation_gallery_this_is_a"), false);
         return 1;
     }
 
@@ -887,13 +852,8 @@ public final class GeoFrontCommands
         {
             return false;
         }
-        source.sendFailure(Component.literal(
-                "/seele dev geofront " + alias
-                        + " belongs to the retired overlapping map pipeline "
-                        + "and is disabled in "
-                        + (s20 ? "SEELE_S20_REBUILD" : "SEELE_S19_CLEAN")
-                        + ". Use the bounded S20 directors or "
-                        + "/seele dev facility_v2 status for S19."));
+        source.sendFailure(Component.translatable("message.projectseele.geo_front_commands.seele_dev_geofront_s_belongs_to_the",
+                        alias, (s20 ? "SEELE_S20_REBUILD" : "SEELE_S19_CLEAN")));
         return true;
     }
 

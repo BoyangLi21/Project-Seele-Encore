@@ -130,8 +130,7 @@ public final class CoastalSeedScoutCommands
         MinecraftServer server = source.getServer();
         Path output = server.getWorldPath(LevelResource.ROOT)
                 .resolve("coastal_anchor_search_" + seed + ".json");
-        source.sendSuccess(() -> Component.literal(
-                "Coastal anchor search started for seed " + seed + "."),
+        source.sendSuccess(() -> Component.translatable("message.projectseele.coastal_seed_scout_commands.coastal_anchor_search_started_for_seed_s", seed),
                 false);
         CompletableFuture.runAsync(() -> runAnchorSearch(
                 server, source, seed, output));
@@ -308,9 +307,7 @@ public final class CoastalSeedScoutCommands
         MinecraftServer server = source.getServer();
         Path output = server.getWorldPath(LevelResource.ROOT)
                 .resolve(fileName);
-        source.sendSuccess(() -> Component.literal(
-                "Coastal seed survey started in the background: " + seeds.size()
-                        + " seeds."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.coastal_seed_scout_commands.coastal_seed_survey_started_in_the_background", seeds.size()), false);
         CompletableFuture.runAsync(() -> runSurvey(
                 server, source, seeds, output, sampleStep));
         return 1;

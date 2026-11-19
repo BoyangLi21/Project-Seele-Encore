@@ -357,9 +357,9 @@ public final class FacilityV2ElevatorDirector
                 player.serverLevel(), manifest, COMMAND_LIFT_ID,
                 "CMD_LIFT_SPINE");
         return requestTravel(player, cabin, targetY,
-                "COMMAND LIFT",
-                targetY == -332.0D ? "L2 SECURE SPINE"
-                        : "L3 HIGH COMMAND");
+                "ops.projectseele.lift_panel.command_lift",
+                targetY == -332.0D ? "ops.projectseele.lift_panel.l2_secure_spine"
+                        : "ops.projectseele.lift_panel.l3_high_command");
     }
 
     private static boolean handlePublicUse(
@@ -406,22 +406,22 @@ public final class FacilityV2ElevatorDirector
         if (lowerPressed)
         {
             requestedY = PUBLIC_LOWER_Y;
-            operation = "CALL GEOFRONT";
+            operation = "ops.projectseele.lift_panel.call_geofront";
         }
         else if (lowerDestinationPressed)
         {
             requestedY = manifest.surfaceY();
-            operation = "SELECT TOKYO-3";
+            operation = "ops.projectseele.lift_panel.select_tokyo_3";
         }
         else if (upperPressed)
         {
             requestedY = manifest.surfaceY();
-            operation = "CALL TOKYO-3";
+            operation = "ops.projectseele.lift_panel.call_tokyo_3";
         }
         else
         {
             requestedY = PUBLIC_LOWER_Y;
-            operation = "SELECT GEOFRONT";
+            operation = "ops.projectseele.lift_panel.select_geofront";
         }
 
         if (!cabin.beginPersistentLiftTravel(requestedY))
@@ -433,9 +433,8 @@ public final class FacilityV2ElevatorDirector
         level.playSound(null, position,
                 SoundEvents.NOTE_BLOCK_PLING.value(),
                 SoundSource.BLOCKS, 0.8F, 0.72F);
-        player.displayClientMessage(Component.literal(
-                "H-01 LIFT  " + operation
-                        + " / DOORS CLOSE IN 3 SECONDS")
+        player.displayClientMessage(Component.translatable("message.projectseele.facility_v2elevator_director.h_01_lift_s_doors_close_in",
+                        com.projectseele.world.OperationText.read(operation))
                 .withStyle(ChatFormatting.AQUA), true);
         return true;
     }
@@ -465,11 +464,11 @@ public final class FacilityV2ElevatorDirector
                 player.serverLevel(), manifest, STAFF_LIFT_ID,
                 "STAFF_LIFT_SHAFT");
         return requestTravel(player, cabin, targetY,
-                "STAFF LIFT", switch (relativeZ)
+                "ops.projectseele.lift_panel.staff_lift", switch (relativeZ)
                 {
-                    case 58 -> "B4 EVA WET CAGES";
-                    case 59 -> "L0 TECHNICAL";
-                    default -> "L2 COMMAND";
+                    case 58 -> "ops.projectseele.lift_panel.b4_eva_wet_cages";
+                    case 59 -> "ops.projectseele.lift_panel.l0_technical";
+                    default -> "ops.projectseele.lift_panel.l2_command";
                 });
     }
 
@@ -520,8 +519,8 @@ public final class FacilityV2ElevatorDirector
                 player.serverLevel(), manifest, DOGMA_LIFT_ID,
                 "DOGMA_LIFT_SHAFT");
         return requestTravel(player, cabin, targetY,
-                "DOGMA LIFT",
-                targetY == -395.0D ? "MAGI SECURE" : "CENTRAL DOGMA");
+                "ops.projectseele.lift_panel.dogma_lift",
+                targetY == -395.0D ? "ops.projectseele.lift_panel.magi_secure" : "ops.projectseele.lift_panel.central_dogma");
     }
 
     private static boolean handleWestSupportUse(
@@ -547,9 +546,9 @@ public final class FacilityV2ElevatorDirector
                 player.serverLevel(), manifest, WEST_SUPPORT_LIFT_ID,
                 "WEST_SUPPORT");
         return requestTravel(player, cabin, targetY,
-                "WEST SUPPORT LIFT",
-                targetY == -408.0D ? "B4 MAINTENANCE"
-                        : "GEOFRONT EXTERIOR");
+                "ops.projectseele.lift_panel.west_support_lift",
+                targetY == -408.0D ? "ops.projectseele.lift_panel.b4_maintenance"
+                        : "ops.projectseele.lift_panel.geofront_exterior");
     }
 
     private static boolean requestTravel(
@@ -558,31 +557,26 @@ public final class FacilityV2ElevatorDirector
     {
         if (cabin == null)
         {
-            player.displayClientMessage(Component.literal(
-                    liftName + "  CABIN IDENTITY UNAVAILABLE")
+            player.displayClientMessage(Component.translatable("ops.projectseele.lift_status.s_cabin_identity_unavailable", OperationText.read(liftName))
                     .withStyle(ChatFormatting.RED), true);
             return true;
         }
         if (!cabin.isPersistentLiftIdle())
         {
-            player.displayClientMessage(Component.literal(
-                    liftName + "  IN TRANSIT")
+            player.displayClientMessage(Component.translatable("ops.projectseele.lift_status.s_in_transit", OperationText.read(liftName))
                     .withStyle(ChatFormatting.GOLD), true);
             return true;
         }
         if (!cabin.beginPersistentLiftTravel(targetY))
         {
-            player.displayClientMessage(Component.literal(
-                    liftName + "  CABIN READY / " + destination)
+            player.displayClientMessage(Component.translatable("ops.projectseele.lift_status.s_cabin_ready_s", OperationText.read(liftName), OperationText.read(destination))
                     .withStyle(ChatFormatting.YELLOW), true);
             return true;
         }
         player.serverLevel().playSound(null, player.blockPosition(),
                 SoundEvents.NOTE_BLOCK_PLING.value(),
                 SoundSource.BLOCKS, 0.8F, 0.72F);
-        player.displayClientMessage(Component.literal(
-                liftName + "  " + destination
-                        + " / DOORS CLOSE IN 3 SECONDS")
+        player.displayClientMessage(Component.translatable("ops.projectseele.lift_status.s_s_doors_close_in_3_seconds", OperationText.read(liftName), OperationText.read(destination))
                 .withStyle(ChatFormatting.AQUA), true);
         return true;
     }

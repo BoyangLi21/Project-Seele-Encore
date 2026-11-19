@@ -86,9 +86,7 @@ public final class Tokyo3RamielBattleDirector
         data.put(new StoredBattle(origin, ramiel.getUUID(), 0));
         Tokyo3RetractionDirector.request(level, origin, true);
         AngelAlarmSystem.engage(ramiel);
-        broadcast(level, origin, Component.literal(
-                "OPERATION YASHIMA — RAMIEL OVER TOKYO-3. "
-                        + "Armour towers descending; EVA launch routes live."));
+        broadcast(level, origin, Component.translatable("message.projectseele.tokyo3ramiel_battle_director.operation_yashima_ramiel_over_tokyo_3_armour"));
         ProjectSeele.LOGGER.info(
                 "Operation Yashima started: ramiel={} origin={} spawn={} target={} route={} blocks",
                 ramiel.getStringUUID(), origin.toShortString(),

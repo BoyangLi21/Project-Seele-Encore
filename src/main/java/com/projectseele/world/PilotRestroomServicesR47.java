@@ -135,19 +135,23 @@ public final class PilotRestroomServicesR47
         var point=Vec3.atCenterOf(room.beacon());
         // facility_siren has a wide fixed sound range. Send its genuine positional
         // packet only to local listeners instead of broadcasting over that range.
-        String response=null;
+        Component response=null;
         if(level.getEntity(room.pilot()) instanceof TrainingPilotEntity pilot&&pilot.isAlive()
                 &&pilot.getAssignedVariant()==room.variant()&&pilot.position().distanceToSqr(Vec3.atCenterOf(room.phone()))<=12*12)
-            response=TrainingPilotEntity.pilotName(room.variant())+"："+switch(room.variant())
-            {case 0->"明白。我会等指挥部通知。";case 1->"听到了。我在这里待命。";default->"听到了。需要出动就通知我。";};
+            response=Component.translatable("dialogue.projectseele.pilot_reply", StaffDialogueCatalogR24.pilotName(room.variant()),
+                    Component.translatable(switch(room.variant()) {
+                        case 0 -> "ops.projectseele.lounge.understood_i_ll_wait_for_word_from_command";
+                        case 1 -> "ops.projectseele.lounge.copy_i_m_standing_by_here";
+                        default -> "ops.projectseele.lounge.copy_tell_me_when_it_s_time_to";
+                    }));
         UUIDGuard guard=guard(level,room);
         for(var listener:level.players())if(!listener.isRemoved()&&listener.position().distanceToSqr(point)<=16*16)
         {
             listener.connection.send(new ClientboundSoundPacket(Holder.direct(ModSounds.FACILITY.get("facility_siren").get()),
                     SoundSource.BLOCKS,point.x,point.y,point.z,.65F,1,level.getRandom().nextLong()));
-            listener.sendSystemMessage(Component.literal("[驾驶员休息室 0"+room.variant()+"] "+reason+"。请保持门口通行，联系作战指挥。"));
-            if(response!=null)listener.sendSystemMessage(Component.literal(response));
-            if(guard.available)listener.sendSystemMessage(Component.literal("["+guard.name+"] 收到。我负责本房门口值守。"));
+            listener.sendSystemMessage(Component.translatable("message.projectseele.pilot_restroom_services_r47.pilot_lounge_0_s_s_keep_the", room.variant(), com.projectseele.world.OperationText.read(reason)));
+            if(response!=null)listener.sendSystemMessage(response);
+            if(guard.available)listener.sendSystemMessage(Component.translatable("ops.projectseele.lounge.s_copy_i_have_the_door", StaffDialogueCatalogR24.speaker(guard.name)));
         }
         return true;
     }
@@ -175,7 +179,7 @@ public final class PilotRestroomServicesR47
                 ||hardware.getValue(ButtonBlock.FACING)!=Direction.WEST||hardware.getValue(ButtonBlock.POWERED)
                 ||!hardware.canSurvive(level,room.button()))return;
         var state=state(level);var alarm=state.alarms.computeIfAbsent(room.variant(),key->new Alarm());
-        if(!ring(level,room,state,alarm,"本房警铃已按下"))
+        if(!ring(level,room,state,alarm,"ops.projectseele.lounge.the_room_alarm_was_pressed"))
         {event.setCanceled(true);event.setCancellationResult(InteractionResult.FAIL);player.sendSystemMessage(Component.translatable("message.projectseele.lounge.alarm_cooldown"));}
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
@@ -192,7 +196,7 @@ public final class PilotRestroomServicesR47
         for(var room:rooms)
         {
             var alarm=state.alarms.computeIfAbsent(room.variant(),key->new Alarm());
-            if(!alert.isEmpty()&&!alert.equals(alarm.mission)&&ring(level,room,state,alarm,"已收到本次使徒作战告警"))
+            if(!alert.isEmpty()&&!alert.equals(alarm.mission)&&ring(level,room,state,alarm,"ops.projectseele.lounge.the_angel_alert_for_this_operation_has_been"))
             {alarm.mission=alert;state.setDirty();}
             light(level,room,level.getGameTime()<alarm.until);
         }

@@ -134,8 +134,7 @@ public final class EvaMotionLabCommands
             source.sendFailure(Component.translatable("message.projectseele.motion.un_board_failed"));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Motion-lab pilot linked to EVA-UN-0" + serial + "."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.eva_motion_lab_commands.motion_lab_pilot_linked_to_eva_un", serial), false);
         return 1;
     }
 
@@ -177,11 +176,7 @@ public final class EvaMotionLabCommands
         if (variant < 0 || !EvaMotionLabDirector.setDemo(
                 source.getLevel(), variant, mode))
         {
-            source.sendFailure(Component.literal(
-                    "Usage: /seele dev motionlab demo unit01 "
-                            + "walk|run|jump|attack_a|attack_b|attack_c|"
-                            + "attack_combo|"
-                            + "live|livepush|physics|recovery|stop"));
+            source.sendFailure(Component.translatable("message.projectseele.eva_motion_lab_commands.usage_seele_dev_motionlab_demo_unit01_walk"));
             return 0;
         }
         boolean physicsPreview = mode.equalsIgnoreCase("physics")

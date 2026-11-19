@@ -179,7 +179,7 @@ public final class NervRootAssemblyInstallationR52
     {
         return Commands.literal("equipment_update").then(Commands.argument("previous_metadata_directory",StringArgumentType.greedyString()).executes(context->{
             var source=context.getSource();try{var result=CarrierEquipmentUpdateR53.admit(source.getLevel(),Path.of(StringArgumentType.getString(context,"previous_metadata_directory")));source.sendSuccess(()->Component.literal(result.reason()),true);return result.accepted()?1:0;}
-            catch(IOException|RuntimeException failure){source.sendFailure(Component.literal("原设备更新未执行："+failure.getMessage()));return 0;}
+            catch(IOException|RuntimeException failure){source.sendFailure(Component.translatable("message.projectseele.nerv_root_assembly_installation_r52.equipment_update_cancelled_s", com.projectseele.world.OperationText.read(failure.getMessage())));return 0;}
         }));
     }
     public static LiteralArgumentBuilder<CommandSourceStack> installCancelCommand()
@@ -194,7 +194,7 @@ public final class NervRootAssemblyInstallationR52
     {
         return Commands.literal("install").then(Commands.argument("world_relative_bundle",StringArgumentType.greedyString()).executes(context->{
             var source=context.getSource();try{String name=NervRouteRuntimeStateR52.relativeBundleR52(StringArgumentType.getString(context,"world_relative_bundle"));var relative=Path.of(name);var result=install(source.getLevel(),source.getServer().getWorldPath(LevelResource.ROOT).resolve(relative));source.sendSuccess(()->Component.literal(result.reason()+" [epoch="+result.epoch()+", directory="+result.directoryFingerprint()+"]"),true);return result.accepted()?1:0;}
-            catch(IOException|RuntimeException failure){source.sendFailure(Component.literal("地图安装未执行："+failure.getMessage()));return 0;}
+            catch(IOException|RuntimeException failure){source.sendFailure(Component.translatable("message.projectseele.nerv_root_assembly_installation_r52.map_installation_cancelled_s", com.projectseele.world.OperationText.read(failure.getMessage())));return 0;}
         }));
     }
     private static String sha(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception impossible){throw new IllegalStateException(impossible);}}

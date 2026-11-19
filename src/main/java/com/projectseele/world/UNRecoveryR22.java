@@ -60,7 +60,7 @@ public final class UNRecoveryR22
             if(!reset){source.sendFailure(Component.translatable("message.projectseele.un.transport_busy"));return 0;}
         }
         JOBS.computeIfAbsent(l,k->new HashMap<>()).put(serial,new Job(serial,reset,source,source.getServer().getTickCount()));
-        source.sendSuccess(()->Component.literal("EVA-UN-0"+serial+"：正在定位机体与插入栓"),false);return 1;
+        source.sendSuccess(()->Component.translatable("message.projectseele.unrecovery_r22.eva_un_0_s_locating_the_eva", serial),false);return 1;
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
@@ -110,7 +110,7 @@ public final class UNRecoveryR22
                 if(job.reset()){EvaBayRepairR33.resetForMaintenance(eva);eva.setHealth(eva.getMaxHealth());}
                 plug.resetIndependentAtDock(eva);eva.enterHangarStandby();EvaDorsalMechanism.set(eva,0,0);
             }
-            remember(eva);remember(plug);job.source().sendSuccess(()->Component.literal("EVA-UN-0"+job.serial()+" 已回到机库。"+(extracting?"插入栓正在退出。":destroyed?"已补充备用插入栓。":"机体和插入栓已复位。")),false);
+            remember(eva);remember(plug);job.source().sendSuccess(()->Component.translatable("message.projectseele.unrecovery_r22.eva_un_0_s_is_back_in", job.serial(), Component.translatable(extracting ? "message.projectseele.unrecovery_r22.the_entry_plug_is_being_extracted" : destroyed ? "message.projectseele.unrecovery_r22.a_spare_entry_plug_has_been_fitted" : "message.projectseele.unrecovery_r22.the_eva_and_entry_plug_have_been")),false);
             ProjectSeele.LOGGER.info("UN R22 {} serial={} eva={} plug={}",job.reset()?"reset":"recover",job.serial(),id,plug.getUUID());it.remove();
         }
     }
