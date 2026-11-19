@@ -102,7 +102,7 @@ public final class SecureStationGateR48
             boolean permit=player!=null&&player.serverLevel()==level&&!player.isSpectator()
                     &&player.distanceToSqr(Vec3.atCenterOf(READER))<=16&&card(player,state.swipe.hand);
             if(permit)state.until=now+120;
-            if(player!=null)player.displayClientMessage(net.minecraft.network.chat.Component.literal(permit?"NERV · 闸机已开启。":"刷卡中断，请保持通行证和读卡距离。"),true);
+            if(player!=null)player.displayClientMessage(net.minecraft.network.chat.Component.translatable(permit ? "ops.projectseele.legacy.secure_station_gate.nerv_gate_open" : "ops.projectseele.legacy.secure_station_gate.swipe_interrupted_keep_your_pass_within_range_of_the"),true);
             level.playSound(null,READER,permit?net.minecraft.sounds.SoundEvents.NOTE_BLOCK_PLING.value():net.minecraft.sounds.SoundEvents.NOTE_BLOCK_BASS.value(),net.minecraft.sounds.SoundSource.BLOCKS,.35F,permit?1.3F:.75F);
             visual(level,-1,permit?2:3,permit?1:0);state.swipe=null;
         }

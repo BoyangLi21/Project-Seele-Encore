@@ -86,7 +86,7 @@ public final class SeeleLightingR48
                 ||button.getValue(ButtonBlock.FACE)!=AttachFace.WALL||button.getValue(ButtonBlock.FACING)!=Direction.EAST
                 ||!button.canSurvive(level,position))return;
         var state=state(level);state.meeting=!state.meeting;state.setDirty();update(level,actual,state.meeting);
-        player.displayClientMessage(net.minecraft.network.chat.Component.literal(state.meeting?"SEELE · 会议暗场，桌面重点照明。":"SEELE · 日常照明。"),true);
+        player.displayClientMessage(net.minecraft.network.chat.Component.translatable(state.meeting ? "ops.projectseele.legacy.seele_lighting.seele_meeting_lights_dimmed_table_lighting_active" : "ops.projectseele.legacy.seele_lighting.seele_normal_lighting"),true);
     }
     private static void update(ServerLevel level,Circuit circuit,boolean meeting)
     {

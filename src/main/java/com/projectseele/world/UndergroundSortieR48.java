@@ -243,7 +243,7 @@ public final class UndergroundSortieR48
             if(!level.getFluidState(p).isEmpty())return "承载通路尚未排空，请等待排液完成。";
             var block=level.getBlockState(p);
             if(closedAllowed&&inPortal(v,p)&&block.is(Blocks.BARRIER))continue;
-            for(var shape:block.getCollisionShape(level,p).toAabbs())if(shape.move(p).intersects(body))return "承载通路有障碍，请清理："+p.toShortString();
+            for(var shape:block.getCollisionShape(level,p).toAabbs())if(shape.move(p).intersects(body))return OperationText.format("ops.projectseele.receiver.the_carrier_route_is_obstructed_clear_s", p.toShortString());
         }
         var nearby=level.getEntities((Entity)null,body,e->e.isAlive()&&!e.isSpectator()&&e!=unit&&e.getRootVehicle()!=unit
                 &&!(e instanceof NervHangarDoorEntity));
@@ -293,7 +293,7 @@ public final class UndergroundSortieR48
             if(!level.hasChunkAt(p)||level.getBlockEntity(p)!=null||!level.getFluidState(p).isEmpty()
                     ||!receiverBearingR50(level,unit.getUnitVariant(),p)
                     ||!level.getBlockState(p).isCollisionShapeFullBlock(level,p))
-                return "接应平台支撑有变化，请检修："+p.toShortString();
+                return OperationText.format("ops.projectseele.receiver.the_receiving_platform_support_has_changed_inspect_s", p.toShortString());
         return "";
     }
     /** Check the measured limb envelopes, including people and the ejected original capsule.
@@ -307,7 +307,7 @@ public final class UndergroundSortieR48
             var a=receiverWorldBoxR50(unit,previous.get(i));var b=receiverWorldBoxR50(unit,next.get(i));var sweep=a.minmax(b).deflate(.001);
             for(var p:BlockPos.betweenClosed(BlockPos.containing(sweep.minX,sweep.minY,sweep.minZ),BlockPos.containing(sweep.maxX,sweep.maxY,sweep.maxZ)))
             {
-                if(!level.hasChunkAt(p))return "接应平台通路信号尚未接通："+p.toShortString();
+                if(!level.hasChunkAt(p))return OperationText.format("ops.projectseele.receiver.the_receiving_platform_route_is_not_connected_at_s", p.toShortString());
                 var block=level.getBlockState(p);if(block.isAir())continue;
                 // posedCarrierHulls adds an 8 cm numerical margin. The actual
                 // lowest mesh vertex is kept on the deck by poseAt; that margin
@@ -320,15 +320,15 @@ public final class UndergroundSortieR48
                 {
                     var obstacle=shape.move(p);
                     if(overlapR50(sweep,obstacle)>overlapR50(a,obstacle)+.001)
-                        return "接应机械臂整姿受阻："+p.toShortString()+"（部件 "+i+"）。";
+                        return OperationText.format("ops.projectseele.receiver.arm_part", p.toShortString(), i);
                 }
                 if(!level.getFluidState(p).isEmpty()&&overlapR50(sweep,new AABB(p))>overlapR50(a,new AABB(p))+.001)
-                    return "接应机械臂通路有液体："+p.toShortString();
+                    return OperationText.format("ops.projectseele.receiver.fluid_obstructs_the_receiver_arm_at_s", p.toShortString());
             }
             for(var entity:level.getEntities((Entity)null,sweep,e->entityOccupiesClearanceR50(e,unit)
                     &&!(e instanceof NervHangarDoorEntity)&&(e instanceof net.minecraft.world.entity.LivingEntity||e.canBeCollidedWith())))
                 if(overlapR50(sweep,entity.getBoundingBox())>overlapR50(a,entity.getBoundingBox())+.001)
-                    return "接应机械臂附近有人或设备："+entity.getType()+"。";
+                    return OperationText.format("ops.projectseele.receiver.arm_occupied", entity.getType().getDescription());
         }
         return "";
     }
@@ -364,12 +364,12 @@ public final class UndergroundSortieR48
             {
                 // The installed apron is 35x29. Actual feet extend beyond
                 // the old 18x18 coarse-box sample; check the real pad boundary.
-                if(p.getX()<X[v]-17||p.getX()>X[v]+17||p.getZ()<(outer?83:-12)||p.getZ()>(outer?118:16))return padRejectedR50(level,v,unit,"foot-outside-pad","机体足部超出平台边缘，请调整站位："+p.toShortString(),feet);
-                if(!level.hasChunkAt(p))return padRejectedR50(level,v,unit,"support-chunk-unloaded","足下平台信号尚未接通："+p.toShortString(),feet);
-                if(!level.getFluidState(p).isEmpty())return padRejectedR50(level,v,unit,"support-fluid","足下平台有液体，请等待排液："+p.toShortString(),feet);
+                if(p.getX()<X[v]-17||p.getX()>X[v]+17||p.getZ()<(outer?83:-12)||p.getZ()>(outer?118:16))return padRejectedR50(level,v,unit,"foot-outside-pad",OperationText.format("ops.projectseele.receiver.the_eva_s_feet_extend_beyond_the_platform_reposition_at_s", p.toShortString()),feet);
+                if(!level.hasChunkAt(p))return padRejectedR50(level,v,unit,"support-chunk-unloaded",OperationText.format("ops.projectseele.receiver.the_platform_signal_is_unavailable_at_s", p.toShortString()),feet);
+                if(!level.getFluidState(p).isEmpty())return padRejectedR50(level,v,unit,"support-fluid",OperationText.format("ops.projectseele.receiver.the_platform_contains_fluid_at_s_wait_for_it_to_drain", p.toShortString()),feet);
                 if(level.getBlockEntity(p)!=null||!receiverBearingR50(level,v,p))
-                    return padRejectedR50(level,v,unit,"support-owner-changed","平台支撑有变化，请检修："+p.toShortString(),feet);
-                if(!level.getBlockState(p).isCollisionShapeFullBlock(level,p))return padRejectedR50(level,v,unit,"support-not-full","机体足下缺少支撑，请调整站位："+p.toShortString(),feet);
+                    return padRejectedR50(level,v,unit,"support-owner-changed",OperationText.format("ops.projectseele.receiver.the_platform_support_has_changed_inspect_s", p.toShortString()),feet);
+                if(!level.getBlockState(p).isCollisionShapeFullBlock(level,p))return padRejectedR50(level,v,unit,"support-not-full",OperationText.format("ops.projectseele.receiver.the_eva_lacks_foot_support_at_s_reposition_it", p.toShortString()),feet);
             }
         }
         LAST_PAD_SUPPORT_DIAGNOSTIC_R50.computeIfAbsent(level,key->new HashMap<>()).remove(unit.getUUID());

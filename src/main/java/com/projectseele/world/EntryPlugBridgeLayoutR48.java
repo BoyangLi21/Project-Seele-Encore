@@ -117,7 +117,7 @@ public final class EntryPlugBridgeLayoutR48
                     ||root.equals(fleet.canonicalId())||root.equals(fleet.entryPlugId()))continue;
             if(actor instanceof net.minecraft.world.entity.decoration.ArmorStand stand&&stand.isMarker())continue;
             if(actor instanceof net.minecraft.world.entity.LivingEntity||actor.canBeCollidedWith())
-                return Optional.of("后桥仍有人或载具："+actor.getName().getString()+"。暂停原撤收时钟。");
+                return Optional.of(OperationText.format("ops.projectseele.bridge.rear_bridge_occupied_by_s_retraction_paused", actor.getName()));
         }
         return Optional.empty();
     }

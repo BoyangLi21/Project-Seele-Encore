@@ -147,7 +147,7 @@ public final class NervUndergroundAirLiftR50
         var fleet=EvaFleetSavedData.get(level.getServer()).entry(eva.getUnitVariant()).orElse(null);
         if(fleet==null||!fleet.canonicalId().equals(eva.getUUID())||fleet.phase()!=EvaFleetSavedData.Phase.DEPLOYED)return "机体尚未完成出动，请到安全位置后再呼叫运输。";
         if(EvaGroundReceiverR50.active(eva))return "接应平台正在接收机体，运输机保持待命。";
-        var s=state(level);if(s.job!=null)return "地下运输机已有任务："+s.job.note;
+        var s=state(level);if(s.job!=null)return OperationText.format("ops.projectseele.underground_air.assigned", OperationText.read(s.job.note));
         if(EvaAirTransportR31.active(eva)||eva.hasActiveCarrierMotion()||eva.isLaunchSequenceActive())return "机体正在转运，请等当前作业结束后再安排运输。";
         String node=site.nearest(eva.position().add(0,NervUndergroundTransportSiteR50.HOIST,0));
         if(node==null)
@@ -302,7 +302,7 @@ public final class NervUndergroundAirLiftR50
         if(plane==null){if(s.job!=null)note(level,s,s.job,"地下机场正在接通运输机信号。");return;}
         if(!plane.isNerv()||plane.groundCart()){if(s.job!=null)note(level,s,s.job,"运输机识别信号异常，暂停接载，等待机场确认。");return;}
         s.planeAt=plane.position();if(s.job==null)return;level.resetEmptyTime();
-        try{advance(level,site,s,plane);}catch(Exception failure){if(s.job!=null){var eva=ServiceAircraftR32.payload(level,s.job.eva);if(eva!=null&&s.job.carrying){eva.endNervCarrierMotion();EvaAirTransportR31.hold(eva);}note(level,s,s.job,"运输安全暂停："+failure.getMessage());}ProjectSeele.LOGGER.error("R50 underground airlift held without actor reset",failure);}
+        try{advance(level,site,s,plane);}catch(Exception failure){if(s.job!=null){var eva=ServiceAircraftR32.payload(level,s.job.eva);if(eva!=null&&s.job.carrying){eva.endNervCarrierMotion();EvaAirTransportR31.hold(eva);}note(level,s,s.job,OperationText.format("ops.projectseele.underground_air.safety_hold", OperationText.read(failure.getMessage())));}ProjectSeele.LOGGER.error("R50 underground airlift held without actor reset",failure);}
     }
     private static void advance(ServerLevel level,NervUndergroundTransportSiteR50 site,State s,UNTransportEntity plane)
     {

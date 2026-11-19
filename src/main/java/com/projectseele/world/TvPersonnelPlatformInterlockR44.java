@@ -238,7 +238,7 @@ public final class TvPersonnelPlatformInterlockR44
             for(var cell:cells.entrySet())
                 if(!level.hasChunkAt(cell.getKey())||level.getBlockEntity(cell.getKey())!=null
                     ||!TvPersonnelPlatformRecipeR44.alreadyOwned(level.getBlockState(cell.getKey()),cell.getValue()))
-                    return Optional.of("人员平台地板、围护或门扇安装不完整："+cell.getKey());
+                    return Optional.of(OperationText.format("ops.projectseele.bridge.the_personnel_platform_floor_railing_or_gate_is_incomplete_at_s", cell.getKey().toString()));
             for(var gate:new HashSet<>(contract.get().gates.values()))
                 if(gate.variant==variant)
                 {
@@ -252,7 +252,7 @@ public final class TvPersonnelPlatformInterlockR44
         for (var actor:level.getEntities((Entity)null,union,e->crew(level,e,variant)))
             for (var volume:volumes)
                 if (volume.intersects(actor.getBoundingBox()))
-                    return Optional.of("检修平台还有人员未撤离："+actor.getName().getString());
+                    return Optional.of(OperationText.format("ops.projectseele.bridge.maintenance_platform_still_occupied_by_s", actor.getName()));
         return Optional.empty();
     }
 
@@ -296,7 +296,7 @@ public final class TvPersonnelPlatformInterlockR44
         for(var cell:installed.entrySet())
             if(!level.hasChunkAt(cell.getKey())||level.getBlockEntity(cell.getKey())!=null
                     ||!TvPersonnelPlatformRecipeR44.alreadyOwned(level.getBlockState(cell.getKey()),cell.getValue()))
-                return Optional.of("本机人员平台完整组件已改变，门保持现状："+cell.getKey());
+                return Optional.of(OperationText.format("ops.projectseele.bridge.the_personnel_platform_has_changed_at_s_gate_position_retained", cell.getKey().toString()));
         double x=-11.5+42*variant;
         var gantries=level.getEntitiesOfClass(NervCarrierPlatformEntity.class,new AABB(x-2,-445,-242,x+2,-439,-237),
                 e->e.isAlive()&&e.isRestraintGantry()&&e.getUnitVariant()==variant);

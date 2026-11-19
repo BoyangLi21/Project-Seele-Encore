@@ -302,7 +302,7 @@ public final class TvYashimaDirectorR50
     public static void fail(ServerLevel level,TvCampaignSavedData data,String reason)
     {
         if(data.phase.equals("failure")||data.targetDeathConfirmedR45)return;
-        data.phase="failure";data.notice=reason+" 作战未完成，正在安排撤离。";data.setDirty();
+        data.phase="failure";data.notice=OperationText.format("ops.projectseele.yashima.evacuation", OperationText.read(reason));data.setDirty();
         TvYashimaFirelineR53.clear(level);
         TvMissionEquipmentR45.revokeMission(level);TvEncounterRulesR45.stopEquipment(level,data);
         NervArmorColumnR50.pause(level);

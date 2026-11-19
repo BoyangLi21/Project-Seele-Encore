@@ -65,6 +65,13 @@ public final class LocalizedReceiptsR64Test
         String oldDisplay = Component.Serializer.toJson(TvBriefingText.read(oldBriefing.encode()));
         check(oldDisplay.contains("ops.projectseele.yashima.status") && oldDisplay.contains("ops.projectseele.yashima.entrance_breached")
                 && oldDisplay.contains("ops.projectseele.yashima.gun_ready") && oldDisplay.contains("3"), "Legacy Yashima receipt lost status fields");
+        var cannon = (TranslatableContents) TvBriefingText.cannonNotice(
+                "炮井在接近时自动展开；请靠近炮台（-332，64，90），右键接入。").getContents();
+        check(cannon.getKey().equals("ops.projectseele.yashima.cannon_approach_at")
+                && java.util.Arrays.equals(cannon.getArgs(), new Object[]{"-332", "64", "90"}),
+                "The native sight must retain all three coordinates");
+        check(key(TvBriefingText.cannonNotice("等待零号机进入左侧防护位置（12，-90，8）。"))
+                .equals("ops.projectseele.yashima.shield_at"), "The shield position must follow the client locale");
         System.out.println("Locale parity, " + variants + " dialogue variants and saved/packet receipt round trips passed");
     }
 }

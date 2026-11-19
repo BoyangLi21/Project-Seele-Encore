@@ -93,7 +93,7 @@ public final class StaffRecoveryR47
                 queued.nextAirRequest=0;
                 queued.expires=level.getGameTime()+20*60*12;
                 state.setDirty();
-                return "运输机尚未派出："+queued.stage.substring("R53_AIR_WAIT:".length())+"正在重新确认接载条件。";
+                return OperationText.format("ops.projectseele.recovery.not_dispatched", OperationText.read(queued.stage.substring("R53_AIR_WAIT:".length())));
             }
             return "ops.projectseele.recovery.recovery_is_already_being_arranged_check_transport";
         }

@@ -36,6 +36,30 @@ public record TvBriefingText(String chapter, String activity, boolean central, i
 
     // R64's sight extracts the final clause from this established saved notice. Read its
     // measured layer count without changing the saved format, including notices from older saves.
+    private static final java.util.regex.Pattern GUN_POSITION = java.util.regex.Pattern.compile(
+            "(阳电子炮已升起；|炮井在接近时自动展开；)请靠近炮台（(-?\\d+)，(-?\\d+)，(-?\\d+)），右键接入。");
+    private static final java.util.regex.Pattern SHIELD_POSITION = java.util.regex.Pattern.compile(
+            "等待零号机进入左侧防护位置（(-?\\d+)，(-?\\d+)，(-?\\d+)）。");
+
+    /** The sight's bounded packet and older saves carry the original short clause. */
+    public static Component cannonNotice(String value)
+    {
+        if (value.startsWith("阳电子炮已升起；") || value.startsWith("炮井在接近时自动展开；"))
+        {
+            var gun = GUN_POSITION.matcher(value);
+            if (gun.matches()) return Component.translatable(gun.group(1).startsWith("阳电子炮")
+                    ? "ops.projectseele.yashima.cannon_raised_at" : "ops.projectseele.yashima.cannon_approach_at",
+                    gun.group(2), gun.group(3), gun.group(4));
+        }
+        if (value.startsWith("等待零号机进入左侧防护位置（"))
+        {
+            var shield = SHIELD_POSITION.matcher(value);
+            if (shield.matches()) return Component.translatable("ops.projectseele.yashima.shield_at",
+                    shield.group(1), shield.group(2), shield.group(3));
+        }
+        return OperationText.read(value);
+    }
+
     private static Component dispatch(String value)
     {
         String prefix = "屋岛作战 · ";
@@ -53,7 +77,7 @@ public record TvBriefingText(String chapter, String activity, boolean central, i
                 int layers = Integer.parseInt(body.substring(armor.length(), end));
                 return Component.translatable("ops.projectseele.yashima.status", breached
                         ? Component.translatable("ops.projectseele.yashima.entrance_breached") : Component.empty(),
-                        layers, OperationText.read(body.substring(end + split.length())));
+                        layers, cannonNotice(body.substring(end + split.length())));
             }
             catch (NumberFormatException ignored) {}
         }
