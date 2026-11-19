@@ -986,7 +986,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         if(com.projectseele.world.NervOriginalActorsR52.managed(this)&&!com.projectseele.world.NervOriginalActorsR52.boardingAllowed((ServerLevel)this.level(),this,player))
         {
             boolean ready=com.projectseele.world.NervRouteRuntimeR52.ready((ServerLevel)this.level());
-            player.displayClientMessage(Component.literal(ready?"当前插入栓尚未恢复到登机停靠位，请使用 /seele eva reset all。":"机库系统仍在加载，完成后即可登机。"),true);
+            player.displayClientMessage(com.projectseele.world.OperationText.read(ready?"当前插入栓尚未恢复到登机停靠位，请使用 /seele eva reset all。":"机库系统仍在加载，完成后即可登机。"),true);
             return InteractionResult.CONSUME;
         }
         int stage = this.getInsertionStage();
@@ -994,8 +994,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                 || (stage != STAGE_SUSPENDED && stage != STAGE_FIELD_LANDED)
                 || this.isVehicle() || player.isPassenger())
         {
-            player.displayClientMessage(Component.literal(
-                    "Entry-plug hatch is sealed or under crane control."), true);
+            player.displayClientMessage(Component.translatable("message.projectseele.plug.sealed"), true);
             return InteractionResult.CONSUME;
         }
         Vec3 eye = player.getEyePosition();
@@ -1010,8 +1009,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                 || direction.normalize().dot(player.getViewVector(1.0F))
                         < 0.35D)
         {
-            player.displayClientMessage(Component.literal(
-                    "Stand on the boarding bridge and face the entry-plug hatch."),
+            player.displayClientMessage(Component.translatable("message.projectseele.plug.face_hatch"),
                     true);
             return InteractionResult.CONSUME;
         }
@@ -1021,8 +1019,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         if (hit.getType() != HitResult.Type.MISS
                 && hit.getLocation().distanceToSqr(hatch) > 3.0D * 3.0D)
         {
-            player.displayClientMessage(Component.literal(
-                    "Entry-plug hatch is obstructed."), true);
+            player.displayClientMessage(Component.translatable("message.projectseele.plug.obstructed"), true);
             return InteractionResult.CONSUME;
         }
         return this.boardPassenger(player)
@@ -1038,8 +1035,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         }
         if (this.getInsertionStage() == STAGE_INSERTING)
         {
-            player.displayClientMessage(Component.literal(
-                    "Entry plug is already under crane control."), true);
+            player.displayClientMessage(Component.translatable("message.projectseele.plug.crane"), true);
             return InteractionResult.CONSUME;
         }
         Entity occupant = this.getFirstPassenger();
@@ -1048,11 +1044,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
             // A seated pilot is invisible — they are inside the capsule — so
             // naming the occupant is the only way to tell a boarded plug from
             // one that is wrongly reporting itself full.
-            player.displayClientMessage(Component.literal(
-                    "Entry plug is already occupied by "
-                            + occupant.getName().getString()
-                            + (com.projectseele.visual.DevelopmentCommandsR43.enabled()
-                                    ? " (/seele dev eva dummy stop to clear)." : ".")), true);
+            player.displayClientMessage(Component.translatable(com.projectseele.visual.DevelopmentCommandsR43.enabled()
+                        ? "message.projectseele.entry_plug_carrier_entity.occupied_by_s_run_seele_dev_eva" : "message.projectseele.entry_plug_carrier_entity.entry_plug_is_already_occupied_by_s", occupant.getName()), true);
             return InteractionResult.CONSUME;
         }
         return this.tryBoardFromHatch(player);

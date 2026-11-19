@@ -73,13 +73,13 @@ public final class StaffConversationR24
 
     private static String role(NervStaffEntity npc)
     {
-        if (npc.skin().equals("fuyutsuki")) return "副司令";
+        if (npc.skin().equals("fuyutsuki")) return "staff.projectseele.deputy";
         return switch (npc.staffRole())
         {
-            case "commander" -> "作战指挥"; case "scientist" -> "技术负责人";
-            case "operator" -> "监视操作员"; case "medic" -> "医疗值班";
-            case "guard", "un_guard" -> "安保值勤"; case "un_crew" -> "UN 基地勤务";
-            default -> "设施技术员";
+            case "commander" -> "staff.projectseele.operations"; case "scientist" -> "staff.projectseele.science";
+            case "operator" -> "staff.projectseele.operator"; case "medic" -> "staff.projectseele.medic";
+            case "guard", "un_guard" -> "staff.projectseele.guard"; case "un_crew" -> "staff.projectseele.un_crew";
+            default -> "staff.projectseele.technician";
         };
     }
 
@@ -89,27 +89,28 @@ public final class StaffConversationR24
         for (int i = 0; i < 3; i++)
         {
             var state = EvaLogisticsDirector.status(player.serverLevel(), i);
-            units.add(NervStaffDialogue.unitName(i) + " · " + NervStaffDialogue.stage(state.phase())
-                    + (state.loaded() ? "" : " / 远端信号待接入"));
+            units.add("unit:" + i + ":" + state.phase() + ":" + (state.loaded() ? "1" : "0"));
         }
         var job = StaffCommandBookR24.order(npc);
-        String order = job == null ? "" : NervStaffDialogue.unitName(job.unit) + " · " + job.message;
+        String order = job == null ? "" : "order:" + job.unit + ":" + job.message;
         boolean authorized = NervStaffDialogue.authorized(player);
         boolean canCommand = authorized && StaffAuthorityR25.commandContact(npc);
         if (!canCommand && order.isEmpty())
-            order = "本次通话只能查询信息；出动指令" + StaffAuthorityR25.denial(authorized, npc.skin(), StaffAuthorityR25.COMMAND) + "。";
+            order = "staff.projectseele.information_only";
         var coordination=CityCoordinationSavedDataR44.get(player.serverLevel());
         boolean current=coordination.active&&session.coordinationInstance!=null&&session.coordinationInstance.equals(coordination.instance);
         List<String> participants=new ArrayList<>();
         if(current)for(int unit=0;unit<5;unit++)
         {
-            var binding=coordination.binding(unit);String row=TvSortiesR32.name(unit)+" / 尚未编入";
-            if(binding!=null)
+            var binding = coordination.binding(unit);
+            String row = "crew:" + unit;
+            if (binding != null)
             {
-                var actual=player.server.getPlayerList().getPlayer(binding.pilot());
-                String who=binding.kind().equals("npc")?com.projectseele.entity.TrainingPilotEntity.pilotName(unit):actual==null?"离线驾驶员":actual.getName().getString();
-                String role=switch(binding.role()){case "cover"->"掩护";case "shooter"->"射击";default->"支援";};
-                row=TvSortiesR32.name(unit)+" / "+who+" / "+role+(coordination.confirmationCurrent(unit)?" / 已确认":" / 待本人确认");
+                var actual = player.server.getPlayerList().getPlayer(binding.pilot());
+                String kind = binding.kind().equals("npc") ? "npc" : actual == null ? "offline" : "player";
+                String name = kind.equals("player") ? actual.getName().getString() : "";
+                row += ":" + binding.role() + ":" + (coordination.confirmationCurrent(unit) ? "1" : "0")
+                        + ":" + kind + ":" + name;
             }
             participants.add(row);
         }
@@ -140,7 +141,7 @@ public final class StaffConversationR24
             sessions(player).remove(player.getUUID());
             SeeleNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new ClientboundStaffConversationPacket(
                     nonce, session.actor, -1, "NERV", "", "", false, false, false, false,
-                    "通话已结束。已经下达的指令会照常执行。", "", List.of()));
+                    "ops.projectseele.staff.call_ended_orders_already_issued_will_continue", "", List.of()));
             return;
         }
         long tick = player.server.getTickCount();
@@ -156,7 +157,7 @@ public final class StaffConversationR24
         if (tick - session.requestWindow >= 20) { session.requestWindow = tick; session.requestCount = 0; }
         if (++session.requestCount > 8)
         {
-            session.reply = "指令输入过快，请稍候再试。已有指令的状态仍显示在上方。";
+            session.reply = "ops.projectseele.staff.commands_are_arriving_too_quickly_try_again_shortly";
             if (tick - session.lastAction >= 5) { session.lastAction = tick; send(player, npc, session, false); }
             return;
         }
@@ -175,7 +176,7 @@ public final class StaffConversationR24
         {
             String[] choice=request.split(":");
             try{if(choice.length==3&&NervOutletControlsR53.TARGETS.contains(choice[2]))StaffCommandBookR24.request(player,npc,"deploy_"+choice[2],Integer.parseInt(choice[1]));}
-            catch(NumberFormatException invalid){session.reply="机体编号无效。";}
+            catch(NumberFormatException invalid){session.reply="ops.projectseele.nerv.invalid_unit_number";}
             return;
         }
         if(request.startsWith(StaffUndergroundChoiceR52.PREFIX))
@@ -187,7 +188,7 @@ public final class StaffConversationR24
                 {StaffCommandBookR24.request(player,npc,StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY,choice.unit());return;}
                 session.reply=StaffOperationsR48.undergroundDeploymentR52(player,npc,choice.unit()).message();
             }
-            catch(IllegalArgumentException error){session.reply="请选择有效的机体与地下部署方式。";}
+            catch(IllegalArgumentException error){session.reply="ops.projectseele.staff.select_a_valid_unit_and_an_underground_deployment";}
             send(player,npc,session,false);return;
         }
         if(request.startsWith("ARMEDSORTIE:")||request.startsWith("UNDERGROUND:"))
@@ -209,13 +210,13 @@ public final class StaffConversationR24
                 session.reply=result.message();
             }
             catch(IllegalArgumentException error)
-            {session.reply="请选择有效的机体、驾驶员和操作。";}
+            {session.reply="ops.projectseele.staff.select_a_valid_unit_pilot_and_operation";}
             send(player,npc,session,false);return;
         }
         if (request.equals("WEAPONS"))
         {
             if (!NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc, "weapons"))
-                session.reply = "武器部署由作战指挥下令。";
+                session.reply = "ops.projectseele.staff.combat_command_authorizes_weapons_deployment";
             else
             {
                 var eva = EvaPilotResolver.controlTarget(player);
@@ -225,30 +226,31 @@ public final class StaffConversationR24
                         rack->rack.payloadR47()==com.projectseele.entity.EvaUnit01Entity.WEAPON_RIFLE&&!TvMissionEquipmentR45.missionRack(rack)).stream()
                         .min(Comparator.comparingDouble(rack->rack.position().subtract(centre).horizontalDistanceSqr())).orElse(null);
                 session.reply = station != null && station.deploy()
-                        ? "就近武器井正在升起，坐标：" + station.blockPosition().toShortString() + "。"
-                        : "附近没有可部署的武器井，或武器井已展开。";
+                        ? OperationText.format("ops.projectseele.staff.silo_coordinates", station.blockPosition().toShortString())
+                        : "ops.projectseele.staff.no_deployable_weapons_silo_is_nearby_or_the";
             }
             send(player, npc, session, false); return;
         }
         if(request.equals("WEAPONS:shield")||request.equals("WEAPONS:sword"))
         {
-            if(!NervStaffDialogue.authorized(player)||!StaffAuthorityR25.allows(npc,"weapons"))session.reply="专用武器井部署请联络作战指挥。";
+            if(!NervStaffDialogue.authorized(player)||!StaffAuthorityR25.allows(npc,"weapons"))session.reply="ops.projectseele.staff.contact_combat_command_to_deploy_a_dedicated_weapons";
             else
             {
                 boolean shield=request.endsWith("shield");
                 int payload=shield?com.projectseele.entity.EvaUnit01Entity.WEAPON_SHIELD_R45:com.projectseele.entity.EvaUnit01Entity.WEAPON_SWORD_R45;
                 var station=EquipmentVaultsR47.recordedStationR47(player.serverLevel(),payload);
-                String purpose=shield?"零号机专用盾井":"二号机专用长剑井";
-                session.reply=station==null?purpose+"信号尚未接通，请稍后查看。"
-                        :station.deploy()?purpose+"正在升起，坐标："+station.blockPosition().toShortString()+"。"
-                        :station.isReadyAndStocked()?purpose+"已展开，等待对应机体领取。"
-                        :!station.isStocked()?purpose+"当前空载，请联系整备部门。":purpose+"仍在进行机械作业，请保持净空。";
+                Component purpose = Component.translatable(shield ? "ops.projectseele.staff.shield_silo" : "ops.projectseele.staff.sword_silo");
+                session.reply = station == null ? OperationText.format("ops.projectseele.staff.silo_offline", purpose)
+                        : station.deploy() ? OperationText.format("ops.projectseele.staff.silo_rising", purpose, station.blockPosition().toShortString())
+                        : OperationText.format(station.isReadyAndStocked() ? "ops.projectseele.staff.silo_ready"
+                                : !station.isStocked() ? "ops.projectseele.staff.silo_empty"
+                                : "ops.projectseele.staff.silo_moving", purpose);
             }
             send(player,npc,session,false);return;
         }
         if(request.startsWith("TRANSPORT:"))
         {
-            if(!NervStaffDialogue.authorized(player)||!StaffAuthorityR25.commandContact(npc))session.reply="本岗位无权调度运输机，请联络指挥或技术负责人。";
+            if(!NervStaffDialogue.authorized(player)||!StaffAuthorityR25.commandContact(npc))session.reply="ops.projectseele.staff.this_station_cannot_dispatch_transport_aircraft_contact_command";
             else try
             {
                 String[] parts=request.split(":");
@@ -266,10 +268,10 @@ public final class StaffConversationR24
                         yield NervAirTransportRuntimeR52.requestRecoveryReceiver(player,Integer.parseInt(parts[2]),parts[3]);
                     }
                     case "deliver" -> parts.length==6?NervAirTransportRuntimeR52.requestXYZ(player,Integer.parseInt(parts[2]),Integer.parseInt(parts[3]),Integer.parseInt(parts[4]),Integer.parseInt(parts[5])):NervAirLiftR30.request(player,Integer.parseInt(parts[2]),false,Integer.parseInt(parts[3]),Integer.parseInt(parts[4]));
-                    default -> "请选择运输操作。";
+                    default -> "ops.projectseele.staff.select_a_transport_operation";
                 };
             }
-            catch(IllegalArgumentException|IndexOutOfBoundsException error){session.reply="请填写有效的机体编号与整数 X、Y、Z 坐标。";}
+            catch(IllegalArgumentException|IndexOutOfBoundsException error){session.reply="ops.projectseele.staff.enter_a_valid_unit_number_and_integer_x";}
             send(player,npc,session,false);return;
         }
         if(request.startsWith("PILOTCHAT:"))
@@ -281,8 +283,7 @@ public final class StaffConversationR24
                 EvaLogisticsDirector.loadControlTarget(player.serverLevel(),unit);
                 var pilot=TrainingPilotDirector.existingPilotR45(player.serverLevel(),unit);
                 session.pilotContact=-1;
-                session.reply=com.projectseele.entity.TrainingPilotEntity.pilotName(unit)+"："
-                        +(pilot==null?"频道待接入。":PilotRadioR28.chat(player,pilot));
+                session.reply=StaffDialogueCatalogR24.pilotReply(unit, pilot == null ? "dialogue.projectseele.awaiting_channel" : PilotRadioR28.chat(player,pilot));
                 send(player,npc,session,false);return;
             }
             catch(NumberFormatException ignored){return;}
@@ -296,7 +297,7 @@ public final class StaffConversationR24
                 if (request.startsWith("BOARD:") || request.startsWith("STANDBY:"))
                 {
                     if (!NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc, "board"))
-                        session.reply = "本岗位无权调遣驾驶员，请联络美里、律子或冬月。";
+                        session.reply = "ops.projectseele.staff.this_station_cannot_dispatch_pilots_contact_misato_ritsuko";
                     else
                     {
                         session.reply = request.startsWith("STANDBY:")
@@ -321,14 +322,14 @@ public final class StaffConversationR24
     {
         EvaLogisticsDirector.loadControlTarget(player.serverLevel(),unit);
         var pilot=TrainingPilotDirector.existingPilotR45(player.serverLevel(),unit);
-        return com.projectseele.entity.TrainingPilotEntity.pilotName(unit)+"："+(pilot==null?"频道待接入。":PilotRadioR28.response(player,pilot,false));
+        return StaffDialogueCatalogR24.pilotReply(unit, pilot == null ? "dialogue.projectseele.awaiting_channel" : PilotRadioR28.response(player,pilot,false));
     }
 
     public static int contact(ServerPlayer player, String name)
     {
         if (!radioAllowed(player))
         {
-            player.sendSystemMessage(Component.literal("请携带 NERV 通行证和卫星电话，或在指挥台附近、已登上的插入栓及机体内使用指挥通信。")); return 0;
+            player.sendSystemMessage(Component.translatable("message.projectseele.phone.requirements")); return 0;
         }
         String contactName = name.strip().toLowerCase(Locale.ROOT).replaceFirst("^dummy[ :：]*", "");
         int pilot = switch (contactName)
@@ -340,7 +341,7 @@ public final class StaffConversationR24
         };
         if (pilot >= 0)
         {
-            player.sendSystemMessage(Component.literal(pilotStatus(player, pilot)));
+            player.sendSystemMessage(StaffDialogueCatalogR24.replyComponent(pilotStatus(player, pilot)));
             return 1;
         }
         String skin = switch (contactName)
@@ -351,13 +352,13 @@ public final class StaffConversationR24
             case "摩耶", "伊吹摩耶", "maya" -> "maya";
             default -> "";
         };
-        if (skin.isEmpty()) { player.sendSystemMessage(Component.literal("可联络：美里、律子、冬月、摩耶。")); return 0; }
+        if (skin.isEmpty()) { player.sendSystemMessage(Component.translatable("message.projectseele.phone.contacts")); return 0; }
         var pending=PENDING.computeIfAbsent(player.server, key -> new HashMap<>());
         if (connect(player, skin)) { pending.remove(player.getUUID()); return 1; }
         var previous=pending.get(player.getUUID());
         if(previous!=null&&previous.skin().equals(skin))return 1;
         pending.put(player.getUUID(), new Pending(skin, System.nanoTime() + 10_000_000_000L));
-        player.sendSystemMessage(Component.literal("正在连接指挥频道……")); return 1;
+        player.sendSystemMessage(Component.translatable("message.projectseele.phone.connecting")); return 1;
     }
 
     private static boolean connect(ServerPlayer player, String skin)
@@ -402,7 +403,7 @@ public final class StaffConversationR24
             if (connect(player, entry.getValue().skin())) { pending.remove(entry.getKey()); continue; }
             if (System.nanoTime() > entry.getValue().until())
             {
-                pending.remove(entry.getKey()); player.sendSystemMessage(Component.literal("该岗位暂时无法接通，请稍后再试。"));
+                pending.remove(entry.getKey()); player.sendSystemMessage(Component.translatable("message.projectseele.phone.unavailable"));
             }
         }
     }

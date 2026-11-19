@@ -55,7 +55,7 @@ public final class PlugChatSourceR64
     /** What a player's name may not be taken for. */
     private static final Set<String> TAKEN = new HashSet<>();
     /** What marks a post or a control room, not a person, in a speaker's place. */
-    private static final String[] POSTS = {"NERV", "MAGI", "管制", "联络", "机库", "休息室"};
+    private static final String[] POSTS = {"NERV", "MAGI", "管制", "联络", "机库", "休息室", "Underground Transport Control", "Underground recovery control", "Underground transport control"};
 
     static
     {

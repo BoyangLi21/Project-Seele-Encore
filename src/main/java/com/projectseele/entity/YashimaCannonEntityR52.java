@@ -1,5 +1,6 @@
 package com.projectseele.entity;
 
+import com.projectseele.world.OperationText;
 import com.projectseele.world.TvYashimaStationR52;
 import net.minecraft.nbt.*;
 import net.minecraft.network.protocol.Packet;
@@ -132,7 +133,7 @@ public final class YashimaCannonEntityR52 extends Entity
     @Override protected void addAdditionalSaveData(CompoundTag tag)
     {tag.put("GunGeometryR52",entityData.get(GEOMETRY).copy());tag.put("GunCradleR52",entityData.get(CRADLE).copy());var a=new ListTag();var q=entityData.get(AIM);for(float v:new float[]{q.x,q.y,q.z,q.w})a.add(FloatTag.valueOf(v));tag.put("GunAimR52",a);tag.putBoolean("GunLoadedR52",loadedR52());tag.putBoolean("GunReadyR52",readyR52());}
     @Override public InteractionResult interact(Player player,InteractionHand hand)
-    {if(hand!=InteractionHand.MAIN_HAND)return InteractionResult.PASS;if(level().isClientSide)return InteractionResult.SUCCESS;if(player instanceof net.minecraft.server.level.ServerPlayer operator){operator.sendSystemMessage(net.minecraft.network.chat.Component.literal(TvYashimaStationR52.interact(operator,this)));return InteractionResult.CONSUME;}return InteractionResult.PASS;}
+    {if(hand!=InteractionHand.MAIN_HAND)return InteractionResult.PASS;if(level().isClientSide)return InteractionResult.SUCCESS;if(player instanceof net.minecraft.server.level.ServerPlayer operator){operator.sendSystemMessage(OperationText.read(TvYashimaStationR52.interact(operator,this)));return InteractionResult.CONSUME;}return InteractionResult.PASS;}
     @Override public boolean isPickable(){return loadedR52()&&readyR52();}
     @Override public boolean isPushable(){return false;}
     @Override public boolean canBeCollidedWith(){return geometryR52()!=null&&cradleR52()!=null;}

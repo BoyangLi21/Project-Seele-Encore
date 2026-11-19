@@ -43,14 +43,14 @@ public final class UNAirLiftR29
             {
                 CompoundTag t=new CompoundTag();t.putInt("Serial",j.serial);t.putUUID("Owner",j.owner);t.putUUID("Unit",j.unit);if(j.plug!=null)t.putUUID("Plug",j.plug);if(j.plane!=null)t.putUUID("Plane",j.plane);t.putString("Phase",j.phase.name());put(t,"From",j.from);put(t,"To",j.to);put(t,"Destination",j.destination);put(t,"Pickup",j.pickup);put(t,"PlanePosition",j.planePosition);put(t,"GroundOffsetR40",j.groundOffset);t.putInt("Age",j.age);t.putInt("Duration",j.duration);t.putInt("Total",j.total);t.putBoolean("Homebound",j.homebound);t.putBoolean("GroundOnly",j.groundOnly);t.putBoolean("Crew",j.crew);t.putBoolean("Cancel",j.cancel);t.putBoolean("Carrying",j.carrying);t.putString("Note",j.note);t.putLong("NextReportR39",j.nextReport);t.putBoolean("TouchdownR40",j.touchdown);if(Float.isFinite(j.landingYaw))t.putFloat("LandingYawR40",j.landingYaw);list.add(t);
             }
-            tag.put("Jobs",list);for(int i=0;i<2;i++){if(carts.containsKey(i))tag.putUUID("Cart"+i,carts.get(i));if(cartPositions.containsKey(i))tag.putLong("CartPos"+i,cartPositions.get(i).asLong());tag.putString("Last"+i,last.getOrDefault(i,"待命"));}return tag;
+            tag.put("Jobs",list);for(int i=0;i<2;i++){if(carts.containsKey(i))tag.putUUID("Cart"+i,carts.get(i));if(cartPositions.containsKey(i))tag.putLong("CartPos"+i,cartPositions.get(i).asLong());tag.putString("Last"+i,last.getOrDefault(i,"ops.projectseele.airlift.standby"));}return tag;
         }
     }
     private static final class Job
     {
         long nextReport;int serial,age,duration,total,loadCursor,missing,planeMissing,contactTicks;boolean touchdown;float landingYaw=Float.NaN;UUID owner,unit,plug,plane;Phase phase=Phase.PREPARE;
         Vec3 from=Vec3.ZERO,to=Vec3.ZERO,destination=Vec3.ZERO,pickup=Vec3.ZERO,planePosition=Vec3.ZERO,groundOffset=Vec3.ZERO;
-        boolean homebound,crew,cancel,carrying,rebase,paused,siteReady,groundOnly,tilting;String note="正在定位机体";CompletableFuture<?> loading;Vec3 waitAt;
+        boolean homebound,crew,cancel,carrying,rebase,paused,siteReady,groundOnly,tilting;String note="ops.projectseele.airlift.locating";CompletableFuture<?> loading;Vec3 waitAt;
     }
     private static void put(CompoundTag tag,String key,Vec3 v){tag.putDouble(key+"X",v.x);tag.putDouble(key+"Y",v.y);tag.putDouble(key+"Z",v.z);}
     private static Vec3 read(CompoundTag tag,String key){return new Vec3(tag.getDouble(key+"X"),tag.getDouble(key+"Y"),tag.getDouble(key+"Z"));}
@@ -64,7 +64,7 @@ public final class UNAirLiftR29
         var job=s.jobs.remove(serial);if(job==null)return;
         var aircraft=ServiceAircraftR32.find(l,job.plane);if(aircraft!=null)aircraft.discard();
         if(ServiceAircraftR32.payload(l,job.unit) instanceof EvaPrototypeEntity eva){eva.endNervCarrierMotion();EvaAirTransportR31.hold(eva);eva.getPersistentData().putBoolean("UNTransportAutoload",false);}
-        s.last.put(serial,"运输已由管理员维护复位接管");s.setDirty();
+        s.last.put(serial,"ops.projectseele.airlift.reset_takeover");s.setDirty();
     }
     public static String phaseName(ServerLevel l,int serial){var j=state(l).jobs.get(serial);return j==null?"IDLE":j.phase.name();}
     public static boolean ownsMotion(ServerLevel l,int serial)
@@ -81,28 +81,28 @@ public final class UNAirLiftR29
     {return eva.level() instanceof ServerLevel l&&active(l,eva.getUNSerial())&&eva.getPersistentData().getBoolean("UNTransportAutoload")&&eva.getUUID().equals(UNRecoveryR22.identity(l,eva.getUNSerial()));}
     public static String status(ServerLevel l,int serial)
     {
-        var j=state(l).jobs.get(serial);if(j==null)return state(l).last.getOrDefault(serial,"运输机待命");
-        return j.note+" · "+(j.homebound?"返回联合国基地":"目的地 "+Math.round(j.destination.x)+" / "+Math.round(j.destination.z));
+        var j=state(l).jobs.get(serial);if(j==null)return state(l).last.getOrDefault(serial,"ops.projectseele.airlift.aircraft_standby");
+        return OperationText.format("ops.projectseele.airlift.status", OperationText.read(j.note), j.homebound ? OperationText.read("ops.projectseele.airlift.homebound") : Component.translatable("ops.projectseele.airlift.destination", Math.round(j.destination.x), Math.round(j.destination.z)));
     }
     public static String request(ServerPlayer player,int serial,boolean homebound,int x,int z)
     {
-        ServerLevel l=player.serverLevel();var s=state(l);if(s.jobs.containsKey(serial))return "这台机体已有运输任务，请先查看状态。";
-        UUID unit=UNRecoveryR22.identity(l,serial);if(unit==null)return "这台 UN 机体尚未登记，无法安排运输。";
-        if(x< -29999000||x>29999000||z< -29999000||z>29999000||!l.getWorldBorder().isWithinBounds(new BlockPos(x,80,z)))return "目标超出世界边界。";
+        ServerLevel l=player.serverLevel();var s=state(l);if(s.jobs.containsKey(serial))return "ops.projectseele.airlift.busy";
+        UUID unit=UNRecoveryR22.identity(l,serial);if(unit==null)return "ops.projectseele.airlift.unregistered";
+        if(x< -29999000||x>29999000||z< -29999000||z>29999000||!l.getWorldBorder().isWithinBounds(new BlockPos(x,80,z)))return "ops.projectseele.airlift.bounds";
         var j=new Job();j.serial=serial;j.owner=player.getUUID();j.unit=unit;j.homebound=homebound;j.destination=homebound?reception(l,serial):new Vec3(x+.5,0,z+.5);
-        if(s.jobs.values().stream().anyMatch(other->other.destination.distanceToSqr(j.destination)<70*70))return "另一架运输机正在使用附近空域，请选择稍远的投放点。";
-        var eva=l.getEntity(unit);if(eva instanceof EvaUnit01Entity repairing&&EvaBayRepairR33.active(repairing))return "机体正在检修，暂时不能起运。";j.crew=eva instanceof EvaPrototypeEntity e&&e.getPilotEntity()==player;
-        if(eva instanceof EvaPrototypeEntity e&&e.getPilotEntity()!=null&&e.getPilotEntity()!=player)return "该机体由另一名驾驶员控制，请由驾驶员本人呼叫运输。";
-        s.jobs.put(serial,j);s.setDirty();return "运输指令已接受。正在加载机体与目的地，随后检查落点和机库联锁。";
+        if(s.jobs.values().stream().anyMatch(other->other.destination.distanceToSqr(j.destination)<70*70))return "ops.projectseele.airlift.airspace_busy";
+        var eva=l.getEntity(unit);if(eva instanceof EvaUnit01Entity repairing&&EvaBayRepairR33.active(repairing))return "ops.projectseele.airlift.repair";j.crew=eva instanceof EvaPrototypeEntity e&&e.getPilotEntity()==player;
+        if(eva instanceof EvaPrototypeEntity e&&e.getPilotEntity()!=null&&e.getPilotEntity()!=player)return "ops.projectseele.airlift.pilot_only";
+        s.jobs.put(serial,j);s.setDirty();return "ops.projectseele.airlift.accepted";
     }
 
     public static String cancel(ServerPlayer player,int serial)
     {
-        var s=state(player.serverLevel());var j=s.jobs.get(serial);if(j==null)return "没有正在执行的运输。";
-        if(!j.owner.equals(player.getUUID())&&!player.hasPermissions(2))return "只有下达指令的人或管理员可以取消这次运输。";
-        if(j.phase==Phase.PREPARE){if(player.serverLevel().getEntity(j.unit) instanceof EvaPrototypeEntity eva)eva.getPersistentData().putBoolean("UNTransportAutoload",false);s.jobs.remove(serial);s.last.put(serial,"已取消；已经启动的机库机械会照常完成当前动作");s.setDirty();return s.last.get(serial);}
-        if(j.phase==Phase.RETREAT||j.phase==Phase.RETURN_FLIGHT)return "机体已安全卸载，运输机正在返航。";
-        j.cancel=true;s.setDirty();return "已收到取消指令，将先安全返回基地，不会在空中释放机体。";
+        var s=state(player.serverLevel());var j=s.jobs.get(serial);if(j==null)return "ops.projectseele.airlift.no_job";
+        if(!j.owner.equals(player.getUUID())&&!player.hasPermissions(2))return "ops.projectseele.airlift.cancel_owner";
+        if(j.phase==Phase.PREPARE){if(player.serverLevel().getEntity(j.unit) instanceof EvaPrototypeEntity eva)eva.getPersistentData().putBoolean("UNTransportAutoload",false);s.jobs.remove(serial);s.last.put(serial,"ops.projectseele.airlift.cancel_pending");s.setDirty();return s.last.get(serial);}
+        if(j.phase==Phase.RETREAT||j.phase==Phase.RETURN_FLIGHT)return "ops.projectseele.airlift.unloaded";
+        j.cancel=true;s.setDirty();return "ops.projectseele.airlift.returning_safely";
     }
     public static Vec3 apron(ServerLevel level,int serial){return UNRecoveryR22.home(level,serial).add(0,DECK,104);}
     private static final Map<ServerLevel,Map<Integer,Vec3>> RECEIVING_PADS=new WeakHashMap<>();
@@ -157,26 +157,26 @@ public final class UNAirLiftR29
     public static String requestDock(ServerPlayer player,int serial)
     {
         var l=player.serverLevel();var s=state(l);
-        if(active(l,serial))return "请先等待当前运输结束。";
+        if(active(l,serial))return "ops.projectseele.airlift.wait_current";
         UUID id=UNRecoveryR22.identity(l,serial);
-        if(id==null)return "这台机体尚未登记。";
-        if(!(l.getEntity(id) instanceof EvaPrototypeEntity eva))return "正在定位机体，请刷新状态后重试。";
-        if(eva.getPilotEntity()!=null&&eva.getPilotEntity()!=player)return "请由当前驾驶员本人请求入库。";
-        if(eva.position().distanceTo(apron(l,serial))>8&&!atReception(eva)&&!eva.isInsideTestHangar()&&!heldOnGround(eva))return "机体尚未抵达库外接应平台，请先呼叫运输机回收。";
+        if(id==null)return "ops.projectseele.airlift.no_unit";
+        if(!(l.getEntity(id) instanceof EvaPrototypeEntity eva))return "ops.projectseele.airlift.locate_retry";
+        if(eva.getPilotEntity()!=null&&eva.getPilotEntity()!=player)return "ops.projectseele.airlift.pilot_dock_only";
+        if(eva.position().distanceTo(apron(l,serial))>8&&!atReception(eva)&&!eva.isInsideTestHangar()&&!heldOnGround(eva))return "ops.projectseele.airlift.approach_apron";
         var j=new Job();j.serial=serial;j.owner=player.getUUID();j.unit=id;j.groundOnly=true;j.homebound=true;j.crew=eva.getPilotEntity()==player;
-        s.jobs.put(serial,j);s.setDirty();return "库外接应已确认。等待机库排液、开门后，由地面载台送回库位。";
+        s.jobs.put(serial,j);s.setDirty();return "ops.projectseele.airlift.ground_pickup";
     }
     /** Ordinary recall uses the existing physical flight/intake routes, never home teleport. */
     public static String requestRecoveryR47(ServerPlayer player,int serial)
     {
         var level=player.serverLevel();
-        if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return "请在第三新东京市呼叫 UN 回收。";
-        if(active(level,serial))return "机体的运输任务仍在执行，请等待安全返回。";
+        if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return "ops.projectseele.airlift.wrong_dimension";
+        if(active(level,serial))return "ops.projectseele.airlift.await_return";
         UUID id=UNRecoveryR22.identity(level,serial);
         if(id!=null&&ServiceAircraftR32.payload(level,id) instanceof EvaPrototypeEntity eva)
         {
             if(eva.position().distanceTo(UNRecoveryR22.home(level,serial))<5&&!waitingForDock(eva)&&!heldOnGround(eva))
-                return "机体已在机库；请先离开插入栓，机体空载后才能维护复位。";
+                return "ops.projectseele.airlift.disembark_maintenance";
             if(eva.position().distanceTo(apron(level,serial))<=8||atReception(eva)||heldOnGround(eva))
                 return requestDock(player,serial);
         }
@@ -232,7 +232,7 @@ public final class UNAirLiftR29
         var p=l.getServer().getPlayerList().getPlayer(j.owner);
         Vec3 at=j.planePosition;
         if(j.plane==null){var known=UNRecoveryR22.lastKnownPosition(l,j.unit);if(known!=null)at=Vec3.atCenterOf(known);}
-        if(p!=null)p.sendSystemMessage(Component.literal("[UN 运输管制 · 0"+j.serial+"] "+BlockPos.containing(at).toShortString()+" · "+j.note));
+        if(p!=null)p.sendSystemMessage(Component.translatable("ops.projectseele.airlift.report", j.serial, BlockPos.containing(at).toShortString(), OperationText.read(j.note)));
     }
     private static boolean cruisePhase(Phase phase)
     {return phase==Phase.CRUISE||phase==Phase.FERRY||phase==Phase.RETURN_FLIGHT;}
@@ -247,7 +247,7 @@ public final class UNAirLiftR29
         if(phase==Phase.DESCEND){j.touchdown=false;j.contactTicks=0;EvaAirTransportR31.transition(eva,0,1,Math.max(40,j.duration*2/3));}
         if(phase==Phase.RELEASE&&EvaAirTransportR31.active(eva))EvaAirTransportR31.release(eva,j.duration);
         if(movesEva(phase)){eva.setNervLogisticsLocked(true);eva.setNoGravity(true);eva.beginNervCarrierMotion(from,to,j.duration);}
-        note(l,j,switch(phase){case GROUND_LIFT->"自行载台升起";case ROLL_OUT->"机体正在移至库外吊装点";case FERRY->"运输机前往接载点";case APPROACH->"运输机下降，展开吊装架";case CLAMP->"夹具接触，正在固定肩部、腰部和双腿";case ASCEND->"机体离地，运输鞍座收平";case CRUISE->"机体已横置固定，运输机巡航中";case DESCEND->"抵达目标，鞍座翻转后垂直下放";case RELEASE->"接地，解除夹具";case GROUND_APPROACH->"接应载台驶入机库转运通道";case ROLL_IN->"自行载台将机体送回库位";case GROUND_LOWER->"机体落座所属机库";case RETREAT,RETURN_FLIGHT->"机体已交付，运输机返航";default->"运输准备中";});
+        note(l,j,switch(phase){case GROUND_LIFT->"ops.projectseele.airlift.carrier_rising";case ROLL_OUT->"ops.projectseele.airlift.moving_to_hook";case FERRY->"ops.projectseele.airlift.approach_aircraft";case APPROACH->"ops.projectseele.airlift.lower_frame";case CLAMP->"ops.projectseele.airlift.secure_clamps";case ASCEND->"ops.projectseele.airlift.lift_clear";case CRUISE->"ops.projectseele.airlift.cruising";case DESCEND->"ops.projectseele.airlift.set_down";case RELEASE->"ops.projectseele.airlift.release_clamps";case GROUND_APPROACH->"ops.projectseele.airlift.cart_arrival";case ROLL_IN->"ops.projectseele.airlift.roll_in";case GROUND_LOWER->"ops.projectseele.airlift.lower_home";case RETREAT,RETURN_FLIGHT->"ops.projectseele.airlift.aircraft_return";default->"ops.projectseele.airlift.preparing";});
     }
     private static boolean movesEva(Phase p){return switch(p){case GROUND_LIFT,ROLL_OUT,ASCEND,CRUISE,DESCEND,GROUND_APPROACH,ROLL_IN,GROUND_LOWER->true;default->false;};}
     private static int duration(Vec3 a,Vec3 b){return AirRouteR39.duration(a,b);}
@@ -267,13 +267,13 @@ public final class UNAirLiftR29
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
         if(event.phase!=TickEvent.Phase.END)return;var l=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return;var s=state(l);if(s.jobs.isEmpty())return;l.resetEmptyTime();
-        for(var j:new ArrayList<>(s.jobs.values()))try{advance(l,s,j);report(l,j);}catch(Exception error){j.phase=Phase.HOLD;if(l.getEntity(j.unit) instanceof EvaUnit01Entity held){held.endNervCarrierMotion();EvaAirTransportR31.hold(held);}j.note="运输暂停："+error.getMessage();s.setDirty();ProjectSeele.LOGGER.error("UN airlift held serial={}",j.serial,error);}
+        for(var j:new ArrayList<>(s.jobs.values()))try{advance(l,s,j);report(l,j);}catch(Exception error){j.phase=Phase.HOLD;if(l.getEntity(j.unit) instanceof EvaUnit01Entity held){held.endNervCarrierMotion();EvaAirTransportR31.hold(held);}j.note=OperationText.format("ops.projectseele.airlift.held", OperationText.read(String.valueOf(error.getMessage())));s.setDirty();ProjectSeele.LOGGER.error("UN airlift held serial={}",j.serial,error);}
     }
     private static void advance(ServerLevel l,State s,Job j)
     {
         BlockPos last=UNRecoveryR22.lastKnownPosition(l,j.unit);retain(l,last==null?BlockPos.containing(UNRecoveryR22.home(l,j.serial)):last,3);retain(l,BlockPos.containing(UNRecoveryR22.home(l,j.serial)),j.phase==Phase.PREPARE?6:3);
         if(!(ServiceAircraftR32.payload(l,j.unit) instanceof EvaPrototypeEntity eva))
-        {if(++j.missing>600){j.phase=Phase.HOLD;note(l,j,"机体未能加载，请由管理员检查登记或执行维护复位");s.setDirty();}return;}
+        {if(++j.missing>600){j.phase=Phase.HOLD;note(l,j,"ops.projectseele.airlift.load_failure");s.setDirty();}return;}
         // Keep the persisted clamp/deployment state. CLAMP is attached before
         // Job.carrying becomes true, and ids are different after a reload.
         var bound=ServiceAircraftR32.find(l,j.plane);
@@ -286,8 +286,8 @@ public final class UNAirLiftR29
         if(j.groundOnly){advanceGround(l,s,j,eva,plug);return;}
         var owner=l.getServer().getPlayerList().getPlayer(j.owner);
         if(j.phase==Phase.RETREAT||j.phase==Phase.RETURN_FLIGHT)j.crew=false;
-        if(eva.getPilotEntity()!=null&&(owner==null||eva.getPilotEntity()!=owner)){if(!j.crew)throw new IllegalStateException("机体已由其他驾驶员占用");}
-        if(j.crew&&owner==null){eva.endNervCarrierMotion();eva.setDeltaMovement(Vec3.ZERO);if(!j.paused)EvaAirTransportR31.hold(eva);j.paused=true;note(l,j,"驾驶员离线，保持位置等待通信恢复");s.setDirty();return;}
+        if(eva.getPilotEntity()!=null&&(owner==null||eva.getPilotEntity()!=owner)){if(!j.crew)throw new IllegalStateException("ops.projectseele.airlift.occupied");}
+        if(j.crew&&owner==null){eva.endNervCarrierMotion();eva.setDeltaMovement(Vec3.ZERO);if(!j.paused)EvaAirTransportR31.hold(eva);j.paused=true;note(l,j,"ops.projectseele.airlift.pilot_offline");s.setDirty();return;}
         if(j.crew&&owner!=null&&eva.getPilotEntity()!=owner)
         {
             if(owner.level()!=l||owner.isPassenger()||owner.distanceToSqr(eva)>128*128)j.crew=false;
@@ -295,31 +295,31 @@ public final class UNAirLiftR29
             else if(plug!=null&&!plug.isVehicle())plug.boardPassenger(owner);
         }
         if(j.paused){j.paused=false;j.rebase=true;}
-        if(j.phase!=Phase.HOLD&&j.total++>24000)throw new IllegalStateException("运输超时，机体保持锁定等待处置");
+        if(j.phase!=Phase.HOLD&&j.total++>24000)throw new IllegalStateException("ops.projectseele.airlift.timeout");
         if(j.phase==Phase.PREPARE)
         {
             if(j.homebound&&eva.position().distanceTo(UNRecoveryR22.home(l,j.serial))<4)
-            {s.jobs.remove(j.serial);s.last.put(j.serial,"机体已在所属机库，无需运输回收");s.setDirty();return;}
-            if(!loadLanding(l,j)){note(l,j,"正在逐批加载目标空域");return;}
+            {s.jobs.remove(j.serial);s.last.put(j.serial,"ops.projectseele.airlift.already_home");s.setDirty();return;}
+            if(!loadLanding(l,j)){note(l,j,"ops.projectseele.airlift.load_airspace");return;}
             if(!j.siteReady)
             {
                 Vec3 at=j.homebound?reception(l,j.serial):landing(l,j.destination,eva);
-                if(at==null){s.jobs.remove(j.serial);s.last.put(j.serial,"落点及邻近地面没有足够净空，请选择开阔位置");note(l,j,s.last.get(j.serial));s.setDirty();return;}
-                j.destination=at;j.siteReady=true;note(l,j,"落点确认："+BlockPos.containing(at).toShortString());
+                if(at==null){s.jobs.remove(j.serial);s.last.put(j.serial,"ops.projectseele.airlift.no_landing");note(l,j,s.last.get(j.serial));s.setDirty();return;}
+                j.destination=at;j.siteReady=true;note(l,j,OperationText.format("ops.projectseele.airlift.site", BlockPos.containing(at).toShortString()));
             }
-            if(eva.isInsideTestHangar()&&!openBase(l,j.serial)){note(l,j,"等待机库排液与舱门开启");return;}
-            if(eva.isUNFlying()){eva.landUNFlight();note(l,j,"等待 EVA-UN-01 降落后接载");return;}
+            if(eva.isInsideTestHangar()&&!openBase(l,j.serial)){note(l,j,"ops.projectseele.airlift.open_hangar");return;}
+            if(eva.isUNFlying()){eva.landUNFlight();note(l,j,"ops.projectseele.airlift.await_landing");return;}
             if(!j.homebound&&!EvaShutdownR30.wreck(eva)&&UNPlugDirector.atDock(eva))
             {
-                if(plug==null){note(l,j,"等待插入栓加载");return;}
-                if(!plug.isLockedToEva()){UNPlugDirector.prepareEmptyForTransport(eva);note(l,j,"吊机正在接入插入栓");return;}
+                if(plug==null){note(l,j,"ops.projectseele.airlift.load_plug");return;}
+                if(!plug.isLockedToEva()){UNPlugDirector.prepareEmptyForTransport(eva);note(l,j,"ops.projectseele.airlift.inserting");return;}
                 if(eva.getPersistentData().getInt("UNSequenceTicks")<60)return;
             }
             // Recovery carries the airframe even after ejection. The independent
             // original capsule stays at its actual dock/escape location; never create a replacement.
-            if(j.crew&&(plug==null||!plug.isLockedToEva())){note(l,j,"等待驾驶员完成插入栓接入");return;}
+            if(j.crew&&(plug==null||!plug.isLockedToEva())){note(l,j,"ops.projectseele.airlift.await_pilot");return;}
             if(plug!=null&&(plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_INSERTING||plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_EJECTING||plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_FIELD_EJECTING))
-            {note(l,j,"等待插入栓机械动作完成后接载");return;}
+            {note(l,j,"ops.projectseele.airlift.await_plug");return;}
             if(!eva.isInsideTestHangar())
             {
                 String problem=TransportClearanceR30.pickupProblem(l,eva);
@@ -340,7 +340,7 @@ public final class UNAirLiftR29
         retain(l,BlockPos.containing(j.planePosition),3);var plane=ServiceAircraftR32.find(l,j.plane);
         if(plane==null)
         {
-            if(++j.planeMissing>600){j.phase=Phase.HOLD;eva.endNervCarrierMotion();lock(eva);note(l,j,"运输机信号丢失，保持机体位置；请管理员检查或维护复位");s.setDirty();}
+            if(++j.planeMissing>600){j.phase=Phase.HOLD;eva.endNervCarrierMotion();lock(eva);note(l,j,"ops.projectseele.airlift.lost_aircraft");s.setDirty();}
             return;
         }
         j.planeMissing=0;
@@ -374,7 +374,7 @@ public final class UNAirLiftR29
         if(cruisePhase(j.phase))AirRouteR39.prefetch(l,j.from,j.to,j.age,j.duration);
         j.age++;double t=smooth(Mth.clamp((double)j.age/Math.max(1,j.duration),0,1));Vec3 point=j.from.lerp(j.to,t);
         if(!readyAt(l,point))
-        {j.age--;if(movesEva(j.phase)){eva.endNervCarrierMotion();}note(l,j,"前方区块正在加载，保持位置");s.setDirty();return;}
+        {j.age--;if(movesEva(j.phase)){eva.endNervCarrierMotion();}note(l,j,"ops.projectseele.airlift.load_path");s.setDirty();return;}
         if(movesEva(j.phase))
         {
             lock(eva);
@@ -383,7 +383,7 @@ public final class UNAirLiftR29
             // Sweep the restrained model's measured parts, preserving the
             // dorsal walkway that lies outside the actual chest and shoulders.
             float yaw=eva.getYRot();if(j.phase==Phase.CRUISE){Vec3 d=j.to.subtract(j.from);float target=(float)Math.toDegrees(Math.atan2(-d.x,d.z));yaw=Mth.approachDegrees(yaw,target,2.5F);}else if(j.phase==Phase.DESCEND&&Float.isFinite(j.landingYaw))yaw=Mth.approachDegrees(yaw,j.landingYaw,2.5F);else if(j.phase==Phase.ROLL_IN||j.phase==Phase.ROLL_OUT)yaw=Mth.approachDegrees(yaw,0,2.5F);
-            if(!(j.carrying?AirCradleClearanceR31.clear(eva,wanted,yaw):UNCarrierClearanceR30.clear(eva,wanted)))throw new IllegalStateException("运输路径受阻，停在 "+eva.blockPosition().toShortString());
+            if(!(j.carrying?AirCradleClearanceR31.clear(eva,wanted,yaw):UNCarrierClearanceR30.clear(eva,wanted)))throw new IllegalStateException(OperationText.format("ops.projectseele.airlift.blocked", eva.blockPosition().toShortString()));
             Vec3 previous=eva.position();eva.moveOnNervCarrier(point.x,point.y,point.z,yaw);
             eva.publishAirCarrierFrameR39(previous,point);
             if(j.carrying){plane.setPos(point.x,point.y+OFFSET,point.z);plane.setYRot(yaw);plane.cargo(eva.getId(),true,1);}
@@ -421,9 +421,9 @@ public final class UNAirLiftR29
             case CLAMP -> {j.carrying=true;begin(l,j,Phase.ASCEND,eva.position(),new Vec3(eva.getX(),cruise(l)-OFFSET,eva.getZ()),120,eva);}
             case ASCEND -> {Vec3 dest=new Vec3(j.destination.x,cruise(l)-OFFSET,j.destination.z);begin(l,j,Phase.CRUISE,eva.position(),dest,duration(eva.position(),dest),eva);}
             case CRUISE -> {
-                if(j.homebound&&cart.position().distanceTo(reception(l,j.serial))>.1){j.age--;note(l,j,"接应载台正在就位，保持空中等待");return;}
+                if(j.homebound&&cart.position().distanceTo(reception(l,j.serial))>.1){j.age--;note(l,j,"ops.projectseele.airlift.await_cart");return;}
                 j.landingYaw=j.homebound?receivingHeading(l,j,eva):eva.getYRot();
-                if(!Float.isFinite(j.landingYaw))throw new IllegalStateException("接应平台没有容纳当前机体姿态的净空");
+                if(!Float.isFinite(j.landingYaw))throw new IllegalStateException("ops.projectseele.airlift.insufficient_clearance");
                 if(j.homebound)cart.setYRot(j.landingYaw);
                 j.destination=AirCradleClearanceR31.landingRoot(eva,j.destination,j.landingYaw);
                 begin(l,j,Phase.DESCEND,eva.position(),j.destination,160,eva);
@@ -431,7 +431,7 @@ public final class UNAirLiftR29
             case DESCEND -> {eva.endNervCarrierMotion();begin(l,j,Phase.RELEASE,plane.position(),plane.position(),70,eva);}
             case RELEASE ->
             {
-                if(!j.touchdown)throw new IllegalStateException("落点没有稳定承重面，保持运输夹具并等待重新调度");
+                if(!j.touchdown)throw new IllegalStateException("ops.projectseele.airlift.unsupported_site");
                 j.carrying=false;
                 release(eva);
                 if(j.homebound){eva.setNervLogisticsLocked(true);eva.setNoGravity(true);eva.getPersistentData().putBoolean("R30AwaitingIntake",true);EvaShutdownR30.waitingR31(eva,true);}
@@ -442,14 +442,14 @@ public final class UNAirLiftR29
             {
                 var occupant=eva.getPilotEntity();release(eva);
                 if(occupant==null){if(plug!=null&&plug.isLockedToEva())plug.resetIndependentAtDock(eva);eva.enterHangarStandby();}
-                else if(!EntryPlugDirector.ejectPilotToPlug(l,-1,eva,occupant))throw new IllegalStateException("退出插入栓的请求未被接受");
+                else if(!EntryPlugDirector.ejectPilotToPlug(l,-1,eva,occupant))throw new IllegalStateException("ops.projectseele.airlift.withdraw_rejected");
                 begin(l,j,Phase.RETREAT,plane.position(),new Vec3(plane.getX(),cruise(l),plane.getZ()),120,eva);
             }
             case RETREAT -> {Vec3 home=UNRecoveryR22.home(l,j.serial);Vec3 end=new Vec3(home.x,cruise(l),home.z+500);begin(l,j,Phase.RETURN_FLIGHT,plane.position(),end,duration(plane.position(),end),eva);}
             case RETURN_FLIGHT ->
             {
-                if(j.homebound&&plug!=null&&plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_EJECTING){j.age=j.duration-1;note(l,j,"机体已固定，等待退出插入栓");return;}
-                plane.discard();s.jobs.remove(j.serial);s.last.put(j.serial,j.homebound?"机体已交付库外接应平台；请选择“平台送回机库”继续回收":"机体已安全投放，运输机待命");note(l,j,s.last.get(j.serial));s.setDirty();ProjectSeele.LOGGER.info("UN AIRLIFT COMPLETE unit={} plug={} serial={} homebound={}",j.unit,j.plug,j.serial,j.homebound);
+                if(j.homebound&&plug!=null&&plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_EJECTING){j.age=j.duration-1;note(l,j,"ops.projectseele.airlift.await_withdrawal");return;}
+                plane.discard();s.jobs.remove(j.serial);s.last.put(j.serial,j.homebound?"ops.projectseele.airlift.apron_delivery":"ops.projectseele.airlift.delivered");note(l,j,s.last.get(j.serial));s.setDirty();ProjectSeele.LOGGER.info("UN AIRLIFT COMPLETE unit={} plug={} serial={} homebound={}",j.unit,j.plug,j.serial,j.homebound);
             }
             default -> {}
         }
@@ -458,16 +458,16 @@ public final class UNAirLiftR29
     {
         if(j.phase==Phase.HOLD)
         {
-            if(!j.cancel){note(l,j,"地面回收暂停，请清理通道后取消并重试，或请管理员执行维护复位。");return;}
+            if(!j.cancel){note(l,j,"ops.projectseele.airlift.ground_blocked");return;}
             cancelGround(l,s,j,eva);return;
         }
         if(j.cancel){cancelGround(l,s,j,eva);return;}
-        if(!openBase(l,j.serial)){note(l,j,"等待机库排液与舱门完全开启");return;}
+        if(!openBase(l,j.serial)){note(l,j,"ops.projectseele.airlift.await_open");return;}
         var cart=cart(l,s,j,eva);if(cart==null)return;
         if(j.phase==Phase.PREPARE)
         {
             EvaAirTransportR31.begin(eva);cart.cargo(eva.getId(),false,1);j.landingYaw=eva.getYRot();
-            var fit=UNReceivingCradleR40.fit(eva,j.landingYaw);if(fit==null)throw new IllegalStateException("当前载台姿态不能进入机库，需要重新调度");j.groundOffset=fit.offset();
+            var fit=UNReceivingCradleR40.fit(eva,j.landingYaw);if(fit==null)throw new IllegalStateException("ops.projectseele.airlift.orientation");j.groundOffset=fit.offset();
             eva.getPersistentData().remove("R30AwaitingIntake");eva.getPersistentData().remove("R31GroundHold");eva.getPersistentData().remove("R31GroundHoldAt");EvaShutdownR30.waitingR31(eva,false);
             if(eva.position().distanceTo(apron(l,j.serial).add(j.groundOffset))>8)
                 begin(l,j,Phase.GROUND_APPROACH,eva.position(),apron(l,j.serial).add(j.groundOffset),Math.max(120,(int)Math.ceil(eva.position().distanceTo(apron(l,j.serial).add(j.groundOffset))/.43)),eva);
@@ -481,7 +481,7 @@ public final class UNAirLiftR29
             lock(eva);Vec3 wanted=at.subtract(eva.position());
             float heading=Float.isFinite(j.landingYaw)?j.landingYaw:eva.getYRot();
             if(!AirCradleClearanceR31.clear(eva,wanted,heading))
-            {eva.endNervCarrierMotion();throw new IllegalStateException("入库通道受阻："+eva.blockPosition().toShortString());}
+            {eva.endNervCarrierMotion();throw new IllegalStateException(OperationText.format("ops.projectseele.airlift.bay_blocked", eva.blockPosition().toShortString()));}
             eva.moveOnNervCarrier(at.x,at.y,at.z,heading);cart.setPos(at);cart.setYRot(eva.getYRot());
             j.age++;s.cartPositions.put(j.serial,cart.blockPosition());UNRecoveryR22.remember(eva);s.setDirty();
             if(j.age<j.duration)return;
@@ -502,8 +502,8 @@ public final class UNAirLiftR29
             eva.endNervCarrierMotion();var occupant=eva.getPilotEntity();eva.normalizeAfterTransportR30(true);
             if(occupant!=null)
             {
-                if(!EntryPlugDirector.ejectPilotToPlug(l,-1,eva,occupant))throw new IllegalStateException("插入栓退出请求失败");
-                j.phase=Phase.RELEASE;note(l,j,"机体已固定，正在退出插入栓");s.setDirty();return;
+                if(!EntryPlugDirector.ejectPilotToPlug(l,-1,eva,occupant))throw new IllegalStateException("ops.projectseele.airlift.withdraw_failed");
+                j.phase=Phase.RELEASE;note(l,j,"ops.projectseele.airlift.withdrawing");s.setDirty();return;
             }
             if(plug!=null&&plug.isLockedToEva())plug.resetIndependentAtDock(eva);
             eva.enterHangarStandby();finishGround(l,s,j,eva);return;
@@ -516,12 +516,12 @@ public final class UNAirLiftR29
         eva.endNervCarrierMotion();EvaAirTransportR31.hold(eva);eva.setNervLogisticsLocked(true);eva.setNoGravity(true);eva.setDeltaMovement(Vec3.ZERO);
         eva.getPersistentData().putBoolean("R31GroundHold",true);eva.getPersistentData().putLong("R31GroundHoldAt",eva.blockPosition().asLong());
         eva.getPersistentData().putBoolean("R30AwaitingIntake",true);EvaShutdownR30.waitingR31(eva,true);
-        s.jobs.remove(j.serial);s.last.put(j.serial,"地面回收已取消，载台保持原位。清理通道后可重新请求入库。");note(l,j,s.last.get(j.serial));s.setDirty();
+        s.jobs.remove(j.serial);s.last.put(j.serial,"ops.projectseele.airlift.ground_cancel");note(l,j,s.last.get(j.serial));s.setDirty();
     }
     private static void finishGround(ServerLevel l,State s,Job j,EvaPrototypeEntity eva)
     {
         var receiver=cart(l,s,j,eva);if(receiver!=null)receiver.cargo(-1,false,0);
-        s.jobs.remove(j.serial);s.last.put(j.serial,EvaShutdownR30.wreck(eva)?"损毁机体已固定在库位，等待维修。":"机体已回到库位，回收完成。");note(l,j,s.last.get(j.serial));s.setDirty();
+        s.jobs.remove(j.serial);s.last.put(j.serial,EvaShutdownR30.wreck(eva)?"ops.projectseele.airlift.wreck_docked":"ops.projectseele.airlift.complete");note(l,j,s.last.get(j.serial));s.setDirty();
     }
     private UNAirLiftR29() {}
 }

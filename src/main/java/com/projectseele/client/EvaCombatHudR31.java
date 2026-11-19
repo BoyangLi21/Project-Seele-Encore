@@ -1,5 +1,6 @@
 package com.projectseele.client;
 
+import net.minecraft.client.resources.language.I18n;
 import com.projectseele.entity.Angel;
 import com.projectseele.entity.EntryPlugCarrierEntity;
 import com.projectseele.entity.EvaAirTransportR31;
@@ -80,7 +81,7 @@ public final class EvaCombatHudR31
                 :String.format(Locale.ROOT,"NERV / EVA-%02d",eva.getUnitVariant());
         text(g,font,identity,x+7,y+5,panelWidth-14,ORANGE);
         String hp=String.format(Locale.ROOT,"%.0f / %.0f",Math.max(0,eva.getHealth()),eva.getMaxHealth());
-        text(g,font,"机体",x+7,y+17,35,MUTED);
+        text(g,font,I18n.get("hud.projectseele.combat.hull"),x+7,y+17,35,MUTED);
         g.drawString(font,hp,x+panelWidth-7-font.width(hp),y+17,WHITE,false);
         float fraction=Mth.clamp(eva.getHealth()/Math.max(1,eva.getMaxHealth()),0,1);
         bar(g,x+7,y+28,panelWidth-14,fraction,fraction<.3F?RED:GREEN);
@@ -94,31 +95,32 @@ public final class EvaCombatHudR31
 
     private static String power(EvaUnit01Entity eva)
     {
-        if(EvaShutdownR30.disabled(eva))return EvaShutdownR30.mode(eva)==EvaShutdownR30.POWER_LOCK?"动力  耗尽 / 姿态锁止":"动力  关闭";
-        if(eva.isExperimentalUnit())return "动力  核能";
-        if(eva.isUmbilicalConnected())return "动力  外部供电";
+        if(EvaShutdownR30.disabled(eva))return EvaShutdownR30.mode(eva)==EvaShutdownR30.POWER_LOCK?I18n.get("hud.projectseele.combat.power_lock"):I18n.get("hud.projectseele.combat.power_off");
+        if(eva.isExperimentalUnit())return I18n.get("hud.projectseele.combat.power_nuclear");
+        if(eva.isUmbilicalConnected())return I18n.get("hud.projectseele.combat.power_external");
         int seconds=Math.max(0,eva.getPowerTicks()/20);
-        return String.format(Locale.ROOT,"动力  内部 %d:%02d",seconds/60,seconds%60);
+        return I18n.get("hud.projectseele.combat.power_internal", String.format(Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60));
     }
 
     private static String actionHint(Minecraft mc,EvaUnit01Entity eva)
     {
         String key=(Keybinds.EVA_GRAB.isUnbound()?Keybinds.EVA_GRAPPLE:Keybinds.EVA_GRAB).getTranslatedKeyMessage().getString();
         String radio=Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString();
-        if(EvaAirTransportR31.active(eva))return "运输中  /  "+radio+" 指挥通信";
-        if(EvaShutdownR30.disabled(eva))return "呼叫回收  /  "+radio+" 指挥通信";
-        if(eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive())return "机械联锁  /  "+radio+" 指挥通信";
+        if(EvaAirTransportR31.active(eva))return I18n.get("hud.projectseele.combat.transport", radio);
+        if(EvaShutdownR30.disabled(eva))return I18n.get("hud.projectseele.combat.recovery", radio);
+        if(eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive())return I18n.get("hud.projectseele.combat.interlock", radio);
         return switch(EvaCombatR31.action(eva))
         {
-            case EvaCombatR31.REACH -> "双手接近";
+            case EvaCombatR31.REACH -> I18n.get("hud.projectseele.combat.reach");
             case EvaCombatR31.HOLD -> com.projectseele.entity.EvaGameplayMotionR32.bodyReadyR64(eva)
-                    ?mc.options.keyAttack.getTranslatedKeyMessage().getString()+" 捶击  /  "+key+" / "+mc.options.keyUse.getTranslatedKeyMessage().getString()+" 投掷"
-                    :key+" / "+mc.options.keyAttack.getTranslatedKeyMessage().getString()+" 投掷";
-            case EvaCombatR31.THROW -> "投掷";
-            case EvaCombatR31.AIR_STRIKE -> "跳击";
-            case EvaCombatR31.AIR_SLAM -> com.projectseele.entity.EvaGameplayMotionR32.ready(eva)?"下踢":"下砸";
-            case EvaCombatR31.LAND -> "落地制动";
-            default -> eva.isPilotProne()||eva.isPilotCrouching()?"站立后可抓取":eva.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS?key+" 抓取需空手":key+" 双手抓取";
+                    ? I18n.get("hud.projectseele.combat.pummel_throw_keys", mc.options.keyAttack.getTranslatedKeyMessage().getString(),
+                            key, mc.options.keyUse.getTranslatedKeyMessage().getString())
+                    : I18n.get("hud.projectseele.combat.throw_keys", key, mc.options.keyAttack.getTranslatedKeyMessage().getString());
+            case EvaCombatR31.THROW -> I18n.get("hud.projectseele.combat.throw");
+            case EvaCombatR31.AIR_STRIKE -> I18n.get("hud.projectseele.combat.air_strike");
+            case EvaCombatR31.AIR_SLAM -> com.projectseele.entity.EvaGameplayMotionR32.ready(eva)?I18n.get("hud.projectseele.combat.kick"):I18n.get("hud.projectseele.combat.slam");
+            case EvaCombatR31.LAND -> I18n.get("hud.projectseele.combat.brake");
+            default -> eva.isPilotProne()||eva.isPilotCrouching()?I18n.get("hud.projectseele.combat.stand"):eva.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS?I18n.get("hud.projectseele.combat.empty_hands", key):I18n.get("hud.projectseele.combat.grapple", key);
         };
     }
 
@@ -148,7 +150,7 @@ public final class EvaCombatHudR31
     {
         panel(g,x,y,width,39,CYAN);
         text(g,font,target.getDisplayName().getString(),x+7,y+5,width-14,CYAN);
-        String health=String.format(Locale.ROOT,"目标 %.0f / %.0f",Math.max(0,target.getHealth()),target.getMaxHealth());
+        String health=I18n.get("hud.projectseele.combat.target_health", String.format(Locale.ROOT, "%.0f / %.0f", Math.max(0, target.getHealth()), target.getMaxHealth()));
         text(g,font,health,x+7,y+16,width-14,WHITE);
         bar(g,x+7,y+26,width-14,Mth.clamp(target.getHealth()/Math.max(1,target.getMaxHealth()),0,1),CYAN);
         Float field=null;
@@ -157,7 +159,7 @@ public final class EvaCombatHudR31
         else if(target instanceof ShamshelEntity shamshel)field=shamshel.getAtField();
         // Other Angel implementations still keep field strength server-local.
         // A default client field would falsely look like live target telemetry.
-        text(g,font,field==null?"AT  暂无遥测":String.format(Locale.ROOT,"AT  %.0f",Math.max(0,field)),x+7,y+30,width-14,MUTED);
+        text(g,font,field==null?I18n.get("hud.projectseele.combat.field_unknown"):String.format(Locale.ROOT,"AT  %.0f",Math.max(0,field)),x+7,y+30,width-14,MUTED);
     }
 
     private static void panel(GuiGraphics g,int x,int y,int width,int height,int colour)

@@ -28,7 +28,7 @@ public final class EvaMaintenanceResetR53
             }
             PENDING.computeIfAbsent(level,l->new LinkedHashMap<>()).put(variant,source);accepted++;
         }
-        if(PENDING.containsKey(level))source.sendSuccess(()->Component.literal("复位请求已保留，场地加载完成后自动执行。"),false);
+        if(PENDING.containsKey(level))source.sendSuccess(()->Component.translatable("message.projectseele.maintenance.queued"),false);
         return accepted;
     }
     private static void reset(CommandSourceStack source,ServerLevel level,int variant)
@@ -46,7 +46,7 @@ public final class EvaMaintenanceResetR53
             for(var entry:new ArrayList<>(pending.entrySet()))
             {
                 try { reset(entry.getValue(),level,entry.getKey()); }
-                catch(IllegalStateException held) { entry.getValue().sendFailure(Component.literal("复位未完成："+held.getMessage())); }
+                catch(IllegalStateException held) { entry.getValue().sendFailure(Component.translatable("message.projectseele.eva_maintenance_reset_r53.reset_incomplete_s", com.projectseele.world.OperationText.read(held.getMessage()))); }
                 pending.remove(entry.getKey());
             }
             if(pending.isEmpty())PENDING.remove(level);

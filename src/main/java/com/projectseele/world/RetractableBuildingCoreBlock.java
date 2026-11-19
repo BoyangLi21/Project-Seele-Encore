@@ -44,7 +44,7 @@ public final class RetractableBuildingCoreBlock extends Block
         }
         Tokyo3RetractionDirector.RequestResult result =
                 Tokyo3RetractionDirector.toggleNearest(serverLevel, position);
-        player.displayClientMessage(Component.literal(result.message()), false);
+        player.displayClientMessage(com.projectseele.world.OperationText.read(result.message()), false);
         return result.accepted() ? InteractionResult.CONSUME : InteractionResult.FAIL;
     }
 }

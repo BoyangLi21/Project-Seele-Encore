@@ -1,5 +1,6 @@
 package com.projectseele.client;
 
+import net.minecraft.client.resources.language.I18n;
 import com.projectseele.config.SeeleConfig;
 import com.projectseele.client.fx.ClientFxManager;
 import com.projectseele.entity.EntryPlugCarrierEntity;
@@ -181,7 +182,7 @@ public final class EvaHud
         guiGraphics.fill(bx, by, bx + Math.round(barWidth * progress), by + 5,
                 NERV_ORANGE);
         guiGraphics.drawCenteredString(gui.getFont(),
-                String.format("SYSTEM  %03d%%", Math.round(progress * 100.0F)),
+                I18n.get("hud.projectseele.cockpit.boot", String.format(java.util.Locale.ROOT, "%03d", Math.round(progress * 100.0F))),
                 width / 2, by + 10, 0xFFE8D2B8);
     };
 
@@ -259,7 +260,7 @@ public final class EvaHud
         ChatFormatting synchroColour = synchro < 25.0F ? ChatFormatting.RED
                 : synchro >= 50.0F ? ChatFormatting.GREEN : ChatFormatting.GOLD;
         String syncText=eva.synchronizationText(partialTick).getString();
-        String radioHint=Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString()+" " + Component.translatable("hud.projectseele.plug.radio").getString();
+        String radioHint=I18n.get("hud.projectseele.radio_key", Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString());
         guiGraphics.drawString(gui.getFont(),radioHint,m+6,height-m-15,0xFFB8D4C0);
         guiGraphics.drawString(gui.getFont(),Component.literal(syncText).withStyle(synchroColour),width-12-gui.getFont().width(syncText),m+6,NERV_ORANGE);
         String roleKey = eva.isExperimentalUnit()?"hud.projectseele.role_experimental":switch (eva.getUnitVariant())
@@ -302,7 +303,7 @@ public final class EvaHud
                         : powerSeconds <= 60 ? 0xFFE03535 : 0xFFE89A22);
 
         int heading = Math.floorMod(Math.round(player.getYRot()), 360);
-        String headingText=String.format("HDG %03d  PITCH %+03d",heading,Math.round(-player.getXRot()));
+        String headingText=I18n.get("hud.projectseele.cockpit.heading", String.format(java.util.Locale.ROOT, "%03d", heading), String.format(java.util.Locale.ROOT, "%+03d", Math.round(-player.getXRot())));
         guiGraphics.drawString(gui.getFont(),headingText,width-12-gui.getFont().width(headingText),m+18,0xFFC1B5A2);
         String speedText=String.format("%.0f km/h",eva.getDeltaMovement().horizontalDistance()*72);
         guiGraphics.drawString(gui.getFont(),speedText,width-12-gui.getFont().width(speedText),m+30,0xFFCFD2BE);
@@ -382,7 +383,7 @@ public final class EvaHud
         String weapon=gui.getFont().plainSubstrByWidth(Component.translatable(eva.getWeaponTranslationKey()).getString(),width/2-20);
         if(eva instanceof com.projectseele.entity.EvaPrototypeEntity un)
         {
-            String status=un.isEyeLaserActive()?"OPTIC / CHARGING":un.eyeLaserCooldown()>0?String.format("OPTIC / %.1fs",un.eyeLaserCooldown()/20F):"K / OPTIC READY";
+            String status=un.isEyeLaserActive()?I18n.get("hud.projectseele.combat.optic_charge"):un.eyeLaserCooldown()>0?I18n.get("hud.projectseele.combat.optic_cooldown", String.format(java.util.Locale.ROOT, "%.1f", un.eyeLaserCooldown() / 20F)):I18n.get("hud.projectseele.combat.optic_ready", Keybinds.UN_EYE_LASER.getTranslatedKeyMessage().getString());
             guiGraphics.drawString(gui.getFont(),status,width-10-gui.getFont().width(status),height-51,0xFFCCB879);
         }
         guiGraphics.drawString(gui.getFont(),weapon,width-10-gui.getFont().width(weapon),height-38,0xFFE4C68A);
@@ -593,7 +594,7 @@ public final class EvaHud
         String distText = blockHit.getType() == HitResult.Type.MISS && entityHit == null
                 ? "----"
                 : String.format("%.0f m", distance);
-        guiGraphics.drawCenteredString(font, "DIST " + distText, cx, y, 0xFFCCCCCC);
+        guiGraphics.drawCenteredString(font, I18n.get("hud.projectseele.combat.distance", distText), cx, y, 0xFFCCCCCC);
 
         if (entityHit != null && entityHit.getEntity() instanceof RamielEntity ramiel)
         {

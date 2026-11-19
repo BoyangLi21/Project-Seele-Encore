@@ -114,8 +114,7 @@ public final class NervHangarControlsR53
         if (selected == Decision.NOT_CONTROL) return 0;
         if (selected == Decision.HOLD || selected == Decision.EMERGENCY_HOLD)
         {
-            player.displayClientMessage(Component.literal(selected == Decision.HOLD ? HOLD
-                    : "新机库后门由整备与回库流程联锁控制；旧紧急开门快捷键未执行。")
+            player.displayClientMessage(Component.translatable(selected == Decision.HOLD ? "ops.projectseele.legacy.nerv_hangar_controls.the_hangar_control_panel_is_not_ready_the_current" : "ops.projectseele.legacy.nerv_hangar_controls.the_new_rear_door_is_interlocked_with_preparation_and")
                     .withStyle(ChatFormatting.YELLOW), false);
             return 1;
         }
@@ -123,10 +122,9 @@ public final class NervHangarControlsR53
         if (selected == Decision.STATUS)
         {
             var state = NervRouteRuntimeR52.status(level, variant);
-            player.displayClientMessage(Component.literal(String.format(Locale.ROOT,
-                    "[NERV 机库] EVA-%02d phase=%s loaded=%s LCL=%d/%d ticks=%d",
-                    variant, state.phase(), state.loaded(), state.lclLayers(),
-                    EvaHangarBuilder.LCL_SHOULDER_LAYERS, state.ticks())).withStyle(ChatFormatting.AQUA), false);
+            player.displayClientMessage(Component.translatable("ops.projectseele.hangar.panel_status", String.format(Locale.ROOT, "%02d", variant), NervStaffDialogue.phaseText(state.phase()),
+                    Component.translatable(state.loaded() ? "ops.projectseele.hangar.loaded" : "ops.projectseele.hangar.unloaded"), state.lclLayers(),
+                    EvaHangarBuilder.LCL_SHOULDER_LAYERS, state.ticks()).withStyle(ChatFormatting.AQUA), false);
             return 1;
         }
         if(selected==Decision.PREPARE&&!NervRouteRuntimeR52.pending(level,variant))
@@ -137,7 +135,7 @@ public final class NervHangarControlsR53
         }
         var result = selected == Decision.PREPARE ? NervRouteRuntimeR52.prepare(level, variant)
                 : NervRouteRuntimeR52.cancel(level, variant);
-        player.displayClientMessage(Component.literal("[NERV 机库] " + result.message())
+        player.displayClientMessage(Component.translatable("ops.projectseele.logistics.radio.hangar", OperationText.read(result.message()))
                 .withStyle(result.accepted() ? ChatFormatting.GREEN : ChatFormatting.RED), false);
         return 1;
     }

@@ -1,5 +1,6 @@
 package com.projectseele.visual;
 
+import com.projectseele.world.OperationText;
 import java.util.List;
 import java.util.Locale;
 
@@ -92,8 +93,7 @@ public final class ThirdTokyoCommands
         ServerPlayer player = source.getPlayerOrException();
         if (player.isPassenger())
         {
-            source.sendFailure(Component.literal(
-                    "Dismount before constructing the Tokyo-3 sortie district."));
+            source.sendFailure(Component.translatable("message.projectseele.city.dismount"));
             return 0;
         }
         if (GeoFrontCommands.setup(source) != 1)
@@ -102,9 +102,7 @@ public final class ThirdTokyoCommands
         }
         teleportOverview(player,
                 IntegratedNervMapBuilder.tokyo3Origin(player.serverLevel()));
-        source.sendSuccess(() -> Component.literal(
-                "Tokyo-3 skyline ready above the same GeoFront dimension. "
-                        + "Run /seele dev geofront link, then board from the lower gantry."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.third_tokyo_commands.tokyo_3_skyline_ready_above_the_same"), false);
         return 1;
     }
 
@@ -144,7 +142,7 @@ public final class ThirdTokyoCommands
         BlockPos origin = findOrigin(player);
         RequestResult result = Tokyo3RetractionDirector.request(
                 player.serverLevel(), origin, retract);
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return result.accepted() ? 1 : 0;
     }
 
@@ -158,10 +156,12 @@ public final class ThirdTokyoCommands
         ServerPlayer player = source.getPlayerOrException();
         BlockPos origin = findOrigin(player);
         RequestResult result = CityCreateDistrictR45.recover(player.serverLevel(), origin, false);
-        String text = result.accepted() ? "已重新接管被中断的城市升降，从中断的那一步重做。"
-                : result.message().startsWith("No held transaction fault") ? "城市升降没有故障，不需要恢复。"
-                : "无法恢复：" + result.message();
-        source.sendSuccess(() -> Component.literal(text), false);
+        Component text = result.accepted()
+                ? Component.translatable("ops.projectseele.city.control_regained")
+                : result.message().startsWith("No held transaction fault")
+                        ? Component.translatable("ops.projectseele.city.no_fault")
+                        : Component.translatable("ops.projectseele.city.recovery_failed", com.projectseele.world.OperationText.read(result.message()));
+        source.sendSuccess(() -> text, false);
         return result.accepted() ? 1 : 0;
     }
 
@@ -177,7 +177,7 @@ public final class ThirdTokyoCommands
         BlockPos origin = findOrigin(player);
         RequestResult result = Tokyo3RetractionDirector.forceDepth(
                 player.serverLevel(), origin, retract);
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return result.accepted() ? 1 : 0;
     }
     private static int status(CommandSourceStack source) throws CommandSyntaxException
@@ -189,14 +189,11 @@ public final class ThirdTokyoCommands
         ServerPlayer player = source.getPlayerOrException();
         BlockPos origin = findOrigin(player);
         Status status = Tokyo3RetractionDirector.status(player.serverLevel(), origin);
-        source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                "%s 城市状态=%s，事务终点=%d/%d，目标终点=%d（终点编号不代表实际米数）。",
-                status.motionReport(),
-                status.phase(), status.depth(), status.maximumDepth(),
-                status.targetDepth())), false);
+        source.sendSuccess(() -> Component.translatable("ops.projectseele.motion.summary",
+                OperationText.read(status.motionReport()), status.phase(), status.depth(), status.maximumDepth(), status.targetDepth()), false);
         if (status.phase().contains("FAULT"))
         {
-            source.sendSuccess(() -> Component.literal("升降被中断后停在故障状态：用 /seele city recover 从中断的那一步重做。"), false);
+            source.sendSuccess(() -> Component.translatable("message.projectseele.city.recover"), false);
         }
         return 1;
     }
@@ -212,27 +209,24 @@ public final class ThirdTokyoCommands
         ServerLevel level = player.serverLevel();
         if (!level.dimension().equals(GeoFrontCommands.GEOFRONT))
         {
-            source.sendFailure(Component.literal(
-                    "Enter the integrated GeoFront/Tokyo-3 dimension first."));
+            source.sendFailure(Component.translatable("message.projectseele.city.enter_dimension"));
             return 0;
         }
         IntegratedNervMapBuilder.RuntimeAudit audit =
                 IntegratedNervMapBuilder.prepareRuntime(level);
         if (!audit.valid())
         {
-            source.sendFailure(Component.literal(
-                    "Operation Yashima refused: live sortie route failed: "
-                            + audit.summary()));
+            source.sendFailure(Component.translatable("message.projectseele.third_tokyo_commands.operation_yashima_refused_live_sortie_route_failed", audit.summary()));
             return 0;
         }
         BattleResult result = Tokyo3RamielBattleDirector.start(level,
                 IntegratedNervMapBuilder.tokyo3Origin(level), player);
         if (!result.accepted())
         {
-            source.sendFailure(Component.literal(result.message()));
+            source.sendFailure(com.projectseele.world.OperationText.read(result.message()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return 1;
     }
 
@@ -264,10 +258,10 @@ public final class ThirdTokyoCommands
                         player.serverLevel()));
         if (!result.accepted())
         {
-            source.sendFailure(Component.literal(result.message()));
+            source.sendFailure(com.projectseele.world.OperationText.read(result.message()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return 1;
     }
 
@@ -289,10 +283,10 @@ public final class ThirdTokyoCommands
                 player.serverLevel(), player.blockPosition());
         if (!result.accepted())
         {
-            source.sendFailure(Component.literal(result.message()));
+            source.sendFailure(com.projectseele.world.OperationText.read(result.message()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return 1;
     }
 
@@ -306,8 +300,7 @@ public final class ThirdTokyoCommands
         BlockPos origin = findOrigin(player);
         player.stopRiding();
         teleportOverview(player, origin);
-        source.sendSuccess(() -> Component.literal(
-                "Tokyo-3 skyline observation deck."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.city.observation"), false);
         return 1;
     }
 
@@ -349,8 +342,7 @@ public final class ThirdTokyoCommands
         return Tokyo3RetractionSavedData.get(player.serverLevel())
                 .nearest(player.blockPosition(), 320.0D)
                 .map(Tokyo3RetractionSavedData.StoredDistrict::origin)
-                .orElseThrow(() -> new SimpleCommandExceptionType(Component.literal(
-                        "附近 320 格内没有已登记的第三新东京市街区，请到城区再试。")).create());
+                .orElseThrow(() -> new SimpleCommandExceptionType(Component.translatable("message.projectseele.city.no_blocks")).create());
     }
 
     private static TokyoAudit inspect(ServerLevel level, BlockPos origin, int depth,
@@ -381,8 +373,7 @@ public final class ThirdTokyoCommands
         {
             return false;
         }
-        source.sendFailure(Component.literal(
-                command + " 属于已退役的重叠地图流程，在 SEELE_S19_CLEAN 存档中不可用。"));
+        source.sendFailure(Component.translatable("ops.projectseele.city.retired_flow", command));
         return true;
     }
 

@@ -106,8 +106,7 @@ public final class S20SurfaceAccessGate
                 ModItems.TERMINAL_DOGMA_ACCESS_CARD.get());
         if (!employee && !highest)
         {
-            player.displayClientMessage(Component.literal(
-                    "ACCESS DENIED / NERV EMPLOYEE CARD REQUIRED")
+            player.displayClientMessage(Component.translatable("message.projectseele.surface.card")
                     .withStyle(ChatFormatting.RED), true);
             level.playSound(null, clicked, SoundEvents.IRON_DOOR_CLOSE,
                     SoundSource.BLOCKS, 0.9F, 0.72F);
@@ -115,8 +114,7 @@ public final class S20SurfaceAccessGate
         }
         OPEN_UNTIL.put(level, level.getGameTime() + OPEN_TICKS);
         setOpen(level, walkY, true);
-        player.displayClientMessage(Component.literal(
-                "NERV STAFF ACCESS ACCEPTED")
+        player.displayClientMessage(Component.translatable("message.projectseele.surface.access")
                 .withStyle(ChatFormatting.GREEN), true);
         level.playSound(null, clicked, SoundEvents.IRON_DOOR_OPEN,
                 SoundSource.BLOCKS, 0.9F, 1.18F);

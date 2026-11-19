@@ -43,7 +43,7 @@ public final class TvMissionAlertR30
         if(commander!=null&&data.alertLine<5&&age>=data.alertLine*35L
                 &&(data.alertLine==0||lastLine==null||level.getGameTime()<lastLine||level.getGameTime()-lastLine>=35))
         {
-            String[][] lines={{"伊吹摩耶","监视网发现异常反应！"},{"伊吹摩耶","波形蓝色，确认为使徒。"},{"葛城美里","司令，迎击准备开始。"},{"赤木律子","摩耶，调出机体数据。驾驶员的情况随时报告。"},{"葛城美里","各机按指令出动。我来负责地面接应。"}};
+            String[][] lines={{"伊吹摩耶","dialogue.projectseele.alert.detected"},{"伊吹摩耶","dialogue.projectseele.alert.blue"},{"葛城美里","dialogue.projectseele.alert.prepare"},{"赤木律子","dialogue.projectseele.alert.monitor"},{"葛城美里","dialogue.projectseele.alert.sortie"}};
             int index=data.alertLine++;var line=lines[index];NervStaffDialogue.say(commander,line[0]+" · 指挥通信",line[1]);
             for(var crew:data.sorties.values())if(!crew.npc&&!crew.commander.equals(commander.getUUID()))
             {var pilot=level.getServer().getPlayerList().getPlayer(crew.commander);if(pilot!=null&&pilot.level()==level)NervStaffDialogue.say(pilot,line[0]+" · 指挥通信",line[1]);}

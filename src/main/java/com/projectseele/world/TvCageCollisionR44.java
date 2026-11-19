@@ -227,7 +227,7 @@ public final class TvCageCollisionR44
             if(!occupied)continue;
             gantry.getPersistentData().putString("TvCageBlockedR44", actor.getUUID().toString());
             if (actor instanceof Player player && level.getGameTime() % 40 == 0)
-                player.displayClientMessage(net.minecraft.network.chat.Component.literal("拘束机构暂停：请离开机械运动范围。"), true);
+                player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.projectseele.cage.wait"), true);
             return false;
         }
         gantry.getPersistentData().remove("TvCageBlockedR44");

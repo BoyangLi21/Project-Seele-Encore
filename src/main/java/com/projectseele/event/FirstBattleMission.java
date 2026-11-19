@@ -1,5 +1,6 @@
 package com.projectseele.event;
 
+import com.projectseele.world.OperationText;
 import com.google.gson.JsonParser;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.projectseele.ProjectSeele;
@@ -58,17 +59,17 @@ public final class FirstBattleMission
     }
     public static boolean begin(ServerPlayer player)
     {
-        ServerLevel level=missionLevel(player);if(level==null){player.displayClientMessage(Component.literal("当前世界尚未设置迎击区域。"),false);return false;}
+        ServerLevel level=missionLevel(player);if(level==null){player.displayClientMessage(Component.translatable("message.projectseele.first_battle.no_area"),false);return false;}
         var campaign=com.projectseele.world.TvCampaignSavedData.get(level);
         if(com.projectseele.world.SurfaceAngelPlanR52.handles(level,"sachiel"))
-        {String blocker=com.projectseele.world.SurfaceAngelPlanR52.startBlocker(level,"sachiel");player.displayClientMessage(Component.literal(blocker.isEmpty()?"本地图使用已登记的地表作战路线，请从作战指挥下达行动，不重复生成旧迎击目标。":blocker),false);return false;}
-        var data=FirstBattleSavedData.get(level);if(data.active!=null||data.missionOwner!=null){player.displayClientMessage(Component.literal("迎击任务已下达，请先完成当前行动。"),false);return false;}
+        {String blocker=com.projectseele.world.SurfaceAngelPlanR52.startBlocker(level,"sachiel");player.displayClientMessage(blocker.isEmpty()?Component.translatable("ops.projectseele.sachiel.registered"):OperationText.read(blocker),false);return false;}
+        var data=FirstBattleSavedData.get(level);if(data.active!=null||data.missionOwner!=null){player.displayClientMessage(Component.translatable("message.projectseele.first_battle.active"),false);return false;}
         Site existingSite=site(level);
         if(!level.getEntitiesOfClass(SachielEntity.class,new net.minecraft.world.phys.AABB(existingSite.angel,existingSite.angel).inflate(220),
                 a->a.isAlive()&&a.getTags().contains("seele_first_battle_mission")).isEmpty())
-        {player.displayClientMessage(Component.literal("迎击区域仍有未归档的任务目标，本次不会重复生成使徒。"),false);return false;}
+        {player.displayClientMessage(Component.translatable("message.projectseele.first_battle.existing_target"),false);return false;}
         data.missionOwner=player.getUUID();data.missionAngel=null;data.missionLastPos=null;data.missionCancelRequested=false;data.missionMissingTicks=0;data.setDirty();Site s=site(level);
-        player.displayClientMessage(Component.literal("作战命令：驾驶初号机前往"+CityBattlefieldR29.name(level)+"。目标区域 X "+(int)s.hero.x+" / Z "+(int)s.hero.z+"。削弱使徒后将进入自主作战演出。"),false);return true;
+        player.displayClientMessage(Component.translatable("ops.projectseele.sachiel.orders", OperationText.read(CityBattlefieldR29.name(level)), (int)s.hero.x, (int)s.hero.z),false);return true;
     }
     public static boolean cancel(ServerPlayer player)
     {
@@ -100,14 +101,14 @@ public final class FirstBattleMission
         return Commands.literal("firstbattle")
             .then(Commands.literal("begin").executes(c->begin(c.getSource().getPlayerOrException())?1:0))
             .then(Commands.literal("cancel").executes(c->cancel(c.getSource().getPlayerOrException())?1:0))
-            .then(Commands.literal("status").executes(c->{ServerPlayer p=c.getSource().getPlayerOrException();ServerLevel l=missionLevel(p);if(l==null)return 0;var d=FirstBattleSavedData.get(l);p.displayClientMessage(Component.literal(d.active!=null?"自主行动中":d.missionOwner!=null?"迎击任务进行中":"作战资料室可下达迎击命令"),false);return 1;}));
+            .then(Commands.literal("status").executes(c->{ServerPlayer p=c.getSource().getPlayerOrException();ServerLevel l=missionLevel(p);if(l==null)return 0;var d=FirstBattleSavedData.get(l);p.displayClientMessage(Component.translatable(d.active!=null?"ops.projectseele.sachiel.autonomous":d.missionOwner!=null?"ops.projectseele.sachiel.active":"ops.projectseele.sachiel.available"),false);return 1;}));
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
         if(event.phase!=TickEvent.Phase.END||event.getServer().getTickCount()%10!=0)return;
         for(ServerLevel level:event.getServer().getAllLevels())
         {
-            Site s=site(level);if(s==null)continue;var data=FirstBattleSavedData.get(level);var bar=BARS.computeIfAbsent(level,l->new ServerBossEvent(Component.literal("NERV 迎撃指令"),BossEvent.BossBarColor.YELLOW,BossEvent.BossBarOverlay.PROGRESS));bar.removeAllPlayers();
+            Site s=site(level);if(s==null)continue;var data=FirstBattleSavedData.get(level);var bar=BARS.computeIfAbsent(level,l->new ServerBossEvent(Component.translatable("message.projectseele.first_battle.order"),BossEvent.BossBarColor.YELLOW,BossEvent.BossBarOverlay.PROGRESS));bar.removeAllPlayers();
             // The TV surface director already owns spawn, approach, live bar and original UUID retention.
             // Independent development replays keep their separate lifecycle.
             if(com.projectseele.world.SurfaceAngelPlanR52.handles(level,com.projectseele.world.TvCampaignSavedData.get(level).active))
@@ -139,16 +140,16 @@ public final class FirstBattleMission
             var eva=TvCampaignDirector.combatEvaR30(player);var campaign=com.projectseele.world.TvCampaignSavedData.get(level);int assigned=campaign.active.equals("sachiel")?campaign.assignedVariant:EvaUnit01Entity.UNIT_01;double distance=eva==null?player.position().distanceTo(s.hero):eva.position().distanceTo(s.hero);
             if(data.missionAngel==null)
             {
-                bar.setName(Component.literal("初号机 · 前往"+CityBattlefieldR29.name(level)+" / "+Math.round(distance)+" m"));bar.setProgress(1);
-                String blocked=CityBattlefieldR29.obstruction(level);if(!blocked.isEmpty()){bar.setName(Component.literal(blocked));continue;}
+                bar.setName(Component.translatable("ops.projectseele.sachiel.distance", OperationText.read(CityBattlefieldR29.name(level)), Math.round(distance)));bar.setProgress(1);
+                String blocked=CityBattlefieldR29.obstruction(level);if(!blocked.isEmpty()){bar.setName(OperationText.read(blocked));continue;}
                 if(eva==null||eva.level()!=level||!com.projectseele.world.TvSortiesR32.ready(eva)||distance>90)continue;
                 loadTarget(level,BlockPos.containing(s.angel));SachielEntity angel=ModEntities.SACHIEL.get().create(level);if(angel==null)continue;
                 angel.moveTo(s.angel.x,s.angel.y,s.angel.z,s.yaw+180,0);angel.yBodyRot=angel.yHeadRot=s.yaw+180;angel.setPersistenceRequired();angel.addTag("seele_first_battle_mission");angel.addTag("seele_first_battle_replay");angel.setTarget(eva);
-                if(!level.noCollision(angel,angel.getBoundingBox())){player.displayClientMessage(Component.literal("迎击区域被占用，清空大道后会继续出动。"),true);continue;}
+                if(!level.noCollision(angel,angel.getBoundingBox())){player.displayClientMessage(Component.translatable("message.projectseele.first_battle.blocked"),true);continue;}
                 if(!level.addFreshEntity(angel))continue;
                 data.missionAngel=angel.getUUID();data.missionLastPos=angel.blockPosition();data.setDirty();
                 TvCampaignDirector.firstBattleBound(level,data.missionOwner,angel.getUUID());
-                com.projectseele.world.NervStaffDialogue.say(player,"葛城美里 · 作战通信","目标就在前方。先站稳，注意它两侧的手臂。攻击没有奏效就报告，别只顾着往前冲。");
+                com.projectseele.world.NervStaffDialogue.say(player,"葛城美里 · 作战通信","dialogue.projectseele.sachiel.approach");
                 ProjectSeele.LOGGER.info("R10 MISSION Angel deployed {}",angel.getUUID());
             }
             if(level.getEntity(data.missionAngel) instanceof SachielEntity angel)
@@ -158,7 +159,7 @@ public final class FirstBattleMission
                     TvCampaignDirector.firstBattleComplete(level,data.missionOwner,angel.getUUID());
                     data.missionOwner=null;data.missionAngel=null;data.setDirty();bar.removeAllPlayers();continue;
                 }
-                float field=angel.getAtField();bar.setName(Component.literal("第3使徒 サキエル · "+(field>0?"AT FIELD "+Math.round(field):"CORE "+Math.round(angel.getHealth()/angel.getMaxHealth()*100)+"%")));bar.setProgress(field>0?Math.min(1,field/900):angel.getHealth()/angel.getMaxHealth());
+                float field=angel.getAtField();bar.setName(field>0?Component.translatable("ops.projectseele.sachiel.at", Math.round(field)):Component.translatable("ops.projectseele.sachiel.core", Math.round(angel.getHealth()/angel.getMaxHealth()*100)));bar.setProgress(field>0?Math.min(1,field/900):angel.getHealth()/angel.getMaxHealth());
             }
         }
     }

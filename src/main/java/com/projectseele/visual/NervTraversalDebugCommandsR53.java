@@ -54,11 +54,11 @@ public final class NervTraversalDebugCommandsR53
 
     private static Component message(CommandSourceStack source, Mode mode)
     {
-        String description = switch (mode)
+        Component description = switch (mode)
         {
-            case NORMAL -> "正常模式：关闭全路线高精网格硬预检，保留运行时运动检查。";
-            case STRICT -> "严格诊断：按需执行严格检查，会阻止不通过的运动。";
-            case BYPASS -> "调试绕过已开启：绕过运动碰撞检查；身份、租约、原任务与设备动作仍保留。";
+            case NORMAL -> Component.translatable("ops.projectseele.debug.traversal.normal");
+            case STRICT -> Component.translatable("ops.projectseele.debug.traversal.strict");
+            case BYPASS -> Component.translatable("ops.projectseele.debug.traversal.bypass");
         };
         ChatFormatting color = switch (mode)
         {
@@ -66,10 +66,9 @@ public final class NervTraversalDebugCommandsR53
             case STRICT -> ChatFormatting.GOLD;
             case BYPASS -> ChatFormatting.RED;
         };
-        return Component.literal("[NERV 运动调试 / " + source.getLevel().dimension().location() + "] ")
+        return Component.translatable("ops.projectseele.debug.traversal.prefix", source.getLevel().dimension().location().toString())
                 .withStyle(color, ChatFormatting.BOLD)
-                .append(Component.literal(description
-                        + " 仅当前维度、本次运行有效；重启恢复 NORMAL。恢复命令：/seele dev traversal normal")
+                .append(Component.translatable("ops.projectseele.debug.traversal.scope", description)
                         .withStyle(style -> style.withBold(false)));
     }
 }

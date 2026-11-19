@@ -1,5 +1,8 @@
 package com.projectseele.client.screen;
 
+import com.projectseele.world.OperationText;
+import com.projectseele.world.StaffDialogueCatalogR24;
+import net.minecraft.client.resources.language.I18n;
 import com.projectseele.network.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -32,7 +35,7 @@ public final class StaffConversationScreen extends Screen
 
     private StaffConversationScreen(ClientboundStaffConversationPacket view)
     {
-        super(Component.literal("指挥通信")); this.view = view;
+        super(Component.translatable("screen.projectseele.phone.command_radio")); this.view = view;
         if(!view.selectedMission().isEmpty())mission=view.selectedMission();
     }
 
@@ -43,7 +46,7 @@ public final class StaffConversationScreen extends Screen
         {
             if (!packet.valid())
             {
-                if (mc.player != null) mc.player.displayClientMessage(Component.literal(packet.reply()), false);
+                if (mc.player != null) mc.player.displayClientMessage(StaffDialogueCatalogR24.replyComponent(packet.reply()), false);
                 mc.setScreen(null); return;
             }
             boolean changed = screen.view.canCommand() != packet.canCommand()
@@ -90,19 +93,19 @@ public final class StaffConversationScreen extends Screen
         x = (width - panelWidth) / 2; y = (height - panelHeight) / 2;
         int tabWidth=(panelWidth-24)/5;
         String command=denial(StaffAuthorityR25.COMMAND);
-        addTab("交谈",0,x+12,tabWidth-3,()->switchTab(0),"");
-        addTab("指挥",1,x+12+tabWidth,tabWidth-3,()->switchTab(1),command);
-        addTab("作战",2,x+12+tabWidth*2,tabWidth-3,()->{switchTab(2);send("TOPIC:campaign");},"");
-        addTab("通讯录",4,x+12+tabWidth*3,tabWidth-3,()->switchTab(4),"");
-        addTab("运输部门",6,x+12+tabWidth*4,tabWidth-3,()->{switchTab(6);send("TRANSPORT:status");},command);
-        addButton("关闭", x + panelWidth - 60, y + 12, 48, this::onClose, "");
+        addTab(I18n.get("screen.projectseele.phone.talk"),0,x+12,tabWidth-3,()->switchTab(0),"");
+        addTab(I18n.get("screen.projectseele.phone.command"),1,x+12+tabWidth,tabWidth-3,()->switchTab(1),command);
+        addTab(I18n.get("screen.projectseele.phone.missions"),2,x+12+tabWidth*2,tabWidth-3,()->{switchTab(2);send("TOPIC:campaign");},"");
+        addTab(I18n.get("screen.projectseele.phone.contacts"),4,x+12+tabWidth*3,tabWidth-3,()->switchTab(4),"");
+        addTab(I18n.get("screen.projectseele.phone.transport"),6,x+12+tabWidth*4,tabWidth-3,()->{switchTab(6);send("TRANSPORT:status");},command);
+        addButton(I18n.get("screen.projectseele.phone.close"), x + panelWidth - 60, y + 12, 48, this::onClose, "");
         int controlsY = controlsTop();
         buildingControls=true;
         int column = (panelWidth - 32) / 3;
         if (tab == 0)
         {
-            String[][] topics = {{"当前状态", "status"}, {"道路指引", "directions"}, {"同步与驾驶", "sync"},
-                    {"插入栓接入", "plug"}, {"供电与回收", "power"}, {"聊一会儿", "chat"}};
+            String[][] topics = {{I18n.get("screen.projectseele.phone.status"), "status"}, {I18n.get("screen.projectseele.phone.directions"), "directions"}, {I18n.get("screen.projectseele.phone.pilot_sync"), "sync"},
+                    {I18n.get("screen.projectseele.phone.entry_plug"), "plug"}, {I18n.get("screen.projectseele.phone.power_and_recovery"), "power"}, {I18n.get("screen.projectseele.phone.chat"), "chat"}};
             for (int i = 0; i < topics.length; i++)
             {
                 String request = "TOPIC:" + topics[i][1];
@@ -114,22 +117,22 @@ public final class StaffConversationScreen extends Screen
         else if (tab == 1)
         {
             int half=(panelWidth-28)/2;
-            addButton("机体整备与发射",x+12,controlsY,half,()->switchTab(8),command);
-            addButton("驾驶员安排",x+16+half,controlsY,half,()->switchTab(9),denial("board"));
-            addButton("武器井与装备",x+12,controlsY+22,half,()->switchTab(10),denial("weapons"));
-            addButton("城市升降",x+16+half,controlsY+22,half,()->{switchTab(5);send("TOPIC:city");},denial("city_rise"));
-            addButton("地下出口门控",x+12,controlsY+44,panelWidth-24,()->switchTab(11),denial("deploy"));
+            addButton(I18n.get("screen.projectseele.phone.prep_and_launch"),x+12,controlsY,half,()->switchTab(8),command);
+            addButton(I18n.get("screen.projectseele.phone.assign_pilots"),x+16+half,controlsY,half,()->switchTab(9),denial("board"));
+            addButton(I18n.get("screen.projectseele.phone.weapons_and_silos"),x+12,controlsY+22,half,()->switchTab(10),denial("weapons"));
+            addButton(I18n.get("screen.projectseele.phone.raise_or_lower_city"),x+16+half,controlsY+22,half,()->{switchTab(5);send("TOPIC:city");},denial("city_rise"));
+            addButton(I18n.get("screen.projectseele.phone.underground_gates"),x+12,controlsY+44,panelWidth-24,()->switchTab(11),denial("deploy"));
         }
         else if (tab == 8)
         {
             for (int i = 0; i < 3; i++)
             {
                 final int selection = i;
-                addButton((unit == i ? "● " : "") + com.projectseele.world.NervStaffDialogue.unitName(i),
+                addButton((unit == i ? "● " : "") + unitName(i),
                         x + 12 + i * (column + 4), controlsY, column, () -> { unit = selection; rebuildWidgets(); }, "");
             }
             String[] commands = {"整备", "发射", "回收"};
-            String[] labels = {"仅整备", "确认发射", "回收"};
+            String[] labels = {I18n.get("screen.projectseele.phone.prep_only"), I18n.get("screen.projectseele.phone.confirm_launch"), I18n.get("screen.projectseele.phone.recover")};
             for (int i = 0; i < commands.length; i++)
             {
                 String action = commands[i];
@@ -137,40 +140,40 @@ public final class StaffConversationScreen extends Screen
                         () -> send(action + " 0" + unit), denial(new String[]{"prepare","launch","recover"}[i]));
             }
             int half = (panelWidth - 28) / 2;
-            addButton("整备＋地表出口", x + 12, controlsY + 44, half, () -> send("OUTLET:"+unit+":surface"), denial("deploy"));
-            addButton("整备＋地下出口", x + 16 + half, controlsY + 44, half,
+            addButton(I18n.get("screen.projectseele.phone.prep_surface"), x + 12, controlsY + 44, half, () -> send("OUTLET:"+unit+":surface"), denial("deploy"));
+            addButton(I18n.get("screen.projectseele.phone.prep_geofront"), x + 16 + half, controlsY + 44, half,
                     () -> send("OUTLET:"+unit+":geofront"), denial("deploy"));
-            addButton("整备＋箱根出口", x + 12, controlsY + 66, half,
+            addButton(I18n.get("screen.projectseele.phone.prep_hakone"), x + 12, controlsY + 66, half,
                     () -> send("OUTLET:"+unit+":hakone"), denial("deploy"));
-            addButton("取消后续操作", x + 16 + half, controlsY + 66, half, () -> send("停止操作"), "");
+            addButton(I18n.get("screen.projectseele.phone.cancel_queued_orders"), x + 16 + half, controlsY + 66, half, () -> send("停止操作"), "");
         }
         else if(tab==9)
         {
             selectUnit(controlsY,column);
             int half=(panelWidth-28)/2;
-            addButton("驾驶员登机",x+12,controlsY+22,half,()->send("BOARD:"+unit),denial("board"));
-            addButton("下机返回待命",x+16+half,controlsY+22,half,()->send("STANDBY:"+unit),denial("board"));
-            addButton("询问驾驶员状态",x+12,controlsY+44,half,()->send("PILOT:"+unit),"");
-            addButton("与驾驶员聊一会儿",x+16+half,controlsY+44,half,()->send("PILOTCHAT:"+unit),"");
+            addButton(I18n.get("screen.projectseele.phone.board_eva"),x+12,controlsY+22,half,()->send("BOARD:"+unit),denial("board"));
+            addButton(I18n.get("screen.projectseele.phone.disembark_and_stand_by"),x+16+half,controlsY+22,half,()->send("STANDBY:"+unit),denial("board"));
+            addButton(I18n.get("screen.projectseele.phone.ask_pilot_status"),x+12,controlsY+44,half,()->send("PILOT:"+unit),"");
+            addButton(I18n.get("screen.projectseele.phone.chat_with_pilot"),x+16+half,controlsY+44,half,()->send("PILOTCHAT:"+unit),"");
         }
         else if(tab==10)
         {
-            addButton("部署就近步枪井",x+12,controlsY,panelWidth-24,()->send("WEAPONS"),denial("weapons"));
-            addButton("部署零号机专用盾井",x+12,controlsY+22,panelWidth-24,()->send("WEAPONS:shield"),denial("weapons"));
-            addButton("部署二号机专用剑井",x+12,controlsY+44,panelWidth-24,()->send("WEAPONS:sword"),denial("weapons"));
+            addButton(I18n.get("screen.projectseele.phone.deploy_nearest_rifle_silo"),x+12,controlsY,panelWidth-24,()->send("WEAPONS"),denial("weapons"));
+            addButton(I18n.get("screen.projectseele.phone.deploy_unit_00_shield_silo"),x+12,controlsY+22,panelWidth-24,()->send("WEAPONS:shield"),denial("weapons"));
+            addButton(I18n.get("screen.projectseele.phone.deploy_unit_02_sword_silo"),x+12,controlsY+44,panelWidth-24,()->send("WEAPONS:sword"),denial("weapons"));
         }
         else if(tab==11)
         {
             selectUnit(controlsY,column);
             int half=(panelWidth-28)/2;
-            addButton("开启已出动机体地下门",x+12,controlsY+22,half,()->send("UNDERGROUND:"+unit+":door_open"),denial("deploy"));
-            addButton("关闭本机地下紧急门",x+16+half,controlsY+22,half,()->send("UNDERGROUND:"+unit+":close"),denial("deploy"));
+            addButton(I18n.get("screen.projectseele.phone.open_deployed_unit_s_gate"),x+12,controlsY+22,half,()->send("UNDERGROUND:"+unit+":door_open"),denial("deploy"));
+            addButton(I18n.get("screen.projectseele.phone.close_underground_gate"),x+16+half,controlsY+22,half,()->send("UNDERGROUND:"+unit+":close"),denial("deploy"));
         }
         else if(tab==2)
         {
-            addButton("任务简报",x+12,controlsY,panelWidth-24,()->send("TOPIC:campaign"),"");
-            addButton("选择任务与编队",x+12,controlsY+22,panelWidth-24,()->switchTab(12),denial("campaign"));
-            addButton("城市协同档案",x+12,controlsY+44,panelWidth-24,()->{switchTab(7);send("COORD:status");},command);
+            addButton(I18n.get("screen.projectseele.phone.mission_briefing"),x+12,controlsY,panelWidth-24,()->send("TOPIC:campaign"),"");
+            addButton(I18n.get("screen.projectseele.phone.choose_mission_and_crew"),x+12,controlsY+22,panelWidth-24,()->switchTab(12),denial("campaign"));
+            addButton(I18n.get("screen.projectseele.phone.city_coordination_file"),x+12,controlsY+44,panelWidth-24,()->{switchTab(7);send("COORD:status");},command);
         }
         else if(tab==12)
         {
@@ -182,33 +185,33 @@ public final class StaffConversationScreen extends Screen
             for(int i=0;i<missions.size();i++)
             {
                 var entry=missions.get(i);String selected=entry.id();
-                addButton((mission.equals(selected)?"● ":"")+entry.title(),x+12+i*(choice+4),controlsY,choice,
+                addButton((mission.equals(selected)?"● ":"")+I18n.get("mission.projectseele." + entry.id() + ".title"),x+12+i*(choice+4),controlsY,choice,
                         ()->{mission=selected;if(selected.equals("ramiel")){sortieCrewR54.putIfAbsent(0,"npc");String self=minecraft.player.getUUID().toString();sortieCrewR54.putIfAbsent(1,sortieCrewR54.containsValue(self)?"npc":self);}send("CAMPAIGN:select:"+selected);rebuildWidgets();},campaign);
             }
             for(int i=0;i<3;i++)
             {
                 int selection=i;
-                addButton(com.projectseele.world.NervStaffDialogue.unitName(i)+"："+crewLabelR54(i)+"（点击更换）",x+12,controlsY+22+i*22,panelWidth-24,()->{cycleCrewR54(selection);rebuildWidgets();},"");
+                addButton(unitName(i)+"："+crewLabelR54(i)+I18n.get("screen.projectseele.phone.click_to_change"),x+12,controlsY+22+i*22,panelWidth-24,()->{cycleCrewR54(selection);rebuildWidgets();},"");
             }
             if(mission.equals("ramiel"))
-                addButton("任务装备：初号机用炮，零号机持盾",x+12,controlsY+88,panelWidth-24,()->{},"拉米尔作战的装备固定，无需更换");
-            else addButton("装备："+(sortieEquipment.equals("rifle")?"步枪":"近战")+"（点击更换）",x+12,controlsY+88,panelWidth-24,()->{sortieEquipment=sortieEquipment.equals("rifle")?"melee":"rifle";rebuildWidgets();},"");
-            addButton("确认出击",x+12,controlsY+110,half,()->send(formationRequestR54()),
-                    !campaign.isEmpty()?campaign:sortieCrewR54.isEmpty()?"请先为至少一台机体安排驾驶员":"");
-            addButton("结束任务",x+16+half,controlsY+110,half,()->send("CAMPAIGN:cancel"),campaign);
-            addButton("任务进度与编队",x+12,controlsY+132,panelWidth-24,()->send("TOPIC:campaign"),"");
+                addButton(I18n.get("screen.projectseele.phone.unit_01_takes_the_cannon_unit_00_takes_the_shield"),x+12,controlsY+88,panelWidth-24,()->{},I18n.get("screen.projectseele.phone.equipment_for_the_ramiel_operation_is_fixed"));
+            else addButton(I18n.get("screen.projectseele.phone.loadout")+(sortieEquipment.equals("rifle")?I18n.get("screen.projectseele.phone.rifle"):I18n.get("screen.projectseele.phone.melee"))+I18n.get("screen.projectseele.phone.click_to_change"),x+12,controlsY+88,panelWidth-24,()->{sortieEquipment=sortieEquipment.equals("rifle")?"melee":"rifle";rebuildWidgets();},"");
+            addButton(I18n.get("screen.projectseele.phone.confirm_sortie"),x+12,controlsY+110,half,()->send(formationRequestR54()),
+                    !campaign.isEmpty()?campaign:sortieCrewR54.isEmpty()?I18n.get("screen.projectseele.phone.assign_at_least_one_pilot_first"):"");
+            addButton(I18n.get("screen.projectseele.phone.end_mission"),x+16+half,controlsY+110,half,()->send("CAMPAIGN:cancel"),campaign);
+            addButton(I18n.get("screen.projectseele.phone.progress_and_formation"),x+12,controlsY+132,panelWidth-24,()->send("TOPIC:campaign"),"");
         }
         else if(tab==7)
         {
-            addButton("档案阅读与共享",x+12,controlsY,panelWidth-24,()->switchTab(13),command);
-            addButton("城市供电与复测",x+12,controlsY+22,panelWidth-24,()->switchTab(14),command);
-            addButton("参与机体与确认",x+12,controlsY+44,panelWidth-24,()->switchTab(15),command);
+            addButton(I18n.get("screen.projectseele.phone.read_and_share_records"),x+12,controlsY,panelWidth-24,()->switchTab(13),command);
+            addButton(I18n.get("screen.projectseele.phone.city_power_and_retesting"),x+12,controlsY+22,panelWidth-24,()->switchTab(14),command);
+            addButton(I18n.get("screen.projectseele.phone.units_and_confirmation"),x+12,controlsY+44,panelWidth-24,()->switchTab(15),command);
         }
         else if(tab==13||tab==14)
         {
             String[][] actions=tab==13
-                    ?new String[][]{{"接受档案","start"},{"当前状态","status"},{"原页","read/page"},{"译注","read/annotation"},{"现场记录","read/field"},{"共享三份记录","share"},{"保留司令档案","private"},{"撤销调度","cancel"}}
-                    :new String[][]{{"城市下降 · 保电","evacuate/services"},{"城市下降 · 蓄能","evacuate/storage"},{"委派远山复测","test/delegate"},{"亲自到站复测","test/onsite"},{"保电 · 等两轮","supply/services"},{"备用馈线 · 一轮","supply/reserve"},{"归档准备结果","finish"},{"当前状态","status"}};
+                    ?new String[][]{{I18n.get("screen.projectseele.phone.accept_file"),"start"},{I18n.get("screen.projectseele.phone.status"),"status"},{I18n.get("screen.projectseele.phone.original_page"),"read/page"},{I18n.get("screen.projectseele.phone.annotations"),"read/annotation"},{I18n.get("screen.projectseele.phone.field_notes"),"read/field"},{I18n.get("screen.projectseele.phone.share_three_records"),"share"},{I18n.get("screen.projectseele.phone.keep_command_file"),"private"},{I18n.get("screen.projectseele.phone.revoke_dispatch"),"cancel"}}
+                    :new String[][]{{I18n.get("screen.projectseele.phone.lower_city_keep_power"),"evacuate/services"},{I18n.get("screen.projectseele.phone.lower_city_store_power"),"evacuate/storage"},{I18n.get("screen.projectseele.phone.delegate_mountain_test"),"test/delegate"},{I18n.get("screen.projectseele.phone.retest_at_station"),"test/onsite"},{I18n.get("screen.projectseele.phone.keep_power_two_cycles"),"supply/services"},{I18n.get("screen.projectseele.phone.backup_feed_one_cycle"),"supply/reserve"},{I18n.get("screen.projectseele.phone.file_prep_results"),"finish"},{I18n.get("screen.projectseele.phone.status"),"status"}};
             int half=(panelWidth-28)/2;
             for(int i=0;i<actions.length;i++)
             {
@@ -219,13 +222,13 @@ public final class StaffConversationScreen extends Screen
         else if(tab==15)
         {
             int half=(panelWidth-28)/2;
-            addButton("编成机体："+com.projectseele.world.TvSortiesR32.name(unit),x+12,controlsY,half,()->{unit=(unit+1)%5;if(unit>=3)npcSortie=false;rebuildWidgets();},"");
-            String driverLabel=npcSortie?"驾驶员："+com.projectseele.entity.TrainingPilotEntity.pilotName(unit):"驾驶者："+humanPilotName();
-            addButton(driverLabel+" / 切换",x+16+half,controlsY,half,()->{cycleParticipant();rebuildWidgets();},"");
-            addButton("加入编成",x+12,controlsY+22,column,()->send("COORD:assign/"+unit+"/"+(unit<3&&npcSortie?"npc":"human/"+selectedHuman())),"");
-            String archive=view.coordinationFormationRevision()>0?"":"需要先接受城市协同档案";
-            addButton("确认说明与待命",x+16+column,controlsY+22,column,()->send("COORD:consent/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),archive);
-            addButton("驾驶员撤回",x+20+column*2,controlsY+22,column,()->send("COORD:withdraw/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),archive);
+            addButton(I18n.get("screen.projectseele.phone.formation_unit")+com.projectseele.world.TvSortiesR32.name(unit),x+12,controlsY,half,()->{unit=(unit+1)%5;if(unit>=3)npcSortie=false;rebuildWidgets();},"");
+            String driverLabel=npcSortie?I18n.get("screen.projectseele.phone.pilot")+StaffDialogueCatalogR24.pilotName(unit).getString():I18n.get("screen.projectseele.phone.player")+humanPilotName();
+            addButton(driverLabel+I18n.get("screen.projectseele.phone.switch"),x+16+half,controlsY,half,()->{cycleParticipant();rebuildWidgets();},"");
+            addButton(I18n.get("screen.projectseele.phone.join_formation"),x+12,controlsY+22,column,()->send("COORD:assign/"+unit+"/"+(unit<3&&npcSortie?"npc":"human/"+selectedHuman())),"");
+            String archive=view.coordinationFormationRevision()>0?"":I18n.get("screen.projectseele.phone.accept_the_city_coordination_file_first");
+            addButton(I18n.get("screen.projectseele.phone.acknowledge_and_stand_by"),x+16+column,controlsY+22,column,()->send("COORD:consent/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),archive);
+            addButton(I18n.get("screen.projectseele.phone.withdraw_pilot"),x+20+column*2,controlsY+22,column,()->send("COORD:withdraw/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),archive);
         }
         else if(tab==6)
         {
@@ -236,63 +239,63 @@ public final class StaffConversationScreen extends Screen
                     :minecraft.player.blockPosition();
             for(int i=0;i<3;i++)
             {
-                int selection=i;addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),x+12+i*(column+4),controlsY,column,()->{unit=selection;rebuildWidgets();},"");
+                int selection=i;addButton((unit==i?"● ":"")+unitName(i),x+12+i*(column+4),controlsY,column,()->{unit=selection;rebuildWidgets();},"");
             }
             int half=(panelWidth-28)/2;
-            transportX=new PhoneUiR54.Field(font,x+12,controlsY+24,column,20,Component.literal("目的地 X"),PhoneUiR54.NERV);transportY=new PhoneUiR54.Field(font,x+16+column,controlsY+24,column,20,Component.literal("目的地 Y"),PhoneUiR54.NERV);transportZ=new PhoneUiR54.Field(font,x+20+column*2,controlsY+24,column,20,Component.literal("目的地 Z"),PhoneUiR54.NERV);
+            transportX=new PhoneUiR54.Field(font,x+12,controlsY+24,column,20,Component.translatable("screen.projectseele.phone.destination_x"),PhoneUiR54.NERV);transportY=new PhoneUiR54.Field(font,x+16+column,controlsY+24,column,20,Component.translatable("screen.projectseele.phone.destination_y"),PhoneUiR54.NERV);transportZ=new PhoneUiR54.Field(font,x+20+column*2,controlsY+24,column,20,Component.translatable("screen.projectseele.phone.destination_z"),PhoneUiR54.NERV);
             transportY.setMaxLength(10);transportY.setFilter(s->s.matches("-?\\d*"));transportY.setValue(enteredY==null?Integer.toString(feet.getY()):enteredY);addRenderableWidget(transportY);
-            transportX.setHint(Component.literal("X"));transportY.setHint(Component.literal("Y · 脚下高度"));transportZ.setHint(Component.literal("Z"));
+            transportX.setHint(Component.literal("X"));transportY.setHint(Component.translatable("screen.projectseele.phone.y_ground_level"));transportZ.setHint(Component.literal("Z"));
             transportX.setMaxLength(10);transportZ.setMaxLength(10);transportX.setFilter(s->s.matches("-?\\d*"));transportZ.setFilter(s->s.matches("-?\\d*"));
             transportX.setValue(enteredX==null?Integer.toString(feet.getX()):enteredX);transportZ.setValue(enteredZ==null?Integer.toString(feet.getZ()):enteredZ);addRenderableWidget(transportX);addRenderableWidget(transportZ);
             controlRows.put(transportX,transportX.getY());controlRows.put(transportY,transportY.getY());controlRows.put(transportZ,transportZ.getY());
-            addButton("投放至 X / Y / Z",x+12,controlsY+48,column,()->send("TRANSPORT:deliver:"+unit+":"+transportX.getValue()+":"+transportY.getValue()+":"+transportZ.getValue()),"");
-            addButton("空运回库",x+16+column,controlsY+48,column,()->send("TRANSPORT:recover:"+unit+(transportReturnExit==0?"":":unit"+unit+"/exit"+transportReturnExit+"/port")),"");
-            addButton("取消本机 / 安全返回",x+20+column*2,controlsY+48,column,()->send("TRANSPORT:cancel:"+unit),"");
-            String returnPort=switch(transportReturnExit){case 1->"GeoFront";case 2->"第三新东京";case 3->"箱根";default->"自动选路";};
-            addButton("回库接收口："+returnPort,x+12,controlsY+72,half,()->{String tx=transportX.getValue(),ty=transportY.getValue(),tz=transportZ.getValue();transportReturnExit=(transportReturnExit+1)%4;rebuildWidgets();transportX.setValue(tx);transportY.setValue(ty);transportZ.setValue(tz);},"");
-            addButton("运输状态",x+16+half,controlsY+72,half,()->send("TRANSPORT:status"),"");
+            addButton(I18n.get("screen.projectseele.phone.deliver_to_x_y_z"),x+12,controlsY+48,column,()->send("TRANSPORT:deliver:"+unit+":"+transportX.getValue()+":"+transportY.getValue()+":"+transportZ.getValue()),"");
+            addButton(I18n.get("screen.projectseele.phone.airlift_to_hangar"),x+16+column,controlsY+48,column,()->send("TRANSPORT:recover:"+unit+(transportReturnExit==0?"":":unit"+unit+"/exit"+transportReturnExit+"/port")),"");
+            addButton(I18n.get("screen.projectseele.phone.cancel_return_safely"),x+20+column*2,controlsY+48,column,()->send("TRANSPORT:cancel:"+unit),"");
+            String returnPort=switch(transportReturnExit){case 1->"GeoFront";case 2->I18n.get("screen.projectseele.phone.tokyo_3");case 3->I18n.get("screen.projectseele.phone.hakone");default->I18n.get("screen.projectseele.phone.auto_route");};
+            addButton(I18n.get("screen.projectseele.phone.return_port")+returnPort,x+12,controlsY+72,half,()->{String tx=transportX.getValue(),ty=transportY.getValue(),tz=transportZ.getValue();transportReturnExit=(transportReturnExit+1)%4;rebuildWidgets();transportX.setValue(tx);transportY.setValue(ty);transportZ.setValue(tz);},"");
+            addButton(I18n.get("screen.projectseele.phone.transport_status"),x+16+half,controlsY+72,half,()->send("TRANSPORT:status"),"");
         }
         else if (tab == 5)
         {
             int half=(panelWidth-28)/2;
-            addButton("城市上升",x+12,controlsY,half,()->send("城市上升"),denial("city_rise"));
-            addButton("城市下降",x+16+half,controlsY,half,()->send("城市下降"),denial("city_lower"));
-            addButton("查询城市状态",x+12,controlsY+22,panelWidth-24,()->send("TOPIC:city"),"");
+            addButton(I18n.get("screen.projectseele.phone.raise_city"),x+12,controlsY,half,()->send("城市上升"),denial("city_rise"));
+            addButton(I18n.get("screen.projectseele.phone.lower_city"),x+16+half,controlsY,half,()->send("城市下降"),denial("city_lower"));
+            addButton(I18n.get("screen.projectseele.phone.check_city_status"),x+12,controlsY+22,panelWidth-24,()->send("TOPIC:city"),"");
         }
         else if (tab == 4)
         {
-            String[] contacts = {"美里", "律子", "冬月", "摩耶"};
+            String[] contacts = {"misato", "ritsuko", "fuyutsuki", "maya"};
             int half = (panelWidth - 28) / 2;
             for (int i = 0; i < contacts.length; i++)
             {
                 String contact = contacts[i];
-                addButton(contact, x + 12 + (i % 2) * (half + 4), controlsY + (i / 2) * 22,
+                addButton(I18n.get("hud.projectseele.chat.name." + contact), x + 12 + (i % 2) * (half + 4), controlsY + (i / 2) * 22,
                         half, () -> send("CONTACT:" + contact), "");
             }
             for (int i = 0; i < 3; i++)
             {
                 int pilot = i;
-                addButton(com.projectseele.entity.TrainingPilotEntity.pilotName(i), x + 12 + i * (column + 4),
+                addButton(StaffDialogueCatalogR24.pilotName(i).getString(), x + 12 + i * (column + 4),
                         controlsY + 44, column, () -> { unit=pilot; send("PILOTCHAT:" + pilot); }, "");
             }
         }
         else
         {
-            String[][] destinations={{"指挥室入口","command"},{"机库","hangars"},{"总部火车站","station"},{"金字塔接驳站","pyramid_station"},{"发射区车站","launch_station"},{"观景走廊","observation"},{"终极教条前厅","dogma"},{"LCL 实验层","experiment"},{"最近电梯","nearest_lift"}};
+            String[][] destinations={{I18n.get("screen.projectseele.phone.control_room_entrance"),"command"},{I18n.get("screen.projectseele.phone.hangar"),"hangars"},{I18n.get("screen.projectseele.phone.hq_station"),"station"},{I18n.get("screen.projectseele.phone.pyramid_transfer_station"),"pyramid_station"},{I18n.get("screen.projectseele.phone.launch_area_station"),"launch_station"},{I18n.get("screen.projectseele.phone.observation_corridor"),"observation"},{I18n.get("screen.projectseele.phone.terminal_dogma_lobby"),"dogma"},{I18n.get("screen.projectseele.phone.lcl_research_floor"),"experiment"},{I18n.get("screen.projectseele.phone.nearest_lift"),"nearest_lift"}};
             for(int i=0;i<destinations.length;i++)
             {
                 String key=destinations[i][1];
                 addButton(destinations[i][0],x+12+(i%3)*(column+4),controlsY+(i/3)*22,column,()->send("ROUTE:"+key),"");
             }
-            addButton("停止步行引导",x+12,controlsY+66,panelWidth-24,()->send("ROUTE:stop"),"");
+            addButton(I18n.get("screen.projectseele.phone.stop_walking_directions"),x+12,controlsY+66,panelWidth-24,()->send("ROUTE:stop"),"");
         }
         buildingControls=false;applyControlScroll();
         int parent=parentTab();
-        if(parent>=0)addButton("← 返回"+(parent==0?"交谈":parent==1?"指挥分类":parent==2?"作战":"城市协同档案"),
+        if(parent>=0)addButton(I18n.get("screen.projectseele.phone.back_to")+(parent==0?I18n.get("screen.projectseele.phone.talk"):parent==1?I18n.get("screen.projectseele.phone.command_groups"):parent==2?I18n.get("screen.projectseele.phone.missions"):I18n.get("screen.projectseele.phone.city_coordination_file")),
                 x+12,y+panelHeight-55,panelWidth-24,()->switchTab(parent),"");
-        input = new PhoneUiR54.Field(font, x + 13, y + panelHeight - 28, panelWidth - 87, 19, Component.literal("输入交谈或指令"),PhoneUiR54.NERV);
-        input.setMaxLength(160);input.setValue(draft); input.setHint(Component.literal("输入消息或指令 · Enter 发送")); addRenderableWidget(input);
-        addButton("发送", x + panelWidth - 65, y + panelHeight - 29, 52, this::submitText, "");
+        input = new PhoneUiR54.Field(font, x + 13, y + panelHeight - 28, panelWidth - 87, 19, Component.translatable("screen.projectseele.phone.enter_a_message_or_command"),PhoneUiR54.NERV);
+        input.setMaxLength(160);input.setValue(draft); input.setHint(Component.translatable("screen.projectseele.phone.message_or_command_enter_to_send")); addRenderableWidget(input);
+        addButton(I18n.get("screen.projectseele.phone.send"), x + panelWidth - 65, y + panelHeight - 29, 52, this::submitText, "");
     }
 
     /** An empty denial enables the control; otherwise it is greyed out and the denial says why. */
@@ -333,11 +336,11 @@ public final class StaffConversationScreen extends Screen
     private UUID selectedHuman(){return humanPilot!=null?humanPilot:minecraft.player.getUUID();}
     private String crewLabelR54(int slot)
     {
-        String selected=sortieCrewR54.get(slot);if(selected==null)return "待命";
-        if(selected.equals("npc"))return com.projectseele.entity.TrainingPilotEntity.pilotName(slot);
-        if(selected.equals(minecraft.player.getUUID().toString()))return "我";
+        String selected=sortieCrewR54.get(slot);if(selected==null)return I18n.get("screen.projectseele.phone.standby");
+        if(selected.equals("npc"))return StaffDialogueCatalogR24.pilotName(slot).getString();
+        if(selected.equals(minecraft.player.getUUID().toString()))return I18n.get("screen.projectseele.phone.me");
         var player=minecraft.getConnection().getPlayerInfo(UUID.fromString(selected));
-        return player==null?"离线玩家":player.getProfile().getName();
+        return player==null?I18n.get("screen.projectseele.phone.offline_player"):player.getProfile().getName();
     }
     private void cycleCrewR54(int slot)
     {
@@ -357,8 +360,8 @@ public final class StaffConversationScreen extends Screen
     }
     private String humanPilotName()
     {
-        if(humanPilot==null||humanPilot.equals(minecraft.player.getUUID()))return "我";
-        var player=minecraft.getConnection().getPlayerInfo(humanPilot);return player==null?"离线玩家":player.getProfile().getName();
+        if(humanPilot==null||humanPilot.equals(minecraft.player.getUUID()))return I18n.get("screen.projectseele.phone.me");
+        var player=minecraft.getConnection().getPlayerInfo(humanPilot);return player==null?I18n.get("screen.projectseele.phone.offline_player"):player.getProfile().getName();
     }
     private void cycleParticipant()
     {
@@ -375,7 +378,7 @@ public final class StaffConversationScreen extends Screen
         for(int i=0;i<3;i++)
         {
             int selection=i;
-            addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),
+            addButton((unit==i?"● ":"")+unitName(i),
                     x+12+i*(column+4),top,column,()->{unit=selection;rebuildWidgets();},"");
         }
     }
@@ -405,7 +408,7 @@ public final class StaffConversationScreen extends Screen
     private String denial(String action)
     {
         boolean allowed=view.canCommand()&&(action.equals(StaffAuthorityR25.COMMAND)||StaffAuthorityR25.allows("",view.skin(),action));
-        return allowed?"":StaffAuthorityR25.denial(view.authorized(),view.skin(),action);
+        return allowed?"":StaffAuthorityR25.denialText(view.authorized(),view.skin(),action).getString();
     }
     private int controlsTop()
     {
@@ -418,6 +421,51 @@ public final class StaffConversationScreen extends Screen
         };
         return y+Math.max(Math.max(142,Math.min(170,panelHeight-120)),panelHeight-(rows*22+76));
     }
+    private static String unitName(int unit)
+    {
+        return OperationText.unit(unit).getString();
+    }
+
+    private static String unitStatus(String row)
+    {
+        if (!row.startsWith("unit:")) return row;
+        String[] parts = row.split(":", -1);
+        if (parts.length != 4 || !parts[1].matches("[0-2]")) return row;
+        String phase = "hud.projectseele.phase." + parts[2].toLowerCase(java.util.Locale.ROOT);
+        return I18n.get("1".equals(parts[3]) ? "hud.projectseele.chat.unit_status" : "hud.projectseele.chat.unit_unloaded",
+                unitName(Integer.parseInt(parts[1])), I18n.get(I18n.exists(phase) ? phase : "hud.projectseele.phase.unknown"));
+    }
+
+    private static String orderText(String row)
+    {
+        String[] fields = row.split(":", 3);
+        if (fields.length != 3 || !fields[0].equals("order") || !fields[1].matches("[0-2]")) return row;
+        return unitName(Integer.parseInt(fields[1])) + " · " + OperationText.read(fields[2]).getString();
+    }
+
+    private static String participantText(String row)
+    {
+        String[] fields = row.split(":", 6);
+        if (fields.length < 2 || !fields[0].equals("crew") || !fields[1].matches("[0-4]")) return row;
+        int unit = Integer.parseInt(fields[1]);
+        if (fields.length == 2) return I18n.get("ops.projectseele.formation.unassigned", unitName(unit));
+        if (fields.length != 6) return row;
+        String role = switch (fields[2])
+        {
+            case "cover" -> "ops.projectseele.formation.cover";
+            case "shooter" -> "ops.projectseele.formation.shooter";
+            default -> "ops.projectseele.formation.support";
+        };
+        String name = switch (fields[4])
+        {
+            case "npc" -> StaffDialogueCatalogR24.pilotName(unit).getString();
+            case "offline" -> I18n.get("ops.projectseele.formation.offline");
+            default -> fields[5];
+        };
+        String confirmation = I18n.get(fields[3].equals("1") ? "ops.projectseele.formation.confirmed" : "ops.projectseele.formation.pending");
+        return I18n.get("ops.projectseele.formation.row", unitName(unit), name, I18n.get(role), confirmation);
+    }
+
     private void submitText() { if (!input.getValue().isBlank()) { send(input.getValue()); input.setValue(""); } }
     private void send(String request)
     {
@@ -445,28 +493,28 @@ public final class StaffConversationScreen extends Screen
     {
         renderBackground(graphics);
         var theme=PhoneUiR54.NERV;
-        PhoneUiR54.frame(graphics,font,theme,x,y,panelWidth,panelHeight,"指挥通信",
-                view.name()+"  ·  "+view.role()+"  /  无线电频道");
+        PhoneUiR54.frame(graphics,font,theme,x,y,panelWidth,panelHeight,I18n.get("screen.projectseele.phone.command_radio"),
+                StaffDialogueCatalogR24.speaker(view.name()).getString()+"  ·  "+(I18n.exists(view.role())?I18n.get(view.role()):view.role())+I18n.get("screen.projectseele.phone.radio_channel"));
         int bottom=controlsTop()-28;replyTop=y+99;
         PhoneUiR54.card(graphics,font,theme,x+8,y+78,panelWidth-16,bottom-(y+78)+4,
-                tab==2||tab==12?"任务简报":"状态与回复",view.canCommand()?"指挥权限":"交谈权限");
+                tab==2||tab==12?I18n.get("screen.projectseele.phone.mission_briefing"):I18n.get("screen.projectseele.phone.status_and_replies"),view.canCommand()?I18n.get("screen.projectseele.phone.command_access"):I18n.get("screen.projectseele.phone.talk_access"));
         var transcript=new StringBuilder();
-        if(tab<2&&!view.units().isEmpty())transcript.append("机体状态\n").append(String.join("\n",view.units())).append("\n\n");
-        else if(tab==15&&view.participants().size()>unit)transcript.append("当前编成\n").append(view.participants().get(unit)).append("\n\n");
-        if(!view.order().isBlank())transcript.append("当前调度\n").append(view.order()).append("\n\n");
-        if(tab!=2&&tab!=12)transcript.append("回复\n");
-        transcript.append(view.reply());
+        if(tab<2&&!view.units().isEmpty())transcript.append(I18n.get("screen.projectseele.phone.unit_status_n")).append(String.join("\n",view.units().stream().map(StaffConversationScreen::unitStatus).toList())).append("\n\n");
+        else if(tab==15&&view.participants().size()>unit)transcript.append(I18n.get("screen.projectseele.phone.current_formation_n")).append(participantText(view.participants().get(unit))).append("\n\n");
+        if(!view.order().isBlank())transcript.append(I18n.get("screen.projectseele.phone.current_orders_n")).append(view.order().equals("staff.projectseele.information_only") ? I18n.get(view.order(), denial(StaffAuthorityR25.COMMAND)) : orderText(view.order())).append("\n\n");
+        if(tab!=2&&tab!=12)transcript.append(I18n.get("screen.projectseele.phone.reply_n"));
+        transcript.append(StaffDialogueCatalogR24.replyComponent(view.reply()).getString());
         replyScroll=PhoneUiR54.text(graphics,font,theme,transcript.toString(),x+16,replyTop,panelWidth-32,
                 Math.max(0,bottom-replyTop),replyScroll);
-        String section=switch(tab){case 0->"交谈主题";case 1->"指挥分类";case 2->"作战任务";case 3->"步行引导";case 4->"通讯录";case 5->"城市升降";case 6->"运输调度 · 目的地 X / Y / Z";case 7->"城市协同档案";case 8->"机体整备与发射";case 9->"驾驶员安排";case 10->"武器井与装备";case 11->"地下出口门控";case 12->"任务与出击编队";case 13->"档案阅读与共享";case 14->"城市供电与复测";case 15->"参与机体与确认";default->"操作";};
-        String meta=pageDenials.isEmpty()?"":pageDenials.size()==1?"灰色按钮："+pageDenials.iterator().next():"悬停灰色按钮可查看原因";
-        if(controlsScrollMax>0)meta=meta.isEmpty()?"滚轮浏览":meta+"  ·  滚轮浏览";
+        String section=switch(tab){case 0->I18n.get("screen.projectseele.phone.topics");case 1->I18n.get("screen.projectseele.phone.command_groups");case 2->I18n.get("screen.projectseele.phone.operations");case 3->I18n.get("screen.projectseele.phone.walking_directions");case 4->I18n.get("screen.projectseele.phone.contacts");case 5->I18n.get("screen.projectseele.phone.raise_or_lower_city");case 6->I18n.get("screen.projectseele.phone.transport_destination_x_y_z");case 7->I18n.get("screen.projectseele.phone.city_coordination_file");case 8->I18n.get("screen.projectseele.phone.prep_and_launch");case 9->I18n.get("screen.projectseele.phone.assign_pilots");case 10->I18n.get("screen.projectseele.phone.weapons_and_silos");case 11->I18n.get("screen.projectseele.phone.underground_gates");case 12->I18n.get("screen.projectseele.phone.mission_and_sortie_crew");case 13->I18n.get("screen.projectseele.phone.read_and_share_records");case 14->I18n.get("screen.projectseele.phone.city_power_and_retesting");case 15->I18n.get("screen.projectseele.phone.units_and_confirmation");default->I18n.get("screen.projectseele.phone.actions");};
+        String meta=pageDenials.isEmpty()?"":pageDenials.size()==1?I18n.get("screen.projectseele.phone.disabled")+pageDenials.iterator().next():I18n.get("screen.projectseele.phone.hover_over_a_disabled_action_for_details");
+        if(controlsScrollMax>0)meta=meta.isEmpty()?I18n.get("screen.projectseele.phone.scroll_for_more"):meta+I18n.get("screen.projectseele.phone.scroll_for_more_inline");
         PhoneUiR54.card(graphics,font,theme,x+8,controlsTop()-21,panelWidth-16,
                 controlsBottom()-controlsTop()+24,section,meta);
         PhoneUiR54.scrollbar(graphics,theme,x+panelWidth-10,controlsTop(),controlsBottom()-controlsTop(),
                 controlsBottom()-controlsTop()+controlsScrollMax,controlsBottom()-controlsTop(),controlsScroll);
         graphics.fill(x+12,y+panelHeight-34,x+panelWidth-12,y+panelHeight-33,theme.border());
-        if(parentTab()<0)graphics.drawString(font,"输入消息与指令    ·    Enter 发送",x+13,y+panelHeight-49,theme.muted(),false);
+        if(parentTab()<0)graphics.drawString(font,I18n.get("screen.projectseele.phone.message_or_command_enter_to_send_inline"),x+13,y+panelHeight-49,theme.muted(),false);
         super.render(graphics, mouseX, mouseY, partial);
     }
     @Override public void onClose() { send("CLOSE"); super.onClose(); }

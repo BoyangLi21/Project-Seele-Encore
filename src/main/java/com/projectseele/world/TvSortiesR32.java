@@ -47,26 +47,27 @@ public final class TvSortiesR32
         var l=TvCampaignDirector.level(caller);
         if(l==null||l!=caller.level()||!NervStaffDialogue.authorized(caller)||unit<0||unit>4||npc&&unit>2)return 0;
         if(unit<3&&(StaffRecoveryR47.pending(l,unit)||PilotReturnR39.pending(l,unit)))
-        {caller.sendSystemMessage(Component.literal("这台机体仍在回收入库，驾驶员交接完成后再加入支援。"));return 0;}
+        {caller.sendSystemMessage(Component.translatable("message.projectseele.sortie.wait_recovery"));return 0;}
         var d=TvCampaignSavedData.get(l);if(d.active.isEmpty()||Set.of("cancel","failure","combat_victory","episode_archived").contains(d.phase)||d.targetDeathConfirmedR45)return 0;
         String supportBlocker=TvEncounterRulesR45.formationSlotBlockerR47(l,d.active,unit);
-        if(!supportBlocker.isEmpty()){caller.sendSystemMessage(Component.literal(supportBlocker));return 0;}
+        if(!supportBlocker.isEmpty()){caller.sendSystemMessage(OperationText.read(supportBlocker));return 0;}
         var current=d.sorties.get(unit);
         if(current!=null)
         {
             boolean same=current.npc==npc&&(npc||caller.getUUID().equals(current.commander));
-            caller.sendSystemMessage(Component.literal(name(unit)+(same?"已在出击编队中。"
-                    :current.npc?"已编入 NPC 驾驶员；真人驾驶请在开始作战前于编队面板选择。":"已由其他驾驶员编入。")));
+            caller.sendSystemMessage(Component.translatable(same ? "ops.projectseele.sortie.already_assigned"
+                    : current.npc ? "ops.projectseele.sortie.npc_assigned"
+                    : "ops.projectseele.sortie.other_pilot", OperationText.unit(unit)));
             return same?1:0;
         }
         var e=unit(l,unit);
         if(e!=null&&TvMissionEquipmentR45.awaitingPhysicalReturn(e))
-        {caller.sendSystemMessage(Component.literal("炮、盾尚未归还，请完成装备回收后再出击。"));return 0;}
+        {caller.sendSystemMessage(Component.translatable("message.projectseele.sortie.return_weapons"));return 0;}
         if(e!=null&&e.getPilotEntity()!=null&&(npc?!(e.getPilotEntity() instanceof TrainingPilotEntity pilot&&pilot.getAssignedVariant()==unit):e.getPilotEntity()!=caller))
-        {caller.sendSystemMessage(Component.literal("这台机体已有其他驾驶员，不能接管。"));return 0;}
+        {caller.sendSystemMessage(Component.translatable("message.projectseele.sortie.occupied"));return 0;}
         d.assign(unit,caller.getUUID(),npc,rifle&&npc);
         stampCommanderR55(l,d.sorties.get(unit));
-        NervStaffDialogue.say(caller,"葛城美里 · 作战通信",name(unit)+"加入迎击。正在交战的机体继续牵制，支援机到达后从侧面接应。");
+        NervStaffDialogue.say(caller,"葛城美里 · 作战通信",OperationText.format("ops.projectseele.sortie.reinforcement", OperationText.unit(unit)));
         return 1;
     }
     /** Each accepted operation re-stamps its parked originals, so an

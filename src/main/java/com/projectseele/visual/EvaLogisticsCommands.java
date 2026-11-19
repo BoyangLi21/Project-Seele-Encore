@@ -27,13 +27,13 @@ import java.util.Locale;
 public final class EvaLogisticsCommands
 {
     private static final SimpleCommandExceptionType UNKNOWN_VARIANT = new SimpleCommandExceptionType(
-            Component.literal("机体请用 unit00、unit01、unit02 或 all（也可写 0、1、2、rei、shinji、asuka）。"));
+            Component.translatable("message.projectseele.eva_unit_argument"));
     private static final SimpleCommandExceptionType NO_GEOFRONT = new SimpleCommandExceptionType(
-            Component.literal("GeoFront 维度未加载。"));
+            Component.translatable("message.projectseele.geofront_unloaded"));
     /** The status line's key. Its arguments: the Unit's label, its phase's name, loaded or not, then what a pilot need not see. */
     public static final String STATUS_KEY = "message.projectseele.eva_status";
     /** The third argument of a Unit that is not loaded. */
-    public static final String STATUS_UNLOADED = "未加载";
+    public static final String STATUS_UNLOADED = "message.projectseele.eva_unloaded";
 
     private EvaLogisticsCommands() {}
 
@@ -108,14 +108,10 @@ public final class EvaLogisticsCommands
             {
                 loaded++;
             }
-            // The line reads as it always did, in the chat and on the console (no language file has the key, so
-            // its fallback is what is shown). The key lets the pilot's chat panel know this line from any other
-            // and say the phase in plain words, without the registry id.
-            source.sendSuccess(() -> Component.translatableWithFallback(STATUS_KEY,
-                    "%s：阶段 %s，%s，登记 %s，LCL %s/%s 层，计时 %s",
+            source.sendSuccess(() -> Component.translatable(STATUS_KEY,
                     String.format(Locale.ROOT, "EVA-%02d", status.variant()), status.phase(),
-                    status.loaded() ? "已加载" : STATUS_UNLOADED,
-                    status.canonicalId() == null ? "无" : status.canonicalId().toString(),
+                    Component.translatable(status.loaded() ? "message.projectseele.eva_loaded" : STATUS_UNLOADED),
+                    status.canonicalId() == null ? Component.translatable("message.projectseele.eva_unregistered") : status.canonicalId().toString(),
                     String.valueOf(status.lclLayers()), String.valueOf(EvaHangarBuilder.LCL_SHOULDER_LAYERS),
                     String.valueOf(status.ticks())), false);
         }
@@ -133,7 +129,7 @@ public final class EvaLogisticsCommands
     {
         if (destination != null && !java.util.Set.of("geofront", "surface", "hakone").contains(destination))
         {
-            source.sendFailure(Component.literal("请选择 geofront（一号）、surface（二号）或 hakone（三号）。"));
+            source.sendFailure(Component.translatable("message.projectseele.eva_exit_argument"));
             return 0;
         }
         ServerLevel level = geoFront(source);
@@ -156,8 +152,7 @@ public final class EvaLogisticsCommands
                     ? EvaLogisticsDirector.requestPrepare(level, variant)
                     : NervRouteRuntimeR52.prepare(level, variant, destination);
             int current = variant;
-            source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d：%s", current, result.message())), false);
+            source.sendSuccess(() -> Component.translatable("ops.projectseele.un.unit_reply", String.format(Locale.ROOT, "EVA-%02d", current), com.projectseele.world.OperationText.read(result.message())), false);
             if (result.accepted())
             {
                 accepted++;
@@ -177,8 +172,7 @@ public final class EvaLogisticsCommands
             if (requested >= 0 && requested != variant) continue;
             ActionResult result = EvaLogisticsDirector.requestCancel(level, variant);
             int current = variant;
-            source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d：%s", current, result.message())), false);
+            source.sendSuccess(() -> Component.translatable("ops.projectseele.un.unit_reply", String.format(Locale.ROOT, "EVA-%02d", current), com.projectseele.world.OperationText.read(result.message())), false);
             if (result.accepted()) accepted++;
         }
         return accepted;
@@ -204,11 +198,9 @@ public final class EvaLogisticsCommands
             }
             EvaUnit01Entity unit;
             try{unit=EvaLogisticsDirector.forceReset(level,variant);}
-            catch(IllegalStateException held){source.sendFailure(Component.literal(held.getMessage()));continue;}
+            catch(IllegalStateException held){source.sendFailure(com.projectseele.world.OperationText.read(held.getMessage()));continue;}
             int current = variant;
-            source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d 已复位到当前机库，插入栓、驾驶员和登机桥同步恢复。",
-                    current)), false);
+            source.sendSuccess(() -> Component.translatable("message.projectseele.eva_reset", String.format(Locale.ROOT, "EVA-%02d", current)), false);
             reset++;
         }
         return reset;
@@ -243,8 +235,7 @@ public final class EvaLogisticsCommands
                     ? EvaLogisticsDirector.requestLaunch(level, variant)
                     : EvaLogisticsDirector.requestRecovery(level, variant);
             int current = variant;
-            source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d：%s", current, result.message())), false);
+            source.sendSuccess(() -> Component.translatable("ops.projectseele.un.unit_reply", String.format(Locale.ROOT, "EVA-%02d", current), com.projectseele.world.OperationText.read(result.message())), false);
             if (result.accepted())
             {
                 accepted++;
@@ -265,7 +256,7 @@ public final class EvaLogisticsCommands
         }
         TrainingPilotDirector.ActionResult result =
                 TrainingPilotDirector.start(level, variant);
-        source.sendSuccess(() -> Component.literal(result.message()), false);
+        source.sendSuccess(() -> com.projectseele.world.OperationText.read(result.message()), false);
         return result.accepted() ? 1 : 0;
     }
 
@@ -274,9 +265,9 @@ public final class EvaLogisticsCommands
     {
         ServerLevel level = geoFront(source);
         int accepted = TrainingPilotDirector.stop(level, parseVariant(raw));
-        source.sendSuccess(() -> Component.literal(accepted>0
-                ?"已接受 "+accepted+" 位驾驶员返回待命的指令。"
-                :"未执行离栓：请确认机体已回库停稳、原驾驶员已接通，并取消待执行出动指令。"), false);
+        source.sendSuccess(() -> accepted > 0
+                ? Component.translatable("message.projectseele.eva_standby_accepted", accepted)
+                : Component.translatable("message.projectseele.eva_standby_refused"), false);
         return accepted;
     }
 
@@ -301,17 +292,16 @@ public final class EvaLogisticsCommands
                     pilot.getVehicle() == null ? "none"
                             : pilot.getVehicle().getStringUUID(),
                     pilot.blockPosition().toShortString())), false);
-            source.sendSuccess(()->Component.literal("DUMMY PATH "+TrainingPilotDirector.routeTraceR47(level,pilot)),false);
+            source.sendSuccess(()->Component.translatable("message.projectseele.eva_logistics_commands.dummy_path_s", TrainingPilotDirector.routeTraceR47(level,pilot)),false);
             String fault=pilot.getPersistentData().getString("SeelePilotLastRouteFaultR47");
-            if(!fault.isEmpty())source.sendSuccess(()->Component.literal("DUMMY LAST FAULT "+fault),false);
+            if(!fault.isEmpty())source.sendSuccess(()->Component.translatable("message.projectseele.eva_logistics_commands.dummy_last_fault_s", fault),false);
             String nativeFault=pilot.getPersistentData().getString("SeelePilotNativePathFailureR47");
-            if(!nativeFault.isEmpty())source.sendSuccess(()->Component.literal("DUMMY LAST NATIVE PATH "+nativeFault),false);
+            if(!nativeFault.isEmpty())source.sendSuccess(()->Component.translatable("message.projectseele.eva_logistics_commands.dummy_last_native_path_s", nativeFault),false);
             count++;
         }
         if (count == 0)
         {
-            source.sendSuccess(() -> Component.literal(
-                    "No NERV training pilots are active."), false);
+            source.sendSuccess(() -> Component.translatable("message.projectseele.eva_no_pilots"), false);
         }
         return count;
     }
@@ -347,8 +337,7 @@ public final class EvaLogisticsCommands
         player.teleportTo(level, target.getX() + 0.5D, target.getY(),
                 target.getZ() + 0.5D, 0.0F, 4.0F);
         player.fallDistance=0;player.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
-        source.sendSuccess(() -> Component.literal(
-                "已到达 EVA 湿式机库观察与后勤廊。"), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.eva_hangar_arrival"), false);
         return 1;
     }
 

@@ -35,7 +35,7 @@ public final class TvMarineArrivalR50
         }
         eva.stopAutonomousR30();
         if(EvaAirTransportR31.active(eva)||NervAirLiftR30.deliveryPendingR50(level,eva,commander.getUUID()))
-        {data.notice="原重型运输机正将本机送往海战接应冠 · "+NervAirLiftR30.status(level);return true;}
+        {data.notice=OperationText.format("ops.projectseele.flight.marine", OperationText.read(NervAirLiftR30.status(level)));return true;}
         if(!EvaLogisticsDirector.status(level,eva.getUnitVariant()).phase().equals("DEPLOYED")||eva.getY()<64)
         {data.notice="等待原机按原机库与发射井流程抵达地表；地下不得起吊。";return true;}
         if(NervAirLiftR30.busy(level)){data.notice="等待原重型运输机完成当前任务，再接本机前往港区。";return true;}

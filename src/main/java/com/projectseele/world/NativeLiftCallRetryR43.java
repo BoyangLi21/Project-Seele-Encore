@@ -35,7 +35,7 @@ public final class NativeLiftCallRetryR43
         if(previous!=null&&Objects.equals(previous.button,button)&&Objects.equals(previous.gatewayTarget,target))return;
         var fake=player instanceof net.minecraftforge.common.util.FakePlayer?new java.lang.ref.WeakReference<ServerPlayer>(player):null;
         int tick=server.getTickCount();jobs.put(key,new Call(player.getUUID(),fake,player.level().dimension(),lift,button,target,tick,tick+lifetime));
-        player.displayClientMessage(Component.literal("呼叫已登记，请稍候。"),true);
+        player.displayClientMessage(Component.translatable("message.projectseele.lift.call_accepted"),true);
         ProjectSeele.LOGGER.info("Lift call waiting for native initialization: lift={} target={}",lift,target==null?button:target);
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
@@ -61,7 +61,7 @@ public final class NativeLiftCallRetryR43
             jobs.remove(entry.getKey());
             if(!ready)
             {
-                player.displayClientMessage(Component.literal("电梯暂时无法响应，请检查控制台。"),true);
+                player.displayClientMessage(Component.translatable("message.projectseele.lift.unresponsive"),true);
                 ProjectSeele.LOGGER.warn("Native lift call initialization timed out: lift={}",call.lift);continue;
             }
             // Re-enter the normal handler so card/egress, cage identity and

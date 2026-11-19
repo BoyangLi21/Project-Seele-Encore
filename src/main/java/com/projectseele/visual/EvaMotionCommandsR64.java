@@ -41,11 +41,8 @@ public final class EvaMotionCommandsR64
 
     private static int status(CommandSourceStack source)
     {
-        source.sendSuccess(() -> Component.literal("EVA movement: " + SeeleConfig.EVA_MOTION_MODEL.get()
-                + ", gait tier " + SeeleConfig.EVA_GAIT_TIER.get()
-                + ", jump " + Math.round(SeeleConfig.EVA_JUMP_HEIGHT.get()) + " blocks"
-                + " (planted is Unit-01 only for now; /seele motion legacy|planted, /seele motion tier A|B|C,"
-                + " /seele motion jump <0-120>, 0 = the old jump)"), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.eva_motion_commands_r64.eva_movement_s_gait_tier_s_jump",
+                        SeeleConfig.EVA_MOTION_MODEL.get(), SeeleConfig.EVA_GAIT_TIER.get(), Math.round(SeeleConfig.EVA_JUMP_HEIGHT.get())), false);
         return 1;
     }
 

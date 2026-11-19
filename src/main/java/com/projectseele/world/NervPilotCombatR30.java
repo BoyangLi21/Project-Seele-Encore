@@ -1,5 +1,6 @@
 package com.projectseele.world;
 
+import net.minecraft.network.chat.Component;
 import com.projectseele.entity.*;
 import com.projectseele.event.TvCampaignDirector;
 import net.minecraft.core.BlockPos;
@@ -47,7 +48,21 @@ public final class NervPilotCombatR30
     private static void say(ServerPlayer commander,TrainingPilotEntity pilot,Brain b,String topic)
     {
         b.tactic=topic;
-        var d=TvCampaignSavedData.get((ServerLevel)pilot.level());String status=pilot.getName().getString()+"："+switch(topic){case "weapon_approach"->"前往武器井";case "weapon_acquired"->"武器接收完成";case "enroute"->"正在前往迎击区";case "evade"->"规避使徒攻击";case "ranged"->"保持距离射击";case "close_in"->"正在接近目标";case "melee"->"近距离交战";case "finale_spacing"->"稳住机体，保持目标在正面";default->"保持通信";};
+        var d=TvCampaignSavedData.get((ServerLevel)pilot.level());
+        String tacticKey=switch(topic)
+        {
+            case "weapon_approach" -> "ops.projectseele.pilot.en_route_to_the_weapons_silo";
+            case "weapon_acquired" -> "ops.projectseele.pilot.equipment_received";
+            case "enroute" -> "ops.projectseele.pilot.en_route_to_the_interception_zone";
+            case "evade" -> "ops.projectseele.pilot.evading_the_angel_s_attack";
+            case "ranged" -> "ops.projectseele.pilot.firing_from_range";
+            case "close_in" -> "ops.projectseele.pilot.closing_on_the_target";
+            case "melee" -> "ops.projectseele.pilot.engaged_at_close_range";
+            case "finale_spacing" -> "ops.projectseele.pilot.steady_the_unit_and_keep_the_target_ahead";
+            default -> "ops.projectseele.pilot.maintain_contact";
+        };
+        String status=OperationText.format("ops.projectseele.un.unit_reply",
+                StaffDialogueCatalogR24.speaker(pilot.getName().getString()), Component.translatable(tacticKey));
         if(!status.equals(d.notice)){d.notice=status;d.setDirty();}
         if(commander==null||commander.level().getGameTime()<b.nextRadio||b.spokenTopic.equals(topic))return;
         b.nextRadio=commander.level().getGameTime()+160;b.spokenTopic=topic;

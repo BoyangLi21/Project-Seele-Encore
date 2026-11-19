@@ -159,7 +159,7 @@ public final class SeeleConferenceAccessR47
             return true;
         }
         if (leased(player)) return true;
-        player.displayClientMessage(Component.literal("SEELE 会议室需先刷最高权限卡；请使用本层读卡器。"), true);
+        player.displayClientMessage(Component.translatable("message.projectseele.seele.swipe"), true);
         return false;
     }
 
@@ -203,7 +203,7 @@ public final class SeeleConferenceAccessR47
         if (!highest(player, hand))
         {
             visual(player.serverLevel(), event.getPos(), -1, 3, 0);
-            player.displayClientMessage(Component.literal("权限不足：需要最高权限NERV卡。"), true);
+            player.displayClientMessage(Component.translatable("message.projectseele.seele.clearance"), true);
             return;
         }
         var pending = SWIPES.computeIfAbsent(player.serverLevel().getServer(), ignored -> new HashMap<>());
@@ -246,7 +246,7 @@ public final class SeeleConferenceAccessR47
                 boolean permit = highest(player, swipe.hand()) && player.distanceToSqr(Vec3.atCenterOf(swipe.reader())) < 16 && !player.isSpectator();
                 if (permit) leases.put(player.getUUID(), new Lease(level.getGameTime() + 600));
                 visual(level, swipe.reader(), swipe.started(), permit ? 2 : 3, permit ? 3 : 0);
-                player.displayClientMessage(Component.literal(permit ? "SEELE 会议室许可已确认：30秒内进梯选择该层。" : "刷卡未完成，请保持最高卡与读卡距离。"), true);
+                player.displayClientMessage(Component.translatable(permit ? "ops.projectseele.legacy.seele_conference_access.seele_conference_room_access_confirmed_enter_the_lift_and" : "ops.projectseele.legacy.seele_conference_access.swipe_incomplete_hold_the_highest_clearance_card_within_range"), true);
                 level.playSound(null, swipe.reader(), permit ? SoundEvents.NOTE_BLOCK_PLING.value() : SoundEvents.NOTE_BLOCK_BASS.value(), SoundSource.BLOCKS, .35F, permit ? 1.3F : .75F);
                 entry.setValue(new Swipe(swipe.reader(), swipe.hand(), swipe.started(), true));
                 if (permit) S20MovingElevatorsAdapter.handleExternalCall(player, swipe.reader());

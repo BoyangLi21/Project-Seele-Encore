@@ -46,7 +46,7 @@ public final class NervAccessReaderEntityR44 extends BlockEntity
     {return linked&&gate.equals(expectedGate)&&exit.equals(BlockPos.ZERO)&&width==3&&height==3&&alongX&&clearance==3;}
     public void present(Player player,InteractionHand hand,int tier)
     {
-        if(!linked){player.displayClientMessage(Component.literal("读卡器未连接门体。"),true);return;}
+        if(!linked){player.displayClientMessage(Component.translatable("message.projectseele.doors.reader_unlinked"),true);return;}
         if(swipeAt>=0&&level.getGameTime()-swipeAt<12)return;
         swipeAt=level.getGameTime();presented=tier;presentedHand=hand;user=player.getUUID();status=1;indicateUntil=swipeAt+32;chamberDecision=false;sync();
     }
@@ -74,7 +74,7 @@ public final class NervAccessReaderEntityR44 extends BlockEntity
             boolean permit=nearby&&reader.presented>=reader.clearance&&heldTier>=reader.clearance;
             reader.status=permit?2:3;
             if(permit)reader.openUntil=now+120;
-            if(player!=null)player.displayClientMessage(Component.literal(permit?reader.label+" · 可以通行":"权限不足，请使用对应通行证。"),true);
+            if(player!=null)player.displayClientMessage(permit ? Component.translatable("ops.projectseele.reader.allow", OperationText.read(reader.label)) : Component.translatable("ops.projectseele.reader.deny"),true);
             level.playSound(null,pos,permit?SoundEvents.NOTE_BLOCK_PLING.value():SoundEvents.NOTE_BLOCK_BASS.value(),SoundSource.BLOCKS,.35F,permit?1.3F:.75F);
             reader.sync();
         }
@@ -109,7 +109,7 @@ public final class NervAccessReaderEntityR44 extends BlockEntity
             boolean granted=presented>=3&&DeadSeaChamberR45.grant(level,this,player,presentedHand);
             status=granted?2:3;indicateUntil=now+32;
             if(granted)openUntil=now+200;
-            if(player!=null)player.displayClientMessage(Component.literal(granted?"死海文书 · 通道开启十秒":"权限不足或通道未就绪，请使用最高权限卡。"),true);
+            if(player!=null)player.displayClientMessage(Component.translatable(granted ? "ops.projectseele.archive.passage.yes" : "ops.projectseele.archive.passage.no"),true);
             level.playSound(null,worldPosition,granted?SoundEvents.NOTE_BLOCK_PLING.value():SoundEvents.NOTE_BLOCK_BASS.value(),SoundSource.BLOCKS,.35F,granted?1.3F:.75F);sync();
         }
         if(swipeAt>=0&&now-swipeAt>=12){swipeAt=-1;sync();}

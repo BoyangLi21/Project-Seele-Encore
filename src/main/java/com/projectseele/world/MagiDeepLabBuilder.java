@@ -253,7 +253,7 @@ public final class MagiDeepLabBuilder
                 + consensus + "/3."
                 : CORE_NAMES[index] + " isolated for maintenance; MAGI consensus "
                 + consensus + "/3.";
-        player.displayClientMessage(Component.literal("[MAGI] " + result)
+        player.displayClientMessage(Component.translatable("message.projectseele.magi_deep_lab_builder.magi_s", com.projectseele.world.OperationText.read(result))
                 .withStyle(consensus == 3
                         ? ChatFormatting.GREEN : ChatFormatting.GOLD), false);
         ProjectSeele.LOGGER.info(

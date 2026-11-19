@@ -1,5 +1,6 @@
 package com.projectseele.world;
 
+import net.minecraft.network.chat.Component;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -722,36 +723,33 @@ public final class Tokyo3RetractionDirector
 
         public String motionReport()
         {
-            String direction = targetDepth > depth ? "下降" : "上升";
+            boolean descending = targetDepth > depth;
             if (motion.total() > 0 && motion.observed() > 0)
             {
-                direction = motion.descending() ? "下降" : "上升";
                 String distance = Math.abs(motion.maximumMetres() - motion.minimumMetres()) < .05
                         ? String.format(java.util.Locale.ROOT, "%.1f", motion.minimumMetres())
-                        : String.format(java.util.Locale.ROOT, "%.1f～%.1f", motion.minimumMetres(), motion.maximumMetres());
-                String state = phase.contains("FAULT") ? "，故障停止"
-                        : phase.contains("OCCUPIED") ? "，受阻暂停"
-                        : phase.contains("HOLD") ? "，检查暂停"
-                        : phase.contains("MOVE") ? "，正在移动"
-                        : phase.contains("REPLAY") ? "，正在恢复升降事务"
-                        : phase.contains("SPAWN") || phase.contains("READY") ? "，正在接入升降机构" : "，正在归位校验";
-                String coverage = motion.observed() == motion.total() ? ""
-                        : "（已核实 " + motion.observed() + "/" + motion.total() + " 栋，其余待确认）";
-                return "城市楼体实际已" + direction + " " + distance + " 米" + coverage + state + "。";
+                        : String.format(java.util.Locale.ROOT, "%.1f–%.1f", motion.minimumMetres(), motion.maximumMetres());
+                String state = phase.contains("FAULT") ? "fault" : phase.contains("OCCUPIED") ? "blocked"
+                        : phase.contains("HOLD") ? "held" : phase.contains("MOVE") ? "moving"
+                        : phase.contains("REPLAY") ? "replay" : phase.contains("SPAWN") || phase.contains("READY") ? "attach" : "align";
+                Component coverage = motion.observed() == motion.total() ? Component.empty()
+                        : Component.translatable("ops.projectseele.motion.coverage", motion.observed(), motion.total());
+                return OperationText.format("ops.projectseele.motion.observed",
+                        Component.translatable(motion.descending() ? "ops.projectseele.motion.down" : "ops.projectseele.motion.up"),
+                        distance, coverage, Component.translatable("ops.projectseele.motion." + state));
             }
-            if (phase.contains("FAULT")) return "城市升降故障停止；实际楼体位置尚未完整核实。";
+            if (phase.contains("FAULT")) return "ops.projectseele.motion.reported_fault";
             if (phase.equals("RIGID_IDLE") || phase.equals("DEPLOYED") || phase.equals("RETRACTED"))
-                return depth == 0 ? "城市已上升到地表。" : "城市已下降到地下。";
+                return depth == 0 ? "ops.projectseele.motion.raised" : "ops.projectseele.motion.lowered";
             if (phase.contains("MOVE") || phase.contains("LOADING") || phase.contains("DISABLED"))
-                return "城市升降状态读取尚未就绪；实际楼体位置尚未完整核实。";
-            if (phase.contains("REPLAY") || phase.contains("RECONCILE"))
-                return "城市正在恢复升降事务；实际楼体位置尚未完整核实。";
-            if (phase.contains("FLUSH") || phase.contains("COMMIT"))
-                return "城市楼体已到达" + (targetDepth == 0 ? "地表" : "地下") + "，正在归位校验。";
-            if (phase.contains("PLACE") || phase.contains("COVER"))
-                return "城市楼体正在归位校验；实际楼体位置尚未完整核实。";
-            return "城市正在准备" + direction + (phase.contains("BLOCKED") ? "，请求受阻，楼体尚未开始移动。"
-                    : phase.contains("OCCUPIED") ? "，等待运动区域清空。" : "，楼体尚未开始移动。");
+                return "ops.projectseele.motion.unavailable";
+            if (phase.contains("REPLAY") || phase.contains("RECONCILE")) return "ops.projectseele.motion.restoring";
+            if (phase.contains("FLUSH") || phase.contains("COMMIT")) return OperationText.format("ops.projectseele.motion.reached",
+                    Component.translatable(targetDepth == 0 ? "ops.projectseele.motion.surface" : "ops.projectseele.motion.underground"));
+            if (phase.contains("PLACE") || phase.contains("COVER")) return "ops.projectseele.motion.verify";
+            return OperationText.format(phase.contains("BLOCKED") ? "ops.projectseele.motion.preparing_blocked"
+                    : phase.contains("OCCUPIED") ? "ops.projectseele.motion.preparing_occupied" : "ops.projectseele.motion.preparing",
+                    Component.translatable(descending ? "ops.projectseele.motion.down" : "ops.projectseele.motion.up"));
         }
 
         /** Mean of the 96 original owners' actual positions, only when all are observed. */

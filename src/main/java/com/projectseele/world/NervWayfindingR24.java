@@ -156,25 +156,25 @@ public final class NervWayfindingR24
         var selections=ACTIVE.computeIfAbsent(player.server,key->new HashMap<>());
         if(goal.equals("operator_nearest_lift")){selections.remove(player.getUUID());return OperatorNavigationProductionR45.start(player);}
         OperatorNavigationProductionR45.stop(player);
-        if(goal.equals("stop")){selections.remove(player.getUUID());return "步行引导已关闭。";}
+        if(goal.equals("stop")){selections.remove(player.getUUID());return "ops.projectseele.route.walking_guidance_off";}
         var graph=graph(player);int index=graph==null?-1:graph.ids.indexOf(goal);
         if(goal.equals("nearest_lift"))
         {
             var guidance=nearestLift(player);
-            if(guidance.isEmpty())return "当前通道尚未配置可达电梯导向，请沿现场标牌行走。";
+            if(guidance.isEmpty())return "ops.projectseele.route.no_accessible_lift_route_is_mapped_from";
             selections.put(player.getUUID(),new Selection(player.serverLevel(),goal));
-            return "已开启电梯入口引导。优先前往本层层门；需要经过原有阶梯时会标明换层，在门外呼梯、进入轿厢后选层。";
+            return "ops.projectseele.route.lift_guidance_on_head_to_the_landing";
         }
-        if(index<0||graph==null||!player.level().dimension().location().toString().equals(graph.dimension))return "当前区域尚未配置总部步行引导。";
-        if(nearest(player,graph)<0)return "请先走到总部公共走廊或门外，再开启引导；不会指引你穿过墙面或玻璃。";
+        if(index<0||graph==null||!player.level().dimension().location().toString().equals(graph.dimension))return "ops.projectseele.route.headquarters_walking_guidance_is_unavailable_in_this";
+        if(nearest(player,graph)<0)return "ops.projectseele.route.go_to_a_public_corridor_or_doorway";
         selections.put(player.getUUID(),new Selection(player.serverLevel(),goal));
-        return "已开启前往"+graph.names[index]+"的步行引导。按屏幕下方提示行走；到达转角后指引会更新。直梯需使用现场呼梯按钮。";
+        return OperationText.format("ops.projectseele.route.start_destination", OperationText.read(graph.names[index]));
     }
     public static String describe(ServerPlayer player)
     {
-        var graph=graph(player);if(graph==null||!player.level().dimension().location().toString().equals(graph.dimension))return "请沿现场导向牌行走。指挥室、机库和总部火车站采用同一套目的地名称。";
-        int start=nearest(player,graph);if(start<0)return "你现在不在已测绘的公共通道上。先从本房间的正式出入口回到走廊，再选择目的地。";
-        return "这里是"+zone(graph,graph.nodes[start])+"。请选择目的地；引导沿实测通道、车站接驳和直梯连接更新。终极教条仍按现场门禁验证通行权限。";
+        var graph=graph(player);if(graph==null||!player.level().dimension().location().toString().equals(graph.dimension))return "ops.projectseele.route.follow_the_posted_signs_the_command_room";
+        int start=nearest(player,graph);if(start<0)return "ops.projectseele.route.you_are_outside_the_surveyed_public_passages";
+        return OperationText.format("ops.projectseele.route.current_zone", OperationText.read(zone(graph,graph.nodes[start])));
     }
     public static Optional<Guide> guide(ServerPlayer player,String goal)
     {
@@ -216,8 +216,9 @@ public final class NervWayfindingR24
         {
             int dy=Integer.signum(next.getY()-here.getY()),dx=Integer.signum(next.getX()-here.getX()),dz=Integer.signum(next.getZ()-here.getZ());
             String direction=dx>0?"东":dx<0?"西":dz>0?"南":"北";
-            cue=(dy==0?"向"+direction+"沿廊前行":"沿楼梯"+(dy>0?"上行":"下行"))+" · 距层门约 "+Math.max(1,Math.round(route.walkingMetres))+" m";
-            if(route.floorTransfer)cue="本处需循原有通道与阶梯到"+zone(graph,route.landing)+" · "+cue;
+            cue=OperationText.format(dy == 0 ? "ops.projectseele.route.lift_walk" : "ops.projectseele.route.lift_stairs",
+                    OperationText.read(dy == 0 ? direction : dy > 0 ? "上行" : "下行"), Math.max(1,Math.round(route.walkingMetres)));
+            if(route.floorTransfer)cue=OperationText.format("ops.projectseele.route.via_level", OperationText.read(zone(graph,route.landing)), OperationText.read(cue));
         }
         if(!arrived&&player.level().hasChunkAt(next))
         {
@@ -230,27 +231,27 @@ public final class NervWayfindingR24
                     next.getX()+.75,next.getY()+.01,next.getZ()+.75)).iterator().hasNext())
                 cue="前方踏面暂不可用，请等待机械到位或循现场导向绕行";
         }
-        return Optional.of(new Guide("最近电梯 · "+zone(graph,route.landing),here,next,cue,arrived));
+        return Optional.of(new Guide(OperationText.format("ops.projectseele.route.nearest_lift", OperationText.read(zone(graph,route.landing))),here,next,cue,arrived));
     }
     public static String zone(int y)
     {
-        if(y<-520)return "终极教条区";
-        if(y<=-465)return "总部车站层";if(y<=-455)return "交通接驳层";if(y<=-440)return "总部主环廊";
-        if(y<=-426)return "作业联络层";if(y<=-412)return "技术联络层";if(y<=-399)return "指挥联络层";
-        if(y<=-384)return "综合服务层";return y<-355?"上层接待区":"总指挥层";
+        if(y<-520)return "ops.projectseele.route.terminal_dogma_sector";
+        if(y<=-465)return "ops.projectseele.route.headquarters_station_level";if(y<=-455)return "ops.projectseele.route.transit_interchange_level";if(y<=-440)return "ops.projectseele.route.headquarters_main_ring_corridor";
+        if(y<=-426)return "ops.projectseele.route.operations_liaison_level";if(y<=-412)return "ops.projectseele.route.technical_liaison_level";if(y<=-399)return "ops.projectseele.route.command_liaison_level";
+        if(y<=-384)return "ops.projectseele.route.general_services_level";return y<-355?"上层接待区":"总指挥层";
     }
     private static String zone(BlockPos at)
     {
         if(at.getY()>=-469&&at.getY()<=-467&&at.getX()>=-37&&at.getX()<=106&&at.getZ()>=-289&&at.getZ()<=-42)
-            return "LCL 同步实验层";
+            return "ops.projectseele.route.lcl_synchronization_laboratory_level";
         return at.getZ()<0?(at.getY()>=-380?"机库观景层":at.getY()>=-405?"机库登机层":"发射区交通层"):zone(at.getY());
     }
     private static String instruction(Graph graph,int from,int goal)
     {
-        BlockPos start=graph.nodes[from];int cursor=graph.next[from][goal];if(cursor==from)return "已到达 "+graph.names[goal];
-        var transit=graph.transit.get(edge(from,cursor));if(transit!=null)return "按站牌乘 "+transit.line()+"，在 "+transit.destination()+" 下车后继续步行";
+        BlockPos start=graph.nodes[from];int cursor=graph.next[from][goal];if(cursor==from)return OperationText.format("ops.projectseele.route.arrived", OperationText.read(graph.names[goal]));
+        var transit=graph.transit.get(edge(from,cursor));if(transit!=null)return OperationText.format("ops.projectseele.route.train_transfer", OperationText.read(transit.line()), OperationText.read(transit.destination()));
         BlockPos first=graph.nodes[cursor];int dx=Integer.signum(first.getX()-start.getX()),dy=Integer.signum(first.getY()-start.getY()),dz=Integer.signum(first.getZ()-start.getZ());
-        if(Math.abs(first.getY()-start.getY())>1)return "乘直梯"+(dy>0?"上行":"下行")+"至"+zone(graph,first);
+        if(Math.abs(first.getY()-start.getY())>1)return OperationText.format("ops.projectseele.route.lift_to", OperationText.read(dy > 0 ? "上行" : "下行"), OperationText.read(zone(graph,first)));
         double metres=start.distSqr(first)==0?0:Math.sqrt(start.distSqr(first));
         for(int i=0;i<60;i++)
         {
@@ -260,7 +261,8 @@ public final class NervWayfindingR24
             metres+=Math.sqrt(a.distSqr(b));cursor=next;
         }
         String direction=dx>0?"东":dx<0?"西":dz>0?"南":"北";
-        return (dy==0?"向"+direction+"沿廊前行 ":"沿梯段"+(dy>0?"上行 ":"下行 "))+Math.max(1,Math.round(metres))+" m";
+        return OperationText.format(dy == 0 ? "ops.projectseele.route.walk" : "ops.projectseele.route.stairs",
+                OperationText.read(dy == 0 ? direction : dy > 0 ? "上行" : "下行"), Math.max(1,Math.round(metres)));
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
@@ -271,8 +273,8 @@ public final class NervWayfindingR24
             var player=event.getServer().getPlayerList().getPlayer(entry.getKey());
             if(player==null||player.level()!=entry.getValue().level){selections.remove(entry.getKey());continue;}
             var guidance=guide(player,entry.getValue().goal);
-            if(guidance.isEmpty()){boolean train=player.isPassenger()&&player.getRootVehicle().getType().builtInRegistryHolder().key().location().getNamespace().equals("mtr");player.displayClientMessage(Component.literal(train?"乘车途中，请留意站内导向与到站播报，下车后继续引导":"步行引导：请回到公共通道，或等待直梯到层"),true);continue;}
-            var guide=guidance.get();player.displayClientMessage(Component.literal(guide.destination+"  ·  "+guide.instruction),true);
+            if(guidance.isEmpty()){boolean train=player.isPassenger()&&player.getRootVehicle().getType().builtInRegistryHolder().key().location().getNamespace().equals("mtr");player.displayClientMessage(OperationText.read(train?"乘车途中，请留意站内导向与到站播报，下车后继续引导":"步行引导：请回到公共通道，或等待直梯到层"),true);continue;}
+            var guide=guidance.get();player.displayClientMessage(Component.empty().append(OperationText.read(guide.destination)).append("  ·  ").append(OperationText.read(guide.instruction)),true);
             if(guide.arrived)selections.remove(entry.getKey());
         }
     }

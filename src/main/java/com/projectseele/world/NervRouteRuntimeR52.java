@@ -509,7 +509,7 @@ public final class NervRouteRuntimeR52
         private void tellSeatedPilotR64(UUID pilot)
         {
             if(level.getPlayerByUUID(pilot) instanceof ServerPlayer seated&&seated.getRootVehicle() instanceof EvaUnit01Entity)
-                seated.sendSystemMessage(net.minecraft.network.chat.Component.literal("出击已取消，机体原位停止。要出舱请按离舱键：机体回库、拔出插入栓后即可离舱。"));
+                seated.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.projectseele.launch.canceled"));
         }
         static final String PILOT_ABORT_R55="PilotAbortR55",ABORT_RETRY_R55="PilotAbortRetryR55",ABORT_MISSION_R55="R55PilotAbortMission";
         EvaLogisticsDirector.ActionResult pilotAbortR55(int variant)

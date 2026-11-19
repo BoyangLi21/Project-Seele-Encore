@@ -1,5 +1,6 @@
 package com.projectseele.network;
 
+import com.projectseele.world.OperationText;
 import java.util.function.Supplier;
 
 import com.projectseele.entity.EvaUnit01Entity;
@@ -93,7 +94,7 @@ public class ServerboundEvaControlPacket
                     case ACTION_GRAPPLE -> com.projectseele.entity.EvaCombatR31.grapple(eva,sender);
                     case ACTION_SMASH -> eva.smashAttack(sender);
                     case ACTION_FIXED_CANNON_R52 ->
-                    {var gun=eva.fixedCannonBodyR52();if(gun!=null&&gun.getId()==this.requestId)sender.sendSystemMessage(net.minecraft.network.chat.Component.literal(com.projectseele.world.TvYashimaStationR52.interact(sender,gun)));}
+                    {var gun=eva.fixedCannonBodyR52();if(gun!=null&&gun.getId()==this.requestId)sender.sendSystemMessage(OperationText.read(com.projectseele.world.TvYashimaStationR52.interact(sender,gun)));}
                     case ACTION_CHARGE_START -> eva.setChargingHeld(true);
                     case ACTION_CHARGE_STOP -> eva.releaseCannon(sender);
                     case ACTION_CROUCH_START -> eva.setPilotCrouching(sender, true);
@@ -144,7 +145,7 @@ public class ServerboundEvaControlPacket
                 // but may still abort the dock preparation.
                 var result = com.projectseele.world.NervRouteRuntimeR52.pilotAbortR55(
                         sender.serverLevel(), plug.getAssignedVariant(), sender.getUUID());
-                sender.displayClientMessage(net.minecraft.network.chat.Component.literal(result.message())
+                sender.displayClientMessage(com.projectseele.world.OperationText.read(result.message()).copy()
                         .withStyle(result.accepted() ? net.minecraft.ChatFormatting.GREEN
                                 : net.minecraft.ChatFormatting.RED), true);
             }

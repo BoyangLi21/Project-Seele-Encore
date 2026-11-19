@@ -23,8 +23,7 @@ import net.minecraft.server.level.ServerPlayer;
 public final class FacilityV2Commands
 {
     private static final SimpleCommandExceptionType GEOFRONT_UNAVAILABLE =
-            new SimpleCommandExceptionType(Component.literal(
-                    "GeoFront dimension is unavailable"));
+            new SimpleCommandExceptionType(Component.translatable("message.projectseele.facility.no_geofront"));
 
     private FacilityV2Commands() {}
 
@@ -377,13 +376,10 @@ public final class FacilityV2Commands
                 FacilityV2BootstrapDirector.start(level);
         if (!result.accepted())
         {
-            source.sendFailure(Component.literal(result.message()));
+            source.sendFailure(com.projectseele.world.OperationText.read(result.message()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "FacilitySchema v2 zero-write preflight started. "
-                        + "Use /seele dev facility_v2 status; no legacy builder "
-                        + "will run."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.facilityschema_v2_zero_write_preflight_started_use"), false);
         return 1;
     }
 
@@ -392,13 +388,8 @@ public final class FacilityV2Commands
     {
         ServerLevel level = requireGeoFront(source);
         FacilityV2SavedData data = FacilityV2SavedData.get(level);
-        source.sendSuccess(() -> Component.literal(
-                "Facility v2: " + data.summary() + " | preflight="
-                        + FacilityV2BootstrapDirector.status(
-                        source.getServer()) + " | "
-                        + FacilityV2ProgrammeSavedData.get(level).summary()
-                        + " | fabric="
-                        + GeoFrontFabricSavedData.get(level).summary()),
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.facility_v2_s_preflight_s_s_fabric",
+                        data.summary(), FacilityV2BootstrapDirector.status(                         source.getServer()), FacilityV2ProgrammeSavedData.get(level).summary(), GeoFrontFabricSavedData.get(level).summary()),
                 false);
         return 1;
     }
@@ -416,12 +407,8 @@ public final class FacilityV2Commands
             source.sendFailure(Component.literal(exception.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "GeoFrontFabric revision "
-                        + GeoFrontFabricPlan.FABRIC_REVISION
-                        + " committed without changing any "
-                        + "FacilitySchema owner. Use build_all to start its "
-                        + "budgeted one-time construction."), true);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.geofrontfabric_revision_s_committed_without_changing_any",
+                        GeoFrontFabricPlan.FABRIC_REVISION), true);
         return 1;
     }
 
@@ -438,10 +425,7 @@ public final class FacilityV2Commands
             source.sendFailure(Component.literal(exception.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "GeoFrontFabric programme started. It writes authored "
-                        + "surfaces only, loads at most one new chunk per "
-                        + "tick, and never enters a facility owner."), true);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.geofrontfabric_programme_started_it_writes_authored_surfaces"), true);
         return 1;
     }
 
@@ -460,9 +444,7 @@ public final class FacilityV2Commands
             source.sendFailure(Component.literal(exception.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "GeoFrontFabric queued " + feature.id()
-                        + " work=" + feature.authoredWork()), true);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.geofrontfabric_queued_s_work_s", feature.id(), feature.authoredWork()), true);
         return 1;
     }
 
@@ -479,10 +461,7 @@ public final class FacilityV2Commands
             source.sendFailure(Component.literal(exception.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Facility v2 public backbone programme started. "
-                        + "Owners will build sequentially and unfinished "
-                        + "destinations remain physically sealed."), true);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.facility_v2_public_backbone_programme_started_owners"), true);
         return 1;
     }
 
@@ -499,11 +478,7 @@ public final class FacilityV2Commands
             source.sendFailure(Component.literal(exception.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Facility v2 command-core slice started. Foyer, H-01, "
-                        + "continuous command volume, secure lift, suite and "
-                        + "MAGI observation will build sequentially; "
-                        + "unfinished routes remain physically sealed."),
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.facility_v2_command_core_slice_started_foyer"),
                 true);
         return 1;
     }
@@ -521,11 +496,7 @@ public final class FacilityV2Commands
             source.sendFailure(Component.literal(exception.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Facility v2 exterior-loop slice started. The west service "
-                        + "spine and supported exterior landing will build "
-                        + "sequentially; the civil seam stays sealed until "
-                        + "the exterior fabric receipts are complete."),
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.facility_v2_exterior_loop_slice_started_the"),
                 true);
         return 1;
     }
@@ -543,10 +514,7 @@ public final class FacilityV2Commands
             source.sendFailure(Component.literal(exception.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Facility v2 MAGI/Dogma programme started. "
-                        + "Lilith will be installed only after the sealed "
-                        + "chamber receives its completion receipt."), true);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.facility_v2_magi_dogma_programme_started_lilith"), true);
         return 1;
     }
 
@@ -569,10 +537,7 @@ public final class FacilityV2Commands
             source.sendFailure(Component.literal(exception.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Facility v2 three-line EVA programme started: restricted "
-                        + "access, three wet cages, three straight carriers "
-                        + "and three independent launch shafts."), true);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.facility_v2_three_line_eva_programme_started"), true);
         return 1;
     }
 
@@ -583,9 +548,7 @@ public final class FacilityV2Commands
         FacilityV2SavedData data = FacilityV2SavedData.get(level);
         if (!data.commissioned())
         {
-            source.sendFailure(Component.literal(
-                    "Facility v2 is not commissioned. Run "
-                            + "/seele dev facility_v2 bootstrap first."));
+            source.sendFailure(Component.translatable("message.projectseele.facility_v2commands.facility_v2_is_not_commissioned_run_seele"));
             return 0;
         }
         try
@@ -598,9 +561,7 @@ public final class FacilityV2Commands
             source.sendFailure(Component.literal(exception.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Facility v2 queued " + zoneId
-                        + " as a clean owner build."), true);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.facility_v2_queued_s_as_a_clean", zoneId), true);
         return 1;
     }
 
@@ -615,9 +576,7 @@ public final class FacilityV2Commands
                 || data.requireZone(requiredZone).state()
                 != FacilityV2SavedData.ZoneState.COMPLETE)
         {
-            source.sendFailure(Component.literal(
-                    "Facility v2 destination is not complete: "
-                            + requiredZone));
+            source.sendFailure(Component.translatable("message.projectseele.facility_v2commands.facility_v2_destination_is_not_complete_s", requiredZone));
             return 0;
         }
         FacilitySchemaV2.ResolvedManifest manifest = data.manifest();
@@ -627,8 +586,7 @@ public final class FacilityV2Commands
                 y,
                 manifest.centre().getZ() + relativeZ + 0.5D,
                 yaw, pitch);
-        source.sendSuccess(() -> Component.literal(
-                "Facility v2 visual checkpoint: " + requiredZone), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.facility_v2_visual_checkpoint_s", requiredZone), false);
         return 1;
     }
 
@@ -647,9 +605,7 @@ public final class FacilityV2Commands
                 || fabric.requireFeature(requiredFeature).state()
                 != GeoFrontFabricSavedData.FeatureState.COMPLETE)
         {
-            source.sendFailure(Component.literal(
-                    "GeoFront fabric destination is not complete: "
-                            + requiredFeature.id()));
+            source.sendFailure(Component.translatable("message.projectseele.facility_v2commands.geofront_fabric_destination_is_not_complete_s", requiredFeature.id()));
             return 0;
         }
         FacilitySchemaV2.ResolvedManifest manifest = facility.manifest();
@@ -659,9 +615,7 @@ public final class FacilityV2Commands
                 y,
                 manifest.centre().getZ() + relativeZ + 0.5D,
                 yaw, pitch);
-        source.sendSuccess(() -> Component.literal(
-                "GeoFront exterior checkpoint: "
-                        + requiredFeature.id()), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.facility_v2commands.geofront_exterior_checkpoint_s", requiredFeature.id()), false);
         return 1;
     }
 

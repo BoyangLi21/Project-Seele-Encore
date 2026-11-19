@@ -273,8 +273,7 @@ public final class NervFacilityTopologyBuilder
                     }
                     if(lift==CAGE_LIFT&&NervLegacyGenerationGuardR52.retired(level))
                     {
-                        player.displayClientMessage(Component.literal(
-                                "R52 EVA ACCESS  DECLARED FACILITY REQUIRED")
+                        player.displayClientMessage(Component.translatable("message.projectseele.access.facility")
                                 .withStyle(ChatFormatting.RED),true);
                         return true;
                     }
@@ -284,17 +283,15 @@ public final class NervFacilityTopologyBuilder
                                     -1);
                     if (!readiness.accepted())
                     {
-                        player.displayClientMessage(Component.literal(
-                                "NERV ELEVATOR  " + readiness.faultCode()
-                                        + ": " + readiness.message())
+                        player.displayClientMessage(Component.translatable("message.projectseele.nerv_facility_topology_builder.nerv_elevator_s_s",
+                        readiness.faultCode(), com.projectseele.world.OperationText.read(readiness.message()))
                                 .withStyle(ChatFormatting.RED), true);
                         return true;
                     }
                     if (ACTIVE_RIDES.containsKey(player.getUUID())
                             || liftIsBusy(lift))
                     {
-                        player.displayClientMessage(Component.literal(
-                                "NERV ELEVATOR  TRANSIT ALREADY ACTIVE")
+                        player.displayClientMessage(Component.translatable("message.projectseele.lift.active")
                                 .withStyle(ChatFormatting.RED), true);
                         return true;
                     }
@@ -325,11 +322,8 @@ public final class NervFacilityTopologyBuilder
                             origin.getZ() + lift.z() + 0.5D,
                             player.getYRot(), player.getXRot());
                     player.resetFallDistance();
-                    player.displayClientMessage(Component.literal(
-                            "NERV ELEVATOR  "
-                                    + floorLabel(lift, sourceStop)
-                                    + " > "
-                                    + floorLabel(lift, destinationStop))
+                    player.displayClientMessage(Component.translatable("message.projectseele.nerv_facility_topology_builder.floor_pair",
+                        floorLabel(lift, sourceStop), floorLabel(lift, destinationStop))
                             .withStyle(ChatFormatting.GOLD), true);
                     return true;
                 }
@@ -430,8 +424,7 @@ public final class NervFacilityTopologyBuilder
                 level.playSound(null, destination,
                         SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS,
                         0.55F, 1.25F);
-                player.displayClientMessage(Component.literal(
-                        "NERV ELEVATOR  ARRIVED / " + ride.lift.label())
+                player.displayClientMessage(Component.translatable("message.projectseele.nerv_facility_topology_builder.nerv_elevator_arrived_s", liftLabel(ride.lift))
                         .withStyle(ChatFormatting.GREEN), true);
                 openAllLiftDoors(level, origin, ride.lift);
                 if (cabin != null)
@@ -1614,28 +1607,42 @@ public final class NervFacilityTopologyBuilder
         }
     }
 
-    private static String floorLabel(LiftSpec lift, int stop)
+    private static Component liftLabel(LiftSpec lift)
+    {
+        return switch (lift.id())
+        {
+            case "command" -> Component.translatable("ops.projectseele.lift_bank.b_20_command_support");
+            case "magi" -> Component.translatable("ops.projectseele.lift_bank.b_30_magi_pribnow_box");
+            case "cage" -> Component.translatable("ops.projectseele.lift_bank.b_40_eva_cages_logistics");
+            case "dogma" -> Component.translatable("ops.projectseele.lift_bank.central_dogma_terminal_dogma");
+            case "central" -> Component.translatable("ops.projectseele.lift_bank.central_shaft_administration");
+            case "surface" -> Component.translatable("ops.projectseele.lift_bank.tokyo_3_geofront_public_transit");
+            default -> Component.literal(lift.label());
+        };
+    }
+
+    private static Component floorLabel(LiftSpec lift, int stop)
     {
         if (lift == SURFACE_LIFT)
         {
-            return stop == 0 ? "GEOFRONT" : "TOKYO-3";
+            return stop == 0 ? Component.translatable("ops.projectseele.lift_floor.geofront") : Component.translatable("ops.projectseele.lift_floor.tokyo_3");
         }
         if (lift == DOGMA_LIFT)
         {
-            return stop == 0 ? "TERMINAL DOGMA" : "B-40";
+            return stop == 0 ? Component.translatable("ops.projectseele.lift_floor.terminal_dogma") : Component.translatable("ops.projectseele.lift_floor.b_40");
         }
         if (lift == CENTRAL_LIFT)
         {
             return switch (stop)
             {
-                case 0 -> "B-30 SCIENCE";
-                case 1 -> "B-20 OPERATIONS";
-                case 2 -> "B-14 STAFF";
-                case 3 -> "B-08 SECURITY";
-                default -> "B-02 EXECUTIVE";
+                case 0 -> Component.translatable("ops.projectseele.lift_floor.b_30_science");
+                case 1 -> Component.translatable("ops.projectseele.lift_floor.b_20_operations");
+                case 2 -> Component.translatable("ops.projectseele.lift_floor.b_14_staff");
+                case 3 -> Component.translatable("ops.projectseele.lift_floor.b_08_security");
+                default -> Component.translatable("ops.projectseele.lift_floor.b_02_executive");
             };
         }
-        return stop == 0 ? "LOWER" : "UPPER";
+        return stop == 0 ? Component.translatable("ops.projectseele.lift_floor.lower") : Component.translatable("ops.projectseele.lift_floor.upper");
     }
 
     private record LiftSpec(String id, String label, int x, int z,

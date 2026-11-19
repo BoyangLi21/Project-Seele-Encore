@@ -68,8 +68,8 @@ public final class NervNpcResetR53
             }
         }
         batch.remaining=count;final int queued=count;
-        if(count==0)source.sendFailure(Component.literal("没有匹配的已登记 NPC，或重置已经在进行。"));
-        else source.sendSuccess(()->Component.literal("正在恢复 "+queued+" 个已登记 NPC；分批恢复岗位区块，完成后汇总。"),false);
+        if(count==0)source.sendFailure(Component.translatable("message.projectseele.staff.reset_busy"));
+        else source.sendSuccess(()->Component.translatable("message.projectseele.nerv_npc_reset_r53.restoring_s_registered_npcs_in_batches_a", queued),false);
         return count;
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
@@ -90,7 +90,7 @@ public final class NervNpcResetR53
             if(!level.areEntitiesLoaded(chunk.toLong()))
             {
                 if(level.getGameTime()-pending.started()<80)continue;
-                pending.source().sendFailure(Component.literal(target.id()+"：岗位区块尚未加载，未生成替身，请稍后重试。"));
+                pending.source().sendFailure(Component.translatable("ops.projectseele.npc_reset.unloaded", target.id()));
             }
             else
             {
@@ -100,7 +100,7 @@ public final class NervNpcResetR53
                 {
                     var existing=level.getEntity(target.uuid());
                     if(existing!=null&&existing.getType()!=target.type())
-                        pending.source().sendFailure(Component.literal(target.id()+"：登记身份对应了其他实体类型，未覆盖。"));
+                        pending.source().sendFailure(Component.translatable("ops.projectseele.npc_reset.mismatch", target.id()));
                     else
                     {
                         PathfinderMob npc=existing instanceof PathfinderMob mob?mob:target.type().create(level);
@@ -116,17 +116,17 @@ public final class NervNpcResetR53
                             if(success)
                             {
                                 pending.batch.success++;
-                                if(!pending.batch.all)pending.source().sendSuccess(()->Component.literal(target.id()+"：已恢复原身份、生命和岗位。"),false);
+                                if(!pending.batch.all)pending.source().sendSuccess(()->Component.translatable("ops.projectseele.npc_reset.restored", target.id()),false);
                             }
-                            else pending.source().sendFailure(Component.literal(target.id()+"：实体添加失败，未报告成功。"));
+                            else pending.source().sendFailure(Component.translatable("ops.projectseele.npc_reset.add", target.id()));
                         }
-                        else pending.source().sendFailure(Component.literal(target.id()+"：实体类型创建失败，未报告成功。"));
+                        else pending.source().sendFailure(Component.translatable("ops.projectseele.npc_reset.create", target.id()));
                     }
                 }
             }
             level.getChunkSource().removeRegionTicket(TICKET,chunk,2,chunk);iterator.remove();
             if(--pending.batch.remaining==0&&pending.batch.all)
-                pending.source().sendSuccess(()->Component.literal("NPC 批量复位结束：已恢复 "+pending.batch.success+" 个；未恢复的原因已单独显示。"),false);
+                pending.source().sendSuccess(()->Component.translatable("message.projectseele.nerv_npc_reset_r53.npc_reset_complete_s_restored_any_failures", pending.batch.success),false);
         }
     }
     private NervNpcResetR53() { }

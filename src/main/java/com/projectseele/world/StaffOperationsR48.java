@@ -1,5 +1,6 @@
 package com.projectseele.world;
 
+import net.minecraft.network.chat.Component;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.*;
 import com.projectseele.event.TvCampaignDirector;
@@ -153,10 +154,12 @@ public final class StaffOperationsR48
                 operator.getUUID(),well.getUUID(),mission,npcPilot,borrowed==null?"pending":"issued");
         saved.put(selection);
         if(borrowed==null&&!well.isReadyAndStocked())well.deploy();
-        String equipment=variant==0?"盾":"长剑";
-        return result(true,borrowed!=null?"机体已持有借用的"+equipment+"，本次出击继续使用。"
-                :npcPilot?"携"+equipment+"出击已安排。驾驶员发射后会先到武器井领取，再前往迎击区。"
-                :"携"+equipment+"出击已登记。请亲自驾驶这台机体，发射后到 "+well.blockPosition().toShortString()+" 的武器井领取装备。");
+        Component equipment=Component.translatable(variant==0 ? "message.projectseele.station.shield" : "message.projectseele.station.sword");
+        return result(true, borrowed!=null
+                ? OperationText.format("ops.projectseele.armament.retain", equipment)
+                : npcPilot ? OperationText.format("ops.projectseele.armament.npc_will_collect", equipment)
+                : OperationText.format("ops.projectseele.armament.collect_here", equipment, well.blockPosition().toShortString()));
+
     }
     public static String undergroundEquipmentBlockerR49(ServerLevel level,EvaUnit01Entity eva)
     {

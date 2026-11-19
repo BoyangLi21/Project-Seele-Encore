@@ -80,8 +80,7 @@ public final class EvaMotionLabCommands
         ServerLevel level = source.getLevel();
         if (!EvaMotionLabDirector.setup(level, force))
         {
-            source.sendFailure(Component.literal(
-                    "This command is restricted to SEELE_EVA_MOTION_LAB."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.lab_only"));
             return 0;
         }
         if (source.getEntity() instanceof ServerPlayer player)
@@ -102,8 +101,7 @@ public final class EvaMotionLabCommands
         if (variant < 0 || !EvaMotionLabDirector.enter(
                 source.getPlayerOrException(), variant))
         {
-            source.sendFailure(Component.literal(
-                    "Motion-lab EVA boarding failed."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.board_failed"));
             return 0;
         }
         source.sendSuccess(() -> Component.literal(String.format(
@@ -121,12 +119,10 @@ public final class EvaMotionLabCommands
                 || !EvaMotionLabDirector.selectWeapon(source.getLevel(),
                 variant, weapon))
         {
-            source.sendFailure(Component.literal(
-                    "Motion-lab weapon selection failed."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.weapon_failed"));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Motion-lab loadout changed."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.motion.loadout"), false);
         return 1;
     }
 
@@ -135,12 +131,10 @@ public final class EvaMotionLabCommands
     {
         if (!EvaMotionLabDirector.enterUnR63(source.getPlayerOrException(), serial))
         {
-            source.sendFailure(Component.literal(
-                    "Motion-lab UN boarding failed."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.un_board_failed"));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Motion-lab pilot linked to EVA-UN-0" + serial + "."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.eva_motion_lab_commands.motion_lab_pilot_linked_to_eva_un", serial), false);
         return 1;
     }
 
@@ -151,12 +145,10 @@ public final class EvaMotionLabCommands
                 ? EvaMotionLabDirector.unUnitR63(source.getLevel()) : null;
         if (weapon < 0 || eva == null || !eva.selectMotionLabWeapon(weapon))
         {
-            source.sendFailure(Component.literal(
-                    "Motion-lab weapon selection failed."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.weapon_failed"));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "Motion-lab loadout changed."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.motion.loadout"), false);
         return 1;
     }
 
@@ -166,8 +158,7 @@ public final class EvaMotionLabCommands
         ServerPlayer player = source.getPlayerOrException();
         if (!EvaMotionLabDirector.isMotionLab(player.serverLevel()))
         {
-            source.sendFailure(Component.literal(
-                    "This command is restricted to SEELE_EVA_MOTION_LAB."));
+            source.sendFailure(Component.translatable("message.projectseele.motion.lab_only"));
             return 0;
         }
         if (player.isPassenger())
@@ -185,11 +176,7 @@ public final class EvaMotionLabCommands
         if (variant < 0 || !EvaMotionLabDirector.setDemo(
                 source.getLevel(), variant, mode))
         {
-            source.sendFailure(Component.literal(
-                    "Usage: /seele dev motionlab demo unit01 "
-                            + "walk|run|jump|attack_a|attack_b|attack_c|"
-                            + "attack_combo|"
-                            + "live|livepush|physics|recovery|stop"));
+            source.sendFailure(Component.translatable("message.projectseele.eva_motion_lab_commands.usage_seele_dev_motionlab_demo_unit01_walk"));
             return 0;
         }
         boolean physicsPreview = mode.equalsIgnoreCase("physics")

@@ -77,15 +77,15 @@ public final class StaffRecoveryR47
     public static String request(ServerPlayer caller, NervStaffEntity officer, int unit)
     {
         if (unit < 0 || unit > 2 || !NervStaffDialogue.authorized(caller) || !StaffAuthorityR25.allows(officer, "recover"))
-            return "回收安排请联络葛城部长或赤木博士，并指定机体。";
+            return "ops.projectseele.recovery.contact_major_katsuragi_or_dr_akagi_and";
         var level = caller.serverLevel();
-        if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return "请先进入第三新东京市，再安排本部机体回收。";
+        if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return "ops.projectseele.recovery.enter_tokyo_3_before_ordering_recovery_of";
         var state = state(level);
         var queued=state.jobs.get(unit);
         if(queued!=null)
         {
             if(!queued.owner.equals(caller.getUUID())&&!caller.hasPermissions(2))
-                return "这台机体已有其他指挥员安排回收，请保持通信。";
+                return "ops.projectseele.recovery.another_commander_has_already_arranged_recovery_keep";
             if(queued.stage.startsWith("R53_AIR_WAIT:"))
             {
                 // A queued request is not an aircraft dispatch. Keep the same
@@ -93,21 +93,21 @@ public final class StaffRecoveryR47
                 queued.nextAirRequest=0;
                 queued.expires=level.getGameTime()+20*60*12;
                 state.setDirty();
-                return "运输机尚未派出："+queued.stage.substring("R53_AIR_WAIT:".length())+"正在重新确认接载条件。";
+                return OperationText.format("ops.projectseele.recovery.not_dispatched", OperationText.read(queued.stage.substring("R53_AIR_WAIT:".length())));
             }
-            return "这台机体的回收已经在安排，请查看运输状态。";
+            return "ops.projectseele.recovery.recovery_is_already_being_arranged_check_transport";
         }
         var receipt = EvaFleetSavedData.get(level.getServer()).entry(unit).orElse(null);
-        if (receipt == null) return "机体登记尚未接通，不能安排回收。";
+        if (receipt == null) return "ops.projectseele.recovery.unit_registration_is_unavailable_recovery_cannot_be";
         if (receipt.phase() != EvaFleetSavedData.Phase.DEPLOYED && receipt.phase() != EvaFleetSavedData.Phase.PARKED
                 &&receipt.phase()!=EvaFleetSavedData.Phase.PLUG_FAULT)
-            return "机体仍在机库运输过程中。请等它到安全位置，再安排回收。";
+            return "ops.projectseele.recovery.the_unit_is_moving_through_hangar_machinery";
         var eva = EvaLogisticsDirector.canonicalUnit(level, unit);
         boolean emptyFault=receipt.phase()==EvaFleetSavedData.Phase.PLUG_FAULT;
         if(emptyFault&&(eva==null||!AutoSortieR32.releaseEmptyFaultBayDelegationR50(caller,eva)))
-            return "故障机体要先在所属湿舱停稳，插入栓空置并锁定，且没有进行中的作战、待执行指令、运输或未归还的装备，才能抽出插入栓回收。";
+            return "ops.projectseele.recovery.to_extract_the_plug_from_a_damaged";
         if (eva != null && eva.getPilotEntity() instanceof ServerPlayer pilot && pilot != caller)
-            return "请由当前驾驶员请求回收，或先让驾驶员离开插入栓。";
+            return "ops.projectseele.recovery.the_current_pilot_must_request_recovery_or";
         String ownership=EntryPlugEjectionR48.recoveryCallerBlocker(caller,eva);if(!ownership.isEmpty())return ownership;
         if(emptyFault)
         {

@@ -1,7 +1,6 @@
 package com.projectseele.visual;
 
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Optional;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -90,24 +89,28 @@ public final class NervCrewCommands
         {
             boolean ready = data.assignment(station)
                     .map(Assignment::ready).orElse(false);
-            player.displayClientMessage(Component.literal(
-                    "NERV 岗位：" + name(station) + "，" + (ready ? "已就绪" : "待命")
-                            + "（/seele crew status）")
+            player.displayClientMessage(Component.translatable("message.projectseele.multiplayer.login", name(station), readiness(ready))
                     .withStyle(ready ? ChatFormatting.GREEN
                             : ChatFormatting.GOLD), false);
         });
     }
 
-    private static String name(Station station)
+    private static Component readiness(boolean ready)
+    {
+        return Component.translatable(ready ? "message.projectseele.multiplayer.ready"
+                : "message.projectseele.multiplayer.standby");
+    }
+
+    private static Component name(Station station)
     {
         return switch (station)
         {
-            case COMMANDER -> "司令";
-            case OPERATIONS -> "作战指挥";
-            case MAGI -> "MAGI";
-            case UNIT_00 -> "零号机驾驶员";
-            case UNIT_01 -> "初号机驾驶员";
-            case UNIT_02 -> "二号机驾驶员";
+            case COMMANDER -> Component.translatable("message.projectseele.multiplayer.commander");
+            case OPERATIONS -> Component.translatable("message.projectseele.multiplayer.operations");
+            case MAGI -> Component.translatable("message.projectseele.multiplayer.magi");
+            case UNIT_00 -> Component.translatable("message.projectseele.multiplayer.unit_00");
+            case UNIT_01 -> Component.translatable("message.projectseele.multiplayer.unit_01");
+            case UNIT_02 -> Component.translatable("message.projectseele.multiplayer.unit_02");
         };
     }
 
@@ -118,8 +121,7 @@ public final class NervCrewCommands
         Optional<Station> parsed = Station.parse(raw);
         if (parsed.isEmpty())
         {
-            source.sendFailure(Component.literal(
-                    "没有这个岗位。可选：" + String.join("、", STATION_IDS)));
+            source.sendFailure(Component.translatable("message.projectseele.multiplayer.unknown_post", String.join(", ", STATION_IDS)));
             return 0;
         }
         NervCrewSavedData data = NervCrewSavedData.get(source.getServer());
@@ -127,16 +129,16 @@ public final class NervCrewCommands
         ClaimResult result = data.claim(station, player);
         if (result == ClaimResult.OCCUPIED)
         {
-            String owner = data.assignment(station)
-                    .map(Assignment::playerName).orElse("未知玩家");
-            source.sendFailure(Component.literal(name(station) + "已由 " + owner
-                    + " 认领。对方已不在时，请管理员执行 /seele crew clear " + station.id() + "。"));
+            Component owner = data.assignment(station)
+                    .<Component>map(value -> Component.literal(value.playerName()))
+                    .orElseGet(() -> Component.translatable("message.projectseele.multiplayer.unknown_player"));
+            source.sendFailure(Component.translatable("message.projectseele.multiplayer.occupied",
+                    name(station), owner, station.id()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                result == ClaimResult.ALREADY_ASSIGNED
-                        ? "仍保留岗位：" + name(station)
-                        : "已认领岗位：" + name(station) + "。准备好后执行 /seele crew ready。"), false);
+        source.sendSuccess(() -> Component.translatable(result == ClaimResult.ALREADY_ASSIGNED
+                ? "message.projectseele.multiplayer.retained" : "message.projectseele.multiplayer.claimed",
+                name(station)), false);
         return 1;
     }
 
@@ -147,12 +149,11 @@ public final class NervCrewCommands
         NervCrewSavedData data = NervCrewSavedData.get(source.getServer());
         if (!data.setReady(player.getUUID(), ready))
         {
-            source.sendFailure(Component.literal(
-                    "请先认领岗位：/seele crew claim <岗位>"));
+            source.sendFailure(Component.translatable("message.projectseele.crew.claim"));
             return 0;
         }
         Station station = data.stationFor(player.getUUID()).orElseThrow();
-        source.sendSuccess(() -> Component.literal(name(station) + "：" + (ready ? "已就绪" : "待命"))
+        source.sendSuccess(() -> Component.translatable("message.projectseele.multiplayer.readiness", name(station), readiness(ready))
                 .withStyle(ready ? ChatFormatting.GREEN
                         : ChatFormatting.GOLD), false);
         return 1;
@@ -166,11 +167,10 @@ public final class NervCrewCommands
                 .release(player.getUUID());
         if (released.isEmpty())
         {
-            source.sendFailure(Component.literal("你还没有认领岗位。"));
+            source.sendFailure(Component.translatable("message.projectseele.crew.no_post"));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                "已释放岗位：" + name(released.get())), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.multiplayer.released", name(released.get())), false);
         return 1;
     }
 
@@ -179,19 +179,17 @@ public final class NervCrewCommands
         Optional<Station> parsed = Station.parse(raw);
         if (parsed.isEmpty())
         {
-            source.sendFailure(Component.literal(
-                    "没有这个岗位。可选：" + String.join("、", STATION_IDS)));
+            source.sendFailure(Component.translatable("message.projectseele.multiplayer.unknown_post", String.join(", ", STATION_IDS)));
             return 0;
         }
         Optional<Assignment> removed = NervCrewSavedData.get(source.getServer())
                 .clear(parsed.get());
         if (removed.isEmpty())
         {
-            source.sendFailure(Component.literal(name(parsed.get()) + "当前无人认领。"));
+            source.sendFailure(Component.translatable("message.projectseele.multiplayer.unclaimed", name(parsed.get())));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal("已清除 " + removed.get().playerName()
-                + " 认领的" + name(parsed.get()) + "岗位。"), true);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.multiplayer.cleared", removed.get().playerName(), name(parsed.get())), true);
         return 1;
     }
 
@@ -200,20 +198,18 @@ public final class NervCrewCommands
         MinecraftServer server = source.getServer();
         NervCrewSavedData data = NervCrewSavedData.get(server);
         CrewOverview overview = data.overview(server);
-        source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                        "NERV 岗位：已认领 %d/6，在线 %d，就绪 %d，在线且就绪 %d",
-                        overview.assigned(), overview.online(), overview.ready(),
-                        overview.onlineReady()))
+        source.sendSuccess(() -> Component.translatable("message.projectseele.multiplayer.overview",
+                        overview.assigned(), overview.online(), overview.ready(), overview.onlineReady())
                 .withStyle(overview.allAssignedOnlineReady()
                         ? ChatFormatting.GREEN : ChatFormatting.GOLD), false);
         for (Station station : Station.values())
         {
             Optional<Assignment> assignment = data.assignment(station);
-            String line;
+            Component line;
             ChatFormatting colour;
             if (assignment.isEmpty())
             {
-                line = name(station) + "（" + station.id() + "）：空缺";
+                line = Component.translatable("message.projectseele.multiplayer.vacant", name(station), station.id());
                 colour = ChatFormatting.DARK_GRAY;
             }
             else
@@ -221,15 +217,16 @@ public final class NervCrewCommands
                 Assignment value = assignment.get();
                 boolean online = server.getPlayerList()
                         .getPlayer(value.playerId()) != null;
-                line = name(station) + "（" + station.id() + "）：" + value.playerName()
-                        + "，" + (online ? "在线" : "离线") + "，" + (value.ready() ? "已就绪" : "待命");
+                line = Component.translatable("message.projectseele.multiplayer.assigned", name(station), station.id(),
+                        value.playerName(), Component.translatable(online
+                                ? "message.projectseele.multiplayer.online" : "message.projectseele.multiplayer.offline"),
+                        readiness(value.ready()));
                 colour = !online ? ChatFormatting.DARK_RED
                         : value.ready() ? ChatFormatting.GREEN
                         : ChatFormatting.YELLOW;
             }
             ChatFormatting finalColour = colour;
-            source.sendSuccess(() -> Component.literal(line)
-                    .withStyle(finalColour), false);
+            source.sendSuccess(() -> line.copy().withStyle(finalColour), false);
         }
         return overview.assigned();
     }
@@ -238,15 +235,14 @@ public final class NervCrewCommands
     {
         MinecraftServer server = source.getServer();
         ServerLevel level = server.getLevel(GeoFrontCommands.GEOFRONT);
-        source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                        "Project SEELE 服务器：%s，玩家 %d/%d",
-                        server.isDedicatedServer() ? "专用服务器" : "单人内置服务器",
-                        server.getPlayerCount(), server.getMaxPlayers()))
+        source.sendSuccess(() -> Component.translatable("message.projectseele.multiplayer.server",
+                        Component.translatable(server.isDedicatedServer()
+                                ? "message.projectseele.multiplayer.dedicated" : "message.projectseele.multiplayer.integrated"),
+                        server.getPlayerCount(), server.getMaxPlayers())
                 .withStyle(ChatFormatting.GOLD), false);
         if (level == null)
         {
-            source.sendFailure(Component.literal(
-                    "GeoFront 维度未加载，请检查模组和数据包是否正常加载。"));
+            source.sendFailure(Component.translatable("message.projectseele.crew.no_geofront"));
             return 0;
         }
         // The current world retires the old map's installation receipt on purpose, so reading it
@@ -278,25 +274,19 @@ public final class NervCrewCommands
             }
         }
         CrewOverview crew = NervCrewSavedData.get(server).overview(server);
-        boolean finalInstalled = installed;
+        Component facility = Component.translatable(!installed ? "message.projectseele.multiplayer.missing"
+                : regional ? "message.projectseele.multiplayer.installed" : "message.projectseele.multiplayer.connected");
         int finalFeeds = feeds;
-        source.sendSuccess(() -> Component.literal(regional
-                        ? String.format(Locale.ROOT, "设施：%s，已加载 EVA %d/3，驾驶舱画面 %d/3",
-                                finalInstalled ? "已安装" : "缺失", airframes, finalFeeds)
-                        : String.format(Locale.ROOT,
-                        "地图：%s，已加载 EVA %d/3，遥测屏 %d/%d，驾驶舱画面 %d/3",
-                        finalInstalled ? "已接入" : "缺失",
-                        airframes, screens, NervCommandTelemetry.SCREEN_COUNT,
-                        finalFeeds))
-                .withStyle(finalInstalled ? ChatFormatting.GREEN
-                        : ChatFormatting.RED), false);
-        source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                        "岗位：已认领 %d/6，在线 %d，在线且就绪 %d",
-                        crew.assigned(), crew.online(), crew.onlineReady()))
+        source.sendSuccess(() -> (regional
+                ? Component.translatable("message.projectseele.multiplayer.facility", facility, airframes, finalFeeds)
+                : Component.translatable("message.projectseele.multiplayer.map", facility, airframes,
+                        screens, NervCommandTelemetry.SCREEN_COUNT, finalFeeds))
+                .withStyle(installed ? ChatFormatting.GREEN : ChatFormatting.RED), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.multiplayer.staffing",
+                        crew.assigned(), crew.online(), crew.onlineReady())
                 .withStyle(crew.allAssignedOnlineReady()
                         ? ChatFormatting.GREEN : ChatFormatting.YELLOW), false);
-        source.sendSuccess(() -> Component.literal(
-                "出击前的有界检查用 /seele admin server audit，不会重建整张地图。")
+        source.sendSuccess(() -> Component.translatable("message.projectseele.crew.audit")
                 .withStyle(ChatFormatting.GRAY), false);
         return installed ? 1 : 0;
     }
@@ -306,19 +296,17 @@ public final class NervCrewCommands
         ServerLevel level = source.getServer().getLevel(GeoFrontCommands.GEOFRONT);
         if (level == null)
         {
-            source.sendFailure(Component.literal("GeoFront 维度未加载。"));
+            source.sendFailure(Component.translatable("message.projectseele.geofront_unloaded"));
             return 0;
         }
         IntegratedNervMapBuilder.RuntimeAudit audit =
                 IntegratedNervMapBuilder.prepareRuntime(level);
         if (!audit.valid())
         {
-            source.sendFailure(Component.literal(
-                    "NERV 运行检查未通过：" + audit.summary()));
+            source.sendFailure(Component.translatable("message.projectseele.multiplayer.audit_fail", audit.summary()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal(
-                        "NERV 运行检查通过：" + audit.summary())
+        source.sendSuccess(() -> Component.translatable("message.projectseele.multiplayer.audit_pass", audit.summary())
                 .withStyle(ChatFormatting.GREEN), true);
         return 1;
     }

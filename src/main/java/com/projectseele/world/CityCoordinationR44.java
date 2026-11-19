@@ -1,5 +1,6 @@
 package com.projectseele.world;
 
+import net.minecraft.network.chat.Component;
 import com.google.gson.*;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.*;
@@ -49,31 +50,34 @@ public final class CityCoordinationR44
     {var level=player.server.getLevel(FacilitySchemaV2.DIMENSION);return level==null?null:CityCoordinationSavedDataR44.get(level).instance;}
     public static String status(ServerPlayer player)
     {
-        var level=player.server.getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return "本世界没有总部。";var data=CityCoordinationSavedDataR44.get(level);
-        String phase=switch(data.stage){case 1->"核对证据";case 2->"城市撤离调度";case 3->"现场复测";case 4->"供电分配";case 5->"知情编成";case 6->"准备归档";case 7->"已归档";default->"尚未接受";};
-        return "城市协同 · "+phase+"\n已阅 "+Integer.bitCount(data.evidence)+" / 3 · 现场复测 "+(data.tested?"通过":"未完成")+"\n"
-                +(data.active?"当前档案："+data.instance:"已归档 "+data.archiveCount()+" 次")+"\n"+data.notice;
+        var level=player.server.getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return "ops.projectseele.city.there_is_no_headquarters_in_this_world";var data=CityCoordinationSavedDataR44.get(level);
+        int stage = data.stage >= 0 && data.stage <= 7 ? data.stage : 0;
+        return OperationText.format("ops.projectseele.city.status",
+                Component.translatable("ops.projectseele.city.phase." + stage), Integer.bitCount(data.evidence),
+                Component.translatable(data.tested ? "ops.projectseele.city.passed" : "ops.projectseele.city.pending"),
+                data.active ? Component.translatable("ops.projectseele.city.active", String.valueOf(data.instance))
+                        : Component.translatable("ops.projectseele.city.archived", data.archiveCount()), OperationText.read(data.notice));
     }
     public static String request(ServerPlayer player,NervStaffEntity contact,String action,UUID expected)
     {
-        var level=player.server.getLevel(FacilitySchemaV2.DIMENSION);if(level==null||player.level()!=level)return "请先进入 NERV 所在世界。";
-        if(!NervStaffDialogue.authorized(player)||!StaffAuthorityR25.commandContact(contact))return "这份调度请联络美里、律子或冬月。";
+        var level=player.server.getLevel(FacilitySchemaV2.DIMENSION);if(level==null||player.level()!=level)return "ops.projectseele.city.enter_the_world_that_contains_nerv_headquarters";
+        if(!NervStaffDialogue.authorized(player)||!StaffAuthorityR25.commandContact(contact))return "ops.projectseele.city.contact_misato_ritsuko_or_fuyutsuki_for_this_coordination";
         var data=CityCoordinationSavedDataR44.get(level);Site site=site(level);
         if(action.equals("status"))return status(player);
         if(action.equals("start"))
         {
-            if(data.active||data.restoring)return "上一份调度还没有结束。先核对当前状态。";
-            if(site==null)return "电网复测台尚未接入，请先联系通信管制室。";
+            if(data.active||data.restoring)return "ops.projectseele.city.the_previous_assignment_is_still_open_check_its";
+            if(site==null)return "ops.projectseele.city.the_grid_retest_console_is_offline_contact_communications";
             var battle=TvCampaignSavedData.get(level);var first=FirstBattleSavedData.get(level);
-            if(!battle.active.isEmpty()||first.active!=null||first.missionOwner!=null)return "作战进行中。等机体回收后再安排复测。";
+            if(!battle.active.isEmpty()||first.active!=null||first.missionOwner!=null)return "ops.projectseele.city.an_operation_is_underway_schedule_the_retest_after";
             data.begin(player.getUUID());data.requiredArchivePagesR45.addAll(site.requiredArchivePages);
             if(!site.requiredArchivePages.isEmpty())data.requiredArchiveRevisionR45=DeadSeaReadingR45.currentRevision();
-            data.setDirty();return "美里：司令，先把这三份记录放在一起看。射击条件还没有结论。\n"+status(player);
+            data.setDirty();return OperationText.format("ops.projectseele.city.new_file", OperationText.read(status(player)));
         }
-        if(!data.active||expected==null||!expected.equals(data.instance))return "这条指令对应的档案已经结束。请重新打开当前档案。";
+        if(!data.active||expected==null||!expected.equals(data.instance))return "ops.projectseele.city.that_order_refers_to_a_closed_file_reopen";
         if(action.startsWith("read/"))
         {
-            String source=action.substring(5);int bit=switch(source){case "page"->1;case "annotation"->2;case "field"->4;default->0;};if(bit==0)return "找不到这条记录。";
+            String source=action.substring(5);int bit=switch(source){case "page"->1;case "annotation"->2;case "field"->4;default->0;};if(bit==0)return "ops.projectseele.city.record_not_found";
             String delivered=switch(source)
             {
                 case "page"->"档案 P-05 · 原页\n来源：旧保管库，保管人：冬月。记录提及近似规则多面体目标与高能定向反击；射击条件所在页缺失。\n外形与反击条件仍待确认。出击许可尚未下达。";
@@ -84,66 +88,66 @@ public final class CityCoordinationR44
             return delivered;
         }
         if(action.startsWith("consent/")||action.startsWith("withdraw/"))return participantRequest(player,level,data,action,expected);
-        if(!player.getUUID().equals(data.owner)&&!player.hasPermissions(2))return "调度方案由这次任务的司令确认。你可以继续查阅证据。";
+        if(!player.getUUID().equals(data.owner)&&!player.hasPermissions(2))return "ops.projectseele.city.the_mission_commander_approves_this_plan_you_may";
         if(action.equals("cancel"))
         {data.active=false;data.restoring=true;data.isolating=data.fieldSampling=false;data.chargeTicks=0;data.notice="调度已撤销。机体保持待命，电网正在复原。已阅记录保留。";data.setDirty();return data.notice;}
         if(action.equals("share")||action.equals("private"))
         {
-            if(data.evidence!=7)return "先读完三项证据，再决定共享范围。";
+            if(data.evidence!=7)return "ops.projectseele.city.review_all_three_pieces_of_evidence_before_deciding";
             data.changeKnowledge(action.equals("share")?7:0);if(data.stage==1)data.stage=2;
             return data.knowledge==7?"律子：记录已交给驾驶员。我们先核对条件，再决定出击。":"律子：现场记录仍会保留。未确认的条件不能作为安全保证。";
         }
         if(action.equals("evacuate/services")||action.equals("evacuate/storage"))
         {
-            if(data.stage!=2)return "先完成证据核对。";
-            var deputy=find(level,"fuyutsuki");if(deputy==null)return "冬月的频道尚未接通，请稍候。";
+            if(data.stage!=2)return "ops.projectseele.city.finish_reviewing_the_evidence_first";
+            var deputy=find(level,"fuyutsuki");if(deputy==null)return "ops.projectseele.city.fuyutsuki_s_channel_is_offline_stand_by";
             var origin=IntegratedNervMapBuilder.tokyo3Origin(level);var district=Tokyo3RetractionSavedData.get(level).get(origin).orElse(null);
             boolean settled=district!=null&&district.depth()==ThirdTokyoSurfaceBuilder.maximumRetractionDepth(origin)&&district.targetDepth()==district.depth()&&district.cursor()==0&&district.voxelCursor()==0;
-            if(!settled&&NervStaffDialogue.beginNativeAction(player,deputy,"city_lower",-1)==0)return "冬月还不能操作城市控制台。请查看现场状态。";
+            if(!settled&&NervStaffDialogue.beginNativeAction(player,deputy,"city_lower",-1)==0)return "ops.projectseele.city.fuyutsuki_cannot_operate_the_city_console_yet_check";
             data.priority=action.endsWith("services")?"services":"storage";data.cityRequested=true;data.setDirty();
-            return "冬月：先收纳城市。应急供电按你的方案保留。";
+            return "ops.projectseele.city.fuyutsuki_retract_the_city_first_emergency_power_will";
         }
         if(action.equals("test/delegate")||action.equals("test/onsite"))
         {
-            if(data.stage!=3||data.isolating)return "复测还没到这个步骤，或正在进行。";
-            if(site==null)return "找不到复测设备。";
-            if(action.endsWith("onsite")&&!site.passengerAccessCertified)return "现场复测台暂未开放。可以先委派远山在通信管制室复测。";
-            if(action.endsWith("onsite")&&(site.fieldButton==null||site.fieldIndicator==null))return "地区技术中心的复测设备尚未接入。";
-            if(action.endsWith("onsite")&&player.distanceToSqr(Vec3.atCenterOf(site.visit))>100)return "请先到地区技术中心的复测台。到站后按线路牌前往南侧站厅。";
-            if(!beginEngineer(player,level,site,data,"coord_test"))return "远山尚未抵达设备。请稍候，或检查操作通道。";
+            if(data.stage!=3||data.isolating)return "ops.projectseele.city.the_retest_has_not_reached_this_step_or";
+            if(site==null)return "ops.projectseele.city.retest_equipment_not_found";
+            if(action.endsWith("onsite")&&!site.passengerAccessCertified)return "ops.projectseele.city.the_field_console_is_not_ready_assign_toyama";
+            if(action.endsWith("onsite")&&(site.fieldButton==null||site.fieldIndicator==null))return "ops.projectseele.city.the_district_technical_center_s_retest_equipment_is";
+            if(action.endsWith("onsite")&&player.distanceToSqr(Vec3.atCenterOf(site.visit))>100)return "ops.projectseele.city.go_to_the_district_technical_center_s_retest";
+            if(!beginEngineer(player,level,site,data,"coord_test"))return "ops.projectseele.city.toyama_has_not_reached_the_equipment_wait_or";
             data.method=action.endsWith("onsite")?"onsite":"delegate";data.fieldSampling=data.fieldSamplePassed=false;
             data.fieldStartedAt=0;data.fieldSamples=0;data.setDirty();
             return data.method.equals("onsite")?"远山：我在管制室隔离馈线。等隔离灯亮了，按你面前的复测键。":"远山：收到。先隔离备用馈线，等读数稳定后复电。";
         }
         if(action.equals("supply/services")||action.equals("supply/reserve"))
         {
-            if(data.stage!=4||!data.tested)return "律子：复测还没通过，先不要充能。";
-            if(site==null||!beginEngineer(player,level,site,data,"coord_charge"))return "电网联络员尚未到达设备。";
+            if(data.stage!=4||!data.tested)return "ops.projectseele.city.ritsuko_the_retest_has_not_passed_hold_charging";
+            if(site==null||!beginEngineer(player,level,site,data,"coord_charge"))return "ops.projectseele.city.the_grid_liaison_has_not_reached_the_equipment";
             data.supply=action.endsWith("services")?"services":"reserve";data.chargeTicks=0;data.setDirty();
             return data.supply.equals("services")?"远山：应急设施保电。蓄能需要多等一轮。":"远山：备用馈线切出充能。任务结束后，我会再做复电检查。";
         }
         if(action.startsWith("assign/"))
         {
-            if(data.stage!=5&&data.stage!=6)return "先完成城市与供电准备。";
-            String[] parts=action.split("/");if(parts.length!=3&&parts.length!=4)return "请选择机体和驾驶员。";
-            int unit;try{unit=Integer.parseInt(parts[1]);}catch(NumberFormatException error){return "机体编号无效。";}
-            if(unit<0||unit>4||!Set.of("human","npc").contains(parts[2])||unit>2&&parts[2].equals("npc"))return "这台机体没有对应的 NERV 驾驶员。";
+            if(data.stage!=5&&data.stage!=6)return "ops.projectseele.city.finish_preparing_the_city_and_grid_first";
+            String[] parts=action.split("/");if(parts.length!=3&&parts.length!=4)return "ops.projectseele.city.choose_a_unit_and_pilot";
+            int unit;try{unit=Integer.parseInt(parts[1]);}catch(NumberFormatException error){return "ops.projectseele.nerv.invalid_unit_number";}
+            if(unit<0||unit>4||!Set.of("human","npc").contains(parts[2])||unit>2&&parts[2].equals("npc"))return "ops.projectseele.city.this_unit_has_no_assigned_nerv_pilot";
             UUID person=player.getUUID();
             if(parts.length==4)
-            {if(!parts[2].equals("human"))return "NPC 驾驶员不能指定其他玩家身份。";try{person=UUID.fromString(parts[3]);}catch(IllegalArgumentException error){return "请从列表中选择在线玩家。";}}
+            {if(!parts[2].equals("human"))return "ops.projectseele.city.an_npc_pilot_cannot_use_another_player_s";try{person=UUID.fromString(parts[3]);}catch(IllegalArgumentException error){return "ops.projectseele.city.select_an_online_player_from_the_list";}}
             var actual=actualBinding(level,unit,parts[2],person);
-            if(actual==null)return "机体或驾驶员的信号尚未接通，请稍候再确认。";
-            if(!data.bind(expected,actual))return "这名驾驶员已有另一台编成，或当前档案已变更。";
-            return TvSortiesR32.name(unit)+"已加入编成，等待驾驶员确认。";
+            if(actual==null)return "ops.projectseele.city.no_unit_or_pilot_signal_yet_check_again";
+            if(!data.bind(expected,actual))return "ops.projectseele.city.the_pilot_has_another_assignment_or_the_current";
+            return OperationText.format("ops.projectseele.city.assigned", OperationText.unit(unit));
         }
         if(action.equals("finish"))
         {
-            if(data.stage!=6||!data.tested||data.supply.isEmpty()||!data.allConfirmed())return "准备或本次驾驶员确认还没有完成，不能归档。";
+            if(data.stage!=6||!data.tested||data.supply.isEmpty()||!data.allConfirmed())return "ops.projectseele.city.preparation_or_pilot_confirmation_is_incomplete_the_file";
             for(int unit:data.formation.keySet())
-            {var old=data.binding(unit);var actual=actualBinding(level,unit,old.kind(),old.pilot());if(!old.equals(actual))return "驾驶员或机体已变更，请重新编成并确认。";}
-            data.archive();return "美里：准备情况已记下。未知的射击条件还要继续确认。\n"+data.notice;
+            {var old=data.binding(unit);var actual=actualBinding(level,unit,old.kind(),old.pilot());if(!old.equals(actual))return "ops.projectseele.city.the_pilot_or_unit_changed_update_and_confirm";}
+            data.archive();return OperationText.format("ops.projectseele.city.complete", OperationText.read(data.notice));
         }
-        return "请选择档案中的有效操作。";
+        return "ops.projectseele.city.select_an_available_action_in_the_file";
     }
     private static CityCoordinationSavedDataR44.Binding actualBinding(ServerLevel level,int unit,String kind,UUID human)
     {
@@ -176,24 +180,24 @@ public final class CityCoordinationR44
         String[] parts=action.split("/");int unit;long formationRevision,evidenceRevision;
         try
         {
-            if(parts.length!=4)return "编成确认已更新，请重新打开当前档案确认。";
+            if(parts.length!=4)return "ops.projectseele.city.formation_confirmation_has_changed_reopen_the_current_file";
             unit=Integer.parseInt(parts[1]);formationRevision=Long.parseLong(parts[2]);evidenceRevision=Long.parseLong(parts[3]);
         }
-        catch(NumberFormatException error){return "请选择当前档案中的有效机体确认。";}
-        if(formationRevision!=data.formationRevisionR45||evidenceRevision!=data.evidenceRevisionR45)return "这条确认来自旧编成或旧资料，请重新核对当前档案。";
+        catch(NumberFormatException error){return "ops.projectseele.city.select_a_valid_unit_in_the_current_file";}
+        if(formationRevision!=data.formationRevisionR45||evidenceRevision!=data.evidenceRevisionR45)return "ops.projectseele.city.this_confirmation_refers_to_an_earlier_formation_or";
         var binding=data.binding(unit);
-        if(binding==null||data.stage!=5&&data.stage!=6)return "这台机体还没有编入本次的驾驶员，请重新编成。";
+        if(binding==null||data.stage!=5&&data.stage!=6)return "ops.projectseele.city.this_unit_has_no_pilot_assigned_for_this";
         if(action.startsWith("withdraw/"))
             return data.withdraw(expected,unit,player.getUUID())?"驾驶员已撤回，后续指令不会继续下达。":"这项撤回请由本人或本次司令确认。";
-        if(binding.kind().equals("human")&&!player.getUUID().equals(binding.pilot()))return "请由已编入的驾驶员本人确认，司令不能替其他玩家同意。";
-        if(binding.kind().equals("npc")&&!player.getUUID().equals(data.owner))return "请由本次司令接通这名驾驶员的频道。";
-        if(!data.requiredReadingComplete())return "本次要求的文书还没有阅读记录，请到书台上阅读确认。";
-        if(binding.kind().equals("human")&&!data.dossierReadCurrent(player.getUUID()))return "请本人先查阅当前三份记录，不能由其他玩家代读后确认。";
-        if(binding.kind().equals("npc")&&data.knowledge!=7)return participantLine(unit,false)+"\n请先共享三份记录。";
+        if(binding.kind().equals("human")&&!player.getUUID().equals(binding.pilot()))return "ops.projectseele.city.the_assigned_pilot_must_confirm_personally_the_commander";
+        if(binding.kind().equals("npc")&&!player.getUUID().equals(data.owner))return "ops.projectseele.city.the_mission_commander_must_open_this_pilot_s";
+        if(!data.requiredReadingComplete())return "ops.projectseele.city.the_required_document_has_no_reading_record_read";
+        if(binding.kind().equals("human")&&!data.dossierReadCurrent(player.getUUID()))return "ops.projectseele.city.review_the_three_current_records_yourself_another_player";
+        if(binding.kind().equals("npc")&&data.knowledge!=7)return OperationText.format("ops.projectseele.city.share_first", OperationText.read(participantLine(unit, false)));
         var actual=actualBinding(level,unit,binding.kind(),binding.pilot());
-        if(!binding.equals(actual))return "机体或驾驶员已变更，请重新编成，之前的确认不再有效。";
-        if(!data.confirm(expected,actual,formationRevision,evidenceRevision,actual.pilot()))return "本次确认已失效，请核对当前编成与资料修订。";
-        return actual.kind().equals("human")?"已记录 "+player.getName().getString()+" 本人驾驶确认，尚未下达发射指令。":participantLine(unit,true);
+        if(!binding.equals(actual))return "ops.projectseele.city.the_unit_or_pilot_changed_update_the_formation";
+        if(!data.confirm(expected,actual,formationRevision,evidenceRevision,actual.pilot()))return "ops.projectseele.city.this_confirmation_has_expired_check_the_current_formation";
+        return actual.kind().equals("human")?OperationText.format("ops.projectseele.city.self_confirmed", player.getName()):participantLine(unit,true);
     }
     private static NervStaffEntity find(ServerLevel level,String skin)
     {
@@ -259,7 +263,7 @@ public final class CityCoordinationR44
             data.fieldSampling=true;data.fieldStartedAt=level.getGameTime();data.fieldSamples=0;data.setDirty();
             reply="复测开始。请留在台前，等待隔离灯转绿。";
         }
-        player.displayClientMessage(net.minecraft.network.chat.Component.literal(reply),false);
+        player.displayClientMessage(OperationText.read(reply),false);
         event.setCanceled(true);event.setCancellationResult(InteractionResult.SUCCESS);
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)

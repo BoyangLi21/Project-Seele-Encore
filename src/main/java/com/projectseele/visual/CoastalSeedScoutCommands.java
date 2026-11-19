@@ -124,15 +124,13 @@ public final class CoastalSeedScoutCommands
     {
         if (!RUNNING.compareAndSet(false, true))
         {
-            source.sendFailure(Component.literal(
-                    "A coastal seed survey is already running."));
+            source.sendFailure(Component.translatable("message.projectseele.scout.running"));
             return 0;
         }
         MinecraftServer server = source.getServer();
         Path output = server.getWorldPath(LevelResource.ROOT)
                 .resolve("coastal_anchor_search_" + seed + ".json");
-        source.sendSuccess(() -> Component.literal(
-                "Coastal anchor search started for seed " + seed + "."),
+        source.sendSuccess(() -> Component.translatable("message.projectseele.coastal_seed_scout_commands.coastal_anchor_search_started_for_seed_s", seed),
                 false);
         CompletableFuture.runAsync(() -> runAnchorSearch(
                 server, source, seed, output));
@@ -207,8 +205,7 @@ public final class CoastalSeedScoutCommands
         catch (IOException | RuntimeException exception)
         {
             ProjectSeele.LOGGER.error("Coastal anchor search failed", exception);
-            server.execute(() -> source.sendFailure(Component.literal(
-                    "Coastal anchor search failed; inspect the server log.")));
+            server.execute(() -> source.sendFailure(Component.translatable("message.projectseele.scout.anchor_failed")));
         }
         finally
         {
@@ -304,16 +301,13 @@ public final class CoastalSeedScoutCommands
     {
         if (!RUNNING.compareAndSet(false, true))
         {
-            source.sendFailure(Component.literal(
-                    "A coastal seed survey is already running."));
+            source.sendFailure(Component.translatable("message.projectseele.scout.running"));
             return 0;
         }
         MinecraftServer server = source.getServer();
         Path output = server.getWorldPath(LevelResource.ROOT)
                 .resolve(fileName);
-        source.sendSuccess(() -> Component.literal(
-                "Coastal seed survey started in the background: " + seeds.size()
-                        + " seeds."), false);
+        source.sendSuccess(() -> Component.translatable("message.projectseele.coastal_seed_scout_commands.coastal_seed_survey_started_in_the_background", seeds.size()), false);
         CompletableFuture.runAsync(() -> runSurvey(
                 server, source, seeds, output, sampleStep));
         return 1;
@@ -375,8 +369,7 @@ public final class CoastalSeedScoutCommands
         catch (IOException | RuntimeException exception)
         {
             ProjectSeele.LOGGER.error("Coastal seed survey failed", exception);
-            server.execute(() -> source.sendFailure(Component.literal(
-                    "Coastal seed survey failed; inspect the server log.")));
+            server.execute(() -> source.sendFailure(Component.translatable("message.projectseele.scout.survey_failed")));
         }
         finally
         {

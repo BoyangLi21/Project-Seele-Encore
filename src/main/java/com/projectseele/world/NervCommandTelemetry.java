@@ -265,12 +265,11 @@ public final class NervCommandTelemetry
                                        int variant)
     {
         String label = String.format(Locale.ROOT, "EVA-%02d", variant);
-        MutableComponent result = Component.literal(label + " / "
-                        + switch (variant)
+        MutableComponent result = Component.literal(label + " / ").append(switch (variant)
                         {
-                            case EvaUnit01Entity.UNIT_00 -> "PROTOTYPE";
-                            case EvaUnit01Entity.UNIT_02 -> "PRODUCTION";
-                            default -> "TEST TYPE";
+                            case EvaUnit01Entity.UNIT_00 -> Component.translatable("ops.projectseele.telemetry.prototype");
+                            case EvaUnit01Entity.UNIT_02 -> Component.translatable("ops.projectseele.telemetry.production");
+                            default -> Component.translatable("ops.projectseele.telemetry.test_type");
                         })
                 .withStyle(variant == EvaUnit01Entity.UNIT_00
                         ? ChatFormatting.GOLD
@@ -278,49 +277,50 @@ public final class NervCommandTelemetry
                                 ? ChatFormatting.RED : ChatFormatting.LIGHT_PURPLE);
         if (unit == null)
         {
-            return result.append(Component.literal("\nLINK OFFLINE\nNO AIRFRAME DATA")
+            return result.append(Component.translatable("message.projectseele.telemetry.no_data")
                     .withStyle(ChatFormatting.DARK_RED));
         }
 
         float health = unit.getHealth();
         float at = unit.getAtFieldEnergy();
         float atMax = Math.max(1.0F, unit.getAtFieldCapacity());
-        result.append(Component.literal("\n").append(unit.synchronizationText(0))
-                .append(String.format(Locale.ROOT, "   HP %03.0f/%03.0f", health, unit.getMaxHealth()))
+        result.append(Component.translatable("ops.projectseele.telemetry_report.sync_status_hp",
+                        unit.synchronizationText(0),
+                        String.format(Locale.ROOT, "%03.0f", health),
+                        String.format(Locale.ROOT, "%03.0f", unit.getMaxHealth()))
                 .append("\n").append(Component.translatable("command.projectseele.proficiency",
-                        String.format(Locale.ROOT, "%.1f", unit.getPilotSynchronization()))).withStyle(ChatFormatting.AQUA));
+                        String.format(Locale.ROOT, "%.1f", unit.getPilotSynchronization())))
+                .withStyle(ChatFormatting.AQUA));
         boolean videoLive = ServerboundEvaVideoFramePacket.isFeedActive(
                 level, variant);
-        result.append(Component.literal(videoLive
+        result.append(Component.translatable(videoLive
                         ? unit.isTrainingPilotActive()
-                                ? "\nCOCKPIT VIDEO: TRAINING LIVE"
-                                : "\nCOCKPIT VIDEO: LIVE"
-                        : "\nCOCKPIT VIDEO: STANDBY")
+                                ? "ops.projectseele.telemetry_video.cockpit_video_training_live"
+                                : "ops.projectseele.telemetry_video.cockpit_video_live"
+                        : "ops.projectseele.telemetry_video.cockpit_video_standby")
                 .withStyle(videoLive ? ChatFormatting.GREEN
                         : ChatFormatting.DARK_GRAY));
-        result.append(Component.literal(String.format(Locale.ROOT,
-                        "\nA.T. %03.0f/%03.0f  %s", at, atMax,
-                        unit.isAtFieldOn() ? "DEPLOYED" : "STANDBY"))
+        result.append(Component.translatable("ops.projectseele.telemetry_report.a_t_s_s_s",
+                String.format(Locale.ROOT, "%03.0f", at),
+                String.format(Locale.ROOT, "%03.0f", atMax),
+                unit.isAtFieldOn() ? Component.translatable("ops.projectseele.telemetry.deployed") : Component.translatable("ops.projectseele.telemetry.standby"))
                 .withStyle(unit.isAtFieldOn()
                         ? ChatFormatting.GREEN : ChatFormatting.GRAY));
-        result.append(Component.literal("\n" + weaponName(unit.getWeapon())
-                        + " / " + stanceName(unit))
+        result.append(Component.literal("\n").append(weaponName(unit.getWeapon())).append(" / ").append(stanceName(unit))
                 .withStyle(ChatFormatting.WHITE));
         if (unit.isBerserk())
         {
-            result.append(Component.literal(String.format(Locale.ROOT,
-                            "\nBERSERK / AUTONOMOUS  %03ds",
-                            Math.max(0, unit.getBerserkTicks() / 20)))
+            result.append(Component.translatable("ops.projectseele.telemetry_report.berserk_autonomous_ss",
+                    String.format(Locale.ROOT, "%03d", Math.max(0, unit.getBerserkTicks() / 20)))
                     .withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
         }
         else if (unit.getBerserkRecoveryTicks() > 0)
         {
-            result.append(Component.literal(String.format(Locale.ROOT,
-                            "\nFORCED SHUTDOWN  %03ds",
-                            Math.max(0, unit.getBerserkRecoveryTicks() / 20)))
+            result.append(Component.translatable("ops.projectseele.telemetry_report.forced_shutdown_ss",
+                    String.format(Locale.ROOT, "%03d", Math.max(0, unit.getBerserkRecoveryTicks() / 20)))
                     .withStyle(ChatFormatting.GOLD));
         }
-        result.append(Component.literal("\n" + launchReadout(level, unit, variant))
+        result.append(Component.literal("\n").append(launchReadout(level, unit, variant))
                 .withStyle(unit.getLaunchPhase() == EvaUnit01Entity.LAUNCH_ASCENT
                         ? ChatFormatting.YELLOW : ChatFormatting.GRAY));
         return result;
@@ -344,23 +344,22 @@ public final class NervCommandTelemetry
             }
         }
 
-        MutableComponent result = Component.literal(
-                "NERV / MAGI LIVE TACTICAL NETWORK")
+        MutableComponent result = Component.translatable("message.projectseele.telemetry.network")
                 .withStyle(ChatFormatting.GOLD);
         if (ramiel != null)
         {
-            result.append(Component.literal(String.format(Locale.ROOT,
-                            "\nANGEL: RAMIEL  HP %.0f/%.0f  A.T. %.0f/%.0f  CORE %s",
-                            ramiel.getHealth(), ramiel.getMaxHealth(),
-                            ramiel.getAtFieldEnergy(), ramiel.getAtFieldMax(),
-                            ramiel.isExposed() ? "EXPOSED" : "SEALED"))
+            result.append(Component.translatable("ops.projectseele.telemetry_report.angel_ramiel_hp_s_s_a_t_s",
+                    String.format(Locale.ROOT, "%.0f", ramiel.getHealth()),
+                    String.format(Locale.ROOT, "%.0f", ramiel.getMaxHealth()),
+                    String.format(Locale.ROOT, "%.0f", ramiel.getAtFieldEnergy()),
+                    String.format(Locale.ROOT, "%.0f", ramiel.getAtFieldMax()),
+                    ramiel.isExposed() ? Component.translatable("ops.projectseele.telemetry.exposed") : Component.translatable("ops.projectseele.telemetry.sealed"))
                     .withStyle(ramiel.isExposed()
                             ? ChatFormatting.YELLOW : ChatFormatting.RED));
         }
         else
         {
-            result.append(Component.literal("\nANGEL MONITOR: "
-                            + (angels.isEmpty() ? "CLEAR" : angels.size() + " ACTIVE"))
+            result.append((angels.isEmpty() ? Component.translatable("message.projectseele.nerv_command_telemetry.angel_monitor_clear") : Component.translatable("message.projectseele.nerv_command_telemetry.angel_monitor_s_active", angels.size()))
                     .withStyle(angels.isEmpty()
                             ? ChatFormatting.GREEN : ChatFormatting.RED));
         }
@@ -369,10 +368,11 @@ public final class NervCommandTelemetry
                 level, IntegratedNervMapBuilder.tokyo3Origin(level));
         if (siege.active())
         {
-            result.append(Component.literal(String.format(Locale.ROOT,
-                            "\nNERV BEACON: WAVE %d/3  INTEGRITY %04d/%04d  HOSTILES %d",
-                            siege.wave(), siege.integrity(),
-                            siege.maximumIntegrity(), siege.aliveAngels()))
+            result.append(Component.translatable("ops.projectseele.telemetry_report.nerv_beacon_wave_s_3_integrity_s_s",
+                    siege.wave(),
+                    String.format(Locale.ROOT, "%04d", siege.integrity()),
+                    String.format(Locale.ROOT, "%04d", siege.maximumIntegrity()),
+                    siege.aliveAngels())
                     .withStyle(siege.integrity() * 4 < siege.maximumIntegrity()
                             ? ChatFormatting.RED : ChatFormatting.YELLOW));
         }
@@ -383,40 +383,40 @@ public final class NervCommandTelemetry
         LivingEntity pilot = activePilot(feed);
         if (feed != null && pilot != null)
         {
-            result.append(Component.literal(String.format(Locale.ROOT,
-                            "\nPILOT SENSOR FEED EVA-%02d  HDG %03d  PITCH %+03d",
-                            feed.getUnitVariant(), heading(pilot.getYRot()),
-                            Math.round(pilot.getXRot())))
+            result.append(Component.translatable("ops.projectseele.telemetry_report.pilot_sensor_feed_eva_s_hdg_s_pitch",
+                    String.format(Locale.ROOT, "%02d", feed.getUnitVariant()),
+                    String.format(Locale.ROOT, "%03d", heading(pilot.getYRot())),
+                    String.format(Locale.ROOT, "%+03d", Math.round(pilot.getXRot())))
                     .withStyle(ChatFormatting.AQUA));
-            result.append(Component.literal(String.format(Locale.ROOT,
-                            "\nPOSITION X%+.0f Y%.0f Z%+.0f  %s",
-                            feed.getX() - origin.getX(), feed.getY(),
-                            feed.getZ() - origin.getZ(), stanceName(feed)))
+            result.append(Component.translatable("ops.projectseele.telemetry_report.position_x_s_y_s_z_s_s",
+                    String.format(Locale.ROOT, "%+.0f", feed.getX() - origin.getX()),
+                    String.format(Locale.ROOT, "%.0f", feed.getY()),
+                    String.format(Locale.ROOT, "%+.0f", feed.getZ() - origin.getZ()),
+                    stanceName(feed))
                     .withStyle(ChatFormatting.WHITE));
-            result.append(Component.literal(String.format(Locale.ROOT,
-                            "\nPOWER %s  %04d/%04d",
-                            feed.isUmbilicalConnected() ? "UMBILICAL" : "INTERNAL",
-                            feed.getPowerTicks(), feed.getPowerCapacityTicks()))
+            result.append(Component.translatable("ops.projectseele.telemetry_report.power_s_s_s",
+                    feed.isUmbilicalConnected() ? Component.translatable("ops.projectseele.telemetry.umbilical") : Component.translatable("ops.projectseele.telemetry.internal"),
+                    String.format(Locale.ROOT, "%04d", feed.getPowerTicks()),
+                    String.format(Locale.ROOT, "%04d", feed.getPowerCapacityTicks()))
                     .withStyle(feed.isPowerDepleted()
                             ? ChatFormatting.RED : feed.isUmbilicalConnected()
                                 ? ChatFormatting.GREEN : ChatFormatting.GOLD));
         }
         else
         {
-            result.append(Component.literal(
-                            "\nPILOT SENSOR FEED: NO ACTIVE ENTRY PLUG LINK")
+            result.append(Component.translatable("message.projectseele.telemetry.no_sensor")
                     .withStyle(ChatFormatting.DARK_GRAY));
         }
-        result.append(Component.literal("\nGEOFRONT > TOKYO-3 PHYSICAL ROUTE: "
-                        + IntegratedNervMapBuilder.ascentDistance()
-                        + " BLOCKS / CONNECTED")
+        result.append(Component.translatable("message.projectseele.nerv_command_telemetry.geofront_tokyo_3_physical_route_s_blocks",
+                        IntegratedNervMapBuilder.ascentDistance())
                 .withStyle(ChatFormatting.GREEN));
         Tokyo3RetractionDirector.Status city =
                 Tokyo3RetractionDirector.status(level,
                         IntegratedNervMapBuilder.tokyo3Origin(level));
-        result.append(Component.literal(String.format(Locale.ROOT,
-                        "\nCITY ARMOUR: %s %02d/%02d",
-                        city.phase(), city.depth(), city.maximumDepth()))
+        result.append(Component.translatable("ops.projectseele.telemetry_report.city_armour_s_s_s",
+                city.phase(),
+                String.format(Locale.ROOT, "%02d", city.depth()),
+                String.format(Locale.ROOT, "%02d", city.maximumDepth()))
                 .withStyle(city.targetDepth() > 0
                         ? ChatFormatting.YELLOW : ChatFormatting.AQUA));
         result.append(Component.literal("\n"
@@ -424,10 +424,11 @@ public final class NervCommandTelemetry
                 .withStyle(ChatFormatting.GOLD));
         NervCrewSavedData.CrewOverview crew = NervCrewSavedData
                 .get(level.getServer()).overview(level.getServer());
-        result.append(Component.literal(String.format(Locale.ROOT,
-                        "\nCREW %d/6  ONLINE %d  READY %d/%d",
-                        crew.assigned(), crew.online(), crew.onlineReady(),
-                        crew.assigned()))
+        result.append(Component.translatable("ops.projectseele.telemetry_report.crew_s_6_online_s_ready_s_s",
+                crew.assigned(),
+                crew.online(),
+                crew.onlineReady(),
+                crew.assigned())
                 .withStyle(crew.allAssignedOnlineReady()
                         ? ChatFormatting.GREEN : ChatFormatting.YELLOW));
         return result;
@@ -444,25 +445,21 @@ public final class NervCommandTelemetry
         EvaUnit01Entity feed = units.stream()
                 .filter(unit -> activePilot(unit) != null)
                 .findFirst().orElse(null);
-        MutableComponent result = Component.literal(
-                "ENTRY PLUG / LIVE OPTICAL SENSOR")
+        MutableComponent result = Component.translatable("message.projectseele.telemetry.optical")
                 .withStyle(ChatFormatting.GOLD);
         LivingEntity pilot = activePilot(feed);
         if (feed == null || pilot == null)
         {
-            result.append(Component.literal(
-                            "\nNO ACTIVE PILOT LINK\n\n"
-                                    + "....................\n".repeat(8)
-                                    + "....................")
+            result.append(Component.translatable("message.projectseele.nerv_command_telemetry.no_active_pilot_link_s", "....................\n".repeat(8))
                     .withStyle(ChatFormatting.DARK_GRAY));
             return result;
         }
 
-        result.append(Component.literal(String.format(Locale.ROOT,
-                        "\nEVA-%02d  %s  HDG %03d  PITCH %+03d",
-                        feed.getUnitVariant(),
-                        pilot instanceof TrainingPilotEntity ? "DUMMY" : "PILOT",
-                        heading(pilot.getYRot()), Math.round(pilot.getXRot())))
+        result.append(Component.translatable("ops.projectseele.telemetry_report.eva_s_s_hdg_s_pitch_s",
+                String.format(Locale.ROOT, "%02d", feed.getUnitVariant()),
+                pilot instanceof TrainingPilotEntity ? Component.translatable("ops.projectseele.telemetry.dummy") : Component.translatable("ops.projectseele.telemetry.pilot"),
+                String.format(Locale.ROOT, "%03d", heading(pilot.getYRot())),
+                String.format(Locale.ROOT, "%+03d", Math.round(pilot.getXRot())))
                 .withStyle(ChatFormatting.AQUA));
 
         Vec3 eye = pilot.getEyePosition();
@@ -648,7 +645,7 @@ public final class NervCommandTelemetry
         return ChatFormatting.DARK_GRAY;
     }
 
-    private static String launchReadout(ServerLevel level,
+    private static Component launchReadout(ServerLevel level,
                                         EvaUnit01Entity unit, int variant)
     {
         BlockPos lower = IntegratedNervMapBuilder.lowerLiftBed(level, variant);
@@ -659,46 +656,45 @@ public final class NervCommandTelemetry
         return switch (unit.getLaunchPhase())
         {
             case EvaUnit01Entity.LAUNCH_LOCKED ->
-                    "SILO LOCKED / ENTRY PLUG SYNCHRONIZING";
+                    Component.translatable("ops.projectseele.telemetry.silo_locked_entry_plug_synchronizing");
             case EvaUnit01Entity.LAUNCH_ASCENT ->
-                    String.format(Locale.ROOT, "MAGLEV ASCENT %03d%% / Y %.1f",
-                            progress, unit.getY());
+                    Component.translatable("ops.projectseele.telemetry.maglev_ascent_s_y_s", String.format(Locale.ROOT, "%03d", progress), String.format(Locale.ROOT, "%.1f", unit.getY()));
             case EvaUnit01Entity.LAUNCH_CLEAR ->
-                    "SURFACE CLEAR / CONTROL TRANSFER";
+                    Component.translatable("ops.projectseele.telemetry.surface_clear_control_transfer");
             default -> unit.getY() >= upper.getY()
-                    ? "TOKYO-3 SURFACE / READY"
-                    : "GEOFRONT BAY / STANDBY";
+                    ? Component.translatable("ops.projectseele.telemetry.tokyo_3_surface_ready")
+                    : Component.translatable("ops.projectseele.telemetry.geofront_bay_standby");
         };
     }
 
-    private static String weaponName(int weapon)
+    private static Component weaponName(int weapon)
     {
         return switch (weapon)
         {
-            case EvaUnit01Entity.WEAPON_KNIFE -> "PROGRESSIVE KNIFE";
-            case EvaUnit01Entity.WEAPON_CANNON -> "POSITRON CANNON";
-            case EvaUnit01Entity.WEAPON_LANCE -> "LANCE OF LONGINUS";
-            case EvaUnit01Entity.WEAPON_RIFLE -> "PALLET RIFLE";
-            case EvaUnit01Entity.WEAPON_N2 -> "N2 SELF-DESTRUCT";
-            default -> "BARE HANDS";
+            case EvaUnit01Entity.WEAPON_KNIFE -> Component.translatable("ops.projectseele.telemetry.progressive_knife");
+            case EvaUnit01Entity.WEAPON_CANNON -> Component.translatable("ops.projectseele.telemetry.positron_cannon");
+            case EvaUnit01Entity.WEAPON_LANCE -> Component.translatable("ops.projectseele.telemetry.lance_of_longinus");
+            case EvaUnit01Entity.WEAPON_RIFLE -> Component.translatable("ops.projectseele.telemetry.pallet_rifle");
+            case EvaUnit01Entity.WEAPON_N2 -> Component.translatable("ops.projectseele.telemetry.n2_self_destruct");
+            default -> Component.translatable("ops.projectseele.telemetry.bare_hands");
         };
     }
 
-    private static String stanceName(EvaUnit01Entity unit)
+    private static Component stanceName(EvaUnit01Entity unit)
     {
         if (unit.isPilotProne())
         {
-            return "PRONE";
+            return Component.translatable("ops.projectseele.telemetry.prone");
         }
         if (unit.isPilotCrouching())
         {
-            return unit.isShieldBraced() ? "SHIELD BRACE" : "KNEEL";
+            return unit.isShieldBraced() ? Component.translatable("ops.projectseele.telemetry.shield_brace") : Component.translatable("ops.projectseele.telemetry.kneel");
         }
         if (unit.isPilotSprinting())
         {
-            return "SPRINT";
+            return Component.translatable("ops.projectseele.telemetry.sprint");
         }
-        return "UPRIGHT";
+        return Component.translatable("ops.projectseele.telemetry.upright");
     }
 
     private static int heading(float yaw)

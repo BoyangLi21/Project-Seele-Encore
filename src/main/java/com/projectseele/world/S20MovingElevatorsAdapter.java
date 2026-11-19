@@ -298,8 +298,7 @@ public final class S20MovingElevatorsAdapter
             {
                 ACCESS_UNTIL.put(accessKey(level, spec),
                         level.getGameTime() + ACCESS_WINDOW_TICKS);
-                player.displayClientMessage(Component.literal(
-                        "NERV CLEARANCE ACCEPTED / FLOORS UNLOCKED")
+                player.displayClientMessage(Component.translatable("message.projectseele.lift.floors_unlocked")
                         .withStyle(ChatFormatting.GREEN), true);
                 level.playSound(null, clicked,
                         SoundEvents.EXPERIENCE_ORB_PICKUP,
@@ -697,7 +696,7 @@ public final class S20MovingElevatorsAdapter
             }
             if(NervTravelDirectoryR52.applies(level)&&!S20LiftDirectoryR52.current(level,spec))
             {
-                player.displayClientMessage(Component.literal("电梯原生绑定尚未确认，请等待设施检查。"),true);
+                player.displayClientMessage(Component.translatable("message.projectseele.lift.binding"),true);
                 return true;
             }
             if (SeeleConferenceAccessR47.office(level, spec)
@@ -717,8 +716,7 @@ public final class S20MovingElevatorsAdapter
                 boolean hasCard = hasHighestClearanceCard(player);
                 if (!hasCard)
                 {
-                    player.displayClientMessage(Component.literal(
-                            "ACCESS DENIED / NERV ACCESS CARD REQUIRED")
+                    player.displayClientMessage(Component.translatable("message.projectseele.lift.card")
                             .withStyle(ChatFormatting.RED), true);
                     level.playSound(null, clicked,
                             SoundEvents.IRON_DOOR_CLOSE,
@@ -727,8 +725,7 @@ public final class S20MovingElevatorsAdapter
                 }
                 ACCESS_UNTIL.put(accessKey(level, spec),
                         level.getGameTime() + ACCESS_WINDOW_TICKS);
-                player.displayClientMessage(Component.literal(
-                        "NERV CLEARANCE ACCEPTED / FLOOR UNLOCKED")
+                player.displayClientMessage(Component.translatable("message.projectseele.lift.floor_unlocked")
                         .withStyle(ChatFormatting.GREEN), true);
             }
             // The x=96 controller and x=93 car belong to adjacent chunks.
@@ -746,8 +743,7 @@ public final class S20MovingElevatorsAdapter
                     controllerPosition(spec, landing));
             if (target == null || !target.hasGroup())
             {
-                player.displayClientMessage(Component.literal(
-                        "NERV LIFT INITIALIZING / PRESS AGAIN")
+                player.displayClientMessage(Component.translatable("message.projectseele.lift.initializing")
                         .withStyle(ChatFormatting.YELLOW), true);
                 return true;
             }
@@ -781,7 +777,7 @@ public final class S20MovingElevatorsAdapter
                 clearDepartureDoorInterlock(level, spec);
                 S20PhysicalElevatorDirector.synchronizeMovingElevatorDoors(
                         level, spec, landing.walkY(), false);
-                player.displayClientMessage(Component.literal("电梯已在本层 / LIFT HERE"), true);
+                player.displayClientMessage(Component.translatable("message.projectseele.lift.here"), true);
                 return true;
             }
             synchronizeDoorsForDeparture(level, spec);
@@ -1891,8 +1887,7 @@ public final class S20MovingElevatorsAdapter
                 {
                     return true;
                 }
-                serverPlayer.displayClientMessage(Component.literal(
-                        "ACCESS DENIED / HIGHEST CLEARANCE REQUIRED")
+                serverPlayer.displayClientMessage(Component.translatable("message.projectseele.lift.highest_clearance")
                         .withStyle(ChatFormatting.RED), true);
                 level.playSound(null, serverPlayer.blockPosition(),
                         SoundEvents.IRON_DOOR_CLOSE, SoundSource.BLOCKS,

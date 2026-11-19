@@ -38,7 +38,7 @@ public final class MilitaryR07Commands
             var level = c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);
             if (level == null || !MilitaryR07Director.state(level).commissioned)
             {
-                c.getSource().sendFailure(Component.literal("此存档尚未安装 R07 设施"));
+                c.getSource().sendFailure(Component.translatable("message.projectseele.military.not_installed"));
                 return 0;
             }
             return visit(c.getSource(), level, point.apply(level), yaw);
@@ -52,7 +52,7 @@ public final class MilitaryR07Commands
             var level = c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);
             if (level == null || !UNAnnexR20.installed(level))
             {
-                c.getSource().sendFailure(Component.literal("此存档未安装 UN-01 试验舱"));
+                c.getSource().sendFailure(Component.translatable("message.projectseele.military.no_chamber"));
                 return 0;
             }
             return visit(c.getSource(), level, point.apply(level), yaw);

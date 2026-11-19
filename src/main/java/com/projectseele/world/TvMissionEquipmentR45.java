@@ -511,7 +511,7 @@ public final class TvMissionEquipmentR45
         if(!(event.getEntity() instanceof ServerPlayer player)||event.getHand()!=InteractionHand.MAIN_HAND
                 ||!deliverHeldCargoToRecoveryStorage(player,event.getHand(),event.getPos()))return;
         event.setCanceled(true);event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
-        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("原任务装备已移入本机实际回收库存。"));
+        player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("message.projectseele.mission.equipment_recovered"));
     }
     private static boolean assignedPilot(ServerLevel l,EvaUnit01Entity eva,LivingEntity pilot)
     {

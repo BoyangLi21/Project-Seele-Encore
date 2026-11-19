@@ -98,40 +98,40 @@ public final class MilitaryR07Director
         }
         return false;
     }
-    private static void say(Player player,String text) { if(player!=null)player.displayClientMessage(Component.literal(text),true); }
+    private static void say(Player player,String text) { if(player!=null)player.displayClientMessage(OperationText.read(text),true); }
     public static String request(ServerLevel level,String action,Player operator)
     {
         Vec3 home=UNRecoveryR22.home(level,0);
-        State data=state(level);if(!data.commissioned)return "设施尚未完成调试";
-        if(operator!=null&&!card(operator))return "需要 NERV 身份卡";
+        State data=state(level);if(!data.commissioned)return "ops.projectseele.bay00.uncommissioned";
+        if(operator!=null&&!card(operator))return "ops.projectseele.bay00.card_required";
         var repairId=UNRecoveryR22.identity(level,0);
-        if(repairId!=null&&level.getEntity(repairId) instanceof EvaUnit01Entity repairing&&EvaBayRepairR33.active(repairing))return "机体正在检修，请等待机械臂撤回。";
+        if(repairId!=null&&level.getEntity(repairId) instanceof EvaUnit01Entity repairing&&EvaBayRepairR33.active(repairing))return "ops.projectseele.bay00.repairing";
         switch(action)
         {
             case "drain" -> {
-                if(data.phase!=Phase.WET&&data.phase!=Phase.FILLING)return "当前无需排液";
-                if(!level.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(level,0),p->!p.isSpectator()).isEmpty())return "请先离开 LCL 试验区";
+                if(data.phase!=Phase.WET&&data.phase!=Phase.FILLING)return "ops.projectseele.bay00.drain_unneeded";
+                if(!level.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(level,0),p->!p.isSpectator()).isEmpty())return "ops.projectseele.bay00.clear_test_area";
                 data.phase=Phase.DRAINING;data.cursor=0;
             }
             case "door" -> {
                 if(data.phase==Phase.DRY)
                 {
-                    if(fluidCells(level)>0){data.phase=Phase.DRAINING;data.cursor=0;data.setDirty();return "检测到余液，继续排液";}
+                    if(fluidCells(level)>0){data.phase=Phase.DRAINING;data.cursor=0;data.setDirty();return "ops.projectseele.bay00.resume_drain";}
                     data.phase=Phase.OPENING;data.cursor=0;
                 }
                 else if(data.phase==Phase.OPEN){
-                    if(occupiedDoor(level))return "舱门运行区域有人员或载具";
+                    if(occupiedDoor(level))return "ops.projectseele.bay00.door_obstructed";
                     data.phase=Phase.CLOSING;data.cursor=0;
                 }
                 else if(data.phase==Phase.CLOSING)data.phase=Phase.OPENING;
-                else if(data.phase==Phase.OPENING)return "舱门正在开启";
-                else return "LCL 未排空，舱门锁定";
+                else if(data.phase==Phase.OPENING)return "ops.projectseele.bay00.opening";
+                else return "ops.projectseele.bay00.interlocked";
             }
             case "fill" -> {
-                if(data.phase!=Phase.DRY)return "请先关闭舱门";
+                if(data.phase!=Phase.DRY)return "ops.projectseele.bay00.close_door";
                 Entity unit=entity(level,data,"prototype");
-                if(unit==null||unit.position().distanceTo(home)>3||unit.isVehicle())return "EVA-UN-00 须归位并解除驾驶";
-                if(!level.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(level,0),p->!p.isSpectator()).isEmpty())return "请先离开 LCL 试验区";
+                if(unit==null||unit.position().distanceTo(home)>3||unit.isVehicle())return "ops.projectseele.bay00.park_uncrewed";
+                if(!level.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(level,0),p->!p.isSpectator()).isEmpty())return "ops.projectseele.bay00.clear_test_area";
                 data.phase=Phase.FILLING;data.cursor=0;
             }
             case "defense" -> data.defense=!data.defense;
@@ -139,14 +139,14 @@ public final class MilitaryR07Director
             default -> { return status(data); }
         }
         data.setDirty();
-        if(action.equals("defense"))return data.defense?"防御系统已启用":"防御系统已待机";
-        if(action.equals("power"))return data.power?"防御能源网已接通":"防御能源网已关闭";
+        if(action.equals("defense"))return data.defense?"ops.projectseele.bay00.defense_enabled":"ops.projectseele.bay00.defense_standby";
+        if(action.equals("power"))return data.power?"ops.projectseele.bay00.grid_online":"ops.projectseele.bay00.grid_offline";
         return status(data);
     }
     public static String status(State data)
     {
-        String phase=switch(data.phase){case WET->"LCL 保管";case DRAINING->"排液中";case DRY->"干燥 / 舱门关闭";case OPENING->"舱门开启中";case OPEN->"允许出舱";case CLOSING->"舱门关闭中";case FILLING->"注液中";};
-        return "EVA-UN-00 试验舱 · "+phase+((data.phase==Phase.DRAINING||data.phase==Phase.FILLING)?" "+(100*data.cursor/(data.poolWidth*90*44))+"%":"");
+        String phase=switch(data.phase){case WET->"ops.projectseele.bay00.stored";case DRAINING->"ops.projectseele.bay00.draining";case DRY->"ops.projectseele.bay00.dry";case OPENING->"ops.projectseele.bay00.opening_state";case OPEN->"ops.projectseele.bay00.exit_clear";case CLOSING->"ops.projectseele.bay00.closing";case FILLING->"ops.projectseele.bay00.filling";};
+        return OperationText.format("ops.projectseele.bay00.state", OperationText.read(phase), (data.phase==Phase.DRAINING||data.phase==Phase.FILLING)?" "+(100*data.cursor/(data.poolWidth*90*44))+"%":"");
     }
     private static boolean occupiedDoor(ServerLevel level)
     {

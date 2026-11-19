@@ -121,12 +121,12 @@ public final class FacilityDoorControlsR49
     public static boolean pilotDoorUse(ServerLevel level,BlockPos clicked,ServerPlayer player)
     {
         if(NervRouteRuntimeR52.claimed(level)&&!installed(level)&&ownsDoor(level,clicked))
-        {player.displayClientMessage(Component.literal("门控原生绑定尚未确认，请等待设施检查。"),true);return true;}
+        {player.displayClientMessage(Component.translatable("message.projectseele.doors.wait"),true);return true;}
         if(!installed(level))return false;
         var p=pilot(level).stream().filter(q->clicked.equals(q)||clicked.equals(q.above())).findFirst().orElse(null);
         if(p==null)return false;
         if(player.isSpectator()||!NervStaffDialogue.authorized(player)||player.distanceToSqr(Vec3.atCenterOf(p))>36)
-        {player.displayClientMessage(Component.literal("驾驶员休息室需要NERV通行权限。"),true);return true;}
+        {player.displayClientMessage(Component.translatable("message.projectseele.doors.lounge_access"),true);return true;}
         if(!validDoor(level,p,DoorHingeSide.RIGHT))return true;
         boolean open=!level.getBlockState(p).getValue(DoorBlock.OPEN);
         var state=STATES.computeIfAbsent(level,key->new State());
@@ -134,7 +134,7 @@ public final class FacilityDoorControlsR49
         {
             for(var feet:doorBinding(level,p)==null?List.of(new Vec3(p.getX()+.5,p.getY(),-221.5),new Vec3(p.getX()+.5,p.getY(),-223.5)):doorBinding(level,p).approachFeet())
                 if(!TrainingPilotDirector.safeActualFeetR47(level,feet)||!level.noCollision(player,player.getDimensions(net.minecraft.world.entity.Pose.STANDING).makeBoundingBox(feet)))
-                {player.displayClientMessage(Component.literal("卫兵侧通道净空不足，请先清理门外。"),true);return true;}
+                {player.displayClientMessage(Component.translatable("message.projectseele.doors.guard_clearance"),true);return true;}
             state.pilotUntil.put(p,level.getGameTime()+100);
         }
         else
@@ -175,12 +175,12 @@ public final class FacilityDoorControlsR49
         if(!(event.getEntity() instanceof ServerPlayer player)||!installed(player.serverLevel()))return;
         var level=player.serverLevel();var p=event.getPos();
         if(gate(level).stream().anyMatch(q->p.equals(q)||p.equals(q.above())))
-        {event.setCanceled(true);event.setCancellationResult(InteractionResult.CONSUME);player.displayClientMessage(Component.literal("SEELE门内外均需在读卡器刷最高权限卡。"),true);return;}
+        {event.setCanceled(true);event.setCancellationResult(InteractionResult.CONSUME);player.displayClientMessage(Component.translatable("message.projectseele.doors.seele_reader"),true);return;}
         if(!readers(level).contains(p))return;
         event.setCanceled(true);event.setCancellationResult(InteractionResult.CONSUME);
         if(player.isSpectator()||player.distanceToSqr(Vec3.atCenterOf(p))>=16||!completeGate(level))return;
         var hand=highest(player,event.getHand())?event.getHand():highest(player,InteractionHand.OFF_HAND)?InteractionHand.OFF_HAND:InteractionHand.MAIN_HAND;
-        if(!highest(player,hand)){visual(level,p,-1,3);player.displayClientMessage(Component.literal("权限不足：进出SEELE均需最高权限NERV卡。"),true);return;}
+        if(!highest(player,hand)){visual(level,p,-1,3);player.displayClientMessage(Component.translatable("message.projectseele.doors.seele_denied"),true);return;}
         var state=STATES.computeIfAbsent(level,key->new State());
         if(state.swipes.containsKey(p))return;
         state.swipes.put(p,new Swipe(player.getUUID(),p,hand,level.getGameTime()));visual(level,p,level.getGameTime(),1);player.startUsingItem(hand);

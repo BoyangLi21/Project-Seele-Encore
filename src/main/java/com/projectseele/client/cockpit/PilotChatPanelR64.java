@@ -9,7 +9,6 @@ import com.projectseele.entity.EntryPlugCarrierEntity;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.visual.EvaLogisticsCommands;
 import com.projectseele.world.EvaPilotResolver;
-import com.projectseele.world.NervStaffDialogue;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -99,9 +98,14 @@ public final class PilotChatPanelR64
     {
         if (!(message.getContents() instanceof TranslatableContents line) || !EvaLogisticsCommands.STATUS_KEY.equals(line.getKey())
                 || line.getArgs().length < 3) return null;
-        String unit = word(line.getArgs()[0]), phase = word(line.getArgs()[1]), loaded = word(line.getArgs()[2]);
-        return new Line(Kind.SYSTEM, PlugChatSourceR64.SYSTEM,
-                unit + "：" + NervStaffDialogue.stage(phase) + (EvaLogisticsCommands.STATUS_UNLOADED.equals(loaded) ? "，机体未加载" : ""));
+        String phase = word(line.getArgs()[1]).toLowerCase(java.util.Locale.ROOT);
+        String key = "hud.projectseele.phase." + phase;
+        Object loaded = line.getArgs()[2];
+        boolean unloaded = loaded instanceof Component text && text.getContents() instanceof TranslatableContents translated
+                ? EvaLogisticsCommands.STATUS_UNLOADED.equals(translated.getKey()) : "未加载".equals(word(loaded));
+        return new Line(Kind.SYSTEM, PlugChatSourceR64.SYSTEM, I18n.get(unloaded
+                ? "hud.projectseele.chat.unit_unloaded" : "hud.projectseele.chat.unit_status",
+                word(line.getArgs()[0]), I18n.get(I18n.exists(key) ? key : "hud.projectseele.phase.unknown")));
     }
 
     private static String word(Object argument)
@@ -211,7 +215,7 @@ public final class PilotChatPanelR64
         {
             // Somebody's voice: the original marks a link without a picture so, and the level moves while they speak.
             int ink = alpha(strength(voice, now));
-            g.drawString(font, "SOUND ONLY", x + 5, y + 3, ink << 24 | RED, true);
+            g.drawString(font, I18n.get("hud.projectseele.chat.sound_only"), x + 5, y + 3, ink << 24 | RED, true);
             boolean speaking = now - voice.born < 3500;
             for (int i = 0; i < 7; i++)
             {

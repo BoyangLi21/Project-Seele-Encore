@@ -40,12 +40,11 @@ public final class LilithCommands
         var found = specimens(source);
         if (found.isEmpty())
         {
-            source.sendFailure(Component.literal("莉莉丝所在区块没有加载，或者这个世界没有莉莉丝。"));
+            source.sendFailure(Component.translatable("message.projectseele.lilith.unloaded"));
             return 0;
         }
         var lilith = found.get(0);
-        source.sendSuccess(() -> Component.literal("朗基努斯之枪：" + lilith.getSpearMode()
-                + (lilith.isSpearShown() ? "（显示）" : "（已取走）")), false);
+        source.sendSuccess(() -> Component.translatable("ops.projectseele.lilith.spear_status", lilith.getSpearMode(), Component.translatable(lilith.isSpearShown() ? "ops.projectseele.lilith.shown" : "ops.projectseele.lilith.removed")), false);
         return found.size();
     }
 
@@ -53,17 +52,17 @@ public final class LilithCommands
     {
         if (!LilithEntity.SPEAR_MODES.contains(mode))
         {
-            source.sendFailure(Component.literal("可选：auto（按剧情，第 22 集后取走）、present、removed。"));
+            source.sendFailure(Component.translatable("message.projectseele.lilith.usage"));
             return 0;
         }
         var found = specimens(source);
         if (found.isEmpty())
         {
-            source.sendFailure(Component.literal("莉莉丝所在区块没有加载，先到终极教条附近再设置。"));
+            source.sendFailure(Component.translatable("message.projectseele.lilith.approach"));
             return 0;
         }
         found.forEach(lilith -> lilith.setSpearMode(mode));
-        source.sendSuccess(() -> Component.literal("朗基努斯之枪已设为 " + mode + "。"), true);
+        source.sendSuccess(() -> Component.translatable("ops.projectseele.lilith.set_mode", mode), true);
         return found.size();
     }
 

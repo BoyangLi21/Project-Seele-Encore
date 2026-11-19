@@ -97,19 +97,19 @@ final class EntryPlugBridgeTopologyR49
         for(int x=-16;x<=16;x++)for(int z=14;z<=24;z++)
         {
             var p=bed.offset(x,48,z);
-            if(level.getBlockEntity(p)!=null||!floorOwned(level.getBlockState(p)))return Optional.of("R49后桥完整桥面存在人工/设备改动："+p.toShortString());
+            if(level.getBlockEntity(p)!=null||!floorOwned(level.getBlockState(p)))return Optional.of(OperationText.format("ops.projectseele.bridge.the_rear_bridge_deck_has_been_modified_at_s", p.toShortString()));
         }
         for(int x=-19;x<=19;x++)for(int z=14;z<=24;z++)
         {
             var p=bed.offset(x,49,z);
             if(PilotRestroomsR47.ownsRoomMaintenanceSpaceR47(level,p))continue;
             if(level.getBlockEntity(p)!=null||(upper(x,z)?!upperOwned(level.getBlockState(p),z):!guardOwned(level.getBlockState(p))))
-                return Optional.of("R49后桥围护/楼梯存在未知改动："+p.toShortString());
+                return Optional.of(OperationText.format("ops.projectseele.bridge.the_rear_bridge_rail_or_stairs_have_changed_at_s", p.toShortString()));
         }
         for(int x:new int[]{-2,2})for(int z=16;z<=18;z++)
         {
             var p=bed.offset(x,50,z);
-            if(level.getBlockEntity(p)!=null||!guardOwned(level.getBlockState(p)))return Optional.of("R49上舱楼梯护栏存在设备/人工改动："+p.toShortString());
+            if(level.getBlockEntity(p)!=null||!guardOwned(level.getBlockState(p)))return Optional.of(OperationText.format("ops.projectseele.bridge.the_upper_stair_railing_has_been_modified_at_s", p.toShortString()));
         }
         for(int amount=0;amount<=9;amount++)
         {
@@ -134,7 +134,7 @@ final class EntryPlugBridgeTopologyR49
                     ||root.equals(fleet.canonicalId())||root.equals(fleet.entryPlugId()))continue;
             if(actor instanceof net.minecraft.world.entity.decoration.ArmorStand stand&&stand.isMarker())continue;
             if(actor instanceof net.minecraft.world.entity.LivingEntity||actor.canBeCollidedWith())
-                return Optional.of("R49后桥/上舱阶梯仍有人或载具："+actor.getName().getString());
+                return Optional.of(OperationText.format("ops.projectseele.bridge.the_rear_bridge_or_upper_stairs_are_occupied_by_s", actor.getName()));
         }
         return Optional.empty();
     }

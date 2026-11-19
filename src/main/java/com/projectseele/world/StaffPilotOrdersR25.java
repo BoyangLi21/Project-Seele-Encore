@@ -50,27 +50,27 @@ public final class StaffPilotOrdersR25
     public static String request(ServerPlayer player, NervStaffEntity npc, int unit)
     {
         if (unit<0 || unit>2 || !NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc,"board"))
-            return "本岗位无权调遣驾驶员，请联络美里、律子或冬月。";
-        if(StaffRecoveryR47.pending(player.serverLevel(),unit))return "这台机体仍在回收和驾驶员交接中，完成后再安排登机。";
+            return "ops.projectseele.staff.this_station_cannot_dispatch_pilots_contact_misato_ritsuko";
+        if(StaffRecoveryR47.pending(player.serverLevel(),unit))return "ops.projectseele.pilotorders.the_unit_and_pilot_are_completing_recovery";
         var jobs=ORDERS.computeIfAbsent(player.serverLevel(),l->new HashMap<>());
         var command=StaffCommandBookR24.unitOrder(player.serverLevel(),unit);
-        if(command!=null&&!command.owner.equals(player.getUUID()))return "这台机体已有其他指挥员的待执行指令，请先联系下令人。";
-        if(jobs.containsKey(unit))return "该驾驶员已有登机指令，正在执行。";
+        if(command!=null&&!command.owner.equals(player.getUUID()))return "ops.projectseele.pilotorders.another_commander_has_an_outstanding_order_for";
+        if(jobs.containsKey(unit))return "ops.projectseele.pilotorders.this_pilot_s_boarding_order_is_already";
         jobs.put(unit,new Order(player.getUUID(),npc.getUUID(),unit,player.server.getTickCount()+300,false,AutoSortieR32.missionToken(player.serverLevel())));
         EvaLogisticsDirector.loadControlTarget(player.serverLevel(),unit);
-        return "正在呼叫"+TrainingPilotEntity.pilotName(unit)+"，确认对应机库后开始登机。";
+        return OperationText.format("ops.projectseele.pilotorders.contact", StaffDialogueCatalogR24.pilotName(unit));
     }
     public static String returnToStandby(ServerPlayer player,NervStaffEntity npc,int unit)
     {
         if(unit<0||unit>2||!NervStaffDialogue.authorized(player)||!StaffAuthorityR25.allows(npc,"board"))
-            return "本岗位无权调遣驾驶员。";
+            return "ops.projectseele.pilotorders.this_station_cannot_dispatch_pilots";
         if(StaffCommandBookR24.unitOrder(player.serverLevel(),unit)!=null)
-            return "请先取消待执行的出动指令，并将机体回收至机库。";
+            return "ops.projectseele.pilotorders.cancel_the_outstanding_sortie_order_and_recover";
         var jobs=ORDERS.computeIfAbsent(player.serverLevel(),l->new HashMap<>());
-        if(jobs.containsKey(unit))return "该驾驶员的上一条指令尚未结束。";
+        if(jobs.containsKey(unit))return "ops.projectseele.pilotorders.the_pilot_s_previous_order_is_still";
         jobs.put(unit,new Order(player.getUUID(),npc.getUUID(),unit,player.server.getTickCount()+300,true,AutoSortieR32.missionToken(player.serverLevel())));
         EvaLogisticsDirector.loadControlTarget(player.serverLevel(),unit);
-        return "正在确认机库联锁，随后通知驾驶员离开插入栓、返回待命。";
+        return "ops.projectseele.pilotorders.checking_the_hangar_interlocks_before_asking_the";
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
@@ -86,11 +86,11 @@ public final class StaffPilotOrdersR25
                         || !NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc,"board"))
                 {jobs.remove(job.unit());continue;}
                 if(event.getServer().getTickCount()>job.deadline())
-                {jobs.remove(job.unit());NervStaffDialogue.reply(player,npc,"机库信号超时，登机指令未执行。");continue;}
+                {jobs.remove(job.unit());NervStaffDialogue.reply(player,npc,"ops.projectseele.pilotorders.hangar_signal_timed_out_the_boarding_order");continue;}
                 if(!job.standby()&&!missionContextCurrentR45(job.mission(),AutoSortieR32.missionToken(level)))
                 {
                     jobs.remove(job.unit());
-                    NervStaffDialogue.reply(player,npc,"作战安排已变更，上一条登机指令已撤销。");continue;
+                    NervStaffDialogue.reply(player,npc,"ops.projectseele.pilotorders.the_operation_changed_the_previous_boarding_order");continue;
                 }
                 EvaLogisticsDirector.loadControlTarget(level,job.unit());
                 if(EvaLogisticsDirector.canonicalUnit(level,job.unit())==null)continue;
@@ -99,17 +99,17 @@ public final class StaffPilotOrdersR25
                 {
                     var entry=EvaFleetSavedData.get(level.getServer()).entry(job.unit()).orElse(null);
                     if(entry==null||entry.phase()!=EvaFleetSavedData.Phase.PARKED)
-                        NervStaffDialogue.reply(player,npc,"机体还未在机库停稳，请先完成回收。驾驶员继续留在插入栓内。");
+                        NervStaffDialogue.reply(player,npc,"ops.projectseele.pilotorders.the_unit_has_not_stopped_in_its");
                     else
                     {
                         int accepted=TrainingPilotDirector.stop(level,job.unit());
-                        NervStaffDialogue.reply(player,npc,accepted>0?"已通知"+TrainingPilotEntity.pilotName(job.unit())+"离栓，返回待命。":"离栓条件尚未满足，驾驶员与机体保持原位。");
+                        NervStaffDialogue.reply(player,npc,accepted>0?OperationText.format("ops.projectseele.pilotorders.leave", StaffDialogueCatalogR24.pilotName(job.unit())):"离栓条件尚未满足，驾驶员与机体保持原位。");
                     }
                     continue;
                 }
                 var result=TrainingPilotDirector.start(level,job.unit());
                 if(result.accepted())AutoSortieR32.assignCommander(EvaLogisticsDirector.canonicalUnit(level,job.unit()),player);
-                NervStaffDialogue.reply(player,npc,result.accepted()?"已通知"+TrainingPilotEntity.pilotName(job.unit())+"登机。":result.message());
+                NervStaffDialogue.reply(player,npc,result.accepted()?OperationText.format("ops.projectseele.pilotorders.board", StaffDialogueCatalogR24.pilotName(job.unit())):result.message());
             }
         }
     }

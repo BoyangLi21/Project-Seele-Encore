@@ -179,13 +179,13 @@ public final class NervRootAssemblyInstallationR52
     {
         return Commands.literal("equipment_update").then(Commands.argument("previous_metadata_directory",StringArgumentType.greedyString()).executes(context->{
             var source=context.getSource();try{var result=CarrierEquipmentUpdateR53.admit(source.getLevel(),Path.of(StringArgumentType.getString(context,"previous_metadata_directory")));source.sendSuccess(()->Component.literal(result.reason()),true);return result.accepted()?1:0;}
-            catch(IOException|RuntimeException failure){source.sendFailure(Component.literal("原设备更新未执行："+failure.getMessage()));return 0;}
+            catch(IOException|RuntimeException failure){source.sendFailure(Component.translatable("message.projectseele.nerv_root_assembly_installation_r52.equipment_update_cancelled_s", com.projectseele.world.OperationText.read(failure.getMessage())));return 0;}
         }));
     }
     public static LiteralArgumentBuilder<CommandSourceStack> installCancelCommand()
     {
         return Commands.literal("install_cancel").executes(context->{
-            var source=context.getSource();var saved=NervRouteRuntimeR52.installationStateR52(source.getLevel());if(saved==null||saved.pendingInstallationR52()==null){source.sendFailure(Component.literal("没有待推进的地图安装。"));return 0;}
+            var source=context.getSource();var saved=NervRouteRuntimeR52.installationStateR52(source.getLevel());if(saved==null||saved.pendingInstallationR52()==null){source.sendFailure(Component.translatable("message.projectseele.facility.no_install"));return 0;}
             saved.pauseInstallationR52("管理员已取消自动安装推进；原实体、任务及已验证安装凭证保留。再次安装同一凭证可继续。");PENDING_TICKETS.remove(source.getLevel());TICKET_REFRESH.remove(source.getLevel());restoreHoldR52(source.getLevel(),saved.pendingInstallationHoldR52());source.sendSuccess(()->Component.literal(saved.pendingInstallationHoldR52()),true);return 1;
         });
     }
@@ -194,7 +194,7 @@ public final class NervRootAssemblyInstallationR52
     {
         return Commands.literal("install").then(Commands.argument("world_relative_bundle",StringArgumentType.greedyString()).executes(context->{
             var source=context.getSource();try{String name=NervRouteRuntimeStateR52.relativeBundleR52(StringArgumentType.getString(context,"world_relative_bundle"));var relative=Path.of(name);var result=install(source.getLevel(),source.getServer().getWorldPath(LevelResource.ROOT).resolve(relative));source.sendSuccess(()->Component.literal(result.reason()+" [epoch="+result.epoch()+", directory="+result.directoryFingerprint()+"]"),true);return result.accepted()?1:0;}
-            catch(IOException|RuntimeException failure){source.sendFailure(Component.literal("地图安装未执行："+failure.getMessage()));return 0;}
+            catch(IOException|RuntimeException failure){source.sendFailure(Component.translatable("message.projectseele.nerv_root_assembly_installation_r52.map_installation_cancelled_s", com.projectseele.world.OperationText.read(failure.getMessage())));return 0;}
         }));
     }
     private static String sha(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception impossible){throw new IllegalStateException(impossible);}}

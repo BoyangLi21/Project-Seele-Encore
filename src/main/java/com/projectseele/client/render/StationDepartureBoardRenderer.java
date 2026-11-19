@@ -1,5 +1,7 @@
 package com.projectseele.client.render;
 
+import net.minecraft.network.chat.Component;
+import net.minecraft.client.resources.language.I18n;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.projectseele.world.StationDepartureBoardBlock;
@@ -40,7 +42,7 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
                 poses.popPose();return;
             }
             boolean lift=!board.rows().isEmpty()&&board.rows().stream().allMatch(s->s.endsWith(" · 直梯"));
-            line(lift?"エレベーター乗換|乘电梯换层|Change by lift":board.station(),0,0xffedbd55,width,poses,buffers);
+            line(lift?I18n.get("sign.projectseele.lift_transfer"):board.station(),0,0xffedbd55,width,poses,buffers);
             // a small "Chinese · English" line under each row needs the rows a little higher to clear the panel's lower edge
             boolean split=board.rows().stream().anyMatch(s->s.indexOf(SPLIT)>0);
             for(int i=0;i<Math.min(3,board.rows().size());i++)line(compactDestination(board.rows().get(i),lift),split?17+i*15:18+i*16,
@@ -49,12 +51,17 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
         else
         {
             // rows with a small "Chinese · English" line under them need more room: shrink the group so it keeps its height
-            boolean split=!board.routeMap()&&board.rows().stream().anyMatch(s->s.indexOf(SPLIT)>0);
+            boolean split=!board.routeMap()&&(!direction||board.rows().stream().anyMatch(s->s.indexOf(SPLIT)>0));
             float group=split?.87F:1F;poses.scale(group,group,1);
             line(board.title(),0,0xffedbd55,width/group,poses,buffers);
             line(board.station(),11,0xffabbec5,width/group,poses,buffers);
-            for(int i=0;i<board.rows().size();i++) line(board.rows().get(i),25+i*(board.routeMap()?11:split?15:13),
-                    board.rows().get(i).contains("本站")?0xffffd572:i==0?0xffe9efde:0xffa9d9ae,width/group,poses,buffers);
+            for(int i=0;i<board.rows().size();i++)
+            {
+                String row = board.rows().get(i);
+                String display = direction || board.routeMap() ? row : departureRow(row);
+                line(display,25+i*(board.routeMap()?11:split?15:13),
+                        row.contains("本站")?0xffffd572:i==0?0xffe9efde:0xffa9d9ae,width/group,poses,buffers);
+            }
         }
         poses.popPose();
         if(!compact)
@@ -85,7 +92,7 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
         poses.translate(0,0,rear?.145:.205);
         String service=board.title().strip().split("\\s+",2)[0];
         int routeColor=routeColor(service);
-        physicalLine(service+"  路線図",0,0,.021F,2.60F,routeColor,poses,buffers);
+        physicalLine(I18n.get("sign.projectseele.route_map", service),0,0,.021F,2.60F,routeColor,poses,buffers);
         physicalLine(currentStation(board.station()),0,.22F,.017F,2.60F,0xffe9efde,poses,buffers);
         if(stops.size()<=4)
         {
@@ -118,7 +125,7 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
             // Order follows the real service, while the physical departure
             // arrow below changes on the rear. Do not invent station numbers
             // that would change when the opposite service reverses its list.
-            physicalLine("続く →",0,1.015F,.008F,.24F,routeColor,poses,buffers);
+            physicalLine(I18n.get("sign.projectseele.continued"),0,1.015F,.008F,.24F,routeColor,poses,buffers);
         }
         var footer=board.rows().stream().filter(s->!s.startsWith("│")&&!s.startsWith("●")).toList();
         if(!footer.isEmpty())physicalLine(rear?reversePhysicalDirection(footer.get(0)):footer.get(0),0,1.12F,.014F,2.60F,0xffa9d9ae,poses,buffers);
@@ -127,15 +134,18 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
     }
     private static String stopName(String source)
     {
-        // stops on a diagram show the Japanese name only; the multilingual name is on the station's own boards
         String name=source.substring(1).replace("本站","").strip();
-        int split=name.indexOf(SPLIT);
-        return split>0?name.substring(0,split).strip():name;
+        String[] names=name.split("\\|",-1);
+        String language=net.minecraft.client.Minecraft.getInstance().getLanguageManager().getSelected();
+        int index=language.startsWith("en_")?2:language.startsWith("zh_")?1:0;
+        return index<names.length&&!names[index].isBlank()?names[index].strip():names[0].strip();
     }
     private static String currentStation(String station)
     {
         int split=station.indexOf(SPLIT);
-        return split>0?station.substring(0,split)+"  当駅"+station.substring(split):station+"  当駅";
+        String name = split > 0 ? station.substring(0, split) : station;
+        String here = I18n.get("sign.projectseele.current_stop", name);
+        return split > 0 ? here + station.substring(split) : here;
     }
     private static int routeColor(String service)
     {
@@ -183,6 +193,40 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
                 .replace("金字塔接驳站","金字塔站").replace("发射区车站","发射区站")
                 .replace(" · 直梯",sharedLiftHeader?"":" · 梯");
     }
+    private static final java.util.regex.Pattern NATIVE_DEPARTURE = java.util.regex.Pattern.compile(
+            "(\\d{2}:\\d{2})  (.*?)  (終点 |次は )(.*?)  (まもなく出発|まもなく到着|約(\\d+)分)");
+    private static final java.util.Map<String, Component> DEPARTURE_NOTES = new java.util.HashMap<>();
+
+    private static String departureRow(String row)
+    {
+        var note = DEPARTURE_NOTES.get(row);
+        if (note == null)
+        {
+            note = switch (row)
+            {
+                case "運行情報を読み込み中", "正在读取运行信息" -> Component.translatable("ops.projectseele.board.loading");
+                case "このホームの運行情報はありません" -> Component.translatable("ops.projectseele.board.unavailable");
+                case "発車予定はありません" -> Component.translatable("ops.projectseele.board.no_trains");
+                default -> {
+                    var match = NATIVE_DEPARTURE.matcher(row);
+                    if (!match.matches()) yield Component.empty();
+                    var destination = Component.translatable(match.group(3).equals("終点 ")
+                            ? "ops.projectseele.board.terminus" : "ops.projectseele.board.next", match.group(4));
+                    var eta = match.group(6) == null ? Component.translatable(
+                            match.group(5).equals("まもなく出発") ? "ops.projectseele.board.leaving" : "ops.projectseele.board.arriving")
+                            : Component.translatable("ops.projectseele.board.minutes", match.group(6));
+                    yield Component.translatable("ops.projectseele.board.service",
+                            match.group(1), match.group(2), destination, eta);
+                }
+            };
+            if (DEPARTURE_NOTES.size() >= 128) DEPARTURE_NOTES.clear();
+            DEPARTURE_NOTES.put(row, note);
+        }
+        String translation = note.getString();
+        if (row.equals("正在读取运行信息")) return translation;
+        return translation.isEmpty() || row.equals(translation) ? row : row + "|" + translation;
+    }
+
     /** "日本語|中文|English": the Japanese part on the line, the rest in small type under it. */
     private void line(String text,int y,int color,float width,PoseStack poses,MultiBufferSource buffers)
     {

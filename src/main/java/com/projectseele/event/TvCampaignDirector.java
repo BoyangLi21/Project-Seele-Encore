@@ -83,24 +83,23 @@ public final class TvCampaignDirector
 
     public static String briefing(ServerPlayer player)
     {
-        var level = level(player); if (level == null) return "作战联络暂不可用，请返回总部后重试。";
+        var level = level(player); if (level == null) return "ops.projectseele.campaign.operations_communications_are_unavailable_return_to_headquarters_and";
         var data = TvCampaignSavedData.get(level); var chapter = selected(player,data);
         String constraint=SurfaceAngelPlanR52.handles(level,chapter.id())?SurfaceAngelPlanR52.startBlocker(level,chapter.id()):TvEncounterRulesR45.handles(chapter.id())?TvEncounterDirectorR45.startBlocker(level,chapter.id()):CityBattlefieldR29.obstruction(level);
-        String activity = data.active.isEmpty() ? "选择任务，安排驾驶员后确认出击。" : switch (data.phase)
-        { case "alert" -> "正在确认使徒位置，准备出击。";case "approach" -> "编队出击中，请前往指定阵地。"; case "combat" -> "正在交战。";case "combat_victory" -> "目标已击破，正在安排回收。";case "episode_archived" -> "任务完成。"; case "cancel" -> "正在结束任务并回收机体。";case "failure" -> "任务未完成。选择“结束任务”安排回收。"; default -> "等待出击指令。"; };
-        var text=new StringBuilder(chapter.title()).append(" · 目标：").append(chapter.target()).append('\n').append(activity);
-        if(!data.sorties.isEmpty())text.append('\n').append(TvSortiesR32.roster(data));
-        text.append("\n\n任务目标\n").append(chapter.briefing().replace("东北迎击大道", CityBattlefieldR29.name(level)));
-        if(chapter.id().equals("ramiel"))
+        String activity = data.active.isEmpty() ? "idle" : switch (data.phase)
         {
-            var cannon=TvYashimaStationR52.operatorPositionR52(level);
-            if(cannon!=null)text.append("\n炮位坐标：").append((int)Math.floor(cannon.x)).append(" / ").append((int)Math.floor(cannon.y+.01)).append(" / ").append((int)Math.floor(cannon.z));
+            case "alert", "approach", "combat", "combat_victory", "episode_archived", "cancel", "failure" -> data.phase;
+            default -> "waiting";
+        };
+        int[] crew = data.sorties.values().stream().mapToInt(s -> s.npc ? -s.unit - 1 : s.unit).toArray();
+        String coordinates = "";
+        if (chapter.id().equals("ramiel"))
+        {
+            var cannon = TvYashimaStationR52.operatorPositionR52(level);
+            if (cannon != null) coordinates = (int)Math.floor(cannon.x) + " / " + (int)Math.floor(cannon.y + .01) + " / " + (int)Math.floor(cannon.z);
         }
-        if(!constraint.isBlank())text.append("\n\n待处理：").append(constraint);
-        if(!data.notice.isBlank())text.append("\n\n最新通报：").append(data.notice);
-        if(data.active.isEmpty())text.append("\n\n所有已开放任务均可再次出击。");
-        else if(Set.of("alert","approach","combat").contains(data.phase))text.append("\n\n需要支援时，可在编队中选择待命机体并确认出击。");
-        return text.toString();
+        return new TvBriefingText(chapter.id(), activity, CityBattlefieldR29.required(level), crew,
+                coordinates, constraint, data.notice).encode();
     }
     public static int begin(ServerPlayer player)
     {var level=level(player);return beginAssigned(player,1,level!=null&&selected(player,TvCampaignSavedData.get(level)).id().equals("ramiel"),false);}
@@ -111,27 +110,27 @@ public final class TvCampaignDirector
     {
         var level=level(commander);
         if(level==null||commander.level()!=level||!NervStaffDialogue.authorized(commander))return 0;
-        if(crew.isEmpty()||crew.size()>3)return message(commander,"请选择出战机体和驾驶员。",false);
+        if(crew.isEmpty()||crew.size()>3)return message(commander,"ops.projectseele.campaign.select_the_units_and_pilots_for_this_sortie",false);
         var data=TvCampaignSavedData.get(level);var units=new HashSet<Integer>();var humans=new HashSet<UUID>();
         if(!data.active.isEmpty()&&(Set.of("cancel","failure","combat_victory").contains(data.phase)||data.targetDeathConfirmedR45))
-            return message(commander,"本次任务已停止出击。请先选择“结束任务”，待机体和装备回库后再出击。",false);
-        if(!data.active.isEmpty()&&!data.active.equals(mission))return message(commander,"请先结束当前作战。",false);
+            return message(commander,"ops.projectseele.campaign.launches_for_this_mission_have_stopped_select_end",false);
+        if(!data.active.isEmpty()&&!data.active.equals(mission))return message(commander,"ops.projectseele.campaign.end_the_current_operation_first",false);
         for(var choice:crew)
         {
-            if(choice.unit()<0||choice.unit()>2||!units.add(choice.unit()))return message(commander,"每台机体只能编入一次。",false);
+            if(choice.unit()<0||choice.unit()>2||!units.add(choice.unit()))return message(commander,"ops.projectseele.campaign.each_unit_can_appear_only_once_in_the",false);
             // An active sortie accepts additions only. A reopened panel can
             // carry local defaults; they must never replace its real pilots.
             if(!data.active.isEmpty()&&data.sorties.containsKey(choice.unit()))continue;
             var pilot=choice.npc()?null:level.getServer().getPlayerList().getPlayer(choice.pilot());
             if(!choice.npc()&&(pilot==null||pilot.level()!=level||!NervStaffDialogue.authorized(pilot)||!humans.add(choice.pilot())))
-                return message(commander,"真人驾驶员需在线并位于本作战世界，每人只能驾驶一台机体。",false);
+                return message(commander,"ops.projectseele.campaign.human_pilots_must_be_online_in_this_operation",false);
             if(!data.active.isEmpty()&&!choice.npc()&&data.sorties.values().stream().anyMatch(s->s.unit!=choice.unit()&&!s.npc&&s.commander.equals(choice.pilot())))
-                return message(commander,"该驾驶员已驾驶另一台出战机体。",false);
-            if(StaffRecoveryR47.pending(level,choice.unit())||PilotReturnR39.pending(level,choice.unit()))return message(commander,TvSortiesR32.name(choice.unit())+"仍在回库交接。",false);
+                return message(commander,"ops.projectseele.campaign.this_pilot_is_already_flying_another_unit_in",false);
+            if(StaffRecoveryR47.pending(level,choice.unit())||PilotReturnR39.pending(level,choice.unit()))return message(commander,OperationText.format("ops.projectseele.campaign.s_is_still_completing_its_hangar_handover", OperationText.unit(choice.unit())),false);
             var eva=TvSortiesR32.unit(level,choice.unit());
             if(eva!=null&&(TvMissionEquipmentR45.awaitingPhysicalReturn(eva)||eva.getPilotEntity()!=null
                     &&(choice.npc()?!(eva.getPilotEntity() instanceof TrainingPilotEntity npcPilot&&npcPilot.getAssignedVariant()==choice.unit()):eva.getPilotEntity()!=pilot)))
-                return message(commander,TvSortiesR32.name(choice.unit())+"当前驾驶员或装备尚未交接。",false);
+                return message(commander,OperationText.format("ops.projectseele.campaign.s_is_waiting_for_a_pilot_or_equipment", OperationText.unit(choice.unit())),false);
             String blocker=TvEncounterRulesR45.formationSlotBlockerR47(level,mission,choice.unit());
             if(!blocker.isEmpty())return message(commander,blocker,false);
         }
@@ -140,37 +139,37 @@ public final class TvCampaignDirector
             int result=1;
             for(var choice:crew)if(!data.sorties.containsKey(choice.unit()))
                 result&=TvSortiesR32.reinforce(choice.npc()?commander:level.getServer().getPlayerList().getPlayer(choice.pilot()),choice.unit(),choice.npc(),rifle);
-            if(result!=0)message(commander,"支援编队正在准备出击。",true);
+            if(result!=0)message(commander,"ops.projectseele.campaign.the_reinforcement_formation_is_preparing_to_launch",true);
             return result;
         }
-        if(mission.equals("ramiel")&&!(units.contains(0)&&units.contains(1)))return message(commander,"屋岛作战需要先选定零号机与初号机的驾驶员。",false);
+        if(mission.equals("ramiel")&&!(units.contains(0)&&units.contains(1)))return message(commander,"ops.projectseele.campaign.assign_pilots_for_unit_00_and_unit_01",false);
         if(select(commander,mission)==0)return 0;
         var primary=crew.stream().filter(c->c.unit()==1).findFirst().orElse(crew.get(0));
         return beginAssigned(commander,primary.unit(),primary.npc(),rifle,List.copyOf(crew));
     }
     private static int beginAssigned(ServerPlayer player,int variant,boolean npc,boolean rifle,List<CrewR54> formation)
     {
-        if(variant<0||variant>4||npc&&variant>2)return message(player,"NPC 驾驶员对应零号机、初号机、二号机；UN 机体可由玩家加入。",false);
-        if (!NervStaffDialogue.authorized(player)) return message(player, "作战下达需要 NERV 通行权限。", false);
-        var level = level(player); if (level == null) return message(player, "本世界尚未配置作战区域。", false);
-        if(npc&&player.level()!=level)return message(player,"请进入第三新东京市后下达驾驶员出击指令。",false);
+        if(variant<0||variant>4||npc&&variant>2)return message(player,"ops.projectseele.campaign.npc_pilots_fly_units_00_01_and_02",false);
+        if (!NervStaffDialogue.authorized(player)) return message(player, "ops.projectseele.campaign.a_nerv_pass_is_required_to_issue_sortie", false);
+        var level = level(player); if (level == null) return message(player, "ops.projectseele.campaign.this_world_has_no_configured_operation_area", false);
+        if(npc&&player.level()!=level)return message(player,"ops.projectseele.campaign.enter_tokyo_3_before_ordering_a_pilot_to",false);
         var data = TvCampaignSavedData.get(level); var chapter = selected(player,data);
         String surfaceHold=SurfaceAngelPlanR52.startBlocker(level,chapter.id());if(!surfaceHold.isEmpty())return message(player,surfaceHold,false);
         String preparation=TvCampaignCatalog.preparationBlockerR52(data.active.isEmpty()?chapter.id():data.active);
         if(!preparation.isEmpty())return message(player,preparation,false);
         if(variant<3&&(StaffRecoveryR47.pending(level,variant)||PilotReturnR39.pending(level,variant)))
-            return message(player,"这台机体仍在执行回收入库与驾驶员交接。完成后再下达新的出击。",false);
+            return message(player,"ops.projectseele.campaign.this_unit_and_its_pilot_are_still_completing",false);
         var acceptedUnit=TvSortiesR32.unit(level,variant);
         if(acceptedUnit!=null&&TvMissionEquipmentR45.awaitingPhysicalReturn(acceptedUnit))
-            return message(player,"炮、盾尚未归还，请完成装备回收后再出击。",false);
+            return message(player,"ops.projectseele.campaign.the_cannon_and_shield_are_outstanding_recover_the",false);
         if(acceptedUnit!=null&&acceptedUnit.getPilotEntity()!=null
                 &&(npc?!(acceptedUnit.getPilotEntity() instanceof TrainingPilotEntity pilot&&pilot.getAssignedVariant()==variant)
                     :!acceptedUnit.getPilotEntity().getUUID().equals(formation==null?player.getUUID():formation.stream().filter(c->c.unit()==variant).findFirst().orElseThrow().pilot())))
-            return message(player,"这台机体已有其他驾驶员。请确认当前驾驶员安排后再编入。",false);
+            return message(player,"ops.projectseele.campaign.this_unit_already_has_a_different_pilot_check",false);
         if(Set.of("cancel","failure","combat_victory").contains(data.phase)||data.targetDeathConfirmedR45)
-            return message(player,"请先结束当前任务，待机体和装备回库后再出击。",false);
+            return message(player,"ops.projectseele.campaign.end_the_current_mission_and_wait_for_units",false);
         if (!data.active.isEmpty()) return TvSortiesR32.reinforce(player,variant,npc,rifle);
-        if (!chapter.playable()) return message(player, "这场作战仍在制作中。", false);
+        if (!chapter.playable()) return message(player, "ops.projectseele.campaign.this_operation_is_still_in_development", false);
         if(SurfaceAngelPlanR52.handles(level,chapter.id()))
         {String blocker=SurfaceAngelPlanR52.startBlocker(level,chapter.id());if(!blocker.isEmpty())return message(player,blocker,false);}
         if(chapter.id().equals("ramiel")&&formation==null)
@@ -182,11 +181,11 @@ public final class TvCampaignDirector
             if(!slotBlocker.isEmpty())return message(player,slotBlocker,false);
         }
         var replay = FirstBattleSavedData.get(level);
-        if (replay.active != null || replay.missionOwner != null) return message(player, "作战区已有任务进行中，请先结束该任务。", false);
+        if (replay.active != null || replay.missionOwner != null) return message(player, "ops.projectseele.campaign.a_mission_is_occupying_this_area_end_it", false);
         player.getPersistentData().putString("SeeleMissionChoiceR30",chapter.id());
         data.generationR43++;
         data.episodeStateR45="";data.equipmentReturnedR45=false;data.targetDeathConfirmedR45=false;
-        data.owner = player.getUUID(); data.lastSortieChapter = chapter.id(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = "出击编队："+TvSortiesR32.name(variant)+" · "+(npc?TrainingPilotEntity.pilotName(variant):player.getGameProfile().getName()); data.angel = null; data.lastPosition = null; data.setDirty();
+        data.owner = player.getUUID(); data.lastSortieChapter = chapter.id(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = OperationText.format("ops.projectseele.briefing.initial_crew", OperationText.unit(variant), npc ? StaffDialogueCatalogR24.pilotName(variant) : Component.literal(player.getGameProfile().getName())); data.angel = null; data.lastPosition = null; data.setDirty();
         if(formation!=null)for(var choice:formation)data.assign(choice.unit(),choice.npc()?player.getUUID():choice.pilot(),choice.npc(),choice.npc()&&rifle);
         else data.assign(variant,player.getUUID(),npc,npc&&rifle);
         if(chapter.id().equals("ramiel")&&formation==null)
@@ -196,21 +195,21 @@ public final class TvCampaignDirector
         data.encounterSiteR45=TvEncounterSitesR45.site(level,chapter.id()).map(TvEncounterSitesR45.Site::id).orElse("");
         data.encounterLayoutR45=TvEncounterSitesR45.site(level,chapter.id()).map(TvEncounterSitesR45.Site::fingerprint).orElse("");
         if(SurfaceAngelPlanR52.handles(level,chapter.id())&&!SurfaceAngelAssaultR52.begun(level,data))
-        {data.phase="failure";data.setDirty();return message(player,"目标区暂时无法联络。请结束任务后重试。",false);}
+        {data.phase="failure";data.setDirty();return message(player,"ops.projectseele.campaign.contact_with_the_target_area_is_unavailable_end",false);}
         if(chapter.id().equals("ramiel")&&!TvYashimaDirectorR50.begin(level,data))
-        {data.phase="failure";data.setDirty();return message(player,data.notice+" 请结束任务后重试。",false);}
+        {data.phase="failure";data.setDirty();return message(player,OperationText.format("ops.projectseele.briefing.end_retry", OperationText.read(data.notice)),false);}
         if(chapter.id().equals("gaghiel"))TvMarineDirectorR50.begin(level,data);
-        return message(player, "出击指令已下达。\n" + briefing(player), true);
+        return message(player, OperationText.format("ops.projectseele.briefing.ordered", TvBriefingText.read(briefing(player))), true);
     }
     private static String yashimaDefaultFormationBlocker(ServerLevel level,int selected)
     {
         for(int unit:new int[]{0,1})if(unit!=selected)
         {
-            if(StaffRecoveryR47.pending(level,unit)||PilotReturnR39.pending(level,unit))return TvSortiesR32.name(unit)+"仍在回收，待驾驶员返回后再出击。";
+            if(StaffRecoveryR47.pending(level,unit)||PilotReturnR39.pending(level,unit))return OperationText.format("ops.projectseele.campaign.s_is_being_recovered_wait_for_the_pilot", OperationText.unit(unit));
             var eva=TvSortiesR32.unit(level,unit);
             if(eva!=null&&(TvMissionEquipmentR45.awaitingPhysicalReturn(eva)
                     ||eva.getPilotEntity()!=null&&!(eva.getPilotEntity() instanceof TrainingPilotEntity p&&p.getAssignedVariant()==unit)))
-                return TvSortiesR32.name(unit)+"尚有装备未归还，或驾驶员与编队安排不符。请先检查整备状态。";
+                return OperationText.format("ops.projectseele.campaign.s_has_outstanding_equipment_or_a_pilot_mismatch", OperationText.unit(unit));
         }
         return "";
     }
@@ -226,11 +225,11 @@ public final class TvCampaignDirector
     {var level=level(player);return level==null?"sachiel":selected(player,TvCampaignSavedData.get(level)).id();}
     public static int select(ServerPlayer player,String id)
     {
-        if(!NervStaffDialogue.authorized(player))return message(player,"需要 NERV 指挥权限。",false);
+        if(!NervStaffDialogue.authorized(player))return message(player,"ops.projectseele.campaign.nerv_command_clearance_is_required",false);
         var mission=TvCampaignCatalog.find(id).orElse(null);
-        if(mission==null||!mission.playable())return message(player,"这份作战尚未开放。",false);
-        var level=level(player);if(level==null)return message(player,"作战联络暂不可用，请返回总部后重试。",false);
-        if(!TvCampaignSavedData.get(level).active.isEmpty())return message(player,"请先结束或取消正在执行的作战。",false);
+        if(mission==null||!mission.playable())return message(player,"ops.projectseele.campaign.this_operation_is_unavailable",false);
+        var level=level(player);if(level==null)return message(player,"ops.projectseele.campaign.operations_communications_are_unavailable_return_to_headquarters_and",false);
+        if(!TvCampaignSavedData.get(level).active.isEmpty())return message(player,"ops.projectseele.campaign.end_or_cancel_the_current_operation_first",false);
         AutoSortieR32.invalidateMission(level);
         player.getPersistentData().putString("SeeleMissionChoiceR30",id);
         return message(player,briefing(player),true);
@@ -239,8 +238,8 @@ public final class TvCampaignDirector
     {
         var level = level(player); if (level == null) return 0;
         var data = TvCampaignSavedData.get(level);
-        if (data.active.isEmpty()) return message(player, "当前没有正在执行的任务。", false);
-        if (!player.getUUID().equals(data.owner) && !player.hasPermissions(2)) return message(player, "只能撤销自己的作战指令。", false);
+        if (data.active.isEmpty()) return message(player, "ops.projectseele.campaign.there_is_no_active_mission", false);
+        if (!player.getUUID().equals(data.owner) && !player.hasPermissions(2)) return message(player, "ops.projectseele.campaign.you_can_withdraw_only_your_own_sortie_order", false);
         AutoSortieR32.invalidateMission(level);
         if (data.active.equals("sachiel")) FirstBattleMission.cancel(player);
         TvMissionAlertR30.clear(level);
@@ -250,10 +249,10 @@ public final class TvCampaignDirector
         PilotReturnR39.enqueue(level,java.util.List.copyOf(data.sorties.values()));
         data.phase = "cancel"; data.setDirty();
         clearCombatBar(level);
-        return message(player, "正在结束任务并回收机体。装备归还后，可重新选择任务出击。", true);
+        return message(player, "ops.projectseele.campaign.ending_the_mission_and_recovering_the_units_select", true);
     }
     private static int message(ServerPlayer player, String text, boolean accepted)
-    { player.sendSystemMessage(Component.literal(text)); return accepted ? 1 : 0; }
+    { player.sendSystemMessage(TvBriefingText.read(text)); return accepted ? 1 : 0; }
     public static void firstBattleComplete(ServerLevel level, UUID owner, UUID angel)
     { complete(level, "sachiel", owner, angel); }
     public static void encounterCompleteR45(ServerLevel level,String chapter,UUID owner,UUID angel)
@@ -264,17 +263,17 @@ public final class TvCampaignDirector
         String surfaceHold=SurfaceAngelPlanR52.startBlocker(l,d.active);if(!surfaceHold.isEmpty())return message(player,surfaceHold,false);
         String preparation=TvCampaignCatalog.preparationBlockerR52(d.active);
         if(!preparation.isEmpty())return message(player,preparation,false);
-        if(!player.getUUID().equals(d.owner)&&!player.hasPermissions(2))return message(player,"只能重试自己受托的作战。",false);
-        if(!TvEncounterRulesR45.handles(d.active)||!d.phase.equals("failure"))return message(player,"当前没有等待恢复的遭遇战。",false);
-        if(d.targetDeathConfirmedR45)return message(player,"目标已经不在了，不能重试这场战斗。先回收机体，再取消这次行动。",false);
-        if(!NervStaffDialogue.authorized(player)||player.level()!=l)return message(player,"请由指挥员回到战区，再下达出击指令。",false);
-        if(d.owner==null||d.generationR43<=0||d.sorties.isEmpty())return message(player,"这次出击的联络信息对不上，暂时无法开始。请联系整备部。",false);
+        if(!player.getUUID().equals(d.owner)&&!player.hasPermissions(2))return message(player,"ops.projectseele.campaign.you_can_retry_only_missions_entrusted_to_you",false);
+        if(!TvEncounterRulesR45.handles(d.active)||!d.phase.equals("failure"))return message(player,"ops.projectseele.campaign.no_encounter_is_awaiting_a_retry",false);
+        if(d.targetDeathConfirmedR45)return message(player,"ops.projectseele.campaign.the_target_is_gone_recover_the_units_and",false);
+        if(!NervStaffDialogue.authorized(player)||player.level()!=l)return message(player,"ops.projectseele.campaign.the_commander_must_return_to_the_combat_area",false);
+        if(d.owner==null||d.generationR43<=0||d.sorties.isEmpty())return message(player,"ops.projectseele.campaign.sortie_communications_records_do_not_match_contact_maintenance",false);
         // Failure retry is a new dispatch of the same originals, not an implicit
         // revival of still-deployed units or an equipment-loan status rewrite.
         String recovery=originalRecoveryBlocker(l,d,false);
         if(!recovery.isEmpty())return message(player,recovery,false);
         if(!TvMissionEquipmentR45.missionEquipmentReturned(l,d.owner,d.generationR43,d.active))
-            return message(player,"装备还没送回整备库。先完成回收，再重新出击。",false);
+            return message(player,"ops.projectseele.campaign.the_equipment_has_not_returned_to_the_maintenance",false);
         for(var sortie:d.sorties.values())
         {
             var eva=TvSortiesR32.unit(l,sortie.unit);
@@ -349,12 +348,12 @@ public final class TvCampaignDirector
             // otherwise a saved, seated pilot outside the player's chunks can never be archived.
             if(sortie.npc&&sortie.unit<3)TrainingPilotDirector.retainOriginalPilotR47(level,sortie.unit);
             var pilot=sortie.npc?level.getEntity(sortie.pilotR45):level.getServer().getPlayerList().getPlayer(sortie.pilotR45);
-            if(sortie.npc&&pilot==null)return TvSortiesR32.name(sortie.unit)+"的驾驶员待命区正在加载，稍后自动完成交接。";
+            if(sortie.npc&&pilot==null)return OperationText.format("ops.projectseele.campaign.the_standby_area_for_the_pilot_of_s", OperationText.unit(sortie.unit));
             if(pilot==null||!pilot.isAlive()||pilot.level()!=level||sortie.npc&&!(pilot instanceof TrainingPilotEntity npc&&npc.getAssignedVariant()==sortie.unit)||pilot.getVehicle()==eva
                     ||pilot instanceof net.minecraft.world.entity.LivingEntity living&&living.getVehicle() instanceof EntryPlugCarrierEntity plug&&plug.getLinkedEva()==eva)
-                return TvSortiesR32.name(sortie.unit)+"的驾驶员还没完成安全交接，请先确认人已离开插入栓。";
+                return OperationText.format("ops.projectseele.campaign.the_pilot_of_s_has_not_completed_handover", OperationText.unit(sortie.unit));
             if(sortie.npc&&!TrainingPilotDirector.atOriginalStandbyR47(level,sortie.unit))
-                return TvSortiesR32.name(sortie.unit)+"的驾驶员仍在返回待命。稍后再结束本次行动。";
+                return OperationText.format("ops.projectseele.campaign.the_pilot_of_s_is_returning_to_standby", OperationText.unit(sortie.unit));
             if(recordVictory&&!data.recordOriginalRecovery(data.owner,data.generationR43,sortie.unit,eva.getUUID(),pilot.getUUID()))return "机体和驾驶员的交接信息对不上，暂时无法结束行动。请联系整备部。";
         }return "";
     }
@@ -421,18 +420,20 @@ public final class TvCampaignDirector
                 }
                 if(event.getServer().getTickCount()%10==0)
                 {
-                    var surfaceBar=BARS.computeIfAbsent(level,key->new ServerBossEvent(Component.literal("地表迎击"),BossEvent.BossBarColor.RED,BossEvent.BossBarOverlay.PROGRESS));
+                    var surfaceBar=BARS.computeIfAbsent(level,key->new ServerBossEvent(Component.translatable("message.projectseele.campaign.surface"),BossEvent.BossBarColor.RED,BossEvent.BossBarOverlay.PROGRESS));
                     surfaceBar.removeAllPlayers();surfaceBar.setVisible(!(boss instanceof SachielEntity s&&s.isFirstBattleActive()));
                     for(var sortie:data.sorties.values()){var p=event.getServer().getPlayerList().getPlayer(sortie.commander);if(p!=null&&p.level()==level)surfaceBar.addPlayer(p);}
                     float field=boss instanceof Angel a?a.getAtField():0,max=data.active.equals("sachiel")?900:700;
-                    surfaceBar.setName(Component.literal((data.active.equals("sachiel")?"第3使徒 萨基尔":"第4使徒 夏姆榭尔")+" · "+(data.phase.equals("combat")?"地表交战":data.phase.equals("alert")?"目标已出现，准备迎击":"使徒正在进攻地表装甲井")));
+                    surfaceBar.setName(Component.translatable("ops.projectseele.campaign.surface_contact",
+                            OperationText.read(data.active.equals("sachiel") ? "第3使徒 萨基尔" : "第4使徒 夏姆榭尔"),
+                            OperationText.read(data.phase.equals("combat") ? "地表交战" : data.phase.equals("alert") ? "目标已出现，准备迎击" : "使徒正在进攻地表装甲井")));
                     surfaceBar.setProgress(Math.max(0,Math.min(1,field>0?field/max:boss.getHealth()/boss.getMaxHealth())));
                 }
                 continue;
             }
             if(site==null)continue;
             if(event.getServer().getTickCount()%10!=0)continue;
-            var bar = BARS.computeIfAbsent(level, key -> new ServerBossEvent(Component.literal("TV 作战"), BossEvent.BossBarColor.RED, BossEvent.BossBarOverlay.PROGRESS));
+            var bar = BARS.computeIfAbsent(level, key -> new ServerBossEvent(Component.translatable("message.projectseele.campaign.tv"), BossEvent.BossBarColor.RED, BossEvent.BossBarOverlay.PROGRESS));
             bar.removeAllPlayers();
             if (data.active.isEmpty()) continue;
             TvSortiesR32.updateTarget(level,data);
@@ -488,22 +489,22 @@ public final class TvCampaignDirector
             {
                 var eva = combatEvaR30(player);
                 double distance = (eva == null ? player.position() : eva.position()).distanceTo(site.hero);
-                bar.setName(Component.literal("第4使徒迎击 · 前往" + CityBattlefieldR29.name(level) + " / " + Math.round(distance) + " m")); bar.setProgress(1);
+                bar.setName(Component.translatable("ops.projectseele.campaign.intercept_distance", OperationText.read(CityBattlefieldR29.name(level)), Math.round(distance))); bar.setProgress(1);
                 String blocked = CityBattlefieldR29.obstruction(level);
-                if (!blocked.isEmpty()) { bar.setName(Component.literal(blocked)); continue; }
+                if (!blocked.isEmpty()) { bar.setName(OperationText.read(blocked)); continue; }
                 if (!TvSortiesR32.ready(eva) || distance > 90) continue;
                 load(level, BlockPos.containing(site.angel));
                 if(!level.isPositionEntityTicking(BlockPos.containing(site.angel)))continue;
                 if(!level.getEntitiesOfClass(ShamshelEntity.class,new net.minecraft.world.phys.AABB(site.angel,site.angel).inflate(180),
                         q->q.isAlive()&&q.getTags().contains("seele_tv_shamshel_r24")).isEmpty())
-                {bar.setName(Component.literal("战区还有上一场作战的目标，请先结束那次行动"));continue;}
+                {bar.setName(Component.translatable("message.projectseele.campaign.end_previous"));continue;}
                 var angel = ModEntities.SHAMSHEL.get().create(level); if (angel == null) continue;
                 angel.moveTo(site.angel.x, site.angel.y + 4, site.angel.z, site.yaw + 180, 0);
                 angel.yBodyRot = angel.yHeadRot = site.yaw + 180; angel.setPersistenceRequired(); angel.addTag("seele_tv_shamshel_r24"); angel.setTarget(eva);
-                if (!level.noCollision(angel, angel.getBoundingBox())) { bar.setName(Component.literal("迎击区域被占用，请清空后继续")); continue; }
+                if (!level.noCollision(angel, angel.getBoundingBox())) { bar.setName(Component.translatable("message.projectseele.campaign.clear_area")); continue; }
                 if (!level.addFreshEntity(angel)) continue;
                 data.angel = angel.getUUID(); data.lastPosition = angel.blockPosition(); data.phase = "combat"; data.setDirty();
-                message(player, "目标确认。光鞭将先蓄势再横扫，注意两侧退路。", true);
+                message(player, "ops.projectseele.campaign.target_confirmed_the_energy_whips_draw_back_before", true);
             }
             load(level, data.lastPosition == null ? BlockPos.containing(site.angel) : data.lastPosition);
             if (level.getEntity(data.angel) instanceof ShamshelEntity angel)
@@ -518,7 +519,7 @@ public final class TvCampaignDirector
                 if (!angel.blockPosition().equals(data.lastPosition)) { data.lastPosition = angel.blockPosition(); data.setDirty(); }
                 TvSortiesR32.updateTarget(level,data);
                 float field = angel.getAtField();
-                bar.setName(Component.literal("第4使徒 夏姆榭尔 · " + (field > 0 ? "AT 力场 " + Math.round(field) : "核心 " + Math.round(100 * angel.getHealth() / angel.getMaxHealth()) + "%")));
+                bar.setName(Component.translatable(field > 0 ? "ops.projectseele.campaign.shamshel_field" : "ops.projectseele.campaign.shamshel_core", field > 0 ? Math.round(field) : Math.round(100 * angel.getHealth() / angel.getMaxHealth())));
                 bar.setProgress(Math.max(0, Math.min(1, field > 0 ? field / 700 : angel.getHealth() / angel.getMaxHealth())));
             }
             else

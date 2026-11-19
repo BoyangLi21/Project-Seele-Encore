@@ -1,5 +1,6 @@
 package com.projectseele.world;
 
+import net.minecraft.network.chat.Component;
 import com.google.gson.*;
 import com.projectseele.entity.*;
 import com.projectseele.world.NervRouteReservationsR52.*;
@@ -84,7 +85,20 @@ public final class NervAirTransportRuntimeR52
     public static String status(ServerLevel l)
     {
         if(!ready(l))return "运输机尚未完成航路准备，请稍后再试。";
-        var controller=LIVE.get(l);var jobs=state(l).jobs().stream().filter(Job::active).toList();return jobs.isEmpty()?"运输机在各泊位待命。":String.join(" ｜ ",jobs.stream().map(j->{var aircraft=controller.manifest.aircraft().values().stream().filter(a->a.entity().equals(j.aircraft())).findFirst().orElse(null);return "运输机"+(aircraft==null?"":aircraft.serial())+"："+NervStaffDialogue.unitName(j.original().variant())+" "+phaseLabelR52(j.phase())+" "+humanWaitingR52(j.waiting());}).toList());
+        var controller = LIVE.get(l);
+        var jobs = state(l).jobs().stream().filter(Job::active).toList();
+        if (jobs.isEmpty()) return "ops.projectseele.airroutes.transport_aircraft_are_standing_by_at_their";
+        var message = Component.empty();
+        for (var job : jobs)
+        {
+            var aircraft = controller.manifest.aircraft().values().stream()
+                    .filter(a -> a.entity().equals(job.aircraft())).findFirst().orElse(null);
+            if (!message.getSiblings().isEmpty()) message.append(" | ");
+            message.append(Component.translatable("ops.projectseele.airroutes.status",
+                    aircraft == null ? "" : String.valueOf(aircraft.serial()), OperationText.unit(job.original().variant()),
+                    OperationText.read(phaseLabelR52(job.phase())), OperationText.read(humanWaitingR52(job.waiting()))));
+        }
+        return OperationText.encode(message);
     }
     private static String phaseLabelR52(Phase phase){return switch(phase){case PREPARE->"准备中";case TAKEOFF,FERRY->"前往接载点";case APPROACH,CLAMP->"接载中";case ASCEND,STOW,CRUISE->"运输中";case UNSTOW,DESCEND,HANDOFF,RELEASE->"交接中";case RETREAT->"退出接应点";case RETURN,LAND->"返场中";case HOLD->"等待";case COMPLETE->"已完成";case CANCELLED->"已取消";};}
     // Hold reasons stay precise in the job record and debug log. One that uses
@@ -494,9 +508,9 @@ public final class NervAirTransportRuntimeR52
                     if(!reported.contains(previous))reported.add(previous);
                 }
                 var key=StringTag.valueOf(note);
-                owner.sendSystemMessage(net.minecraft.network.chat.Component.literal("[NERV 运输管制] 运输机"
-                            +aircraft.serial()+" · "+plane.blockPosition().toShortString()+" · "
-                            +NervStaffDialogue.unitName(j.original().variant())+" · "+note));
+                owner.sendSystemMessage(Component.translatable("ops.projectseele.airroutes.report",
+                        aircraft.serial(), plane.blockPosition().toShortString(), OperationText.unit(j.original().variant()),
+                        OperationText.read(phaseLabelR52(j.phase())), OperationText.read(humanWaitingR52(j.waiting()))));
                 reported.add(key);data.put("ReportSeenR54",reported);
                 data.putLong("ReportAtR53",now);data.putString("ReportNoteR53",note);
                 save(j.update(j.leg(),j.age(),j.phase(),j.carrying(),j.payloadTransferred(),j.spaces(),j.mechanisms(),data,j.waiting()));

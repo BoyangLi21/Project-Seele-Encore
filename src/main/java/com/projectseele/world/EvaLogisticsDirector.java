@@ -434,30 +434,27 @@ public final class EvaLogisticsDirector
         FleetEntry entry = entry(level, variant);
         if (unit == null || entry == null)
         {
-            return new ActionResult(false, label(variant) + " is not loaded; use force reset.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.is_not_loaded_use_force_reset", label(variant)));
         }
         if(unit.refreshTvPersonnelClockHoldR44())return new ActionResult(false,unit.tvPersonnelClockFaultR44());
         if (com.projectseele.entity.EvaBayRepairR33.active(unit))return new ActionResult(false,"机体正在检修，机械臂撤回后即可出动。");
         if (entry.phase() != Phase.PARKED)
         {
-            return new ActionResult(false, label(variant) + " is " + entry.phase() + ".");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.state", label(variant), NervStaffDialogue.phaseText(entry.phase().name())));
         }
         if (FacilityWorldPolicy.isS20Rebuild(level.getServer())
                 && !EvaHangarBuilder.ensureRuntimePowerPylon(level,
                 RegionalFacilityLayout.evaOrigin(level), variant))
         {
-            return new ActionResult(false, label(variant)
-                    + " cage external-power socket is obstructed.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.cage_external_power_socket_is_obstructed", label(variant)));
         }
         if (EntryPlugDirector.ensureSuspended(level, variant, unit) == null)
         {
-            return new ActionResult(false, label(variant)
-                    + " entry-plug authority is unavailable; use force reset.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.entry_plug_authority_is_unavailable_use_force", label(variant)));
         }
         if (!EntryPlugDirector.hasBoardedPilot(level, variant, unit))
         {
-            return new ActionResult(false, label(variant)
-                    + " pilot must board the suspended external entry plug first.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.pilot_must_board_the_suspended_external_entry", label(variant)));
         }
         unit.clearSortieDestination();
         unit.setNervLogisticsLocked(true);
@@ -467,8 +464,7 @@ public final class EvaLogisticsDirector
                 hangarBed(level, variant).getZ(), lcl));
         level.playSound(null, unit.blockPosition(), SoundEvents.PISTON_CONTRACT,
                 SoundSource.BLOCKS, 2.5F, 0.62F);
-        return new ActionResult(true, label(variant)
-                + " boarding bridge retraction and entry-plug insertion started.");
+        return new ActionResult(true, OperationText.format("ops.projectseele.logistics.boarding_bridge_retraction_and_entry_plug_insertion", label(variant)));
     }
 
     /**
@@ -501,15 +497,14 @@ public final class EvaLogisticsDirector
         if (unit == null || entry == null)
         {
             return new ActionResult(false,
-                    label(variant) + " is not linked to the command network.");
+                    OperationText.format("ops.projectseele.logistics.is_not_linked_to_the_command_network", label(variant)));
         }
         if(unit.refreshTvPersonnelClockHoldR44())return new ActionResult(false,unit.tvPersonnelClockFaultR44());
         if(UndergroundSortieR48.reservesLaunchR48(level,variant,unit))
             return new ActionResult(false,"地下出口正在开门/转移，未释放地表弹射。");
         if (entry.phase() != Phase.SILO_READY)
         {
-            return new ActionResult(false, label(variant) + " is "
-                    + entry.phase() + "; launch requires SILO READY.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.not_ready", label(variant), NervStaffDialogue.phaseText(entry.phase().name())));
         }
         BlockPos bed = lowerLiftBed(level, variant);
         double dx = unit.getX() - (bed.getX() + 0.5D);
@@ -519,22 +514,19 @@ public final class EvaLogisticsDirector
         if (!atAssignedBed || !EntryPlugDirector.hasLaunchLock(
                 level, variant, unit))
         {
-            return new ActionResult(false, label(variant)
-                    + " launch interlock is incomplete at the assigned silo.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.launch_interlock_is_incomplete_at_the_assigned", label(variant)));
         }
         if (unit.getLaunchPhase() != EvaUnit01Entity.LAUNCH_LOCKED
                 && !unit.armPreparedLaunch(bed))
         {
-            return new ActionResult(false, label(variant)
-                    + " could not restore its silo launch lock.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.could_not_restore_its_silo_launch_lock", label(variant)));
         }
         if (!unit.releaseLaunchFromCommand())
         {
-            return new ActionResult(false, label(variant)
-                    + " catapult release was rejected by the occupied airframe.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.catapult_release_was_rejected_by_the_occupied", label(variant)));
         }
         return new ActionResult(true,
-                label(variant) + " catapult release authorized.");
+                OperationText.format("ops.projectseele.logistics.catapult_release_authorized", label(variant)));
     }
     /** Only the installed underground service may begin a bound original carrier trip. */
     public static ActionResult requestUndergroundDepartureR48(ServerPlayer caller,int variant,UUID expected)
@@ -687,12 +679,11 @@ public final class EvaLogisticsDirector
         FleetEntry entry = entry(level, variant);
         if (unit == null || entry == null)
         {
-            return new ActionResult(false, label(variant) + " is not loaded; use force reset.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.is_not_loaded_use_force_reset", label(variant)));
         }
         if (entry.phase() != Phase.DEPLOYED)
         {
-            return new ActionResult(false, label(variant) + " is " + entry.phase()
-                    + "; recovery requires DEPLOYED.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.not_deployed", label(variant), NervStaffDialogue.phaseText(entry.phase().name())));
         }
         if(UndergroundSortieR48.deployedBindingR48(level,variant,unit))
             return UndergroundSortieR48.recoverR48(level,variant,unit);
@@ -703,13 +694,11 @@ public final class EvaLogisticsDirector
         if (horizontal > RECOVERY_RADIUS
                 || Math.abs(unit.getY() - (surface.getY() + 2.0D)) > 8.0D)
         {
-            return new ActionResult(false, label(variant)
-                    + " must stand on its own Tokyo-3 recovery deck.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.must_stand_on_its_own_tokyo_3", label(variant)));
         }
         if (!recoveryMotionSettled(unit))
         {
-            return new ActionResult(false, label(variant)
-                    + " must be motionless before surface command authorizes recovery.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.must_be_motionless_before_surface_command_authorizes", label(variant)));
         }
         if(!HangarEmergencyR47.releaseForRecoveryR47(level,variant))
             return new ActionResult(false,"机库后门正在通行，请清空门域后回收。");
@@ -725,8 +714,7 @@ public final class EvaLogisticsDirector
                 surface.getY() + 1, 0));
         level.playSound(null, surface, SoundEvents.PISTON_CONTRACT,
                 SoundSource.BLOCKS, 4.0F, 0.48F);
-        return new ActionResult(true, label(variant)
-                + " 回收已开始：支撑架升起、舱门开启，然后下降。");
+        return new ActionResult(true, OperationText.format("ops.projectseele.logistics.recovery_started", label(variant)));
     }
 
     /**
@@ -765,17 +753,15 @@ public final class EvaLogisticsDirector
         FleetEntry entry = entry(level, variant);
         if (unit == null || entry == null)
         {
-            return new ActionResult(false, label(variant) + " is not loaded; use force reset.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.is_not_loaded_use_force_reset", label(variant)));
         }
         if (entry.phase() != Phase.SILO_READY)
         {
-            return new ActionResult(false, label(variant) + " is " + entry.phase()
-                    + "; launch cancel is only available at SILO READY (launch lock).");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.already_released", label(variant), NervStaffDialogue.phaseText(entry.phase().name())));
         }
         if (!unit.cancelPreparedLaunch())
         {
-            return new ActionResult(false, label(variant)
-                    + " has already released; recovery must be commanded from Tokyo-3.");
+            return new ActionResult(false, OperationText.format("ops.projectseele.logistics.has_already_released_recovery_must_be_commanded", label(variant)));
         }
         BlockPos silo = lowerLiftBed(level, variant);
         // Open the wet-cage gate before the airframe slides home. The recovery
@@ -790,8 +776,7 @@ public final class EvaLogisticsDirector
         put(level, variant, entry.withPhase(Phase.TO_HANGAR, 0, silo.getZ(), 0));
         level.playSound(null, silo, SoundEvents.PISTON_CONTRACT,
                 SoundSource.BLOCKS, 2.5F, 0.55F);
-        return new ActionResult(true, label(variant)
-                + " launch cancelled; airframe returning to its wet cage.");
+        return new ActionResult(true, OperationText.format("ops.projectseele.logistics.launch_cancelled_airframe_returning_to_its_wet", label(variant)));
     }
 
     /** Maintenance of the original empty wet-cage assembly, never replacement actors. */
@@ -861,7 +846,7 @@ public final class EvaLogisticsDirector
                         &&level.getBlockState(position).getBlock() instanceof net.minecraft.world.level.block.ButtonBlock)
                 {
                     var result=NervRouteRuntimeR52.recover(player,variant);
-                    player.displayClientMessage(Component.literal("[NERV 回收] "+result.message()),false);return true;
+                    player.displayClientMessage(Component.translatable("ops.projectseele.logistics.radio.recovery", OperationText.read(result.message())),false);return true;
                 }
         }
         int mappedControl = NervHangarControlsR53.handleUse(player, position);
@@ -892,8 +877,7 @@ public final class EvaLogisticsDirector
                 case CANCEL ->
                 {
                     ActionResult result = requestCancel(level, control.variant());
-                    player.displayClientMessage(Component.literal(
-                            "[NERV HANGAR] " + result.message()).withStyle(
+                    player.displayClientMessage(Component.translatable("ops.projectseele.logistics.radio.hangar", OperationText.read(result.message())).withStyle(
                             result.accepted() ? ChatFormatting.GREEN : ChatFormatting.RED), false);
                 }
             }
@@ -914,8 +898,7 @@ public final class EvaLogisticsDirector
                         .equals(position))
                 {
                     ActionResult result = requestCancel(level, variant);
-                    player.displayClientMessage(Component.literal(
-                            "[NERV HANGAR] " + result.message())
+                    player.displayClientMessage(Component.translatable("ops.projectseele.logistics.radio.hangar", OperationText.read(result.message()))
                             .withStyle(result.accepted()
                                     ? ChatFormatting.GREEN
                                     : ChatFormatting.RED), false);
@@ -945,8 +928,7 @@ public final class EvaLogisticsDirector
                 continue;
             }
             ActionResult result = requestRecovery(player.serverLevel(), variant);
-            player.displayClientMessage(Component.literal("[TOKYO-3 RECOVERY] "
-                    + result.message()).withStyle(result.accepted()
+            player.displayClientMessage(Component.translatable("ops.projectseele.logistics.radio.tokyo3_recovery", OperationText.read(result.message())).withStyle(result.accepted()
                     ? ChatFormatting.GREEN : ChatFormatting.RED), false);
             return true;
         }
@@ -958,8 +940,7 @@ public final class EvaLogisticsDirector
                     .equals(position))
             {
                 ActionResult result = requestCancel(player.serverLevel(), variant);
-                player.displayClientMessage(Component.literal("[NERV HANGAR] "
-                        + result.message()).withStyle(result.accepted()
+                player.displayClientMessage(Component.translatable("ops.projectseele.logistics.radio.hangar", OperationText.read(result.message())).withStyle(result.accepted()
                         ? ChatFormatting.GREEN : ChatFormatting.RED), false);
                 return true;
             }
@@ -985,17 +966,15 @@ public final class EvaLogisticsDirector
         if (prepare)
         {
             ActionResult result = requestPrepare(player.serverLevel(), variant);
-            player.displayClientMessage(Component.literal("[NERV HANGAR] "
-                    + result.message()).withStyle(result.accepted()
+            player.displayClientMessage(Component.translatable("ops.projectseele.logistics.radio.hangar", OperationText.read(result.message())).withStyle(result.accepted()
                     ? ChatFormatting.GREEN : ChatFormatting.RED), false);
             return;
         }
         Status snapshot = status(player.serverLevel(), variant);
-        player.displayClientMessage(Component.literal(String.format(Locale.ROOT,
-                "[NERV HANGAR STATUS] %s phase=%s loaded=%s LCL=%d/%d ticks=%d",
-                label(variant), snapshot.phase(), snapshot.loaded(),
-                snapshot.lclLayers(), EvaHangarBuilder.LCL_SHOULDER_LAYERS,
-                snapshot.ticks())).withStyle(ChatFormatting.AQUA), false);
+        player.displayClientMessage(Component.translatable("ops.projectseele.logistics.monitor_status",
+                label(variant), NervStaffDialogue.phaseText(snapshot.phase()),
+                Component.translatable(snapshot.loaded() ? "message.projectseele.eva_loaded" : "message.projectseele.eva_unloaded"),
+                snapshot.lclLayers(), EvaHangarBuilder.LCL_SHOULDER_LAYERS, snapshot.ticks()).withStyle(ChatFormatting.AQUA), false);
     }
 
     @SubscribeEvent

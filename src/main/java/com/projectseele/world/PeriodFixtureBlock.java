@@ -88,12 +88,12 @@ public final class PeriodFixtureBlock extends HorizontalDirectionalBlock impleme
         if (hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
         if(state.getValue(KIND)==Kind.CAFE_STOOL)return NervOfficeChairBlock.sit(level,pos,player,state.getValue(FACING),-.25);
         if(!level.isClientSide&&state.getValue(KIND)==Kind.TECH_BENCH&&player instanceof net.minecraft.server.level.ServerPlayer operator)
-            operator.sendSystemMessage(net.minecraft.network.chat.Component.literal("设施监视终端\n初号机："+NervStaffDialogue.readinessHint(operator.serverLevel(),1,"query")));
+            operator.sendSystemMessage(net.minecraft.network.chat.Component.translatable("ops.projectseele.nerv.monitor", OperationText.read(NervStaffDialogue.readinessHint(operator.serverLevel(),1,"query"))));
         if (!level.isClientSide && state.getValue(KIND) == Kind.PUBLIC_PHONE)
         {
             if(player instanceof net.minecraft.server.level.ServerPlayer caller
                     &&PilotRestroomServicesR47.handlePhoneR47(caller,pos))return InteractionResult.CONSUME;
-            player.displayClientMessage(net.minecraft.network.chat.Component.literal("线路处于紧急管制。请按站内导向牌前往 NERV 接驳设施。"), false);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.projectseele.station.service_control"), false);
             level.playSound(null, pos, com.projectseele.registry.ModSounds.PERIOD_PHONE_BUSY.get(), net.minecraft.sounds.SoundSource.BLOCKS, .55F, 1);
         }
         else if (!level.isClientSide && state.getValue(KIND) == Kind.NOTICE_BOARD && level.getBlockEntity(pos) instanceof PeriodFixtureBlockEntity board)
