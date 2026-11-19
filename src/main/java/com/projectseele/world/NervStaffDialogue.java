@@ -18,8 +18,14 @@ public final class NervStaffDialogue
 {
     public static void say(ServerPlayer player,String name,String line)
     {
+        say(player, Component.literal(name), Component.literal(line));
+    }
+
+    public static void say(ServerPlayer player, Component name, Component line)
+    {
         // Named characters use chat only. Facility PA is a separate sound circuit.
-        player.sendSystemMessage(Component.literal("「"+name+"」 ").withStyle(ChatFormatting.AQUA).append(Component.literal(line).withStyle(ChatFormatting.WHITE)));
+        player.sendSystemMessage(Component.literal("「").append(name).append("」 ").withStyle(ChatFormatting.AQUA)
+                .append(line.copy().withStyle(ChatFormatting.WHITE)));
     }
     public static void reply(ServerPlayer player,NervStaffEntity npc,String line)
     {

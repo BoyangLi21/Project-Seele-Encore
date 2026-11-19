@@ -107,7 +107,8 @@ public final class EvaShutdownR30
         if(e instanceof EvaPrototypeEntity un)un.stopUNFlight();
         if(!e.isNervLogisticsLocked()&&!e.hasActiveCarrierMotion())e.setNoGravity(false);
         e.refreshDimensions();
-        if(mode!=EMPTY&&e.getPilotEntity() instanceof ServerPlayer pilot)pilot.sendSystemMessage(net.minecraft.network.chat.Component.literal(mode==POWER_LOCK?"主电源耗尽，机体姿态锁止。通信电源仍可呼叫运输回收。":"机体损毁，驱动系统已关闭。可通过电话请求回收，或弹出插入栓。"));
+        if(mode!=EMPTY&&e.getPilotEntity() instanceof ServerPlayer pilot)pilot.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
+                mode==POWER_LOCK?"radio.projectseele.shutdown.power_lock":"radio.projectseele.shutdown.wreck"));
     }
     public static void tick(EvaUnit01Entity e)
     {

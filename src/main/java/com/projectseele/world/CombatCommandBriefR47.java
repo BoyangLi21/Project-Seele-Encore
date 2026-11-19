@@ -2,6 +2,7 @@ package com.projectseele.world;
 
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
@@ -30,6 +31,23 @@ public final class CombatCommandBriefR47
     }
 
     private static void say(ServerLevel level, EvaUnit01Entity eva, String speaker, String line)
+    {
+        say(level, eva, Component.literal(speaker), Component.literal(line));
+    }
+
+    private static void monitor(ServerLevel level, EvaUnit01Entity eva, String key)
+    {
+        int slot = TvSortiesR32.slot(eva);
+        Component unit = switch (slot)
+        {
+            case 0, 1, 2 -> Component.translatable("radio.projectseele.unit." + slot);
+            default -> Component.literal(TvSortiesR32.name(slot));
+        };
+        say(level, eva, Component.translatable("radio.projectseele.monitor.channel"),
+                Component.translatable(key, unit));
+    }
+
+    private static void say(ServerLevel level, EvaUnit01Entity eva, Component speaker, Component line)
     {
         Set<UUID> recipients = new HashSet<>();
         if (eva != null)
@@ -83,8 +101,7 @@ public final class CombatCommandBriefR47
             boolean critical = eva.getHealth() - event.getAmount() <= eva.getMaxHealth() * .25F;
             if (now < pulse.hurtAfter || (!critical && now < pulse.lineAfter)) return;
             pulse.hurtAfter = now + 140; pulse.lineAfter = now + 50; pulse.critical = critical;
-            say(level, eva, "赤木律子 · 机体监视", TvSortiesR32.name(TvSortiesR32.slot(eva))
-                    + (critical ? "损伤较重。请确认驾驶员状态，建议回收检查。" : "受到冲击。驾驶员，请报告操纵反馈。"));
+            monitor(level, eva, critical ? "radio.projectseele.monitor.damage_critical" : "radio.projectseele.monitor.impact");
         }
         else if (event.getSource().getEntity() instanceof EvaUnit01Entity eva)
         {
@@ -118,8 +135,7 @@ public final class CombatCommandBriefR47
                 boolean berserk = eva.isBerserk();
                 if ((!pulse.observed && berserk) || (pulse.observed && pulse.berserk != berserk))
                 {
-                    say(level, eva, "赤木律子 · 机体监视", TvSortiesR32.name(TvSortiesR32.slot(eva))
-                            + (berserk ? "出现自律反应，制御状态异常。先确认驾驶员安全。" : "自律反应减弱。继续确认驾驶员和操纵系统。"));
+                    monitor(level, eva, berserk ? "radio.projectseele.monitor.autonomous" : "radio.projectseele.monitor.subsiding");
                     pulse.lineAfter = level.getGameTime() + 60;
                 }
                 pulse.berserk = berserk; pulse.observed = true;

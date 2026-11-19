@@ -72,7 +72,7 @@ public final class EvaBerserkMotionR34
         if(kind(e)==1&&age==16)
         {
             EvaMovementSounds.play(e,e.position().add(0,e.getBbHeight()*.9,0),ModSounds.EVA_BERSERK_ROAR.get(),2.2F,1);
-            if(e.getPilotEntity() instanceof net.minecraft.server.level.ServerPlayer pilot)pilot.sendSystemMessage(net.minecraft.network.chat.Component.literal("律子：没有外部供电……初号机在自己动！"));
+            if(e.getPilotEntity() instanceof net.minecraft.server.level.ServerPlayer pilot)pilot.sendSystemMessage(net.minecraft.network.chat.Component.translatable("radio.projectseele.berserk.unpowered"));
         }
         if(striking(e))
         {
