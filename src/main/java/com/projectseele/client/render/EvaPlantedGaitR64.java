@@ -750,8 +750,7 @@ public final class EvaPlantedGaitR64
         float yaw=s.yaw+Mth.clamp(s.yawRate*(float)Math.min(TURN_AHEAD,left+s.stanceSeconds*.5),-30,30);
         double side=f.lat*s.half,near=Double.isFinite(s.ground)?s.ground:eva.getY();
         float heading=yaw-f.lat*TOE_OUT;
-        double x=s.atX+s.px*ahead+leftX(yaw)*side,z=s.atZ+s.pz*ahead+leftZ(yaw)*side;
-        x=s.atX+s.px*ahead*f.share+leftX(yaw)*side;z=s.atZ+s.pz*ahead*f.share+leftZ(yaw)*side;
+        double x=s.atX+s.px*ahead*f.share+leftX(yaw)*side,z=s.atZ+s.pz*ahead*f.share+leftZ(yaw)*side;
         Footing ground=footing(s,eva,s.rig,x,z,heading,near);
         // Nothing to stand on there (a wall, a drop past the leg's reach): a shorter step, down to one under the
         // hip, and for the rest of this swing (a footfall that went back and forth between the two carried the foot with it).
@@ -761,32 +760,30 @@ public final class EvaPlantedGaitR64
             x=s.atX+s.px*ahead*f.share+leftX(yaw)*side;z=s.atZ+s.pz*ahead*f.share+leftZ(yaw)*side;
             ground=footing(s,eva,s.rig,x,z,heading,near);
         }
-        // R64 (STOPPED): nor through a wall. A footfall is under where the hip will be, and a body that runs at a
-        // wall will not be there: measured against the review world's wall, a fast run's last foot was set down 18
-        // blocks past where the body was stopped, in the wall or beyond it, and brought back half a second later.
-        // The way from the body to the footfall is looked along at the height of the knee (along the slope, where
-        // there is one); what stands in it shortens the step to in front of it, for the rest of this swing.
-        if(STOPPED&&ground.found()&&f.share>0)
-        {
-            double knee=s.rig.leg()*.5,dx=x-s.atX,dz=z-s.atZ,far=Math.hypot(dx,dz);
-            if(far>s.rig.toe())
-            {
-                var hit=eva.level().clip(new ClipContext(new Vec3(s.atX,near+knee,s.atZ),
-                        new Vec3(x+dx/far*s.rig.toe(),ground.y()+knee,z+dz/far*s.rig.toe()),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,eva));
-                if(hit.getType()==HitResult.Type.BLOCK)
-                {
-                    double open=Math.max(0,Math.hypot(hit.getLocation().x-s.atX,hit.getLocation().z-s.atZ)-s.rig.toe()-1);
-                    f.share*=Math.min(1,open/far);
-                    x=s.atX+s.px*ahead*f.share+leftX(yaw)*side;z=s.atZ+s.pz*ahead*f.share+leftZ(yaw)*side;
-                    Footing nearer=footing(s,eva,s.rig,x,z,heading,near);
-                    if(nearer.found())ground=nearer;
-                }
-            }
-        }
         if(ground.shift()!=0)
         {
             // Across a kerb's edge: on, or back, until the whole sole stands on one level.
             x+=-Mth.sin(heading*Mth.DEG_TO_RAD)*ground.shift();z+=Mth.cos(heading*Mth.DEG_TO_RAD)*ground.shift();
+        }
+        if(STOPPED&&ground.found())
+        {
+            double knee=s.rig.leg()*.5;
+            Vec3 body=new Vec3(s.atX,near+knee,s.atZ),foot=new Vec3(x,ground.y()+knee,z);
+            Vec3 clear=EvaFootfallWalls.constrain(body,foot,heading,s.rig.tip(),s.rig.heel(),s.rig.sole(),
+                    (from,to)->eva.level().clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,eva)));
+            if(!clear.equals(foot))
+            {
+                Footing support=footing(s,eva,s.rig,clear.x,clear.z,heading,near);
+                if(support.found())
+                {
+                    x=clear.x;z=clear.z;ground=support;
+                }
+                else
+                {
+                    // The clear side borders a drop. This foot can return to the surface it pushed off.
+                    x=f.x;z=f.z;heading=f.yaw;ground=new Footing(f.y,f.slope,0,true);
+                }
+            }
         }
         if(f.targeted)
         {

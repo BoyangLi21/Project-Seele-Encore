@@ -83,6 +83,14 @@ public final class EvaCombatPoseR31
                         RELEASE.put(e,new Vec3[]{EvaCombatR31.grip(e,victim,true,partial),EvaCombatR31.grip(e,victim,false,partial)});
                     for(String side:List.of("l","r"))
                     {
+                        if(EvaCombatR31.pounding(e,partial)>=0)
+                        {
+                            // The rest of the pose graph can still freeze or blend these arms.
+                            // Claim the same bones now; solve once against the finished torso below.
+                            for(String prefix:List.of("arm_","forearm_","wrist_","hand_"))
+                            {changed.add(prefix+side);position.add(prefix+side);}
+                            continue;
+                        }
                         boolean left=side.equals("l");Vec3 target=EvaCombatR31.hand(e,victim,left,partial);
                         if(action==EvaCombatR31.THROW&&age>16)
                         {
@@ -141,6 +149,22 @@ public final class EvaCombatPoseR31
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.copyOf(position),"MOTION_ENGINE_LIVE_ACTION");
     }
     private static void collect(GeoBone b,List<GeoBone> all){all.add(b);for(var child:b.getChildBones())collect(child,all);}
+    static void finishHeldStrike(EvaUnit01Entity e,BakedGeoModel model,float partial,Matrix4f root)
+    {
+        if(EvaCombatR31.pounding(e,partial)<0||e.isNervLogisticsLocked()||e.isFirstBattleActive()
+                ||EvaShutdownR30.disabled(e)||com.projectseele.physics.CombatBodyDynamics.active(e))return;
+        var victim=EvaCombatR31.target(e);
+        if(victim==null)return;
+        Vec3 right=e.getForward().multiply(1,0,1).normalize().cross(new Vec3(0,1,0));
+        for(String side:List.of("l","r"))
+        {
+            boolean left=side.equals("l");
+            var surface=AngelGrappleSurfaceR31.contact(victim,left,partial);
+            Vec3 normal=surface==null?right.scale(left?1:-1):surface.outwardNormal().multiply(-1,0,-1).normalize();
+            Vec3 target=left&&surface!=null?surface.position():EvaCombatR31.hand(e,victim,left,partial);
+            hand(e,model,side,target,normal.toVector3f(),1,root,null,null);
+        }
+    }
     private static Matrix3f frame(Vector3f y,Vector3f x)
     {y=new Vector3f(y).normalize();x=new Vector3f(x).sub(new Vector3f(y).mul(x.dot(y))).normalize();return new Matrix3f().setColumn(0,x).setColumn(1,y).setColumn(2,new Vector3f(x).cross(y));}
     private static void hand(EvaUnit01Entity e,BakedGeoModel m,String side,Vec3 contact,Vector3f palmNormal,float weight,Matrix4f root,Set<String> changed,Set<String> position)
@@ -153,6 +177,11 @@ public final class EvaCombatPoseR31
         Vector3f desiredY=new Vector3f(0,1,0),desiredZ=new Vector3f(palmNormal);if(Math.abs(desiredY.dot(desiredZ))>.9F)desiredZ.set(0,0,1);
         var desiredX=new Vector3f(desiredY).cross(desiredZ).normalize();var q=new Quaternionf().setFromNormalized(frame(desiredY,desiredX).mul(frame(along,across).transpose()));
         var target=contact.toVector3f().sub(q.transform(new Vector3f(along).mul(.62F*EvaScale.RENDER_SCALE)));
+        if(changed==null)
+        {
+            EvaRigTransforms.solveArm(upper,lower,wrist,hand,side,target,q,new Vector3f(side.equals("l")?1:-1,-1,0),root);
+            return;
+        }
         var bones=new GeoBone[]{upper,lower,wrist,hand};Map<GeoBone,BonePose> before=new HashMap<>();for(var b:bones)before.put(b,new BonePose(new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX()),new Vector3f(b.getPosX(),b.getPosY(),b.getPosZ())));
         EvaRigTransforms.solveArm(upper,lower,wrist,hand,side,target,q,new Vector3f(side.equals("l")?1:-1,-1,0),root);
         for(var b:bones){var old=before.get(b);EvaRigTransforms.rotate(b,new Quaternionf(old.rotation).slerp(new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX()),weight));b.setPosX(Mth.lerp(weight,old.position.x,b.getPosX()));b.setPosY(Mth.lerp(weight,old.position.y,b.getPosY()));b.setPosZ(Mth.lerp(weight,old.position.z,b.getPosZ()));changed.add(b.getName());position.add(b.getName());}
