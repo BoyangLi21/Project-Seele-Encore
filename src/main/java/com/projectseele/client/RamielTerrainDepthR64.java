@@ -21,9 +21,9 @@ public final class RamielTerrainDepthR64
     public static void newFrame() { terrainPass = null; }
     public static void observe(Object parameters) { terrainPass = parameters; }
 
-    static boolean begin(Matrix4f worldProjection)
+    static DepthSample sample(Matrix4f worldProjection)
     {
-        if (terrainPass == null || unavailable || !GL.getCapabilities().OpenGL33) return false;
+        if (terrainPass == null || unavailable || !GL.getCapabilities().OpenGL33) return null;
         try {
             if (projection == null) {
                 projection = terrainPass.getClass().getField("dhProjectionMatrix");
@@ -34,15 +34,33 @@ public final class RamielTerrainDepthR64
             }
             Object dh = projection.get(terrainPass);
             float dhA = m22.getFloat(dh), dhB = m23.getFloat(dh);
-            if (!(dhB < 0 && worldProjection.m32() < 0 && worldProjection.m23() == -1)) return false;
-            dhDepth = (int) depthTexture.invoke(null);
-            if (dhDepth <= 0) return false;
+            if (!(dhB < 0 && worldProjection.m32() < 0 && worldProjection.m23() == -1)) return null;
+            int dhDepth = (int) depthTexture.invoke(null);
+            if (dhDepth <= 0) return null;
             // Both depth functions are affine in reciprocal eye-space Z.
             double ratio = worldProjection.m32() / (double) dhB;
-            scale = (float) ratio;
-            offset = (float) ((1.0 - worldProjection.m22() + ratio * (dhA - 1.0)) * 0.5);
-            if (!Float.isFinite(scale) || !Float.isFinite(offset)) return false;
+            float scale = (float) ratio;
+            float offset = (float) ((1.0 - worldProjection.m22() + ratio * (dhA - 1.0)) * 0.5);
+            if (!Float.isFinite(scale) || !Float.isFinite(offset)) return null;
 
+            return new DepthSample(dhDepth, scale, offset);
+        } catch (ReflectiveOperationException | LinkageError | IllegalStateException failure) {
+            unavailable = true;
+            ProjectSeele.LOGGER.warn("Could not read distant terrain depth", failure);
+            return null;
+        }
+    }
+
+    record DepthSample(int texture, float scale, float offset) {}
+
+    static boolean begin(Matrix4f worldProjection)
+    {
+        DepthSample sample = sample(worldProjection);
+        if (sample == null) return false;
+        dhDepth = sample.texture();
+        scale = sample.scale();
+        offset = sample.offset();
+        try {
             try (State state = new State()) {
                 if (state.draw == 0 || glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                         GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE) != GL_TEXTURE) return false;
@@ -66,7 +84,7 @@ public final class RamielTerrainDepthR64
                 }
                 return true;
             }
-        } catch (ReflectiveOperationException | LinkageError | IllegalStateException e) {
+        } catch (LinkageError | IllegalStateException e) {
             unavailable = true;
             ProjectSeele.LOGGER.warn("Could not read distant terrain depth for Ramiel", e);
             return false;

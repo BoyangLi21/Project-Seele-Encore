@@ -124,6 +124,10 @@ public final class EncounterObserverR45
                     : ClientboundEncounterObserverPacket.Kind.DAY, new UUID(0, 0), Math.max(1, data.generationR43),
                     level.dimension().location(), ClientboundEncounterObserverPacket.RAMIEL, 0, level.getGameTime(), null);
             SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension), sky);
+            if (night)
+                SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension),
+                        new com.projectseele.network.ClientboundCityLightsR65(level.dimension().location(),
+                                CityCreateDistrictR45.lightRetractions(level, IntegratedNervMapBuilder.tokyo3Origin(level))));
         }
         var site = live(data) ? TvEncounterSitesR45.site(level, data.active).orElse(null) : null;
         if (site == null || !site.geometryValidated() || !site.modelReady()

@@ -96,7 +96,9 @@ public final class YashimaBlackoutR64
     /** The blackout is on and this place is on the surface, outside the position: whether it is dark here is the sky's to say. */
     public static boolean zone(int x, int y, int z)
     {
-        if (!dark || y < SURFACE_FROM) return false;
+        if (y < SURFACE_FROM) return false;
+        boolean city = CityLightWavesR65.contains(x, z);
+        if (!(city ? CityLightWavesR65.dark(x,z) : dark)) return false;
         if (!centred) return true;
         double dx = x + .5 - centreX, dz = z + .5 - centreZ;
         return dx * dx + dz * dz > LIT * LIT;
@@ -159,10 +161,12 @@ public final class YashimaBlackoutR64
             world = new WeakReference<>(level);
             dark = false; centred = false; sought = 0; depth = 0;
         }
-        if (level == null) return;
+        if (level == null) { CityLightWavesR65.update(null, false); return; }
         depth = dark ? Math.min(FADE, depth + 1) : Math.max(0, depth - 1);
         // The server says when: the operation's night, from the moment the power is switched to the gun.
         boolean wanted = !held && SeeleConfig.YASHIMA_BLACKOUT.get() && TvYashimaNightClientR54.blackout(level);
+        int changed = CityLightWavesR65.update(level, wanted);
+        if (changed != 0) remeshCityWave(mc, level, changed);
         boolean known = centred, moved = false;
         double x = centreX, z = centreZ;
         // The gun's place: looked for once a second (it does not move level; it is there whenever its chunk is).
@@ -196,6 +200,22 @@ public final class YashimaBlackoutR64
         // Every mesh of the surface was built with the light as it was read then.
         remesh(mc, level, Double.NaN, Double.NaN);
         rebuildFarView();
+    }
+
+    /** Refresh loaded city sections whose service area crossed half brightness. */
+    private static void remeshCityWave(Minecraft mc, ClientLevel level, int districts)
+    {
+        BlockPos eye = mc.gameRenderer.getMainCamera().getBlockPosition();
+        int reach = mc.options.getEffectiveRenderDistance() + 1;
+        for (int sx=Math.max(-22,(eye.getX()>>4)-reach); sx<=Math.min(19,(eye.getX()>>4)+reach); sx++)
+            for (int sz=Math.max(-2,(eye.getZ()>>4)-reach); sz<=Math.min(36,(eye.getZ()>>4)+reach); sz++)
+            {
+                int lo=CityLightWavesR65.district(sx*16-1,sz*16-1);
+                int hi=CityLightWavesR65.district(sx*16+16,sz*16+16);
+                int mask=((2<<hi)-1) & ~((1<<lo)-1);
+                if ((districts & mask)==0) continue;
+                for (int sy=3; sy<=13; sy++) mc.levelRenderer.setSectionDirty(sx,sy,sz);
+            }
     }
 
     /**

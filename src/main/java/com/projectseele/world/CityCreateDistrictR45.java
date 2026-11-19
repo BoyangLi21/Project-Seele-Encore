@@ -156,6 +156,29 @@ public final class CityCreateDistrictR45
         return null;
     }
 
+    /** Night presentation reads only the existing endpoint or resident carriage owners. */
+    static byte[] lightRetractions(ServerLevel level, BlockPos origin)
+    {
+        if (!origin.equals(new BlockPos(30,80,220)) || !owns(level, origin)) return new byte[0];
+        if (active == null || active.level != level || !active.origin.equals(origin))
+            return Tokyo3RetractionSavedData.get(level).get(origin)
+                    .map(district -> new byte[]{(byte)(district.depth() == 0 ? 0 : 254)}).orElseGet(() -> new byte[0]);
+        if (!active.state.worldTouched || active.state.phase.equals("IDLE"))
+            return new byte[]{(byte)(active.state.depth == 0 ? 0 : 254)};
+        if (active.loadingPlans || active.plans.size() != 100 || active.towers.size() != 100) return new byte[0];
+        byte[] offsets = new byte[active.towers.size()];
+        java.util.Arrays.fill(offsets, (byte)255);
+        for (Plan plan : active.plans)
+        {
+            Entity owner = level.getEntity(plan.owner);
+            if (owner == null || !owner.isAlive() || !owner.getPersistentData().hasUUID("R45CityJourney")
+                    || !owner.getPersistentData().getUUID("R45CityJourney").equals(active.state.journey)) continue;
+            double f = (plan.spec.centre().getY() - owner.getY()) / (plan.spec.centre().getY() - plan.spec.retractedY());
+            if (Double.isFinite(f)) offsets[plan.spec.index()] = (byte)Math.round(254 * Math.max(0, Math.min(1, f)));
+        }
+        return offsets;
+    }
+
     public static Tokyo3RetractionDirector.Status status(ServerLevel level, BlockPos origin)
     {
         if (!owns(level, origin)) return null;

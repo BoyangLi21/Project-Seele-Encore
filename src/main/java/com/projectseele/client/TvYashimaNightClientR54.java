@@ -21,6 +21,9 @@ public final class TvYashimaNightClientR54
         if (level == null || !level.dimension().equals(FacilitySchemaV2.DIMENSION)
                 || !level.dimension().location().equals(packet.dimension())) return;
         if (bound.get() == level && packet.serverTick() < receivedTick) return;
+        if (bound.get() != level && packet.kind() == ClientboundEncounterObserverPacket.Kind.BLACKOUT
+                && com.projectseele.config.SeeleConfig.YASHIMA_BLACKOUT.get()
+                && !YashimaBlackoutR64.held) CityLightWavesR65.joinDark(level);
         bound = new WeakReference<>(level);receivedTick = packet.serverTick();
         // R64: BLACKOUT is the same night with the power switched to the gun.
         powered = packet.kind() == ClientboundEncounterObserverPacket.Kind.BLACKOUT;
@@ -42,7 +45,7 @@ public final class TvYashimaNightClientR54
     public static boolean surfaceNight(Level level)
     {
         var minecraft = Minecraft.getInstance();
-        return minecraft.isSameThread() && night && level != null && level == minecraft.level
+        return minecraft.isSameThread() && (night || CityLightWavesR65.restoring(minecraft.level)) && level != null && level == minecraft.level
                 && bound.get() == level && level.dimension().equals(FacilitySchemaV2.DIMENSION)
                 && minecraft.gameRenderer.getMainCamera().getPosition().y >= -128;
     }
