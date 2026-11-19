@@ -625,7 +625,7 @@ public final class S20CommandPresentationDirector
             units[variant] = new ClientboundPilotStatusPacket.Unit(true,
                     pilot == null ? "" : pilot.getName().getString(),
                     phase,
-                    unit.getPilotSynchronization(),
+                    unit.synchronizationUnavailable(0) ? -1F : unit.getSynchronizationRatio(0),
                     unit.getAtFieldEnergy(), unit.getAtFieldCapacity(),
                     unit.getHealth(), unit.getMaxHealth(),
                     unit.getPowerTicks(), unit.getPowerCapacityTicks(),

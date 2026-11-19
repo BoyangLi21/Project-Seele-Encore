@@ -17,6 +17,11 @@ public final class EvaPilotDisplayR45
     public static void render(GuiGraphics g, Font font, EvaUnit01Entity eva, float partial, int width, int height)
     {
         if (width < 120 || height < 80) return;
+        if (FirstBattleClient.active()) return;
+        if (com.projectseele.client.cockpit.PilotBerserkViewR64.active(eva)) {
+            com.projectseele.client.cockpit.PilotBerserkViewR64.instruments(g, font, eva, partial, width, height);
+            return;
+        }
         if (com.projectseele.client.cockpit.PilotCockpitR64.ON) { windows(g, font, eva, partial, width, height); return; }
         tiles(g, font, eva, partial, width, height);
     }
@@ -43,11 +48,11 @@ public final class EvaPilotDisplayR45
         float sight = com.projectseele.client.cockpit.PlugCannonSightR64.down();
         int px = ClientForgeEvents.isCannonScopeActive(eva) || sight > 0 ? width - margin - 104 : (width - 104) / 2, py = Math.max(4, margin - 4);
         window(g, px, py, 104, 40, powerColour);
-        line(g, font, stopped ? "电源停止  OFFLINE" : external ? "外部电源  EXTERNAL" : "内部电源  INTERNAL", px + 5, py + 4, 96, powerColour);
+        line(g, font, stopped ? Component.translatable("hud.projectseele.plug.offline").getString() : external ? Component.translatable("hud.projectseele.plug.external").getString() : Component.translatable("hud.projectseele.plug.internal").getString(), px + 5, py + 4, 96, powerColour);
         if (stopped) figures(g, px + 6, py + 15, -1, -1, -1, RED);
         else if (external)
         {
-            line(g, font, "脐带缆  CONNECTED", px + 5, py + 16, 96, WHITE);
+            line(g, font, Component.translatable("hud.projectseele.plug.connected").getString(), px + 5, py + 16, 96, WHITE);
             gauge(g, px + 5, py + 31, 94, 1, GREEN);
         }
         else
@@ -71,10 +76,10 @@ public final class EvaPilotDisplayR45
         window(g, margin, ly, panel, 50, AMBER);
         float synchro = eva.getSynchronizationRatio(partial);
         line(g, font, String.format(Locale.ROOT, "EVA-%02d", eva.getUnitVariant()), margin + 5, ly + 4, 40, WHITE);
-        String ratio = String.format(Locale.ROOT, "SYNCHRO %.1f%%", synchro);
+        String ratio = eva.synchronizationText(partial).getString();
         line(g, font, ratio, margin + panel - 5 - font.width(ratio), ly + 4, panel - 10, synchro < 25 ? RED : WHITE);
         harmonics(g, margin + 5, ly + 15, panel - 10, 9, synchro, eva.tickCount + partial);
-        String body = String.format(Locale.ROOT, "机体 %03d%%", Math.round(hull * 100));
+        String body = String.format(Locale.ROOT, "%s %03d%%", Component.translatable("hud.projectseele.plug.hull").getString(), Math.round(hull * 100));
         line(g, font, body, margin + 5, ly + 27, 52, hull <= .34F ? RED : MUTED);
         gauge(g, margin + 58, ly + 30, panel - 63, hull, hull <= .34F ? RED : GREEN);
         String field = String.format(Locale.ROOT, "AT %03d", Math.round(eva.getAtFieldEnergy()));
@@ -84,8 +89,8 @@ public final class EvaPilotDisplayR45
         int rx = width - margin - panel;
         window(g, rx, ly, panel, 29, eva.isAtFieldOn() ? GREEN : AMBER);
         line(g, font, Component.translatable(eva.getWeaponTranslationKey()).getString(), rx + 5, ly + 4, panel - 10, WHITE);
-        String stance = eva.isPilotProne() ? "趴伏" : eva.isPilotCrouching() ? "下蹲" : eva.isPilotSprinting() ? "冲刺" : "常规操纵";
-        String radio = Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString() + " 指挥通信";
+        String stance = eva.isPilotProne() ? Component.translatable("hud.projectseele.plug.prone").getString() : eva.isPilotCrouching() ? Component.translatable("hud.projectseele.plug.crouch").getString() : eva.isPilotSprinting() ? Component.translatable("hud.projectseele.plug.sprint").getString() : Component.translatable("hud.projectseele.plug.drive").getString();
+        String radio = Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString() + " " + Component.translatable("hud.projectseele.plug.radio").getString();
         line(g, font, stance + "  /  " + radio, rx + 5, ly + 16, panel - 10, MUTED);
         // What is said to the pilot has its own window in the corner above (PilotChatPanelR64).
         com.projectseele.client.cockpit.PlugCannonSightR64.serviceBelow(font, g, eva, rx + 5, ly + 34);
@@ -169,9 +174,9 @@ public final class EvaPilotDisplayR45
             centred(g, font, Component.translatable(key).getString(), width, top + 30, RED);
         }
         else if (stopped)
-            centred(g, font, EvaShutdownR30.wreck(eva) ? "机体损伤 / 等待回收" : "操纵系统停止", width, top + 30, RED);
+            centred(g, font, EvaShutdownR30.wreck(eva) ? Component.translatable("hud.projectseele.plug.wreck").getString() : Component.translatable("hud.projectseele.plug.shutdown").getString(), width, top + 30, RED);
         else if (hull <= .34F)
-            centred(g, font, "机体损伤 / DAMAGE", width, top + 30, RED);
+            centred(g, font, Component.translatable("hud.projectseele.plug.damage").getString(), width, top + 30, RED);
 
         float damage = ClientForgeEvents.damageFlash(partial);
         if (damage > 0)
@@ -204,22 +209,22 @@ public final class EvaPilotDisplayR45
         // optical field. These compact telemetry tiles are a game adaptation,
         // not a claim that the TV camera carried a fixed aircraft HUD.
         tile(g, left, margin, 108, 29, powerColour);
-        line(g, font, stopped ? "电源停止 / OFFLINE" : external ? "外部电源 / EXTERNAL" : "内部电源 / INTERNAL",
+        line(g, font, stopped ? Component.translatable("hud.projectseele.plug.offline").getString() : external ? Component.translatable("hud.projectseele.plug.external").getString() : Component.translatable("hud.projectseele.plug.internal").getString(),
                 left + 5, margin + 4, 98, powerColour);
         String power = stopped ? "--:--" : external ? "CONNECTED" : String.format(Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60);
         line(g, font, power, left + 5, margin + 16, 98, WHITE);
 
         tile(g, left, bottom, panel, 29, AMBER);
-        String identity = String.format(Locale.ROOT, "EVA-%02d  /  SYNCHRO %.1f%%", eva.getUnitVariant(), eva.getSynchronizationRatio(partial));
+        String identity = String.format(Locale.ROOT, "EVA-%02d  /  %s", eva.getUnitVariant(), eva.synchronizationText(partial).getString());
         line(g, font, identity, left + 5, bottom + 4, panel - 10, WHITE);
-        String condition = String.format(Locale.ROOT, "机体 %03d%%    AT %03d", Math.round(hull * 100), Math.round(eva.getAtFieldEnergy()));
+        String condition = String.format(Locale.ROOT, "%s %03d%%    AT %03d", Component.translatable("hud.projectseele.plug.hull").getString(), Math.round(hull * 100), Math.round(eva.getAtFieldEnergy()));
         line(g, font, condition, left + 5, bottom + 16, panel - 10, hull <= .34F ? RED : MUTED);
 
         int right = width - margin - panel;
         tile(g, right, bottom, panel, 29, eva.isAtFieldOn() ? GREEN : AMBER);
         line(g, font, Component.translatable(eva.getWeaponTranslationKey()).getString(), right + 5, bottom + 4, panel - 10, WHITE);
-        String stance = eva.isPilotProne() ? "趴伏" : eva.isPilotCrouching() ? "下蹲" : eva.isPilotSprinting() ? "冲刺" : "常规操纵";
-        String radio = Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString() + " 指挥通信";
+        String stance = eva.isPilotProne() ? Component.translatable("hud.projectseele.plug.prone").getString() : eva.isPilotCrouching() ? Component.translatable("hud.projectseele.plug.crouch").getString() : eva.isPilotSprinting() ? Component.translatable("hud.projectseele.plug.sprint").getString() : Component.translatable("hud.projectseele.plug.drive").getString();
+        String radio = Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString() + " " + Component.translatable("hud.projectseele.plug.radio").getString();
         line(g, font, stance + "  /  " + radio, right + 5, bottom + 16, panel - 10, MUTED);
 
         if (eva.isLaunchSequenceActive())
@@ -233,9 +238,9 @@ public final class EvaPilotDisplayR45
             centred(g, font, Component.translatable(key).getString(), width, margin + 38, RED);
         }
         else if (stopped)
-            centred(g, font, EvaShutdownR30.wreck(eva) ? "机体损伤 / 等待回收" : "操纵系统停止", width, margin + 38, RED);
+            centred(g, font, EvaShutdownR30.wreck(eva) ? Component.translatable("hud.projectseele.plug.wreck").getString() : Component.translatable("hud.projectseele.plug.shutdown").getString(), width, margin + 38, RED);
         else if (hull <= .34F)
-            centred(g, font, "机体损伤 / DAMAGE", width, margin + 38, RED);
+            centred(g, font, Component.translatable("hud.projectseele.plug.damage").getString(), width, margin + 38, RED);
 
         float damage = ClientForgeEvents.damageFlash(partial);
         if (damage > 0)

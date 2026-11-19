@@ -258,8 +258,8 @@ public final class EvaHud
         float synchro = eva.getSynchronizationRatio(partialTick);
         ChatFormatting synchroColour = synchro < 25.0F ? ChatFormatting.RED
                 : synchro >= 50.0F ? ChatFormatting.GREEN : ChatFormatting.GOLD;
-        String syncText=String.format("SYNCHRO  %.1f%%",synchro);
-        String radioHint=Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString()+" 指挥通信";
+        String syncText=eva.synchronizationText(partialTick).getString();
+        String radioHint=Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString()+" " + Component.translatable("hud.projectseele.plug.radio").getString();
         guiGraphics.drawString(gui.getFont(),radioHint,m+6,height-m-15,0xFFB8D4C0);
         guiGraphics.drawString(gui.getFont(),Component.literal(syncText).withStyle(synchroColour),width-12-gui.getFont().width(syncText),m+6,NERV_ORANGE);
         String roleKey = eva.isExperimentalUnit()?"hud.projectseele.role_experimental":switch (eva.getUnitVariant())
@@ -275,8 +275,8 @@ public final class EvaHud
 
         int powerTicks = eva.getPowerTicks();
         int powerSeconds = Math.max(0, powerTicks / 20);
-        Component powerStatus = eva.isBerserk() ? Component.literal("制御不能 · 自律活动").withStyle(ChatFormatting.RED, ChatFormatting.BOLD)
-                : com.projectseele.entity.EvaShutdownR30.disabled(eva)?Component.literal(com.projectseele.entity.EvaShutdownR30.wreck(eva)?"机体损毁 · 等待回收":com.projectseele.entity.EvaShutdownR30.mode(eva)==1?"电源耗尽 · 姿态锁止":"机体停机 · 驾驶舱无人").withStyle(ChatFormatting.RED):eva.isExperimentalUnit() ? Component.literal("核能反应堆 · 在线") : eva.isUmbilicalConnected()
+        Component powerStatus = eva.isBerserk() ? Component.translatable("hud.projectseele.plug.autonomous").withStyle(ChatFormatting.RED, ChatFormatting.BOLD)
+                : com.projectseele.entity.EvaShutdownR30.disabled(eva)?Component.translatable(com.projectseele.entity.EvaShutdownR30.wreck(eva)?"hud.projectseele.plug.wreck":com.projectseele.entity.EvaShutdownR30.mode(eva)==1?"hud.projectseele.plug.lock":"hud.projectseele.plug.empty").withStyle(ChatFormatting.RED):eva.isExperimentalUnit() ? Component.translatable("hud.projectseele.plug.reactor") : eva.isUmbilicalConnected()
                 ? (powerTicks < eva.getPowerCapacityTicks()
                     ? Component.translatable(
                             "hud.projectseele.power_external_charging",

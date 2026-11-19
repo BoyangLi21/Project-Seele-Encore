@@ -166,7 +166,10 @@ public final class PilotCockpitR64
         // In the liquid the whole picture is its colour; the plug's own parts, close to the eye, take less of it.
         if (strength > 0 && under > 0) graphics.fill(0, 0, width, height, colour(CockpitMeshR64.LCL, under * strength * .66F));
         boolean parts = seated && interior() && shown > .01F;
-        if (parts && light > .5F) panorama(graphics, width, height, (light - .5F) * 2 * shown);
+        var airframe = EvaPilotResolver.controlTarget(player);
+        boolean emergency = PilotBerserkViewR64.active(airframe);
+        int trim = emergency ? (airframe.isBerserk() ? 0xA32622 : 0x835B32) : 0xE8C8A0;
+        if (parts && light > .5F) panorama(graphics, width, height, (light - .5F) * 2 * shown, trim);
         // The cannon's sight is part of the plug's inside: its housing swings down in the same picture as the yokes,
         // round the window the sight's own display is laid in. Its glass is drawn first, under it.
         int[] sight = PlugCannonSightR64.window(width, height);
@@ -185,17 +188,18 @@ public final class PilotCockpitR64
             draw(graphics, mc);
         }
         if (strength > 0 && under > 0) graphics.fill(0, 0, width, height, colour(CockpitMeshR64.LCL, under * strength * .16F));
+        if (emergency && seated) graphics.fill(0, 0, width, height, airframe.isBerserk() ? 0x52220408 : 0x4422180B);
     };
 
     /**
      * The picture is on the plug's round wall: two faint rings about the middle of the view, the outer one seen
      * only in the corners, with the wall's joints as short spokes between them. Nothing crosses the picture itself.
      */
-    private static void panorama(GuiGraphics g, int width, int height, float amount)
+    private static void panorama(GuiGraphics g, int width, int height, float amount, int trim)
     {
         int alpha = Math.round(24 * Mth.clamp(amount, 0, 1));
         if (alpha <= 2) return;
-        int line = alpha << 24 | 0xE8C8A0, faint = alpha / 2 << 24 | 0xE8C8A0;
+        int line = alpha << 24 | trim, faint = alpha / 2 << 24 | trim;
         float cx = width * .5F, cy = height * .5F, inner = width * .468F, outer = width * .532F;
         for (int y = 0; y < height; y++)
         {

@@ -104,15 +104,7 @@ public class GameEvents
             if (event.getSource().getEntity() instanceof ServerPlayer pilot
                     && EvaPilotResolver.controlTarget(pilot) != null)
             {
-                float gained = EvaPilotCapability.awardAngelKill(pilot);
-                if (gained > 0.0F)
-                {
-                    pilot.displayClientMessage(Component.translatable(
-                            "msg.projectseele.sync_angel_gain",
-                            String.format("%.1f", gained),
-                            String.format("%.1f", EvaPilotCapability.synchronization(pilot))),
-                            false);
-                }
+                EvaPilotCapability.awardAngelKill(pilot);
             }
         }
     }

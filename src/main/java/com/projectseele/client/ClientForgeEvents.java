@@ -224,6 +224,8 @@ public final class ClientForgeEvents
             damageFlashTicks = 0;
         }
 
+        com.projectseele.client.cockpit.PilotBerserkViewR64.inputs(eva);
+        if (eva != null && eva.isBerserk()) com.projectseele.client.cockpit.PlugEjectConfirmR64.cancelled();
         while (Keybinds.COMMAND_RADIO.consumeClick())
         {
             if(eva instanceof com.projectseele.entity.EvaPrototypeEntity)
@@ -252,6 +254,11 @@ public final class ClientForgeEvents
                 && docked.laboratorySlotR47() < 0 ? docked.getId() : -1;
         while (Keybinds.EXIT_EVA.consumeClick())
         {
+            if (eva != null && eva.isBerserk()) {
+                com.projectseele.client.cockpit.PlugEjectConfirmR64.cancelled();
+                player.displayClientMessage(net.minecraft.network.chat.Component.translatable("hud.projectseele.berserk.eject"), true);
+                continue;
+            }
             if (ejectSeat < 0 || !com.projectseele.client.cockpit.PlugEjectConfirmR64.pressed(ejectSeat)) continue;
             if (eva != null) send(ServerboundEvaControlPacket.ACTION_EXIT);
             else SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH, -1));

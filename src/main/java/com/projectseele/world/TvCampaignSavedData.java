@@ -29,6 +29,15 @@ public final class TvCampaignSavedData extends SavedData
     private final Map<Integer,Recovery> recoveryR45=new LinkedHashMap<>();
     public record Recovery(UUID eva,UUID pilot,long generation){}
     public String active = "", phase = "idle", notice = "";
+    public String lastSortieChapter = "";
+    public String synchronizationChapter()
+    {
+        if (!active.isEmpty()) return active;
+        if (!lastSortieChapter.isEmpty()) return lastSortieChapter;
+        if (!episodeChapterR45.isEmpty()) return episodeChapterR45;
+        return completed.isEmpty() ? "sachiel" : completed.get(completed.size() - 1);
+    }
+
     public BlockPos lastPosition;
     public final List<String> completed = new ArrayList<>();
     public static final class Sortie
@@ -59,6 +68,7 @@ public final class TvCampaignSavedData extends SavedData
         data.wasRiding=tag.getBoolean("WasRiding");
         data.assignedVariant=tag.contains("AssignedVariant")?Math.max(0,Math.min(2,tag.getInt("AssignedVariant"))):1;
         data.npcPilot=tag.getBoolean("NpcPilot");data.autoArmament=tag.getBoolean("AutoArmament");data.pilotDispatchRequested=tag.getBoolean("PilotDispatchRequested");data.alertStarted=tag.getLong("AlertStarted");data.alertLine=tag.getInt("AlertLine");
+        data.lastSortieChapter = tag.getString("LastSortieChapter");
         data.active = tag.getString("Active"); data.phase = tag.getString("Phase"); data.notice = tag.getString("Notice");
         data.generationR43=tag.getLong("GenerationR43");
         data.rayPreloadCursorR45=Math.max(0,tag.getInt("RayPreloadCursorR45"));
@@ -90,6 +100,7 @@ public final class TvCampaignSavedData extends SavedData
     }
     @Override public CompoundTag save(CompoundTag tag)
     {
+        tag.putString("LastSortieChapter", lastSortieChapter);
         tag.putInt("Chapter", chapter); tag.putString("Active", active); tag.putString("Phase", phase); tag.putString("Notice", notice);
         tag.putLong("GenerationR43",generationR43);
         tag.putBoolean("TargetDeathConfirmedR45",targetDeathConfirmedR45);tag.putInt("RayPreloadCursorR45",rayPreloadCursorR45);tag.putString("EncounterSiteR45",encounterSiteR45);tag.putString("EncounterLayoutR45",encounterLayoutR45);

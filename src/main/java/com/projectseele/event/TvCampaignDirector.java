@@ -186,7 +186,7 @@ public final class TvCampaignDirector
         player.getPersistentData().putString("SeeleMissionChoiceR30",chapter.id());
         data.generationR43++;
         data.episodeStateR45="";data.equipmentReturnedR45=false;data.targetDeathConfirmedR45=false;
-        data.owner = player.getUUID(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = "出击编队："+TvSortiesR32.name(variant)+" · "+(npc?TrainingPilotEntity.pilotName(variant):player.getGameProfile().getName()); data.angel = null; data.lastPosition = null; data.setDirty();
+        data.owner = player.getUUID(); data.lastSortieChapter = chapter.id(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = "出击编队："+TvSortiesR32.name(variant)+" · "+(npc?TrainingPilotEntity.pilotName(variant):player.getGameProfile().getName()); data.angel = null; data.lastPosition = null; data.setDirty();
         if(formation!=null)for(var choice:formation)data.assign(choice.unit(),choice.npc()?player.getUUID():choice.pilot(),choice.npc(),choice.npc()&&rifle);
         else data.assign(variant,player.getUUID(),npc,npc&&rifle);
         if(chapter.id().equals("ramiel")&&formation==null)

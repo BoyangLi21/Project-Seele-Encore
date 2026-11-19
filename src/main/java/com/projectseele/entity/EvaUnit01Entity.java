@@ -120,7 +120,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         boolean wasBerserk=this.isBerserk();
         var finalPose=FirstBattleClip.finalEvaPose(this);
-        this.endFirstBattle();this.entityData.set(DATA_BERSERK,false);this.entityData.set(DATA_BERSERK_TICKS,0);this.berserkRecoveryTicks=0;
+        this.endFirstBattle();this.entityData.set(DATA_BERSERK,false);this.entityData.set(DATA_BERSERK_TICKS,0);this.berserkRecoveryTicks=0;this.entityData.set(RECOVERY_END,0L);
         EvaBerserkMotionR34.clear(this);
         if(wasBerserk)EvaDorsalMechanism.afterBerserk(this);
         if(wasBerserk||this.isPowerDepleted())EvaShutdownR30.restAfterFirstBattle(this,finalPose);
@@ -868,6 +868,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.entityData.define(DATA_POWER_ANCHOR_Y, 0);
         this.entityData.define(DATA_POWER_ANCHOR_Z, 0);
         this.entityData.define(DATA_PILOT_SYNCHRONIZATION, 40.0F);
+        this.entityData.define(STORY_BASE, 41.3F);
+        this.entityData.define(BERSERK_ENTRY_RATIO, 41.3F);
+        this.entityData.define(BERSERK_TRANSITION, 0L);
+        this.entityData.define(RECOVERY_END, 0L);
+        this.entityData.define(SHOCK_END, 0L);
         this.entityData.define(DATA_BERSERK, false);
         this.entityData.define(DATA_BERSERK_TICKS, 0);
         this.entityData.define(DATA_MOTION_LAB_PHYSICS_PREVIEW, 0);
@@ -929,6 +934,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaBerserkMotionR34.save(this,tag);
         tag.putInt("SeeleBerserkTicks", this.getBerserkTicks());
         tag.putInt("SeeleBerserkRecoveryTicks", this.berserkRecoveryTicks);
+        if (isBerserk() || berserkRecoveryTicks > 0) {
+            tag.putLong("BerserkPhaseAge", (long) berserkPhaseAge(0));
+            tag.putFloat("BerserkEntryRatio", entityData.get(BERSERK_ENTRY_RATIO));
+        }
+        tag.putInt("SyncShockLeft", (int) Math.max(0, entityData.get(SHOCK_END) - level().getGameTime()));
         if(this.isBerserk())
         {
             UUID targetId=this.berserkRestoreTargetR53;
@@ -1043,6 +1053,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 ? Math.max(1, tag.getInt("SeeleBerserkTicks")) : 0);
         this.berserkRecoveryTicks = Math.max(0,
                 tag.getInt("SeeleBerserkRecoveryTicks"));
+        long now = level().getGameTime();
+        long phaseAge = tag.contains("BerserkPhaseAge") ? tag.getLong("BerserkPhaseAge") : 80L;
+        entityData.set(BERSERK_TRANSITION, now - Math.max(0, phaseAge));
+        entityData.set(RECOVERY_END, now + berserkRecoveryTicks);
+        entityData.set(SHOCK_END, now + Mth.clamp(tag.getInt("SyncShockLeft"), 0, 100));
+        if (tag.contains("BerserkEntryRatio")) entityData.set(BERSERK_ENTRY_RATIO, tag.getFloat("BerserkEntryRatio"));
+        if (level() instanceof ServerLevel server) updateStoryBase(server);
         this.batterySessionArmed=tag.getBoolean("SeeleBatterySession");
         this.entityData.set(DATA_CARRIER_RISE_R26,tag.getFloat("SeeleCarrierRise"));
         this.setUmbilicalAnchor(tag.contains("SeeleUmbilicalAnchor") && !this.isUmbilicalSevered()
@@ -1235,12 +1252,18 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     public int getBerserkRecoveryTicks()
     {
-        return this.berserkRecoveryTicks;
+        return level().isClientSide ? (int) Math.max(0, entityData.get(RECOVERY_END) - level().getGameTime()) : berserkRecoveryTicks;
     }
 
     private static final EntityDataAccessor<Float> DATA_CARRIER_RISE_R26 = SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> DATA_CARRIER_POWER_CONNECTED_R53 =
             SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Float> STORY_BASE = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> BERSERK_ENTRY_RATIO = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Long> BERSERK_TRANSITION = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.LONG);
+    private static final EntityDataAccessor<Long> RECOVERY_END = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.LONG);
+    private static final EntityDataAccessor<Long> SHOCK_END = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.LONG);
+    private static final float LEGACY_SYNC = -2F;
     private float oldCarrierRiseR26;
     public void setRecoveryRackR39(boolean active){this.entityData.set(DATA_RECOVERY_RACK_R39,active);}
     public boolean recoveryRackR39(){return this.entityData.get(DATA_RECOVERY_RACK_R39);}
@@ -3029,10 +3052,49 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
     }
 
-    /** Cockpit readout uses the persistent pilot value plus live airframe load. */
+    private void updateStoryBase(ServerLevel server)
+    {
+        if (SeeleConfig.COMMON_SPEC.isLoaded() && !SeeleConfig.EVA_STORY_DISPLAY.get()) {
+            entityData.set(STORY_BASE, LEGACY_SYNC);
+            return;
+        }
+        var campaign = com.projectseele.world.TvCampaignSavedData.peek(server);
+        if (campaign == null) {
+            var geofront = server.getServer().getLevel(com.projectseele.visual.GeoFrontCommands.GEOFRONT);
+            if (geofront != null && geofront != server) campaign = com.projectseele.world.TvCampaignSavedData.peek(geofront);
+        }
+        entityData.set(STORY_BASE, StorySynchronizationR64.baseline(
+                campaign == null ? "sachiel" : campaign.synchronizationChapter(), getUnitVariant()));
+    }
+
+    public float berserkPhaseAge(float partialTick)
+    {
+        return Math.max(0, level().getGameTime() - entityData.get(BERSERK_TRANSITION)) + partialTick;
+    }
+
+    public Component synchronizationText(float partialTick)
+    {
+        if (synchronizationUnavailable(partialTick))
+            return Component.translatable(isBerserk() ? "hud.projectseele.sync.range" : "hud.projectseele.sync.absent");
+        return Component.literal(String.format(java.util.Locale.ROOT, "SYNCHRO %.1f%%", getSynchronizationRatio(partialTick)));
+    }
+
+    public boolean synchronizationUnavailable(float partialTick)
+    {
+        if (entityData.get(STORY_BASE) == LEGACY_SYNC) return false;
+        return isBerserk() ? berserkPhaseAge(partialTick) >= 75
+                : getBerserkRecoveryTicks() == 0 && entityData.get(STORY_BASE) == StorySynchronizationR64.UNAVAILABLE;
+    }
+
+    /** Cockpit and command room use this display value. Pilot skills keep their own progression. */
     public float getSynchronizationRatio(float partialTick)
     {
-        float pilotValue = this.getPilotSynchronization();
+        float base = entityData.get(STORY_BASE);
+        boolean story = base != LEGACY_SYNC;
+        if (story && isBerserk())
+            return Mth.lerp(Mth.clamp(berserkPhaseAge(partialTick) / 60F, 0, 1), entityData.get(BERSERK_ENTRY_RATIO), 400F);
+        if (story && (base <= 0 || getBerserkRecoveryTicks() > 0)) return 0;
+        float pilotValue = story ? base : getPilotSynchronization();
         if (this.getActivationTicks() > 0)
         {
             return pilotValue * getActivationProgress(partialTick);
@@ -3040,11 +3102,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         float hullPenalty = (1.0F - this.getHealth() / this.getMaxHealth()) * 11.0F;
         float fieldGain = this.isAtFieldOn() ? 1.6F : 0.0F;
         float motion = this.getDeltaMovement().horizontalDistanceSqr() > 0.002D
-                ? Mth.sin((this.tickCount + partialTick) * 0.38F) * 1.25F
-                : Mth.sin((this.tickCount + partialTick) * 0.08F) * 0.45F;
+                ? Mth.sin((this.tickCount + partialTick) * 0.38F) * (story ? 1.2F : 1.25F)
+                : Mth.sin((this.tickCount + partialTick) * 0.08F) * (story ? .5F : .45F);
         float cannonLoad = this.getCannonCharge() > 0 ? -1.8F * this.chargeProgress() : 0.0F;
-        return Mth.clamp(pilotValue - hullPenalty + fieldGain + motion + cannonLoad,
-                0.0F, EvaPilotData.maxSynchronization());
+        float shock = story ? 6F * Mth.clamp((entityData.get(SHOCK_END) - level().getGameTime() - partialTick) / 100F, 0, 1) : 0;
+        return Mth.clamp(pilotValue - hullPenalty + fieldGain + motion + cannonLoad - shock,
+                0.0F, story ? 100F : EvaPilotData.maxSynchronization());
     }
 
     /** Nail to / release from the Tree. Gravity and pose follow the flag. */
@@ -4937,6 +5000,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         if (this.getControllingPassenger() == pilot)
         {
+            if (isBerserk()) {
+                pilot.displayClientMessage(Component.translatable("hud.projectseele.berserk.eject"), true);
+                return;
+            }
             boolean inAssignedHangar = this.level() instanceof ServerLevel server
                     && this.isInsideActiveAssignedHangar(server);
             if (this.isLaunchSequenceActive() || this.isCrucified())
@@ -5396,11 +5463,24 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void tickBerserkState()
     {
+        if (level() instanceof ServerLevel server && (tickCount == 1 || tickCount % 20 == 0)) updateStoryBase(server);
+        if (!isFirstBattleActive() && getPilotEntity() instanceof ServerPlayer pilot) {
+            long age = level().getGameTime() - entityData.get(BERSERK_TRANSITION);
+            String line = null;
+            if (isBerserk()) {
+                if (age == 40) line = "restart";
+                if (age == 100) line = "range";
+                if (age == 180) line = "answer";
+                if (age == 280) line = "orders";
+            } else if (berserkRecoveryTicks > 0 && age == 60) line = "recover";
+            if (line != null) pilot.displayClientMessage(Component.translatable("radio.projectseele.berserk." + line), false);
+        }
         if(this.isBerserk()&&EvaShutdownR30.wreck(this))
         {
             this.finishBerserk();
             // Wreck recovery is owned by the complete bay repair cycle.
             this.berserkRecoveryTicks=0;
+            entityData.set(RECOVERY_END, 0L);
             return;
         }
         if (this.berserkRecoveryTicks > 0 && !this.isBerserk())
@@ -5519,6 +5599,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 ? SeeleConfig.EVA_BERSERK_DURATION_TICKS.get() : 900;
         ServerPlayer pilot = this.getPilotEntity() instanceof ServerPlayer player
                 ? player : null;
+        entityData.set(BERSERK_ENTRY_RATIO, getSynchronizationRatio(0));
+        entityData.set(BERSERK_TRANSITION, level().getGameTime());
         this.interruptCombatR31();EvaShutdownR30.clear(this);CombatFeelR31.clear(this);
         this.setHealth(50);this.setUmbilicalAnchor(null);this.entityData.set(DATA_POWER_TICKS,0);
         this.entityData.set(DATA_BERSERK, true);
@@ -5542,7 +5624,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaBerserkMotionR34.begin(this,0,null);
         if (pilot != null)
         {
-            pilot.displayClientMessage(Component.literal("律子：主电源切断。初号机停止活动。"), false);
+            pilot.displayClientMessage(Component.translatable("radio.projectseele.berserk.cut"), false);
         }
         ProjectSeele.LOGGER.warn(
                 "EVA Unit-01 berserk: eva={} synchronization={} durationTicks={}",
@@ -5663,6 +5745,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaDorsalMechanism.afterBerserk(this);
         this.berserkRecoveryTicks = SeeleConfig.COMMON_SPEC.isLoaded()
                 ? SeeleConfig.EVA_BERSERK_RECOVERY_TICKS.get() : 6000;
+        entityData.set(BERSERK_TRANSITION, level().getGameTime());
+        entityData.set(RECOVERY_END, level().getGameTime() + berserkRecoveryTicks);
+        if (!isFirstBattleActive() && getPilotEntity() instanceof ServerPlayer pilot)
+            pilot.displayClientMessage(Component.translatable("radio.projectseele.berserk.stopped"), false);
         this.getNavigation().stop();
         this.setTarget(null);
         this.setDeltaMovement(Vec3.ZERO);
@@ -7544,6 +7630,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         float healthBefore = this.getHealth();
         if(canArmBerserkR37()&&!source.is(DamageTypeTags.BYPASSES_INVULNERABILITY))amount=Math.min(amount,Math.max(0,healthBefore-1));
         boolean accepted = super.hurt(source, amount);
+        if (accepted && healthBefore - getHealth() > getMaxHealth() * .15F)
+            entityData.set(SHOCK_END, level().getGameTime() + 100);
         if(accepted&&canEnterBerserk())this.beginBerserk();
         float actualHullDamage = Math.max(0.0F, healthBefore - this.getHealth());
         if (accepted && actualHullDamage > 0.0F && !this.isNervLogisticsLocked()

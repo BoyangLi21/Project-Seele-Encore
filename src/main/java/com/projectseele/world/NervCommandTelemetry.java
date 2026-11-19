@@ -285,11 +285,10 @@ public final class NervCommandTelemetry
         float health = unit.getHealth();
         float at = unit.getAtFieldEnergy();
         float atMax = Math.max(1.0F, unit.getAtFieldCapacity());
-        result.append(Component.literal(String.format(Locale.ROOT,
-                        "\nSYNC %05.1f%%   HP %03.0f/%03.0f",
-                        unit.getSynchronizationRatio(0.0F), health,
-                        unit.getMaxHealth()))
-                .withStyle(ChatFormatting.AQUA));
+        result.append(Component.literal("\n").append(unit.synchronizationText(0))
+                .append(String.format(Locale.ROOT, "   HP %03.0f/%03.0f", health, unit.getMaxHealth()))
+                .append("\n").append(Component.translatable("command.projectseele.proficiency",
+                        String.format(Locale.ROOT, "%.1f", unit.getPilotSynchronization()))).withStyle(ChatFormatting.AQUA));
         boolean videoLive = ServerboundEvaVideoFramePacket.isFeedActive(
                 level, variant);
         result.append(Component.literal(videoLive

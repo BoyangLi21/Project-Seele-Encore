@@ -91,6 +91,7 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.DoubleValue UMBILICAL_REPAIR_PER_SECOND;
 
     // ----- common: EVA pilot synchronization -----
+    public static final ForgeConfigSpec.BooleanValue EVA_STORY_DISPLAY;
     public static final ForgeConfigSpec.DoubleValue EVA_SYNC_INITIAL;
     public static final ForgeConfigSpec.DoubleValue EVA_SYNC_MAX;
     public static final ForgeConfigSpec.DoubleValue EVA_SYNC_DRIVE_GAIN_PER_MINUTE;
@@ -402,6 +403,7 @@ public final class SeeleConfig
         common.pop();
 
         common.push("eva_synchronization");
+        EVA_STORY_DISPLAY = common.comment("Use story synchronization for cockpit and command-room instruments.").define("storyDisplay", true);
         EVA_SYNC_INITIAL = common
                 .comment("Initial pilot synchronization percentage and the no-bonus response baseline.")
                 .defineInRange("initial", 40.0D, 0.0D, 100.0D);

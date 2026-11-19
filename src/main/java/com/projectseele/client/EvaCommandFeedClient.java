@@ -895,8 +895,8 @@ public final class EvaCommandFeedClient
                             ? "NONE / DUMMY PLUG" : unit.pilot()),
                     unit.pilot().isEmpty() ? label : value);
             row = line(font, pose, buffers, row, String.format(Locale.ROOT,
-                    "  SYNC   %5.1f%%   AT %4.0f/%4.0f",
-                    unit.sync() * 100.0F, unit.atEnergy(),
+                    "  SYNC   %s   AT %4.0f/%4.0f",
+                    unit.sync() < 0 ? "----" : String.format(Locale.ROOT, "%.1f%%", unit.sync()), unit.atEnergy(),
                     unit.atCapacity()), value);
             row = line(font, pose, buffers, row, String.format(Locale.ROOT,
                     "  POWER  %s", powerLabel(unit)),
