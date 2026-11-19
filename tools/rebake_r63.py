@@ -1248,7 +1248,7 @@ def step_xaero(a):
 def step_report(a):
     core = json.loads(log_path('core').read_text('utf8'))
     xaero = json.loads(log_path('xaero').read_text('utf8'))
-    cmd = [sys.executable, '-I', str(ROOT / 'tools/package_r60.py'), '--date', time.strftime('%Y%m%d'),
+    cmd = [sys.executable, '-I', str(ROOT / 'tools/package_r60.py'), '--date', a.date,
            '--world', str(FORMAL), '--client', str(SHIP), '--delivery', str(a.delivery), '--server-template', str(REFERENCE_SERVER_ZIP),
            '--map-note', '<一行地图状态>', '--server-address', '<服务器地址>', '--xaero-map', xaero['output'], '--geofront-lod', core['output']]
     if a.client_template:
@@ -1289,6 +1289,7 @@ def main():
     p.add_argument('--batch', type=int, help='mirror: the batch the formal world should be at; refuse if the batch table says otherwise')
     p.add_argument('--client-template', type=Path, help='report: PCL ZIP to pass to the packager')
     p.add_argument('--compare-build', type=Path, help='report: compiled jar to pass to the packager')
+    p.add_argument('--date', default=time.strftime('%Y%m%d'), help='report: release date YYYYMMDD, including when a bake spans midnight')
     p.add_argument('--release-source', type=Path, help='report: source checkout matching the jar to be packaged')
     p.add_argument('--logged-world-folder', help='report: source folder name in the shipped client DH logs for renamed mirrors')
     p.add_argument('--source-world', type=Path, default=FORMAL, help='Stopped world used for checks and every mirror')
@@ -1303,6 +1304,8 @@ def main():
     p.add_argument('--resume-pregen', action='store_true', help='xaero: resume a normally saved pregeneration on its existing, verified mirror')
     p.add_argument('--pregen-strip-chunks', type=int, default=80000, help='xaero --resume-pregen: approximate maximum number of distinct chunk positions per new client')
     a = p.parse_args()
+    if not re.fullmatch(r'[0-9]{8}', a.date):
+        p.error('--date must use YYYYMMDD')
     if a.resume_pregen and (a.step != 'xaero' or not a.xaero_pregen or not a.city_raised or a.pregen_strip_chunks < 1):
         p.error('--resume-pregen requires xaero --city-raised, the original --xaero-pregen bounds and positive strip size')
     if a.segment_minutes is not None and a.segment_minutes < 1:

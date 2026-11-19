@@ -8,7 +8,7 @@
 - R63r 客户端模板为 `Project_SEELE_Encore_R63r_20261115_Client_PCL.zip`。服务端模板和变动对照使用 `Project_SEELE_Encore_R63r_20261115_Server_Fix1.zip`。Fix1 回执逐项核对过 80,497 个世界条目，两种服务端模板的世界和起始远景相同。Fix1 还带 `server.jar`、启动器源码和 Forge 47.4.10 参数文件，打包时一并继承。
 - 在其他磁盘彩排时，对每个烘焙步骤传入 `--work <工作目录> --source-world <停机副本> --source-client <配好候选私包的客户端> --reference-server <Fix1.zip> --batch-log <该副本对应的批次记录> --delivery <输出目录> --slot-name codex-pack`。打包时传入同一个 `--world`、`--client` 和 `--delivery`，并分别用 `--server-template`、`--client-template` 指定模板的完整路径。副本更名后，用 `--logged-world-folder HOTFIX_20261025` 指定同一世界在所选客户端日志中的原目录名，保留原有 DH 缓存标识。彩排最后只在副本验证远景替换。
 - 磁盘预算见第 1 步输出。工具读取实际世界、客户端、起始库和外圈库的大小，给两份世界镜像、SQLite 写入和导出、指定范围的预生成、两份 ZIP 及打包临时远景库预留容量。WORK 与 delivery 在同一卷时合并计算。解压后的两套进服实例需另留空间。
-- 当游戏候选构建与打包工具位于不同工作树时，对 `report` 和打包命令传入 `--release-source <候选代码工作树>`。配置默认值从这个工作树中的 Forge 定义读取，包内启动说明和发布说明也取同一版本。
+- 当游戏候选构建与打包工具位于不同工作树时，对 `report` 和打包命令传入 `--release-source <候选代码工作树>`。配置默认值从这个工作树中的 Forge 定义读取，包内启动说明和发布说明也取同一版本。跨午夜运行时，生成命令及实际打包均传入同一个 `--date YYYYMMDD`，可保留原定版本日期。
 
 ## 步骤
 
