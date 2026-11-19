@@ -7,13 +7,13 @@
 - 世界最后一批写完，记下批次号 N；代码定在 main 的某个提交，并已装进主客户端（`F:/eva/artifacts/r53_repair_20261015/client/mods`）。`--compare-build` 用同一提交的构建。
 - R63r 客户端模板为 `Project_SEELE_Encore_R63r_20261115_Client_PCL.zip`。服务端模板和变动对照使用 `Project_SEELE_Encore_R63r_20261115_Server_Fix1.zip`。Fix1 回执逐项核对过 80,497 个世界条目，两种服务端模板的世界和起始远景相同。Fix1 还带 `server.jar`、启动器源码和 Forge 47.4.10 参数文件，打包时一并继承。
 - 在其他磁盘彩排时，对每个烘焙步骤传入 `--work <工作目录> --source-world <停机副本> --source-client <配好候选私包的客户端> --reference-server <Fix1.zip> --batch-log <该副本对应的批次记录> --delivery <输出目录> --slot-name codex-pack`。打包时传入同一个 `--world`、`--client` 和 `--delivery`，并分别用 `--server-template`、`--client-template` 指定模板的完整路径。副本更名后，用 `--logged-world-folder HOTFIX_20261025` 指定同一世界在所选客户端日志中的原目录名，保留原有 DH 缓存标识。彩排最后只在副本验证远景替换。
-- 磁盘：E 盘至少 15 GB 空（WORK 峰值约 10 GB，加 map-edges 外圈库增长）；F 盘至少 8 GB（两个 zip 约 1.8 + 3.0 GB，加约 1.2 GB 临时远景库副本）。
+- 磁盘预算见第 1 步输出。工具读取实际世界、客户端、起始库和外圈库的大小，给两份世界镜像、SQLite 写入和导出、指定范围的预生成、两份 ZIP 及打包临时远景库预留容量。WORK 与 delivery 在同一卷时合并计算。解压后的两套进服实例需另留空间。
 
 ## 步骤
 
 | # | 做什么 | 命令 | 时间 | 磁盘 |
 |---|---|---|---|---|
-| 1 | 只读检查：世界锁、Java、变动区块、估时 | `tools/rebake_r63.py check` | 1 分钟 | — |
+| 1 | 只读检查：世界锁、Java、变动区块、估时 | `tools/rebake_r63.py check --city-raised --xaero-pregen=-6464,-5408,7584,5920` | 1–2 分钟，按第 9 步范围给出串行总时 | — |
 | 2 | **外圈远景重烘（用 R64 的生成器）** | **已完成（2026-11-17）**：39,160 段全齐，库在 `D:/eva-ringbake/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite`（`prepare` 的默认 `--ring-db`）。外圈生成器（`OuterBoundaryTerrain`、`outer_edge.bin.gz`）改了才要重烘 | 已完成 | 3.63 GB（LZ4，保留；见下文压缩测试） |
 | 3 | 烘焙实例 | `tools/rebake_r63.py instance` | 2 分钟 | E 0.8 GB |
 | 4 | 镜像正式世界（持锁） | `tools/rebake_r63.py mirror --batch N` | 8 分钟 | E 1.6 GB |
@@ -28,7 +28,7 @@
 | 13 | 本机专用服务器进服测试 | 解压服务端包，`Start-Server.bat`；客户端用打出的 PCL 包 | 15 分钟 | E 约 3 GB |
 | 14 | **把新远景库换进正式世界**（负责人主客户端看到的城北"平顶墙"是正式世界自己的旧库：R62 时期 11-09/10 烘的 90,949 行 LZMA2，不在包里） | 世界必须关着：没有客户端或服务端开着它，`session.lock` 没被占（写入会话确认）。旧库连同 `-wal`/`-shm` 先备份到 D 盘 junction 之外的目录；删掉正式世界里的 `-wal`/`-shm`，再把 `WORK/out/geofront_lod.sqlite` 复制成 `HOTFIX_20261025/dimensions/projectseele/geofront/data/DistantHorizons.sqlite`。之后正式世界每写一批，DH 只会在玩家走近时更新那些区块，远处保持烘焙时的样子 | 2 分钟 | F 约 1.2 GB |
 
-合计（外圈已烘完）：客户端约 6 小时（小地图预生成 4.1 + 核心 1.3 + 升城两次 0.3 + 其他 0.3）。第 8 步和第 9 步的预生成都只占普通槽位时可以同时跑（两个客户端，各 6–8 GB）。第 9 步用自己的镜像，第 5b 步只改 `MAP_REVIEW`；第 5b 步必须在第 6 步之前（工具会拦：`prepare` 跑过之后再 `raise` 会被拒，要先重新 `mirror`）。
+外圈远景库已就绪时，完整串行烘焙约 6 小时，小地图预生成约占 4.1 小时。第 8 和第 9 步共用同一 WORK 下的客户端、模组目录和配置，须依次执行。使用各自独立 WORK 和槽位时才能同时跑。第 9 步用自己的世界镜像，第 5b 步升起 `MAP_REVIEW` 中的城市，须在第 6 步之前执行。
 
 第 14 步换进去的库是按城市升起烘的；正式世界里城市现在是降下的（Depth 312），所以在正式世界里从远处看到的是升起的城市，走近后显示真实区块。
 

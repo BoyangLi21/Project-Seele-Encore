@@ -555,8 +555,9 @@ def raise_city(name, heap='6G', exclusive=False):
 
 def step_check(a):
     problems, notes = [], []
+    ring_db = Path(a.ring_db or RING_DB)
     for name, path in (('formal world', FORMAL / 'level.dat'), ('shipped client jar', SHIP / JAR), ('reference server zip', REFERENCE_SERVER_ZIP),
-                       ('outer ring LOD database', RING_DB), ('args template', ARGS_TEMPLATE), ('probe jar', PROBE_JAR),
+                       ('outer ring LOD database', ring_db), ('args template', ARGS_TEMPLATE), ('probe jar', PROBE_JAR),
                        ('javaw', JAVAW), ('slot tool', SLOT)):
         if not path.exists():
             problems.append('missing ' + name + ': ' + str(path))
@@ -588,7 +589,7 @@ def step_check(a):
     changed, added, removed = chunk_changes(FORMAL)
     newest = max(p.stat().st_mtime for p in (FORMAL / GEO / 'region').glob('*.mca'))
     formal_db = FORMAL / GEO / 'data/DistantHorizons.sqlite'
-    core_rows, ring_rows = rows_of(formal_db), rows_of(RING_DB, live=True)
+    core_rows, ring_rows = rows_of(formal_db), rows_of(ring_db, live=True)
     plan = plan_merge(core_rows, ring_rows, saved, changed | added)
     points = viewpoints(plan['rebuild'])
     sg = plan['saved_grid']
@@ -597,15 +598,26 @@ def step_check(a):
     ring_want = {(x, z) for x in range(-6464 // 64, 7584 // 64 + 1) for z in range(-5408 // 64, 5920 // 64 + 1)
                  if classify(0, x, z, sg) == 'ring'}
     core_minutes = sum(min(25, max(6, math.ceil(c / SECTIONS_PER_MINUTE) + 2)) for _, _, c in points) + CLIENT_START_MIN
+    stages = dict(mirror_min=8, prepare_min=3, core_client_min=core_minutes, fill_pass_min=25,
+                  city_raises_min=16 if a.city_raised else 0, xaero_min=12,
+                  xaero_pregen_min=math.ceil(a.pregen_chunks / 42 / 60), pack_min=5)
     estimate = dict(
-        mirror_min=8, prepare_min=3, core_client_min=core_minutes, fill_pass_min=25, xaero_min=12, pack_min=5,
-        total_hours=round((8 + 3 + core_minutes + 25 + 12 + 5) / 60, 1),
+        **stages, xaero_pregen_chunks=a.pregen_chunks, reference_pregen_chunks_per_second=42,
+        total_hours=round(sum(stages.values()) / 60, 1),
         ring_left_sections=len(ring_want - ring_l0), ring_left_hours_at_63_per_min=round(len(ring_want - ring_l0) / 63 / 60, 1))
+    with zipfile.ZipFile(REFERENCE_SERVER_ZIP) as reference:
+        seed_bytes = reference.getinfo('SEELE_R53_WORLD/' + GEO + '/data/DistantHorizons.sqlite').file_size
+    ring_bytes = ring_db.stat().st_size
+    lod_bytes = seed_bytes + ring_bytes
+    # Budget full-size copies: ring snapshot, mutable core, export, SQLite journal, two ZIPs and aged LOD.
+    work_bytes = inst_bytes + 2 * world_bytes + ring_bytes + 3 * lod_bytes + a.pregen_chunks * 10 * 1024
+    delivery_bytes = world_bytes + 2 * inst_bytes + 3 * lod_bytes
     disk = dict(work_drive=str(WORK.drive), work_free_gb=free_gb(WORK.drive + '/'), delivery_drive=str(a.delivery.resolve().drive), delivery_free_gb=free_gb(a.delivery),
                 instance_gb=round(inst_bytes / 2**30, 2), world_gb=round(world_bytes / 2**30, 2),
-                work_need_gb=round((inst_bytes + 2 * world_bytes) / 2**30 + 2.0, 1),
-                delivery_need_gb=4.5, note='WORK: instance + mirror (+ second mirror state for xaero reuses the same folder) + LOD copies; '
-                                           'delivery: two zips about 3.2 GB plus the aged LOD temp copy')
+                seed_bytes=seed_bytes, ring_bytes=ring_bytes, work_need_gb=round(work_bytes / 2**30, 1),
+                delivery_need_gb=round(delivery_bytes / 2**30, 1),
+                note='Work includes two mirrors, ring snapshot, mutable/export/journal LOD and estimated chunk generation. '
+                     'Delivery budgets both archives and the aged database. Unpacked join-test copies are additional.')
     if WORK.resolve().drive.lower() == a.delivery.resolve().drive.lower():
         disk['work_need_gb'] += disk['delivery_need_gb']
     if disk['work_free_gb'] < disk['work_need_gb'] + 5:
@@ -1031,28 +1043,38 @@ def step_xaero(a):
     held = WORK / 'mods-held'
     moved = hold_mods(game, ['DistantHorizons-*.jar', 'oculus-*.jar'], held)
     pregen = None
+    pregen_result = None
     try:
         if a.xaero_pregen:
             # The outer ring was never saved as chunks; generate them on this mirror only, in a run of its own.
             args = client_args(game, {'projectseele.xaeroBakePregen': a.xaero_pregen}, 'xaero-pregen.args', world=XAERO_COPY)
             pregen = run_client(args, a.pregen_minutes, 'Xaero bake outer ring pregeneration', a.exclusive)
-            text = (game / 'logs/latest.log').read_text('utf8', 'replace')
-            if 'Xaero bake pregeneration finished' not in text or not client_log()['ok']:
-                save('xaero', dict(ok=False, pregen=pregen, pregen_finished=False, mirror=info))
+            native_log = WORK / 'logs/xaero-pregen-native.log'
+            shutil.copyfile(game / 'logs/latest.log', guard(native_log))
+            text = native_log.read_text('utf8', 'replace')
+            match = re.search(r'Xaero bake pregeneration finished: (\d+) chunks in (\d+) s', text)
+            pregen_result = dict(expected=a.pregen_chunks, generated=int(match[1]) if match else None,
+                                 seconds=int(match[2]) if match else None, log=str(native_log))
+            if pregen_result['generated'] != a.pregen_chunks or not client_log()['ok'] or pregen != 'exit=0':
+                save('xaero', dict(ok=False, pregen=pregen, pregen_result=pregen_result, pregen_finished=False, mirror=info))
                 raise SystemExit('Outer ring pregeneration did not finish')
         args = client_args(game, {'projectseele.xaeroBake': 'true'}, 'xaero.args', world=XAERO_COPY)
         result = run_client(args, 25 if not a.xaero_pregen else 90, 'R63 Xaero minimap bake', a.exclusive)
     finally:
         restore_mods(game, held)
     logtext = (game / 'logs/latest.log').read_text('utf8', 'replace')
-    finished = 'Xaero map bake finished' in logtext and client_log()['ok']
     zips = sorted(baked.rglob('*.zip')) if baked.exists() else []
+    caves = sum('caves' in p.relative_to(baked).parts for p in zips)
+    surface = len(zips) - caves
+    finished = (result == 'exit=0' and client_log()['ok'] and 'Xaero map bake finished' in logtext
+                and 'Xaero map bake surface finished, full cave layer started' in logtext and surface > 0 and caves > 0)
     out = WORK / 'out/xaero/projectseele$geofront'
     if finished and zips:
         if out.exists():
             shutil.rmtree(guard(out))
         shutil.copytree(baked, guard(out))
     save('xaero', dict(ok=finished and bool(zips), client=result, pregen=pregen, finished=finished, region_zips=len(zips), held_mods=moved,
+                       pregen_result=pregen_result, surface_region_zips=surface, cave_region_zips=caves,
                        mirror=info, raise_city=raised, output=str(out)))
     if not (finished and zips):
         raise SystemExit('Minimap bake did not finish')
@@ -1106,9 +1128,19 @@ def main():
     p.add_argument('--delivery', type=Path, default=Path('F:/eva/delivery'), help='Volume used for package disk estimates')
     p.add_argument('--work', help='work folder (default E:/eva-r63-rebake)')
     p.add_argument('--slot-name', help='slot.py name for the client runs (default r63-pack; trial runs by another session use their own)')
-    p.add_argument('--xaero-pregen', help='xaero: x0,z0,x1,z1 block bounds to generate and save on the mirror first (outer ring: -6464,-5408,7584,5920)')
+    p.add_argument('--xaero-pregen', help='check, xaero: inclusive x0,z0,x1,z1 block bounds to pregenerate (outer ring: -6464,-5408,7584,5920)')
     p.add_argument('--pregen-minutes', type=int, default=360, help='xaero --xaero-pregen: client time limit for the pregeneration run (the R64 outer ring takes over four hours)')
     a = p.parse_args()
+    a.pregen_chunks = 0
+    if a.xaero_pregen is not None:
+        try:
+            x0, z0, x1, z1 = map(int, a.xaero_pregen.split(','))
+        except ValueError:
+            p.error('--xaero-pregen requires four integer coordinates x0,z0,x1,z1')
+        if x0 > x1 or z0 > z1:
+            p.error('--xaero-pregen requires x0 <= x1 and z0 <= z1')
+        # Match XaeroMapBake's inclusive chunk rectangle, including already saved chunks.
+        a.pregen_chunks = ((x1 >> 4) - (x0 >> 4) + 1) * ((z1 >> 4) - (z0 >> 4) + 1)
     # Review session, 2026-11-13: with the machine to ourselves R62's 8 GB / 4 threads; shared, 6 GB / 3 threads.
     a.heap = a.heap or ('8G' if a.exclusive else '6G')
     a.dh_threads = a.dh_threads or (4 if a.exclusive else 3)
