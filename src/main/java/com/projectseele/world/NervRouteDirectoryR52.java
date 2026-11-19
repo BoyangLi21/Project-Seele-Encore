@@ -101,8 +101,8 @@ public final class NervRouteDirectoryR52
     private final Map<String,Resource> resources;
     private final Map<String,Leg> legs;
     private final Map<String,Route> routes;
-    private record RouteResources(Map<String,Set<String>> byRoute, Map<Set<String>,Set<String>> mechanisms) {}
-    private final RouteResources routeResources;
+    private final int hakoneBank;
+    private final Map<Route,Set<String>> hakoneResources;
     private final Map<String,Port> ports;
     private final NervDynamicAirspaceR52 dynamicSpaces;
     private final Map<String,RampArc> rampArcs=new HashMap<>();
@@ -115,7 +115,8 @@ public final class NervRouteDirectoryR52
         require(epoch>0,"Root commissioning epoch required");this.epoch=epoch;this.installed=installed;this.fingerprint=fingerprint;
         this.schemaVersion=schemaVersion;this.bankRoles=Map.copyOf(bankRoles);
         this.units=Map.copyOf(units);this.nodes=Map.copyOf(nodes);this.resources=Map.copyOf(resources);this.legs=Map.copyOf(legs);this.routes=Map.copyOf(routes);this.ports=Map.copyOf(ports);this.continuousLegs=routes.values().stream().filter(Route::continuousUpright).flatMap(r->r.legs().stream()).collect(java.util.stream.Collectors.toUnmodifiableSet());this.dynamicSpaces=Objects.requireNonNull(dynamicSpaces);validate();for(var domain:dynamicSpaces.domains())require(knowsDimension(domain.dimension()),"Dynamic SPACE domain must use an actual Root directory dimension");
-        routeResources = indexRouteResources();
+        hakoneBank = bankForIntentR52("hakone");
+        hakoneResources = indexHakoneResources();
         if(!dynamicSpaces.domains().isEmpty())for(var resource:resources.values())if(resource.kind()==ResourceKind.SPACE)require(NervDynamicAirspaceR52.canonicalBox(resource.id())!=null&&resource.component().equals(resource.id()),"Ground and dynamic air SPACE must use the same canonical32m identity");
     }
     public long epoch(){return epoch;}
@@ -139,37 +140,33 @@ public final class NervRouteDirectoryR52
     public Map<String,Resource> declaredResources(){return resources;}
     public Map<String,Route> routes(){return routes;}
     public boolean knowsDimension(String dimension){return nodes.values().stream().anyMatch(node->node.dimension().equals(dimension));}
-    private RouteResources indexRouteResources()
+    private Map<Route,Set<String>> indexHakoneResources()
     {
-        var byRoute = new HashMap<String,Set<String>>();
-        var byIdentity = new IdentityHashMap<Set<String>,Set<String>>();
-        for (var route : routes.values())
-        {
-            Set<String> ids = collectResources(route);
-            byRoute.put(route.id(), ids);
-            var mechanisms = new HashSet<String>();
-            for (String id : ids)
-                if (resource(id).kind() != ResourceKind.SPACE) mechanisms.add(id);
-            byIdentity.put(ids, Set.copyOf(mechanisms));
-        }
-        return new RouteResources(Map.copyOf(byRoute), Collections.unmodifiableMap(byIdentity));
+        var indexed = new IdentityHashMap<Route,Set<String>>();
+        for (Route route : routes.values())
+            if (route.bank() == hakoneBank && route.continuousUpright())
+                indexed.put(route, collectResources(route));
+        return Collections.unmodifiableMap(indexed);
     }
 
     public Set<String> resources(Route route)
     {
-        if (route == routes.get(route.id())) return routeResources.byRoute().get(route.id());
+        // The long Hakone ascent repeatedly asks for the complete, commissioned manifest.
+        // Other banks, legacy routes and unregistered route objects use the original collection.
+        if (route.bank() == hakoneBank && route.continuousUpright())
+        {
+            Set<String> commissioned = hakoneResources.get(route);
+            if (commissioned != null) return commissioned;
+        }
         return collectResources(route);
     }
 
-    // Validated route sets share SPACE and exclusively own only mechanisms. Other request
-    // sets still go through the original per-ID checks, including unknown IDs and airspace.
-    Set<String> ownershipCandidates(Set<String> ids)
-    {
-        return routeResources.mechanisms().getOrDefault(ids, ids);
-    }
-
     private Set<String> collectResources(Route route)
-    {var result=new HashSet<String>();for(String id:route.legs())result.addAll(leg(id).resources());return Set.copyOf(result);}
+    {
+        var result = new HashSet<String>();
+        for (String id : route.legs()) result.addAll(leg(id).resources());
+        return Set.copyOf(result);
+    }
 
     private void validate()
     {

@@ -78,32 +78,10 @@ public final class NervRouteReservationsR52
      * relation; mere availability never satisfies this receipt. */
     public synchronized boolean resourcesHeldR52(UUID task,Set<String> ids)
     {
-        if (task == null || ids.isEmpty()) return false;
-        for (String id : directory.ownershipCandidates(ids))
-        {
-            var resource = directory.resource(id);
-            if (resource == null) return false;
-            if (resource.kind() == ResourceKind.SPACE) continue;
-            UUID ground = resources.get(id), steel = hardwareResources.get(id);
-            if (!task.equals(ground) && !task.equals(steel)) return false;
-            if (ground != null && !ground.equals(task))
-            {
-                var owner = hardware.get(task);
-                var flight = flights.get(ground);
-                if (owner == null || flight == null || !ground.equals(owner.companionFlight())
-                        || flight.payloadTransferred() || flight.original().variant() != owner.variant()
-                        || owner.epoch() != directory.epoch()) return false;
-            }
-            if (steel != null && !steel.equals(task))
-            {
-                var owner = hardware.get(steel);
-                var flight = flights.get(task);
-                if (owner == null || flight == null || !task.equals(owner.companionFlight())
-                        || flight.payloadTransferred() || flight.original().variant() != owner.variant()
-                        || owner.epoch() != directory.epoch()) return false;
-            }
-        }
-        return true;
+        if(task==null||ids.isEmpty())return false;for(String id:ids){if(directory.resource(id)==null)return false;if(isSpace(id))continue;UUID ground=resources.get(id),steel=hardwareResources.get(id);if(!task.equals(ground)&&!task.equals(steel))return false;
+            if(ground!=null&&!ground.equals(task)){var h=hardware.get(task);var f=flights.get(ground);if(h==null||f==null||!ground.equals(h.companionFlight())||f.payloadTransferred()||f.original().variant()!=h.variant()||h.epoch()!=directory.epoch())return false;}
+            if(steel!=null&&!steel.equals(task)){var h=hardware.get(steel);var f=flights.get(task);if(h==null||f==null||!task.equals(h.companionFlight())||f.payloadTransferred()||f.original().variant()!=h.variant()||h.epoch()!=directory.epoch())return false;}
+        }return true;
     }
     private boolean isSpace(String id)
     {var resource=directory.resource(id);return resource!=null&&resource.kind()==ResourceKind.SPACE;}
