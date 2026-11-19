@@ -5,7 +5,8 @@
 ## 前提
 
 - 世界最后一批写完，记下批次号 N；代码定在 main 的某个提交，并已装进主客户端（`F:/eva/artifacts/r53_repair_20261015/client/mods`）。`--compare-build` 用同一提交的构建。
-- **R63r 的两个 zip 要留到 R64 打完**：服务端 zip 是变动比对的基准，也是远景的起点；两个 zip 都是 `--template`。R63 原包可以删。
+- R63r 客户端模板为 `Project_SEELE_Encore_R63r_20261115_Client_PCL.zip`。服务端模板和变动对照使用 `Project_SEELE_Encore_R63r_20261115_Server_Fix1.zip`。Fix1 回执逐项核对过 80,497 个世界条目，两种服务端模板的世界和起始远景相同。Fix1 还带 `server.jar`、启动器源码和 Forge 47.4.10 参数文件，打包时一并继承。
+- 在其他磁盘彩排时，对每个烘焙步骤传入 `--work <工作目录> --source-world <停机副本> --source-client <配好候选私包的客户端> --reference-server <Fix1.zip> --batch-log <该副本对应的批次记录> --delivery <输出目录> --slot-name codex-pack`。打包时传入同一个 `--world`、`--client` 和 `--delivery`，并分别用 `--server-template`、`--client-template` 指定模板的完整路径。副本更名后，用 `--logged-world-folder HOTFIX_20261025` 指定同一世界在所选客户端日志中的原目录名，保留原有 DH 缓存标识。彩排最后只在副本验证远景替换。
 - 磁盘：E 盘至少 15 GB 空（WORK 峰值约 10 GB，加 map-edges 外圈库增长）；F 盘至少 8 GB（两个 zip 约 1.8 + 3.0 GB，加约 1.2 GB 临时远景库副本）。
 
 ## 步骤
@@ -16,11 +17,11 @@
 | 2 | **外圈远景重烘（用 R64 的生成器）** | **已完成（2026-11-17）**：39,160 段全齐，库在 `D:/eva-ringbake/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite`（`prepare` 的默认 `--ring-db`）。外圈生成器（`OuterBoundaryTerrain`、`outer_edge.bin.gz`）改了才要重烘 | 已完成 | 3.63 GB（LZ4，保留；见下文压缩测试） |
 | 3 | 烘焙实例 | `tools/rebake_r63.py instance` | 2 分钟 | E 0.8 GB |
 | 4 | 镜像正式世界（持锁） | `tools/rebake_r63.py mirror --batch N` | 8 分钟 | E 1.6 GB |
-| 5 | 远景起点换成 R63r 的 | 从 R63r 服务端 zip 取 `SEELE_R53_WORLD/dimensions/projectseele/geofront/data/DistantHorizons.sqlite`，覆盖 `WORK/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite` | 1 分钟 | E 0.9 GB |
+| 5 | 远景起点换成 R63r 的 | 从上述 R63r Fix1 服务端 zip 取 `SEELE_R53_WORLD/dimensions/projectseele/geofront/data/DistantHorizons.sqlite`，覆盖 `WORK/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite` | 1 分钟 | E 0.9 GB |
 | 5b | **把镜像里的城市升起来**（远景按城市升起的状态烘） | `tools/rebake_r63.py raise`：短客户端，视距 2、不带 DH，以玩家身份 `/seele city raise`，等 R45 升到 Depth 0 再存盘退出；城市已升起就跳过。只改镜像 | 约 8 分钟（含进世界） | — |
 | 6 | 合并外圈、删变动行，并做 V6 | `tools/rebake_r63.py prepare --v6`：升起后的楼和正式世界不同，算作变动区块，它们的旧行被删、由第 8 步按升起状态重建；`--v6` 接着对重建清单跑 `dh_v6_prepare.py` | 4 分钟 | — |
 | 8 | 核心远景重烘（独占，8 GB，4 线程，LZ4） | `tools/rebake_r63.py core --exclusive` | 约 55 分钟，缺段多时补烘再加 ≤25 分钟 | E 输出约 1.2 GB |
-| 9 | 小地图：城市升起、预生成外圈，再烘地表和完整洞穴层 | `tools/rebake_r63.py xaero --exclusive --city-raised --xaero-pregen -6464,-5408,7584,5920` | 预生成约 4.1 小时（约 62 万区块，42 个/秒）+ 烘焙约 10 分钟 | E 镜像 1.6 GB + 预生成 3 GB |
+| 9 | 小地图：城市升起、预生成外圈，再烘地表和完整洞穴层 | `tools/rebake_r63.py xaero --exclusive --city-raised --xaero-pregen=-6464,-5408,7584,5920` | 预生成约 4.1 小时（约 62 万区块，42 个/秒）+ 烘焙约 10 分钟 | E 镜像 1.6 GB + 预生成 3 GB |
 | 10 | 生成打包命令 | `tools/rebake_r63.py report` | — | — |
 | 11 | 打包检查（必须 0 处失败） | `tools/package_r60.py --check <报告> --geofront-lod WORK/out/geofront_lod.sqlite --xaero-map <report 给的路径> --compare-build <main 构建 jar>` | 1 分钟 | — |
 | 12 | 打包 | 同上把 `--check <报告>` 换成 `--pack --date YYYYMMDD --map-note "<一行地图说明>" --server-address <地址>` | 5 分钟 | F 峰值约 6 GB |

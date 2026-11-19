@@ -44,7 +44,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FORMAL = Path('F:/eva/artifacts/r53_repair_20261015/client/saves/HOTFIX_20261025')
 SHIP = Path('F:/eva/artifacts/r53_repair_20261015/client')
 # The world the starting LOD database was built from. R64 starts from R63r's (batch 455, the R63 far view).
-REFERENCE_SERVER_ZIP = Path('F:/eva/delivery/Project_SEELE_Encore_R63r_20261115_Server.zip')
+REFERENCE_SERVER_ZIP = Path('F:/eva/delivery/Project_SEELE_Encore_R63r_20261115_Server_Fix1.zip')
 # The R64 outer ring map-edges baked with the R64 generator on its D: copy (2026-11-17, 39,160 sections, LZ4 rows).
 RING_DB = Path('D:/eva-ringbake/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite')
 WORK = Path('E:/eva-r63-rebake')
@@ -222,10 +222,10 @@ def saved_chunks(world):
     return saved
 
 
-def chunk_changes(world, server_zip=REFERENCE_SERVER_ZIP):
+def chunk_changes(world, server_zip=None):
     """Chunks that differ from the reference server zip's world: changed payload, added, removed."""
     changed, added, removed = set(), set(), set()
-    with zipfile.ZipFile(server_zip) as z:
+    with zipfile.ZipFile(server_zip or REFERENCE_SERVER_ZIP) as z:
         old = {n[len(R62_PREFIX):] for n in z.namelist() if n.startswith(R62_PREFIX) and n.endswith('.mca')}
         new = {p.name for p in (world / GEO / 'region').glob('r.*.*.mca')}
         for name in sorted(old | new):
@@ -560,7 +560,10 @@ def step_check(a):
                        ('javaw', JAVAW), ('slot tool', SLOT)):
         if not path.exists():
             problems.append('missing ' + name + ': ' + str(path))
-    missing = jar_classes(SHIP / JAR) if (SHIP / JAR).exists() else list(R63_CLASSES)
+    if problems:
+        save('check', dict(problems=problems))
+        raise SystemExit('Required bake inputs are missing')
+    missing = jar_classes(SHIP / JAR)
     if missing:
         problems.append('shipped jar lacks R63 classes: ' + ', '.join(missing))
     jar_time = datetime.datetime.fromtimestamp((SHIP / JAR).stat().st_mtime).isoformat(timespec='minutes')
@@ -598,15 +601,17 @@ def step_check(a):
         mirror_min=8, prepare_min=3, core_client_min=core_minutes, fill_pass_min=25, xaero_min=12, pack_min=5,
         total_hours=round((8 + 3 + core_minutes + 25 + 12 + 5) / 60, 1),
         ring_left_sections=len(ring_want - ring_l0), ring_left_hours_at_63_per_min=round(len(ring_want - ring_l0) / 63 / 60, 1))
-    disk = dict(work_drive=str(WORK.drive), work_free_gb=free_gb(WORK.drive + '/'), f_free_gb=free_gb('F:/'), e_free_gb=free_gb('E:/'),
+    disk = dict(work_drive=str(WORK.drive), work_free_gb=free_gb(WORK.drive + '/'), delivery_drive=str(a.delivery.resolve().drive), delivery_free_gb=free_gb(a.delivery),
                 instance_gb=round(inst_bytes / 2**30, 2), world_gb=round(world_bytes / 2**30, 2),
                 work_need_gb=round((inst_bytes + 2 * world_bytes) / 2**30 + 2.0, 1),
                 delivery_need_gb=4.5, note='WORK: instance + mirror (+ second mirror state for xaero reuses the same folder) + LOD copies; '
                                            'delivery: two zips about 3.2 GB plus the aged LOD temp copy')
+    if WORK.resolve().drive.lower() == a.delivery.resolve().drive.lower():
+        disk['work_need_gb'] += disk['delivery_need_gb']
     if disk['work_free_gb'] < disk['work_need_gb'] + 5:
         problems.append('not enough free space for WORK on ' + str(WORK.drive))
-    if disk['f_free_gb'] < disk['delivery_need_gb'] + 5:
-        problems.append('not enough free space on F: for the zips')
+    if disk['delivery_free_gb'] < disk['delivery_need_gb'] + 5:
+        problems.append('not enough free space on ' + disk['delivery_drive'] + ' for the zips')
     data = dict(
         problems=problems, notes=notes, formal_world=str(FORMAL), world_lock_free=lock_free, world_files=world_files,
         newest_region=datetime.datetime.fromtimestamp(newest).isoformat(timespec='seconds'),
@@ -1056,9 +1061,17 @@ def step_xaero(a):
 def step_report(a):
     core = json.loads(log_path('core').read_text('utf8'))
     xaero = json.loads(log_path('xaero').read_text('utf8'))
-    cmd = ['<frpy>', 'tools/package_r60.py', '--date', time.strftime('%Y%m%d'), '--map-note', '"<一行地图状态>"',
-           '--server-address', '<服务器地址>', '--xaero-map', '"%s"' % xaero['output'], '--geofront-lod', '"%s"' % core['output']]
-    save('report', dict(check_first=' '.join(cmd + ['--check']), then_pack=' '.join(cmd + ['--pack'])))
+    cmd = [sys.executable, '-I', str(ROOT / 'tools/package_r60.py'), '--date', time.strftime('%Y%m%d'),
+           '--world', str(FORMAL), '--client', str(SHIP), '--delivery', str(a.delivery), '--server-template', str(REFERENCE_SERVER_ZIP),
+           '--map-note', '<一行地图状态>', '--server-address', '<服务器地址>', '--xaero-map', xaero['output'], '--geofront-lod', core['output']]
+    if a.client_template:
+        cmd += ['--client-template', str(a.client_template)]
+    if a.compare_build:
+        cmd += ['--compare-build', str(a.compare_build)]
+    if a.logged_world_folder:
+        cmd += ['--logged-world-folder', a.logged_world_folder]
+    save('report', dict(check_first=subprocess.list2cmdline(cmd + ['--check', str(WORK / 'logs/package-check.json')]),
+                        then_pack=subprocess.list2cmdline(cmd + ['--pack'])))
 
 
 def main():
@@ -1083,16 +1096,32 @@ def main():
     p.add_argument('--dh-threads', type=int, help='core: DH worker threads (default 4 with --exclusive, else 3: 4 at 6G ran out of heap in the trial)')
     p.add_argument('--no-lock', action='store_true', help='mirror: copy without holding session.lock (trial runs only, never for packing)')
     p.add_argument('--batch', type=int, help='mirror: the batch the formal world should be at; refuse if the batch table says otherwise')
+    p.add_argument('--client-template', type=Path, help='report: PCL ZIP to pass to the packager')
+    p.add_argument('--compare-build', type=Path, help='report: compiled jar to pass to the packager')
+    p.add_argument('--logged-world-folder', help='report: source folder name in the shipped client DH logs for renamed mirrors')
+    p.add_argument('--source-world', type=Path, default=FORMAL, help='Stopped world used for checks and every mirror')
+    p.add_argument('--source-client', type=Path, default=SHIP, help='Client instance supplying the exact jar and assets to ship')
+    p.add_argument('--reference-server', type=Path, default=REFERENCE_SERVER_ZIP, help='Server zip whose world matches the starting LOD database')
+    p.add_argument('--batch-log', type=Path, default=BATCH_LOG, help='Execution order table corresponding to --source-world')
+    p.add_argument('--delivery', type=Path, default=Path('F:/eva/delivery'), help='Volume used for package disk estimates')
     p.add_argument('--work', help='work folder (default E:/eva-r63-rebake)')
     p.add_argument('--slot-name', help='slot.py name for the client runs (default r63-pack; trial runs by another session use their own)')
     p.add_argument('--xaero-pregen', help='xaero: x0,z0,x1,z1 block bounds to generate and save on the mirror first (outer ring: -6464,-5408,7584,5920)')
-    p.add_argument('--pregen-minutes', type=int, default=240, help='xaero --xaero-pregen: client time limit for the pregeneration run')
+    p.add_argument('--pregen-minutes', type=int, default=360, help='xaero --xaero-pregen: client time limit for the pregeneration run (the R64 outer ring takes over four hours)')
     a = p.parse_args()
     # Review session, 2026-11-13: with the machine to ourselves R62's 8 GB / 4 threads; shared, 6 GB / 3 threads.
     a.heap = a.heap or ('8G' if a.exclusive else '6G')
     a.dh_threads = a.dh_threads or (4 if a.exclusive else 3)
+    globals().update(FORMAL=a.source_world.resolve(), SHIP=a.source_client.resolve(),
+                     REFERENCE_SERVER_ZIP=a.reference_server.resolve(), BATCH_LOG=a.batch_log.resolve())
     if a.work:
         globals()['WORK'] = Path(a.work)
+    if FORMAL == WORK.resolve() or WORK.resolve().is_relative_to(FORMAL) or FORMAL.is_relative_to((WORK / 'client').resolve()):
+        raise SystemExit('The source world and working client must be separate')
+    if a.step == 'instance':
+        target_client = (WORK / 'client').resolve()
+        if SHIP.is_relative_to(target_client) or target_client.is_relative_to(SHIP):
+            raise SystemExit('The source client and working client must be separate')
     if a.slot_name:
         globals()['SLOT_NAME'] = a.slot_name
     globals()['step_' + a.step](a)
