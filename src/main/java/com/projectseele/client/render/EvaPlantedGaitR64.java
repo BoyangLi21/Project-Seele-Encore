@@ -1139,6 +1139,25 @@ public final class EvaPlantedGaitR64
         return heel(s,rig,f.x,f.z,f.yaw,hipX,hipZ);
     }
 
+    /** A heel strike can pivot only where the heel itself has support. On steep terraces the
+     * uphill end can carry a flat sole while the downhill heel hangs over a lower tread. */
+    private static float supportedHeelRoll(State s,EvaUnit01Entity eva,double x,double y,double z,float yaw,float slope,float pitch)
+    {
+        if(pitch<=0||slope<=0)return pitch;
+        double lie=slope*Mth.DEG_TO_RAD,heading=yaw*Mth.DEG_TO_RAD;
+        double heel=s.rig.heel(),back=heel*Math.cos(lie),width=s.rig.sole()*.8;
+        double hx=x+Math.sin(heading)*back,hz=z-Math.cos(heading)*back;
+        double sideX=Math.cos(heading)*width,sideZ=Math.sin(heading)*width;
+        double highest=Double.NEGATIVE_INFINITY;
+        for(int side=-1;side<=1;side++)
+        {
+            double under=column(s,eva,hx+side*sideX,hz+side*sideZ);
+            if(Double.isFinite(under))highest=Math.max(highest,under);
+        }
+        double gap=y-heel*Math.sin(lie)-highest;
+        return (float)(pitch*Mth.clamp((FLAT_RISE-gap)/(FLAT_RISE-SLOPE_SINK),0,1));
+    }
+
     /** How far the heel of a foot standing at a place is up for a hip that has gone on ahead of it (degrees, below 0). */
     private static float heel(State s,Rig rig,double x,double z,float yaw,double hipX,double hipZ)
     {
@@ -1343,6 +1362,7 @@ public final class EvaPlantedGaitR64
                 float twisted=Mth.wrapDegrees(f.yaw-s.yaw);
                 if(Math.abs(twisted)>TWIST_MOST)f.yaw=s.yaw+Math.copySign(TWIST_MOST,twisted);
                 float pitch=rolled(rig,f.x,f.y,f.z,f.yaw,f.slope,scheduled(s,f,rig,hipX,hipZ),hipX,hipZ,above,nominal);
+                pitch=supportedHeelRoll(s,eva,f.x,f.y,f.z,f.yaw,f.slope,pitch);
                 ankleAt(rig,f.x,f.y,f.z,f.yaw,f.slope,pitch,anklesAt[i]);
                 f.pitch=pitch;f.drawnYaw=f.yaw;f.drawnSlope=f.slope;reaches[i]=reach(rig,anklesAt[i],hipX,hipZ,above);
             }
@@ -1358,6 +1378,7 @@ public final class EvaPlantedGaitR64
                 // degrees in its last frame.
                 double thenX=hipX+s.px*f.timeLeft,thenZ=hipZ+s.pz*f.timeLeft;
                 f.landWith=rolled(rig,f.toX,f.toY,f.toZ,f.toYaw,f.toSlope,s.landPitch>0?s.landPitch:heel(s,rig,f.toX,f.toZ,f.toYaw,thenX,thenZ),thenX,thenZ,above,nominal);
+                f.landWith=supportedHeelRoll(s,eva,f.toX,f.toY,f.toZ,f.toYaw,f.toSlope,f.landWith);
                 float pitch=Mth.lerp(t,f.fromPitch,f.landWith);
                 Vector3f to=ankleAt(rig,f.toX,f.toY,f.toZ,f.toYaw,f.toSlope,f.landWith,new Vector3f());
                 double distance=Math.hypot(to.x-f.fromX,to.z-f.fromZ),along=along(s,f,f.swing,distance);
