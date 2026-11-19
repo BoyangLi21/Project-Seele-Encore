@@ -44,8 +44,7 @@ public final class LilithCommands
             return 0;
         }
         var lilith = found.get(0);
-        source.sendSuccess(() -> Component.literal("朗基努斯之枪：" + lilith.getSpearMode()
-                + (lilith.isSpearShown() ? "（显示）" : "（已取走）")), false);
+        source.sendSuccess(() -> Component.translatable("ops.projectseele.lilith.spear_status", lilith.getSpearMode(), Component.translatable(lilith.isSpearShown() ? "ops.projectseele.lilith.shown" : "ops.projectseele.lilith.removed")), false);
         return found.size();
     }
 
@@ -63,7 +62,7 @@ public final class LilithCommands
             return 0;
         }
         found.forEach(lilith -> lilith.setSpearMode(mode));
-        source.sendSuccess(() -> Component.literal("朗基努斯之枪已设为 " + mode + "。"), true);
+        source.sendSuccess(() -> Component.translatable("ops.projectseele.lilith.set_mode", mode), true);
         return found.size();
     }
 

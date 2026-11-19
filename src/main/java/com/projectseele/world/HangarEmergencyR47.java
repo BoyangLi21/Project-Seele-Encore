@@ -89,26 +89,26 @@ public final class HangarEmergencyR47
     {
         ServerLevel level = player.serverLevel();
         if (!retainedPlant(level) || !NervStaffDialogue.authorized(player))
-            return "需要原机库操作权限。";
+            return "ops.projectseele.hangar.door.auth";
         var state = state(level);
         BlockPos origin = RegionalFacilityLayout.evaOrigin(level);
         BlockPos bed = EvaHangarBuilder.hangarBed(origin, variant);
-        if (!loadedEnvelope(level, bed)) return "原机库门域尚未加载，紧急开闭保持原状态。";
+        if (!loadedEnvelope(level, bed)) return "ops.projectseele.hangar.door.unloaded";
         if (open)
         {
             if (!idleDryReceipt(level, variant))
-                return "机库后门只在原机出库、干池且无运输动作时允许紧急开启；本操作不排液。";
+                return "ops.projectseele.hangar.door.busy";
             if (EvaHangarBuilder.countLclEnvelope(level, origin, variant) != 0)
-                return "池内或门前仍有实际 LCL，后门保持关闭；请先完成正常排液。";
+                return "ops.projectseele.hangar.door.lcl";
             state.requested[variant] = true;
             state.held[variant] = true;
         }
         else state.requested[variant] = false;
         state.setDirty();
         boolean actual = desiredOpenR47(level, variant, centre(level, variant), false);
-        return open ? "机库后门紧急开启：通往原机库转移廊。"
-                : actual ? "门域有人员、机体或载具，后门保持开启；清空后自动关闭。"
-                : "机库后门已请求关闭。";
+        return open ? "ops.projectseele.hangar.door.open"
+                : actual ? "ops.projectseele.hangar.door.occupied"
+                : "ops.projectseele.hangar.door.close";
     }
     /** Call before the original installed-control switch, avoiding a second cancel request. */
     public static boolean handleUse(ServerPlayer player, BlockPos position)
@@ -118,8 +118,7 @@ public final class HangarEmergencyR47
         if (control == null || control.action() != HangarOperationsR44.Action.CANCEL) return false;
         if (player.distanceToSqr(Vec3.atCenterOf(position)) > 36) return true;
         var state = state(player.serverLevel());
-        player.sendSystemMessage(Component.literal("[NERV 机库后门] "
-                + request(player, control.variant(), !state.requested[control.variant()])));
+        player.sendSystemMessage(Component.translatable("ops.projectseele.hangar.rear_door_notice", OperationText.read(request(player, control.variant(), !state.requested[control.variant()]))));
         return true;
     }
     /** A normal recovery must not override an occupied manual passage or start filling it. */
@@ -201,9 +200,9 @@ public final class HangarEmergencyR47
                 {
                     var player = context.getSource().getPlayerOrException();
                     String reply = action.equals("status")
-                            ? "机库后门：" + (state(player.serverLevel()).held[selected] ? "保持开启" : "自动控制")
+                            ? (state(player.serverLevel()).held[selected] ? "ops.projectseele.hangar.door.held" : "ops.projectseele.hangar.door.auto")
                             : request(player, selected, action.equals("open"));
-                    player.sendSystemMessage(Component.literal("[NERV 机库后门] " + reply));
+                    player.sendSystemMessage(Component.translatable("ops.projectseele.hangar.rear_door_notice", OperationText.read(reply)));
                     return 1;
                 }));
             }

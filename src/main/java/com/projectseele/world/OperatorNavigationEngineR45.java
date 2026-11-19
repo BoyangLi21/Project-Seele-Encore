@@ -174,7 +174,7 @@ public final class OperatorNavigationEngineR45
     }
     public static Result guide(ServerPlayer player,Contract document,String selected)
     {
-        if(player.isSpectator()||player.isPassenger())return blocked(Status.NOT_ON_FOOT,selected,null,"请先回到可站立的人行踏面。");
+        if(player.isSpectator()||player.isPassenger())return blocked(Status.NOT_ON_FOOT,selected,null,"ops.projectseele.operator.on_foot");
         var data=Optional.of(document);
         Scope scope=null;int node=-1;double best=Double.POSITIVE_INFINITY;
         for(var s:data.get().scopes)
@@ -185,40 +185,42 @@ public final class OperatorNavigationEngineR45
             double cost=s.nodes.get(i).kind.equals("fixed_operator")?-1:s.metres[i];
             if(cost<best){scope=s;node=i;best=cost;}
         }
-        if(scope==null)return blocked(Status.NO_OWNED_ROUTE,selected,null,"这里没有登记的固定人员踏面；请使用真实入口或设备出口流程。");
+        if(scope==null)return blocked(Status.NO_OWNED_ROUTE,selected,null,"ops.projectseele.operator.no_walkway");
         var here=scope.nodes.get(node);int nextId=scope.next[node];var next=scope.nodes.get(nextId);var level=player.serverLevel();
         boolean operator=!here.kind.equals("public")||!next.kind.equals("public");
         if(operator)
         {
-            if(!TvPersonnelPlatformInterlockR44.enabled(level)||!TvCageCollisionR44.enabled())return blocked(Status.FLAGS_DISABLED,scope.id,here.feet,"人员平台的实际碰撞与门联锁尚未启用，请循现场出口流程撤离。");
+            if(!TvPersonnelPlatformInterlockR44.enabled(level)||!TvCageCollisionR44.enabled())return blocked(Status.FLAGS_DISABLED,scope.id,here.feet,"ops.projectseele.operator.interlocks");
             for(var owner:data.get().owners)
             {
                 if(owner.variant!=scope.variant)continue;
-                if(!level.hasChunkAt(owner.pos)||!loaded(level,new AABB(owner.pos)))return blocked(Status.UNLOADED,scope.id,here.feet,"本机人员区尚未完整加载，请等待设施就绪。");
-                if(level.getBlockEntity(owner.pos)!=null||!TvPersonnelPlatformRecipeR44.alreadyOwned(level.getBlockState(owner.pos),owner.state))return blocked(Status.OWNER_CHANGED,scope.id,here.feet,"本机人员区安装或归属已变化，请使用现场安全出口流程。");
+                if(!level.hasChunkAt(owner.pos)||!loaded(level,new AABB(owner.pos)))return blocked(Status.UNLOADED,scope.id,here.feet,"ops.projectseele.operator.loading_crew");
+                if(level.getBlockEntity(owner.pos)!=null||!TvPersonnelPlatformRecipeR44.alreadyOwned(level.getBlockState(owner.pos),owner.state))return blocked(Status.OWNER_CHANGED,scope.id,here.feet,"ops.projectseele.operator.crew_changed");
             }
             double x=-11.5+42*scope.variant;
-            if(!loaded(level,new AABB(x-2,-445,-242,x+2,-439,-237)))return blocked(Status.UNLOADED,scope.id,here.feet,"设备实体区域尚未加载。");
+            if(!loaded(level,new AABB(x-2,-445,-242,x+2,-439,-237)))return blocked(Status.UNLOADED,scope.id,here.feet,"ops.projectseele.operator.loading_equipment");
             var diagnostic=TvPersonnelPlatformInterlockR44.gateDiagnostic(level,scope.gates.get(0),player);
             if(!diagnostic.get("metadata_valid").getAsBoolean()||!"PARKED".equals(diagnostic.get("fleet_phase").getAsString())
-                    ||diagnostic.get("actual_gantry_count").getAsInt()!=1)return blocked(Status.MACHINE_UNAVAILABLE,scope.id,here.feet,"设备尚未停靠或实际支架未就绪，请等待现场人员确认。");
+                    ||diagnostic.get("actual_gantry_count").getAsInt()!=1)return blocked(Status.MACHINE_UNAVAILABLE,scope.id,here.feet,"ops.projectseele.operator.equipment_absent");
             double clock=diagnostic.getAsJsonArray("actual_gantry_clocks").get(0).getAsDouble();
-            if(!Double.isFinite(clock)||(clock>.001&&clock<.999))return blocked(Status.MACHINE_UNAVAILABLE,scope.id,here.feet,"设备正在运动，请等待平台静止。");
+            if(!Double.isFinite(clock)||(clock>.001&&clock<.999))return blocked(Status.MACHINE_UNAVAILABLE,scope.id,here.feet,"ops.projectseele.operator.equipment_moving");
             boolean open=level.getBlockState(scope.gates.get(0)).getValue(DoorBlock.OPEN);
             for(var lower:scope.gates)for(var q:List.of(lower,lower.above()))
-                if(level.getBlockState(q).getValue(DoorBlock.OPEN)!=open)return blocked(Status.GATE_INCONSISTENT,scope.id,here.feet,"登记安全门四半片状态不一致，请使用现场安全出口流程。");
-            if((here.kind.equals("gate")||next.kind.equals("gate"))&&!open)return blocked(Status.GATE_CLOSED,scope.id,here.feet,"前方是本操作区登记安全门，请按现场权限或出口开关操作后继续。");
+                if(level.getBlockState(q).getValue(DoorBlock.OPEN)!=open)return blocked(Status.GATE_INCONSISTENT,scope.id,here.feet,"ops.projectseele.operator.gate_mismatch");
+            if((here.kind.equals("gate")||next.kind.equals("gate"))&&!open)return blocked(Status.GATE_CLOSED,scope.id,here.feet,"ops.projectseele.operator.gate_closed");
         }
-        if(!loaded(level,body(next.feet)))return blocked(Status.UNLOADED,scope.id,here.feet,"前方踏面或实体分区尚未加载。");
-        if(!support(player,next))return blocked(Status.SUPPORT_CHANGED,scope.id,here.feet,"前方实际踏面或分数高度已变化，请停步并循现场出口流程。");
+        if(!loaded(level,body(next.feet)))return blocked(Status.UNLOADED,scope.id,here.feet,"ops.projectseele.operator.loading_walkway");
+        if(!support(player,next))return blocked(Status.SUPPORT_CHANGED,scope.id,here.feet,"ops.projectseele.operator.walkway_changed");
         double y=Math.max(here.feet.y,next.feet.y);
         var sweep=body(new Vec3(here.feet.x,y,here.feet.z)).minmax(body(new Vec3(next.feet.x,y,next.feet.z)));
-        if(!loaded(level,sweep))return blocked(Status.UNLOADED,scope.id,here.feet,"前方通道尚未完整加载。");
-        if(occupied(player,sweep))return blocked(Status.OCCUPIED,scope.id,here.feet,"前方通道被人员或设备占用，请等待通道清空。");
+        if(!loaded(level,sweep))return blocked(Status.UNLOADED,scope.id,here.feet,"ops.projectseele.operator.loading_passage");
+        if(occupied(player,sweep))return blocked(Status.OCCUPIED,scope.id,here.feet,"ops.projectseele.operator.occupied");
         boolean arrived=node==scope.target;String cue;
-        if(arrived)cue="已到本层西侧电梯层门；请在门外呼梯并等待轿厢到层。";
-        else if(Math.abs(next.feet.y-here.feet.y)>.063)cue="沿当前登记梯段"+(next.feet.y>here.feet.y?"上行":"下行")+"，返回本层安全门与西侧电梯。";
-        else cue="沿当前踏面向"+(next.feet.x>here.feet.x?"东":next.feet.x<here.feet.x?"西":next.feet.z>here.feet.z?"南":"北")+"行走 · 距本层西侧层门约 "+Math.max(1,Math.round(scope.metres[node]))+" m";
+        if(arrived)cue="ops.projectseele.operator.lift_arrival";
+        else if(Math.abs(next.feet.y-here.feet.y)>.063)cue=OperationText.format("ops.projectseele.operator.stairs", net.minecraft.network.chat.Component.translatable(next.feet.y>here.feet.y?"ops.projectseele.route.up":"ops.projectseele.route.down"));
+        else cue=OperationText.format("ops.projectseele.operator.walk", net.minecraft.network.chat.Component.translatable(
+                next.feet.x>here.feet.x?"ops.projectseele.route.east":next.feet.x<here.feet.x?"ops.projectseele.route.west"
+                        :next.feet.z>here.feet.z?"ops.projectseele.route.south":"ops.projectseele.route.north"), Math.max(1,Math.round(scope.metres[node])));
         return new Result(arrived?Status.ARRIVED:Status.READY,scope.id,here.feet,next.feet,cue,arrived);
     }
     private OperatorNavigationEngineR45() { }

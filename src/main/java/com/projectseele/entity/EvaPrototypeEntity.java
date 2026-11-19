@@ -25,7 +25,7 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
         if(getPilotEntity()!=pilot||CombatFeelR31.restrained(this)||EvaCombatR31.active(this))return;
         if(Unit03SourceRigR53.uses(this)){pilot.sendSystemMessage(Component.translatable("message.projectseele.un.flight_model"));return;}
         if(getUNSerial()!=1){pilot.sendSystemMessage(Component.translatable("message.projectseele.un.flight_only"));return;}
-        if(isUNFlying()){entityData.set(LANDING,!isUNLanding());pilot.sendSystemMessage(Component.literal(isUNLanding()?"EVA-UN-01 自动降落中。":"EVA-UN-01 恢复悬停。"));return;}
+        if(isUNFlying()){entityData.set(LANDING,!isUNLanding());pilot.sendSystemMessage(Component.translatable(isUNLanding() ? "ops.projectseele.un.autoland.yes" : "ops.projectseele.un.autoland.no"));return;}
         if(isNervLogisticsLocked()||!isPoweredOn()||getActivationTicks()>0||isInsideTestHangar()||isPilotProne()||isPilotCrouching()||isFirstBattleActive())
         {pilot.sendSystemMessage(Component.translatable("message.projectseele.un.flight_stand"));return;}
         entityData.set(FLIGHT,true);entityData.set(LANDING,false);flightInput=0;noPilotFlightTicks=0;setNoGravity(true);

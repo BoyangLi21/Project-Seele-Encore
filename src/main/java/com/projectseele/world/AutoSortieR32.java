@@ -254,7 +254,7 @@ public final class AutoSortieR32
             {
                 tag.putBoolean("R32AutoCancelled",true);
                 var commander=level.getServer().getPlayerList().getPlayer(tag.getUUID("R32SortieCommander"));
-                if(commander!=null)NervStaffDialogue.say(commander,"赤木律子 · 整备通信",NervStaffDialogue.unitName(unit)+"还有损伤，不能接入。先修复机体，再重新登机。");
+                if(commander!=null)NervStaffDialogue.say(commander,"赤木律子 · 整备通信",OperationText.format("ops.projectseele.pilot.sortie_damaged", OperationText.unit(unit)));
                 continue;
             }
             if(phase.equals("DEPLOYED")){tag.remove("R32AutoStep");continue;}

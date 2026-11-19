@@ -105,6 +105,7 @@ public final class StaffDialogueCatalogR24
             case "回收联络" -> "radio.projectseele.channel.recovery";
             case "作战通信" -> "radio.projectseele.channel.combat";
             case "指挥通信" -> "radio.projectseele.channel.command";
+            case "整备通信" -> "ops.projectseele.pilot.maintenance_channel";
             case "驾驶员通信" -> "radio.projectseele.channel.pilot";
             case "通信" -> "radio.projectseele.channel.radio";
             case "机体监视" -> "radio.projectseele.channel.monitor";

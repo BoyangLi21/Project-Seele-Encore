@@ -12,7 +12,7 @@ public record ServerboundDeadSeaReadPageR45(UUID nonce,int page,String revision)
     {
         var context=supplier.get();var player=context.getSender();context.enqueueWork(()->{
             if(player==null)return;boolean accepted=com.projectseele.world.DeadSeaReadingR45.confirmPage(player,nonce,page,revision);
-            player.displayClientMessage(Component.literal(accepted?"已阅。":"请回到书台，重新翻开文书。"),true);
+            player.displayClientMessage(Component.translatable(accepted ? "ops.projectseele.archive.confirm.yes" : "ops.projectseele.archive.confirm.no"),true);
         });context.setPacketHandled(true);
     }
 }

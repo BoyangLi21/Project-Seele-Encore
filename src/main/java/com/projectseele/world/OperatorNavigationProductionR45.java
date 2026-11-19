@@ -110,7 +110,7 @@ public final class OperatorNavigationProductionR45
     private static OperatorNavigationEngineR45.Result guide(ServerPlayer player,String selected)
     {
         var contract=load(player.serverLevel());
-        if(contract.isEmpty())return new OperatorNavigationEngineR45.Result(OperatorNavigationEngineR45.Status.UNBOUND,selected,null,null,"当前存档尚未安装有效的人员区返回导航，请使用现场出口标牌。",false);
+        if(contract.isEmpty())return new OperatorNavigationEngineR45.Result(OperatorNavigationEngineR45.Status.UNBOUND,selected,null,null,"ops.projectseele.operator.no_guide",false);
         return OperatorNavigationEngineR45.guide(player,contract.get(),selected);
     }
     public static String start(ServerPlayer player)
@@ -120,7 +120,7 @@ public final class OperatorNavigationProductionR45
         if(result.status()!=OperatorNavigationEngineR45.Status.READY&&result.status()!=OperatorNavigationEngineR45.Status.ARRIVED&&!waiting)return result.instruction();
         NervWayfindingR24.start(player,"stop");
         if(!result.arrived())ACTIVE.computeIfAbsent(player.server,k->new HashMap<>()).put(player.getUUID(),new Selection(player.serverLevel(),result.scope()));
-        return waiting||result.arrived()?result.instruction():"已开启人员区返回本层电梯的引导；安全门与设备状态会实时检查。";
+        return waiting||result.arrived()?result.instruction():"ops.projectseele.operator.started";
     }
     public static void stop(ServerPlayer player)
     { var active=ACTIVE.get(player.server);if(active!=null)active.remove(player.getUUID()); }
@@ -140,7 +140,7 @@ public final class OperatorNavigationProductionR45
         {
             var player=event.getServer().getPlayerList().getPlayer(e.getKey());
             if(player==null||player.serverLevel()!=e.getValue().level){selections.remove(e.getKey());continue;}
-            var result=guide(player,e.getValue().scope);player.displayClientMessage(Component.literal("人员区返回 · "+result.instruction()),true);
+            var result=guide(player,e.getValue().scope);player.displayClientMessage(Component.translatable("ops.projectseele.operator.return", OperationText.read(result.instruction())),true);
             if(result.arrived())selections.remove(e.getKey());
         }
     }

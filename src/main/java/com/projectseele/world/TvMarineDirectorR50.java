@@ -71,10 +71,10 @@ public final class TvMarineDirectorR50
     public static String startBlocker(ServerLevel level)
     {
         var site=TvMarineSiteR50.site(level).orElse(null);
-        if(site==null)return "海战的实测水域尚未安装。";
-        if(!site.geometryValidated()||!site.modelReady())return "海战水域与目标仍在验收中。";
-        if(!BuiltInRegistries.ENTITY_TYPE.containsKey(new ResourceLocation("projectseele:gaghiel")))return "海战目标尚未接入。";
-        if(TvMarineSavedDataR50.get(level).cannonCleanupPending)return "原舰炮的上次操纵交接仍待确认，请等待原炮加载。";
+        if(site==null)return "ops.projectseele.marine.no_site";
+        if(!site.geometryValidated()||!site.modelReady())return "ops.projectseele.marine.unverified";
+        if(!BuiltInRegistries.ENTITY_TYPE.containsKey(new ResourceLocation("projectseele:gaghiel")))return "ops.projectseele.marine.no_target";
+        if(TvMarineSavedDataR50.get(level).cannonCleanupPending)return "ops.projectseele.marine.handover";
         return "";
     }
     public static void begin(ServerLevel level,TvCampaignSavedData campaign)
@@ -134,7 +134,7 @@ public final class TvMarineDirectorR50
             if(originalCannon(level,i)==null)
             {
                 state.spawnWait+=10;
-                if(state.spawnWait>=200)fail(level,campaign,state,"第"+(i+1)+"座原舰炮失联、受损或离开原炮座，行动暂停；不会补造炮台。");
+                if(state.spawnWait>=200)fail(level,campaign,state,OperationText.format("ops.projectseele.marine.lost_gun", i+1));
                 else campaign.notice="原舰炮通信正在恢复；近海目标已活动。";
                 state.setDirty();return;
             }
@@ -171,9 +171,12 @@ public final class TvMarineDirectorR50
         if(state.elapsed>=site.deadline()){fail(level,campaign,state,"海战拦截时限已过，未及时完成二号机水中牵制与击破；本场可回收后重试。");return;}
         if(lead!=null&&campaign.phase.equals("combat")&&(!lead.isAlive()||com.projectseele.entity.EvaShutdownR30.wreck(lead)))
         {fail(level,campaign,state,"原二号机失去战斗能力，请先回收整备。");return;}
-        state.notice="美里：二号机，把它引到舰炮正前方，再撑住嘴。 · 舰桥电源"+(supply?"接通":"断开")+" · 一炮"+cannonStatusR50(state,0)+" / 二炮"+cannonStatusR50(state,1)+" · 拦截余"+Math.max(0,(site.deadline()-state.elapsed)/20)+"秒";
-        if(boss.mouthHeldR50())state.notice+=" · 真实口部接触稳定，请在6秒内完成双炮";
-        campaign.notice=state.notice;bar.setName(OperationText.read(state.notice));bar.setProgress(Math.max(0,Math.min(1,boss.getHealth()/boss.getMaxHealth())));state.setDirty();
+        var briefing=Component.translatable("ops.projectseele.marine.active", Component.translatable(supply ?
+                "ops.projectseele.marine.online" : "ops.projectseele.marine.offline"), cannonStatusR50(state,0),
+                cannonStatusR50(state,1), Math.max(0,(site.deadline()-state.elapsed)/20));
+        if(boss.mouthHeldR50())briefing.append(Component.translatable("ops.projectseele.marine.mouth_held"));
+        state.notice=OperationText.encode(briefing);
+        campaign.notice=state.notice;bar.setName(briefing);bar.setProgress(Math.max(0,Math.min(1,boss.getHealth()/boss.getMaxHealth())));state.setDirty();
     }
     private static void freeze(ServerLevel level,TvCampaignSavedData campaign)
     {if(campaign.angel!=null&&level.getEntity(campaign.angel) instanceof GaghielEntity boss&&TvEncounterDirectorR45.owned(boss,campaign)){boss.setNoAi(true);boss.holdMouthR50(null);}}
@@ -222,8 +225,12 @@ public final class TvMarineDirectorR50
         return state.bound(campaign)&&boss.getUUID().equals(state.boss)&&TvEncounterDirectorR45.owned(boss,campaign)
                 &&!campaign.phase.equals("cancel")&&!campaign.phase.equals("failure")&&owner!=null&&owner.level()==level;
     }
-    private static String cannonStatusR50(TvMarineSavedDataR50 state,int index)
-    {return state.cannonCooldown[index]>0?"装填"+((state.cannonCooldown[index]+19)/20)+"秒":state.cannonCharge[index]<CHARGE_TICKS?"校准"+((CHARGE_TICKS-state.cannonCharge[index]+19)/20)+"秒":"就绪";}
+    private static Component cannonStatusR50(TvMarineSavedDataR50 state,int index)
+    {
+        if(state.cannonCooldown[index]>0)return Component.translatable("ops.projectseele.marine.reloading", (state.cannonCooldown[index]+19)/20);
+        if(state.cannonCharge[index]<CHARGE_TICKS)return Component.translatable("ops.projectseele.marine.calibrating", (CHARGE_TICKS-state.cannonCharge[index]+19)/20);
+        return Component.translatable("ops.projectseele.marine.ready");
+    }
     /** This only relaxes the underwater eligibility; EVA still requires an actual pylon and cable range. */
     public static boolean marinePowerAllowed(EvaUnit01Entity eva)
     {
@@ -367,52 +374,52 @@ public final class TvMarineDirectorR50
     public static String operatePowerR50(ServerPlayer operator)
     {
         var level=operator.serverLevel();var campaign=TvCampaignSavedData.get(level);var state=TvMarineSavedDataR50.get(level);var site=TvMarineSiteR50.site(level).orElse(null);
-        if(site==null||!state.bound(campaign)||campaign.phase.equals("failure")||operator.position().distanceTo(Vec3.atCenterOf(site.powerControl()))>6)return "请在本次海战的舰上电源岗位操作。";
+        if(site==null||!state.bound(campaign)||campaign.phase.equals("failure")||operator.position().distanceTo(Vec3.atCenterOf(site.powerControl()))>6)return "ops.projectseele.marine.bridge_post";
         var control=level.getBlockState(site.powerControl());
-        if(!(control.getBlock() instanceof net.minecraft.world.level.block.LeverBlock)||!control.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED))return "实际舰桥电源开关不在原登记位置，无法接线。";
+        if(!(control.getBlock() instanceof net.minecraft.world.level.block.LeverBlock)||!control.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED))return "ops.projectseele.marine.bridge_missing";
         state.powerEnabled=!control.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED);
         level.setBlock(site.powerControl(),control.setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED,state.powerEnabled),3);
-        state.setDirty();return state.powerEnabled?"舰上电源接通，双炮开始校准。":"舰上电源已断开，双炮失去充电。";
+        state.setDirty();return state.powerEnabled?"ops.projectseele.marine.power_on":"ops.projectseele.marine.power_off";
     }
     public static String fireOriginalCannonR50(ServerPlayer operator,int index)
     {
-        if(index<0||index>1)return "无效舰炮岗位。";
+        if(index<0||index>1)return "ops.projectseele.marine.bad_gun";
         var level=operator.serverLevel();var campaign=TvCampaignSavedData.get(level);var state=TvMarineSavedDataR50.get(level);var site=TvMarineSiteR50.site(level).orElse(null);
-        if(site==null||!state.bound(campaign)||operator.position().distanceTo(Vec3.atCenterOf(site.cannonControls()[index]))>6)return "请到实际舰炮岗位操作。";
-        if(!(state.boss!=null&&level.getEntity(state.boss) instanceof GaghielEntity boss)||!damageAllowed(level,boss))return "本次海战目标已暂停或失联。";
-        Entity cannon=originalCannon(level,index);if(cannon==null)return "原舰炮尚未加载、已受损或离开炮座，不能用替身发射。";
-        if(state.cannonCharge[index]<CHARGE_TICKS||state.cannonCooldown[index]>0)return "舰炮尚未完成供电与装填。";
+        if(site==null||!state.bound(campaign)||operator.position().distanceTo(Vec3.atCenterOf(site.cannonControls()[index]))>6)return "ops.projectseele.marine.stand_at_gun";
+        if(!(state.boss!=null&&level.getEntity(state.boss) instanceof GaghielEntity boss)||!damageAllowed(level,boss))return "ops.projectseele.marine.target_unavailable";
+        Entity cannon=originalCannon(level,index);if(cannon==null)return "ops.projectseele.marine.gun_missing";
+        if(state.cannonCharge[index]<CHARGE_TICKS||state.cannonCooldown[index]>0)return "ops.projectseele.marine.gun_not_ready";
         Vec3 aim=boss.coreWorldPos(1);
         try
         {
             Object gun=cannon.getClass().getMethod("getGunData",String.class).invoke(cannon,"Main");
-            if(gun==null)return "原舰炮武器数据不可用。";
+            if(gun==null)return "ops.projectseele.marine.no_gun_data";
             Entity supplier=(Entity)cannon.getClass().getMethod("getAmmoSupplier").invoke(cannon);
             Method ready=gun.getClass().getMethod("canShoot",Entity.class);
-            if(!(Boolean)ready.invoke(gun,supplier))return "原舰炮弹药、能源或原生冷却尚未就绪。";
+            if(!(Boolean)ready.invoke(gun,supplier))return "ops.projectseele.marine.gun_cooling";
             Vec3 muzzle=(Vec3)cannon.getClass().getMethod("getShootPos",String.class,float.class).invoke(cannon,"Main",1F);
             double speed=((Number)cannon.getClass().getMethod("getProjectileVelocity",String.class).invoke(cannon,"Main")).doubleValue();
             double gravity=((Number)cannon.getClass().getMethod("getProjectileGravity",String.class).invoke(cannon,"Main")).doubleValue();
             Vec3 ballistic=ballisticDirectionR50(muzzle,aim,speed,gravity);
-            if(ballistic==null)return "原舰炮实际弹速与重力无法形成该炮击弹道。";
+            if(ballistic==null)return "ops.projectseele.marine.no_trajectory";
             cannon.getClass().getMethod("turretAutoAimFromVector",Vec3.class).invoke(cannon,ballistic);
             Vec3 actual=(Vec3)cannon.getClass().getMethod("getShootVec",String.class,float.class).invoke(cannon,"Main",1F);
-            if(actual.normalize().dot(ballistic)<.995)return "原炮口仍在转向，请再次确认射击。";
+            if(actual.normalize().dot(ballistic)<.995)return "ops.projectseele.marine.gun_turning";
             int steps=Math.min(120,(int)Math.ceil(aim.subtract(muzzle).horizontalDistance()/Math.max(.1,speed*ballistic.horizontalDistance()))+1);
             Vec3 previous=muzzle,velocity=actual.normalize().scale(speed);
             for(int step=0;step<steps;step++)
             {
                 Vec3 next=previous.add(velocity);var wall=level.clip(new ClipContext(previous,next,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,cannon));
-                if(wall.getType()!=HitResult.Type.MISS&&wall.getLocation().distanceTo(aim)>5.5*boss.modelScaleR50())return "原炮口的实际弹道被船体、岸线或海床遮挡。";
+                if(wall.getType()!=HitResult.Type.MISS&&wall.getLocation().distanceTo(aim)>5.5*boss.modelScaleR50())return "ops.projectseele.marine.gun_obstructed";
                 previous=next;velocity=velocity.add(0,-gravity,0);
             }
             state.cannonFired[index]=level.getGameTime();state.cannonCharge[index]=0;state.cannonCooldown[index]=RELOAD_TICKS;
             state.cannonOperator[index]=operator.getUUID();state.shotTagBudget[index]=1;state.setDirty();
             cannon.getClass().getMethod("vehicleShoot",LivingEntity.class,String.class,UUID.class,Vec3.class).invoke(cannon,operator,"Main",boss.getUUID(),aim);
-            return "第"+(index+1)+"炮已从原炮口发射。保持口部真实接触并完成另一炮。";
+            return OperationText.format("ops.projectseele.marine.fired", index+1);
         }
         catch(ReflectiveOperationException failure)
-        {ProjectSeele.LOGGER.error("Original SBW marine cannon API rejected",failure);return "原舰炮接口不符合安装版本，本次没有替代发射。";}
+        {ProjectSeele.LOGGER.error("Original SBW marine cannon API rejected",failure);return "ops.projectseele.marine.gun_api";}
     }
     private static Vec3 ballisticDirectionR50(Vec3 from,Vec3 target,double speed,double gravity)
     {
@@ -435,9 +442,12 @@ public final class TvMarineDirectorR50
         {
             event.setCanceled(true);event.setCancellationResult(InteractionResult.SUCCESS);
             var block=event.getLevel().getBlockState(event.getPos());
-            if(result.contains("已从原炮口发射")&&block.getBlock() instanceof net.minecraft.world.level.block.ButtonBlock)
+            var message=OperationText.read(result);
+            if(message.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents receipt
+                    &&receipt.getKey().equals("ops.projectseele.marine.fired")
+                    &&block.getBlock() instanceof net.minecraft.world.level.block.ButtonBlock)
                 block.use(event.getLevel(),player,event.getHand(),event.getHitVec());
-            player.sendSystemMessage(Component.literal(result));
+            player.sendSystemMessage(message);
         }
     }
     @SubscribeEvent public static void joined(EntityJoinLevelEvent event)

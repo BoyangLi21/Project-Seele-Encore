@@ -158,10 +158,12 @@ public final class ThirdTokyoCommands
         ServerPlayer player = source.getPlayerOrException();
         BlockPos origin = findOrigin(player);
         RequestResult result = CityCreateDistrictR45.recover(player.serverLevel(), origin, false);
-        String text = result.accepted() ? "已重新接管被中断的城市升降，从中断的那一步重做。"
-                : result.message().startsWith("No held transaction fault") ? "城市升降没有故障，不需要恢复。"
-                : "无法恢复：" + result.message();
-        source.sendSuccess(() -> Component.literal(text), false);
+        Component text = result.accepted()
+                ? Component.translatable("ops.projectseele.city.control_regained")
+                : result.message().startsWith("No held transaction fault")
+                        ? Component.translatable("ops.projectseele.city.no_fault")
+                        : Component.translatable("ops.projectseele.city.recovery_failed", com.projectseele.world.OperationText.read(result.message()));
+        source.sendSuccess(() -> text, false);
         return result.accepted() ? 1 : 0;
     }
 
@@ -375,8 +377,7 @@ public final class ThirdTokyoCommands
         {
             return false;
         }
-        source.sendFailure(Component.literal(
-                command + " 属于已退役的重叠地图流程，在 SEELE_S19_CLEAN 存档中不可用。"));
+        source.sendFailure(Component.translatable("ops.projectseele.city.retired_flow", command));
         return true;
     }
 

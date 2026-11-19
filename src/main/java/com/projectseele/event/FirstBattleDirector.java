@@ -66,7 +66,7 @@ public final class FirstBattleDirector
         var record=new FirstBattleSavedData.Encounter();record.eva=eva.getUUID();record.angel=angel.getUUID();record.pilot=pilot.getUUID();record.npcPilot=occupant instanceof com.projectseele.entity.TrainingPilotEntity?occupant.getUUID():null;record.spec=spec;record.originalField=angel.getAtField();record.originalHealth=angel.getHealth();data.active=record;data.setDirty();
         eva.beginFirstBattle(spec,angel.getId());angel.beginFirstBattle(spec,eva.getId());
         tickets(level,record);pilot.displayClientMessage(Component.translatable("message.projectseele.first_battle.autonomous"),true);
-        com.projectseele.world.NervStaffDialogue.say(pilot,"赤木律子 · 指挥通信","初号机没有接收指令……它在自行行动。驾驶员的生命信号还在。");
+        com.projectseele.world.NervStaffDialogue.say(pilot,"赤木律子 · 指挥通信","ops.projectseele.first.autonomous_radio");
         sound(level,FirstBattleClip.point(spec,true,"eye_blocks",0),ModSounds.EVA_BERSERK_ROAR.get(),2.3F);
         ProjectSeele.LOGGER.info("R10 FIRST BATTLE START hero={} angel={} pilot={} health={}",record.eva,record.angel,record.pilot,record.originalHealth);return true;
     }
@@ -227,7 +227,7 @@ public final class FirstBattleDirector
                     eva.completeFirstBattle();if(angel!=null)angel.endFirstBattle();
                     publishControlReturn(level,eva,pilot);if(angel!=null)publishState(level,angel,pilot);
                     data.completedPilots.add(pilot.getUUID());data.active=null;data.missionOwner=null;data.missionAngel=null;release(level);
-                    pilot.displayClientMessage(Component.literal(eva.isPowerDepleted()?"目标沉默。初号机停止活动，可以呼叫回收。":"目标沉默。操纵系统已恢复。"),true);ProjectSeele.LOGGER.info("R10 FIRST BATTLE COMPLETE hero={} pilot={}",eva.getUUID(),pilot.getUUID());
+                    pilot.displayClientMessage(Component.translatable(eva.isPowerDepleted() ? "ops.projectseele.first.return_control.yes" : "ops.projectseele.first.return_control.no"),true);ProjectSeele.LOGGER.info("R10 FIRST BATTLE COMPLETE hero={} pilot={}",eva.getUUID(),pilot.getUUID());
                 }
                 data.setDirty();
             }
