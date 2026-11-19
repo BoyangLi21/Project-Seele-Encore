@@ -74,6 +74,8 @@
     "client.PlugPilotHeldItemR64Mixin",
     "client.MovingElevatorDisplayMixin",
     "client.CreateVirtualLightStarlightGuardMixin",
+    "client.CreateWrappedLightAccess",
+    "client.CreateContraptionVisualLightMixin",
     "client.CatnipBlockQuadsMixin",
     "client.EntityShadowRangeMixin",
     "client.HeavyTextureLoadMixin",
