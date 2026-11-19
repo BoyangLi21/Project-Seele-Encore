@@ -65,6 +65,11 @@ final class EvaTurnStepR59
         float dt=fresh?Mth.clamp((now-s.time)/1e9F,0,.1F):0;
         s.time=now;
         if(fresh)s.weight+=((standing?1:0)-s.weight)*(1-(float)Math.exp(-dt*FADE_RATE));
+        // R64 (flow, "step"): a blow that takes a stride has its feet at once. The fade leaves them to a strike over
+        // some nine ticks (a third of the hold is still there after two), which is nothing to a blow made where
+        // the Unit stands; a foot that steps in those ticks was drawn back towards where it had stood: measured in
+        // the kick's step in, three blocks short through its flight, set down as far short, and slid on from there.
+        if(!standing&&eva.rowStridesR64())s.weight=0;
         if(!standing&&s.weight<.01F){s.live=false;s.weight=0;s.left.step=s.right.step=-1;return;}
         float body=Mth.rotLerp(partial,eva.yBodyRotO,eva.yBodyRot);
         var worldL=new Matrix4f(root).mul(EvaRigTransforms.model(footL));var worldR=new Matrix4f(root).mul(EvaRigTransforms.model(footR));

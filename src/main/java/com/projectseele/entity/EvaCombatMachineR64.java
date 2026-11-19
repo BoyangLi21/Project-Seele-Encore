@@ -42,6 +42,8 @@ public final class EvaCombatMachineR64
     private final EvaUnit01Entity e;
     private Row row,last;
     private int startup,active,recovery,serial;
+    /** Ticks the row in hand begins its live part later than its table has it (the kick's step in): what the table counts from the row's beginning past its start-up comes that much later. */
+    private int late;
     private float open,close,rate=1;
     private boolean hit,whiffed;
     /** R64 (flow): this row's stages lie on its clip along the smooth curve (the switch as it stood when the row began). */
@@ -100,7 +102,8 @@ public final class EvaCombatMachineR64
         {
             if(button<0||!owns()||e.hasLiveActionForRender(0)||e.leapLockedR64())return;
             Row next=sinceEnd<=LINK&&last!=null?follow(last,button):null;
-            if(next==null)next=EvaMoveTableR64.opener(e.getWeapon(),button==HEAVY,sinceEvade<=AFTER_EVADE,EvaGameplayMotionR32.knifeCutsReadyR64(e));
+            if(next==null)next=EvaMoveTableR64.opener(e.getWeapon(),button==HEAVY,sinceEvade<=AFTER_EVADE,EvaGameplayMotionR32.knifeCutsReadyR64(e),
+                    EvaGameplayMotionR32.bodyReadyR64(e),e.isPilotSprinting()&&e.pilotLocomotionRequestedR45());
             if(next!=null&&ready(next))start(next,"standing");
             return;
         }
@@ -108,10 +111,10 @@ public final class EvaCombatMachineR64
         if(button>=0)
         {
             int from=n(hit?row.cancelHit():row.cancelWhiff());Row next=follow(row,button);
-            if(next!=null&&from>0&&k>=from&&ready(next)&&owns())start(next,row.name()+(hit?" landed":" missed")+" at tick "+k);
+            if(next!=null&&from>0&&k>=from+late&&ready(next)&&owns())start(next,row.name()+(hit?" landed":" missed")+" at tick "+k);
         }
         else if(pilot instanceof ServerPlayer player&&(player.zza<-.15F&&k<=n(row.feint())
-                ||(player.zza<-.15F||Math.abs(player.xxa)>.15F)&&k>=n(row.moveFrom())))
+                ||(player.zza<-.15F||Math.abs(player.xxa)>.15F)&&k>=n(row.moveFrom())+late))
         {
             // A step back in the first ticks withdraws the blow; a step back or aside in its recovery ends it.
             if(DIAG)ProjectSeele.LOGGER.info("R64MOVE tick {} {} left at tick {} for a step",e.level().getGameTime(),row.name(),k);
@@ -119,10 +122,74 @@ public final class EvaCombatMachineR64
         }
     }
 
+    /**
+     * R64 (flow, "step"). KICK_BEST: the kick lands best with its mark's side this far from the Unit's middle
+     * (blocks; a mark's side is half its width from its own middle). Measured on a still Sachiel, nine blocks to
+     * its side (tourKickR64, 2026-11-18): kicked from where the Unit stands it is hit with its middle 30 off and
+     * missed at 38; after a step it is hit at 36, the sole meeting it as the leg comes straight. Three blocks
+     * nearer than that, the sole meets it a little before. KICK_STEP: the stride of the step in, as
+     * tools/finale/kick.py writes it. KICK_STEP_LEAST: the least share of the stride that is worth a step (two
+     * blocks); a mark nearer than that is kicked from where the Unit stands. KICK_STEP_TICKS: the ticks a step in
+     * adds to the kick's start-up (the leg has a stride further to come).
+     */
+    private static final double KICK_BEST=24,KICK_STEP=10;
+    private static final float KICK_STEP_LEAST=.2F;
+    private static final int KICK_STEP_TICKS=3;
+    /**
+     * The hard kick (flow, "step" without "kick"; tools/finale/hardkick.py). HARD_BEST: with no stride its sole
+     * meets a mark whose side is this far from where the Unit's middle was as the kick began in the row's second
+     * live tick, on its way up and at its fastest (measured against a still Sachiel: a side 21 blocks off is met
+     * at phase .33 of the clip, 31 at .39, 40 at .42, where the leg is all but at its highest and slowing; the
+     * hold then stood it there for three ticks). A nearer mark is met earlier in the swing, lower, and the body
+     * is stopped by it where it stands.
+     * HARD_STRIDE: what the whole step in adds, as the clip's stride_m has it. HARD_LEAST: the share is never
+     * nothing: the kick changes feet and carries the body even on the spot, and the clients, who are told a
+     * stride, carry the body through it by the row's clock (EvaUnit01Entity.stepRootR64). Its start-up is longer
+     * by up to KICK_STEP_TICKS, by the share.
+     */
+    private static final double HARD_BEST=32,HARD_STRIDE=15.2;
+    private static final float HARD_LEAST=.001F;
+    /**
+     * R64 (flow, "body"): the strides of the Unit's own bare-handed blows, as tools/finale/unarmed.py writes them.
+     * best: how far the mark's side is from the Unit's middle where the blow lands as it is written, once the
+     * stride is made; length: the stride; least: the least share of it worth making.
+     */
+    private record Stride(double best,double length,float least){}
+    // (Thrown forward as it is in the pounce, the trunk is itself 22 blocks ahead of the hips, and two bodies are
+    // kept that far apart (CombatSpacingR32): a pounce asked to end nearer was stopped 32 blocks from a Sachiel's
+    // middle whatever it was asked. So it ends with its hand out, and the knee that follows springs the rest.)
+    private static final java.util.Map<String,Stride> STRIDES=java.util.Map.of("pounce",new Stride(22,8,.2F),"knee",new Stride(7,17,.2F),"charge",new Stride(15,16,.2F));
     private void start(Row next,String from)
     {
         rate=Math.min(1.12F,EvaPilotCapability.attackSpeedMultiplier(e.getPilotSynchronization()));
-        startup=n(next.startup());active=Math.max(2,n(next.active()));recovery=n(next.recovery());
+        // R64 (flow, "step"): the kick's step in is as long as brings its mark to the leg's length, a stride at the
+        // most, and none against a body already near enough. Against nothing it is the whole stride. Which of the
+        // kick's two clips is played goes by it, so it is settled before the row's ticks are.
+        float step=0;int longer=0;
+        var stride=STRIDES.get(next.name());
+        boolean strides=EvaCombatModelR64.flowStep(e)&&(next.kind()==EvaMoveTableR64.KICK||stride!=null&&EvaCombatModelR64.flowBody(e));
+        // A punch made while the pilot walks is laid over the walk (EvaGameplayMotionR32.movementMayComposeR45): the
+        // ground it covers is the walk's, and it takes no stride of its own.
+        boolean walking=next.kind()==EvaMoveTableR64.PUNCH&&stride!=null&&!next.name().equals("charge")&&e.pilotLocomotionRequestedR45();
+        if(strides&&!walking)
+        {
+            var mark=lock();
+            if(next.kind()==EvaMoveTableR64.KICK&&EvaCombatModelR64.flowHardKick(e)&&EvaGameplayMotionR32.kickReady(e))
+            {
+                step=mark==null?0:(float)Mth.clamp((Math.hypot(mark.getX()-e.getX(),mark.getZ()-e.getZ())-.5*mark.getBbWidth()-HARD_BEST)/HARD_STRIDE,0,1);
+                longer=Math.round(KICK_STEP_TICKS*step);step=Math.max(step,HARD_LEAST);
+            }
+            else
+            {
+                double best=stride==null?KICK_BEST:stride.best(),length=stride==null?KICK_STEP:stride.length();
+                step=mark==null?1F:(float)Mth.clamp((Math.hypot(mark.getX()-e.getX(),mark.getZ()-e.getZ())-.5*mark.getBbWidth()-best)/length,0,1);
+                if(step<(stride==null?KICK_STEP_LEAST:stride.least()))step=0;
+                longer=step>0&&next.kind()==EvaMoveTableR64.KICK?KICK_STEP_TICKS:0;
+            }
+        }
+        if(next.kind()==EvaMoveTableR64.KICK)e.rowStepShareR64=step;
+        startup=n(next.startup()+longer);active=Math.max(2,n(next.active()));recovery=n(next.recovery());
+        late=startup-n(next.startup());
         float contact=e.rowContactPhaseR64(next);
         open=Mth.clamp(contact-next.lead(),.02F,.9F);close=Mth.clamp(contact+next.tail(),open+.02F,.97F);
         // R64 (flow): the recovery is as long as its part of the clip takes at RECOVERY_PACE (the punches' was played
@@ -133,8 +200,11 @@ public final class EvaCombatMachineR64
         row=next;last=null;hit=false;whiffed=false;serial++;target=lock();
         e.beginRowR64(next,startup+active+recovery);
         // R64 (flow): the row's clock, for the clients that play it themselves (nothing is told where they do not).
-        if(EvaCombatModelR64.flowClock(e))EvaRowClockR64.begin(e,serial,next.name(),EvaUnit01Entity.rowClipR64(next),startup,active,recovery,open,close,curve);
+        if(EvaCombatModelR64.flowClock(e))EvaRowClockR64.begin(e,serial,next.name(),EvaUnit01Entity.rowClipR64(next),startup,active,recovery,open,close,curve,
+                next.kind()==EvaMoveTableR64.KICK?EvaCombatModelR64.flowKickClip(e)&&EvaGameplayMotionR32.kickReady(e)
+                        :next.kind()==EvaMoveTableR64.PUNCH&&EvaGameplayMotionR32.bodyReadyR64(e));
         else EvaRowClockR64.end(e);
+        if(strides)EvaRowClockR64.step(e,step);
         // The Unit's turn for this tick has been made (the ridden body turns before the blows are looked at):
         // without this the first of a row's wind-up ticks was lost to the turn onto its target.
         if(target!=null&&pilotView!=NO_VIEW)e.faceR64(yaw(e.getYRot(),e.getYRot(),pilotView,true));
@@ -230,7 +300,7 @@ public final class EvaCombatMachineR64
         // search that only ran on from there took the opening jab seven blocks back into its wind-up.
         // R64 (flow, "kick"): the kick's own clip is not blended in through its live ticks, and its foot passes
         // near a body that stands close on its way up: only this tick's sweep is searched.
-        int back=row.kind()==EvaMoveTableR64.KICK&&EvaCombatModelR64.flowKick(e)?1:3;
+        int back=row.kind()==EvaMoveTableR64.KICK&&EvaCombatModelR64.flowKickClip(e)?1:3;
         float lo=phase(Math.max(0,now-back),0),hi=phase(now,0),best=hi;double least=Double.MAX_VALUE;
         for(int i=0;i<=8;i++)
         {
@@ -266,14 +336,14 @@ public final class EvaCombatMachineR64
     {
         if(row==null)return true;
         int k=e.rowElapsedR64(row)+1;
-        return k>=n(hit?row.evadeHit():row.evadeWhiff())||k<=n(row.feint());
+        return k>=n(hit?row.evadeHit():row.evadeWhiff())+late||k<=n(row.feint());
     }
     /** In these ticks a blow that would stagger the Unit only makes it flinch. */
     public boolean armored()
     {
         if(row==null||row.armorFrom()<0)return false;
         int k=e.rowElapsedR64(row);
-        return k>=n(row.armorFrom())&&k<=n(row.armorTo());
+        return k>=n(row.armorFrom())+late&&k<=n(row.armorTo())+late;
     }
 
     private LivingEntity lock()

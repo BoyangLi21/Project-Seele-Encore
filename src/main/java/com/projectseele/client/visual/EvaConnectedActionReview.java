@@ -641,6 +641,8 @@ public final class EvaConnectedActionReview
         if(KNIFE_R64){knifeR64(mc,eva);positionCamera(mc,eva);return;}
         if(IMPACT_R64){impactR64(mc,eva);positionCamera(mc,eva);return;}
         if(MOVING_R64){movingR64(mc,eva);positionCamera(mc,eva);return;}
+        if(KICK_R64){kickR64(mc,eva);positionCamera(mc,eva);return;}
+        if(BODY_R64){bodyR64(mc,eva);positionCamera(mc,eva);return;}
         if(BEAM_R64){beamR64(mc,eva);positionCamera(mc,eva);return;}
         if(HITS){hitsR63(mc,eva);positionCamera(mc,eva);return;}
         if(RAMIEL){ramielR63(mc,eva);positionCamera(mc,eva);return;}
@@ -1403,6 +1405,90 @@ public final class EvaConnectedActionReview
             ProjectSeele.LOGGER.info("R64TOUR tick {} game {} the unit is struck",tick,mc.level.getGameTime());
         }
         if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
+    }
+
+    /**
+     * -Dprojectseele.tourKickR64=true (tourEnd=640): the kick at marks at different distances, with
+     * -Dprojectseele.combatDiagR64=true. A still Sachiel with its field down is set 20 blocks ahead and the Unit
+     * presses heavy (40); then one 30 ahead (140), one 38 ahead (240), one 46 ahead (340), none at all (440), and
+     * one 58 ahead that the Unit walks at before it kicks (walks 512 to 560, heavy at 532). Where the two bodies
+     * stand is logged every other tick (R64DUMMY). -Dprojectseele.tourKickMarksR64=a,b,c,d sets the four
+     * distances (the hard kick reaches further than the kick these were chosen for).
+     */
+    /**
+     * -Dprojectseele.tourBodyR64=true (tourEnd=800): the Unit's own bare hands (the flow switch's "body"), with
+     * -Dprojectseele.combatDiagR64=true. A still Sachiel with its field down each time. The pounce at a mark 30
+     * ahead (40), at one 38 ahead (140: half a stride), at one 44 ahead (240: the whole stride); the string
+     * pounce, knee, slam at one 36 ahead (340, 349, 359); the charge: a run from 480 at a mark 80 ahead, the light
+     * press when it is 32 off; a grab at one 24 ahead (640), three blows on it (670, 684, 698) and the throw (722).
+     * Where the two bodies stand is logged as in the kick's tour.
+     */
+    private static final boolean BODY_R64=Boolean.getBoolean("projectseele.tourBodyR64");
+    private static boolean bodyChargedR64;
+    private static void bodyR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        boolean run=tick>=480&&tick<540;
+        mc.options.keyUp.setDown(run);mc.player.input.up=run;mc.player.input.forwardImpulse=run?1:0;mc.player.zza=run?1:0;mc.player.xxa=0;
+        // (the run's key is held through the run: let go, the client tells the server the run is over)
+        mc.options.keySprint.setDown(run&&tick>=482);
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        if(at(10))dummyR64(mc,eva,30,0);
+        if(at(110))dummyR64(mc,eva,38,0);
+        if(at(210))dummyR64(mc,eva,44,0);
+        if(at(310))dummyR64(mc,eva,36,0);
+        if(at(40)||at(140)||at(240)||at(340)||at(349)||at(359))lightR64();
+        if(at(450)){dummyR64(mc,eva,80,0);bodyChargedR64=false;}
+        if(at(482))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(540))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(at(610))dummyR64(mc,eva,24,0);
+        if(at(640))send(ServerboundEvaControlPacket.ACTION_GRAPPLE);
+        if(at(670)||at(684)||at(698))lightR64();
+        if(at(722))heavyR64();
+        if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
+        var near=mc.level.getEntitiesOfClass(com.projectseele.entity.SachielEntity.class,eva.getBoundingBox().inflate(140)).stream()
+                .min(java.util.Comparator.comparingDouble(eva::distanceToSqr)).orElse(null);
+        if(run&&!bodyChargedR64&&near!=null&&Math.hypot(near.getX()-eva.getX(),near.getZ()-eva.getZ())<32){bodyChargedR64=true;lightR64();}
+        if(tick%2==0||eva.hasLiveActionForRender(0)||com.projectseele.entity.EvaCombatR31.active(eva))
+            ProjectSeele.LOGGER.info("R64DUMMY tick {} game {} target at {} {} unit at {} {} yaw {} feet {} grab {} {}",tick,mc.level.getGameTime(),
+                    near==null?"-":String.format(java.util.Locale.ROOT,"%.2f",near.getX()),near==null?"-":String.format(java.util.Locale.ROOT,"%.2f",near.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.2f",eva.getX()),String.format(java.util.Locale.ROOT,"%.2f",eva.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.1f",eva.getYRot()),com.projectseele.entity.EvaCombatSupportR33.diagR64(eva),
+                    com.projectseele.entity.EvaCombatR31.action(eva),near==null?"-":String.format(java.util.Locale.ROOT,"%.0f",near.getHealth()));
+    }
+
+    private static final boolean KICK_R64=Boolean.getBoolean("projectseele.tourKickR64");
+    private static final int[] KICK_MARKS_R64=kickMarksR64(System.getProperty("projectseele.tourKickMarksR64",""));
+    private static int[] kickMarksR64(String list)
+    {
+        int[] marks={20,30,38,46};String[] parts=list.split(",");
+        for(int i=0;i<marks.length&&i<parts.length;i++)
+            try{marks[i]=Integer.parseInt(parts[i].trim());}catch(NumberFormatException ignored){}
+        return marks;
+    }
+    private static void kickR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        boolean walk=tick>=512&&tick<560;
+        mc.options.keyUp.setDown(walk);mc.player.input.up=walk;mc.player.input.forwardImpulse=walk?1:0;mc.player.zza=walk?1:0;mc.player.xxa=0;
+        mc.options.keySprint.setDown(false);
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        if(at(10))dummyR64(mc,eva,KICK_MARKS_R64[0],0);
+        if(at(110))dummyR64(mc,eva,KICK_MARKS_R64[1],0);
+        if(at(210))dummyR64(mc,eva,KICK_MARKS_R64[2],0);
+        if(at(310))dummyR64(mc,eva,KICK_MARKS_R64[3],0);
+        if(at(410))removeTargetR63(mc,"sachiel");
+        if(at(500))dummyR64(mc,eva,58,0);
+        if(at(40)||at(140)||at(240)||at(340)||at(440)||at(532))heavyR64();
+        if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
+        if(tick%2==0||eva.isKickMotionActive(0))
+        {
+            var near=mc.level.getEntitiesOfClass(com.projectseele.entity.SachielEntity.class,eva.getBoundingBox().inflate(120)).stream()
+                    .min(java.util.Comparator.comparingDouble(eva::distanceToSqr)).orElse(null);
+            ProjectSeele.LOGGER.info("R64DUMMY tick {} game {} target at {} {} unit at {} {} yaw {} feet {}",tick,mc.level.getGameTime(),
+                    near==null?"-":String.format(java.util.Locale.ROOT,"%.2f",near.getX()),near==null?"-":String.format(java.util.Locale.ROOT,"%.2f",near.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.2f",eva.getX()),String.format(java.util.Locale.ROOT,"%.2f",eva.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.1f",eva.getYRot()),com.projectseele.entity.EvaCombatSupportR33.diagR64(eva)
+                            +(eva.isKickMotionActive(0)?" | "+com.projectseele.entity.EvaGameplayMotionR32.diagKickR64(eva,0):""));
+        }
     }
 
     /**

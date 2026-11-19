@@ -31,6 +31,8 @@ public final class EvaOrdinaryStandingSupportR52
     private static final Map<CombatBodyProfiles.Profile,CombatBodyProfiles.Profile> LEG_PROFILES=new java.util.IdentityHashMap<>();
     private static JsonObject data;
 
+    /** R64 (flow, "step"): ticks in which the standing feet give way to a kick that steps in. */
+    private static final float STEP_OUT_R64=1.2F;
     public static void apply(EvaUnit01Entity e,EvaBodyPose.Sample pose,float partial)
     {
         if(e.isExperimentalUnit()||!e.isPoweredOn()||e.isBerserk()||e.isCrucified()||e.getPilotEntity()==null
@@ -63,7 +65,15 @@ public final class EvaOrdinaryStandingSupportR52
         {
             // Fade the actual preceding standing correction; no new floor
             // targets or support IK are imposed on a genuine attack pose.
-            memory.clearFeet();memory.applyCached(pose,profile,envelope);return;
+            // R64 (flow, "step"): a kick with a step in is out of the stand in a tick (EvaRowClockR64.STEP_IN), and
+            // its stride begins there. Over the six ticks this fade takes, the legs and the hips were still three
+            // quarters the standing ones as the foot stepped: measured, the stepping foot was lifted 0.8 of a block
+            // where its clip lifts it 3.2, and set down 2.6 short; the foot held behind was drawn three blocks
+            // forward of where it stood.
+            memory.clearFeet();
+            if(EvaCombatModelR64.flowStep(e)&&EvaRowClockR64.stepFrom(e)!=null)
+                envelope*=Math.max(0,1-memory.sinceR64(now)/STEP_OUT_R64);
+            memory.applyCached(pose,profile,envelope);return;
         }
         // A grounded low stance owns its authored contacts, but is still the
         // same ordinary action. Keep the contact memory warm while its weight
@@ -164,6 +174,8 @@ public final class EvaOrdinaryStandingSupportR52
                 pose.rotations.put(name,parentWorld.invert().mul(orientation));pose.dirty();
             }
         }
+        /** Ticks since the Unit last went into an action or came out of one. */
+        public float sinceR64(double now){return (float)Math.max(0,now-changed);}
         public void applyCached(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile,float envelope)
         {if(correction!=null&&actionFrom>0)correction.apply(pose,profile,Math.max(0,Math.min(1,envelope/actionFrom)));}
     }

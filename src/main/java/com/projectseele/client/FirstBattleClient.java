@@ -88,6 +88,8 @@ public final class FirstBattleClient
     }
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent event)
     {
+        if(event.phase==TickEvent.Phase.START)
+            com.projectseele.entity.FirstBattleSignals.beginClientTick(AircraftRenderClockR21.stampedNanos(),Minecraft.getInstance().getFrameTime());
         if(event.phase!=TickEvent.Phase.END)return;var eva=actor();if(eva==null){restore();return;}
         var mc=Minecraft.getInstance();capture(eva,mc.gameRenderer.getMainCamera());
         float time=eva.firstBattleSignals().time(eva,1);

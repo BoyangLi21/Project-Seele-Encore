@@ -83,7 +83,7 @@ public final class EvaCombatPoseR31
                         RELEASE.put(e,new Vec3[]{EvaCombatR31.grip(e,victim,true,partial),EvaCombatR31.grip(e,victim,false,partial)});
                     for(String side:List.of("l","r"))
                     {
-                        boolean left=side.equals("l");Vec3 target=EvaCombatR31.grip(e,victim,left,partial);
+                        boolean left=side.equals("l");Vec3 target=EvaCombatR31.hand(e,victim,left,partial);
                         if(action==EvaCombatR31.THROW&&age>16)
                         {
                             var release=RELEASE.get(e);Vec3 from=release==null?target:release[left?0:1];

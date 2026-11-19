@@ -299,15 +299,24 @@ public final class SeeleConfig
                 .defineInList("hitStop", "tiered", java.util.List.of("tiered", "flat"));
         EVA_COMBAT_FLOW = common
                 .comment("Under the frames core, how a blow is timed and drawn. off: as first built (the server sends the clip's",
-                        "place every tick and a client chases it; a hit freezes the pose). on: the six parts below. Or any of",
+                        "place every tick and a client chases it; a hit freezes the pose). on: the parts below but kick. Or any of",
                         "them by name, with commas: clock (a client plays the blow by its own frame time: no late start, an even",
                         "pace at any frame rate), stop (a hit slows the blow for a moment and drops none of it; both bodies are",
                         "held 1 tick for a light blow, 2 medium, 3 heavy, 4 a finisher, where tiered holds 2 to 8), curve (the",
                         "pace does not break between wind-up, blow and recovery; no recovery faster than 1.15 times as captured),",
                         "fade (a blow begun out of another takes its place over a few ticks), stand (with an Angel near the",
                         "Unit takes no guard: it stands as it always stands, a blow comes out of that and goes back into it,",
-                        "and a blow left for a step or an evade gives way over six ticks), kick (the kick is one motion from a",
-                        "stand and back, the standing foot never moving, in place of the old hop and high kick; with curve).",
+                        "and a blow left for a step or an evade gives way over six ticks), step (the kick is the hard kick the",
+                        "Unit has always had, played at an even pace from the stand and back to it: it changes feet, drives",
+                        "forward over the standing foot, which stays where it is set down, and lands on the kicking foot; with",
+                        "a mark far off it steps in first, up to 15 blocks, with up to three ticks more start-up; a foot",
+                        "leaving the ground in a blow is eased out of its place; the pilot's own client moves the body by the",
+                        "row's clock a tick ahead, in time with the pose; with curve and clock), kick (not part of on: in place",
+                        "of the hard kick, the front kick written for R64: one motion from a stand and back, the standing foot",
+                        "never moving, and with step a stride of ten blocks before it; with curve), body (bare hands are the",
+                        "Unit's own blows in place of a boxer's: the light press is a pounce, then a knee, then the two-fisted",
+                        "slam; out of a run it is a charge with the shoulder; a held Angel is beaten on with the light press",
+                        "and thrown with the heavy one; with stand, curve, clock and step).",
                         "In game: /seele combat flow.")
                 .define("flow", "off", value -> value instanceof String);
         common.pop();

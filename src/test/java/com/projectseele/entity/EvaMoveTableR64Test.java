@@ -48,7 +48,7 @@ public final class EvaMoveTableR64Test
             check(Math.abs(EvaMoveTableR64.phase(live,r.startup(),r.active(),r.recovery(),open,close)-close)<1e-5F,n+": and closes with the live ticks");
             check(Math.abs(EvaMoveTableR64.phase(total,r.startup(),r.active(),r.recovery(),open,close)-1F)<1e-5F,n+": the clip ends with the row");
         }
-        check(rows==10,"ten rows");
+        check(rows==13,"thirteen rows");
 
         // The light string from standing: four blows, 95 points, and it ends.
         Set<String> seen=new HashSet<>();
@@ -60,6 +60,23 @@ public final class EvaMoveTableR64Test
             check(r.heavy()==null||r.heavy().equals("kick"),r.name()+": the heavy press out of a punch is the kick");
         }
         check(blows==4&&damage==95F,"jab, cross, jab, slam: 95 points, found "+blows+" blows and "+damage);
+        // R64 (flow, "body"): the Unit's own string from standing: three blows, 75 points, and it ends.
+        seen.clear();damage=0;blows=0;
+        for(Row r=EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,false,false,true,true,false);r!=null;r=EvaMoveTableR64.get(r.light()))
+        {
+            check(seen.add(r.name()),"the Unit's own string does not come back to "+r.name());
+            damage+=r.damage();blows++;
+            check(r.heavy()==null||r.heavy().equals("kick"),r.name()+": the heavy press out of it is the kick");
+        }
+        check(blows==3&&damage==75F,"pounce, knee, slam: 75 points, found "+blows+" blows and "+damage);
+        Row sprint=EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,false,false,true,true,true);
+        check(sprint.name().equals("charge"),"a sprinting light starts the shoulder charge");
+        for(String[] pair:new String[][]{{"pounce","jab"},{"knee","cross"},{"charge","jab"}})
+        {
+            Row move=EvaMoveTableR64.get(pair[0]),old=EvaMoveTableR64.get(pair[1]);
+            check(move.damage()==old.damage()&&move.cooldown()==old.cooldown()&&move.radius()==old.radius()
+                    &&move.knock()==old.knock()&&move.level()==old.level(),move.name()+": preserves the light attack's balance");
+        }
         check(EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,true,false,true).name().equals("kick"),"the heavy press from standing is the kick");
         check(EvaMoveTableR64.get("kick").cooldown()==44&&EvaMoveTableR64.get("knife_reverse").cooldown()==53,"the cooldowns of R63 stand");
 

@@ -1,4 +1,4 @@
-"""Author the kick: python kick.py out.json [sheet.png|-] [table]
+"""Author the kick: python kick.py out.json [sheet.png|-] [table|-] [step]
 
 The kick the frames core had was drawn by the old live-combat code: a hop that changed the feet over and a leg
 thrown up to the height of the head in seven ticks, which then stood at its highest through the hold and came down
@@ -32,6 +32,13 @@ Built on the first frame of the knife's forward thrust in Unit-01's private prof
 hands. That frame is not this project's to publish, so what is written is only how each frame differs from it,
 bone by bone (the game puts it back on: EvaGameplayMotionR32.addClipsR64).
 
+With "step" the kick is made with a step in (clip r32_kick_step_r64, beside the one made in place): the right foot
+is lifted and set down a stride ahead as the body comes forward over the left, which stays where it stood and is
+left behind, its heel coming up; then the left leg comes through from behind into the same kick over the right
+foot. The clip carries the stride as its root's path (STEP blocks ahead, never back); the game takes as much of it
+as brings the mark to the leg's length (EvaCombatMachineR64.start) and holds a foot that is on the ground where
+it stands in the world, so a foot's place while it is planted is only written here for the whole stride.
+
 The frames are laid on the clip so that the row that plays it (EvaMoveTableR64 "kick": start-up, live and
 recovery ticks along EvaRowClockR64's curve) gives every part of the motion the time it is written with here, in
 ticks at the pilot's speed of one.
@@ -53,12 +60,44 @@ X, Y, Z = np.array([1.0, 0, 0]), np.array([0, 1.0, 0]), np.array([0, 0, 1.0])   
 ONE = np.array([1.0, 0, 0, 0])
 
 # The row as EvaMoveTableR64 has it, and where its live part lies about the clip's contact.
-STARTUP, LIVE, RECOVERY, LEAD, TAIL = 7, 4, 13, .078, .142
-SECONDS, CONTACT, FRAMES = 1.2, .37, 73
+STEPPING = len(sys.argv) > 4 and sys.argv[4] == 'step'
+# The row's ticks. With the step in the start-up is three ticks longer (EvaCombatMachineR64.KICK_STEP_TICKS): in
+# seven the leg had to come through from a stride behind to the knee's height in 1.2 ticks, the thigh at 75 degrees
+# a tick, where the kick in place has nothing faster than 55.
+STARTUP, LIVE, RECOVERY, LEAD, TAIL = 10 if STEPPING else 7, 4, 13, .078, .142
+SECONDS, CONTACT, FRAMES = (STARTUP + LIVE + RECOVERY) / 20.0, .37, 3 * (STARTUP + LIVE + RECOVERY) + 1
 # How the Unit stands (a capture of Unit-01 standing, 2026-11-18): each ankle to the left of and ahead of the
 # middle, and its height; the hips' height and how far ahead of the middle they and the head are. Toes a little out.
 STAND = dict(ankle={'l': (6.0, 2.0), 'r': (-5.9, -.7)}, ankle_high=5.8, toes_out=8.0, hip_high=35.0, hips_ahead=.75, head_ahead=3.9)
 BALL = 3.7      # from under the ankle to the ball of the foot, ahead
+# The point of a foot the game holds to the ground (the profile's support_toes): ahead of the ankle and below it.
+# A foot whose heel comes up turns about that point, and its ankle goes forward as well as up, being that high over
+# the sole. (The step in was first written turning about the ball at the ankle's own height: the game's solve of a
+# held foot then put the ankle 1.6 to 3.5 blocks ahead of where the clip had it, measured frame by frame.)
+TOE, SOLE = 5.38, 5.8
+# The stride of the step in (blocks), and the ticks the body makes it in. It begins a tick in: until then the pose
+# is still coming out of the way the Unit stood (EvaRowClockR64.STEP_IN), and a foot that set off earlier was drawn
+# part way between its place in the stand and the clip's.
+STEP, STEP_FROM, STEP_TO = 10.0, 1.1, 5.2
+BLOCKS_A_METRE = 35.0                          # a clip's root path is in metres: 112 / 16 * the Unit's scale of 5
+
+
+R_OFF, R_ON, R_LIFT = 1.0, 4.0, 3.2            # the ticks between which the right foot is off the ground, and how high
+
+
+def advance(t):
+    """How far ahead of where it began the body is at a tick (the step in)."""
+    return STEP * smooth((t - STEP_FROM) / (STEP_TO - STEP_FROM)) if STEPPING else 0.0
+
+
+def stride(t):
+    """The right foot of the step in at a tick: how far ahead of where it stood it is over the ground, and how
+    high. It goes out ahead of the body and is set down a stride on while the body is still coming: a step, not a
+    foot carried under a body that slides."""
+    if not STEPPING:
+        return 0.0, 0.0
+    u = min(1.0, max(0.0, (t - R_OFF) / (R_ON - R_OFF)))
+    return STEP * smooth(u), R_LIFT * math.sin(math.pi * u) ** 1.2
 
 
 def unit(v):
@@ -124,10 +163,48 @@ def row_place(phase):
 # yaw     the pelvis turned to its left; tuck: its top tipped back; hike: its left side lifted
 # chest   the chest turned to its left on top of the pelvis; lean: its top tipped back on top of the pelvis
 # arm_l, arm_r   the wrist's place added to where it hangs, in the chest's own left, up, ahead
-REST = dict(flex=None, knee=None, toe=0, plant=1, hip=(0, 0), give=0, yaw=0, tuck=0, hike=0, chest=0, lean=0, arm_l=(0, 0, 0), arm_r=(0, 0, 0))
+# With the step in: high, the hips' height added to how they stand (the right foot is in the air for a while, so
+# its knee cannot set it).
+REST = dict(flex=None, knee=None, toe=0, plant=1, hip=(0, 0), give=0, yaw=0, tuck=0, hike=0, chest=0, lean=0, arm_l=(0, 0, 0), arm_r=(0, 0, 0),
+            high=0)
+
+
+def keys_step(t_out):
+    return [
+        (0.0, dict(REST)),
+        # the right foot off the ground, the body going forward over the left
+        (1.3, dict(REST, hip=(.9, .3), high=-.2, lean=-2, arm_l=(0, .3, 1.2), arm_r=(0, .2, -1.0))),
+        # the stride: the right foot out ahead, the left heel beginning to come up
+        (2.6, dict(REST, toe=-8, hip=(1.0, .9), high=-.8, chest=-3, lean=-5, arm_l=(.2, 1.2, 3.5), arm_r=(0, .6, -3.0))),
+        # the right foot set down ahead; the body coming on over it, the left behind on its toes
+        (4.0, dict(REST, toe=-20, hip=(.2, .8), high=-1.0, chest=-3, lean=-5, arm_l=(.3, 1.2, 3.2), arm_r=(0, .6, -2.6))),
+        (5.0, dict(REST, toe=-30, hip=(-1.6, .5), high=-.8, chest=-1, lean=-3, arm_l=(.4, 1.0, 1.8), arm_r=(0, .8, -1.2))),
+        # the left foot leaving the ground behind, coming through
+        # (thigh and knee as carry the foot on from where its raised heel had it: with the thigh at 10 and the knee at
+        # 58 the foot went four blocks back as it left the ground, and was then thrown forward)
+        (5.8, dict(REST, flex=18, knee=66, toe=-30, plant=.35, hip=(-3.2, 0), high=-.4, yaw=-2, tuck=2, hike=2, chest=1, lean=-1,
+                   arm_l=(.7, .8, -.6), arm_r=(-.3, 1.8, 2.0))),
+        # the knee up ahead, the shin folded under it
+        (t_out - 3.0, dict(REST, flex=72, knee=110, toe=6, plant=0, hip=(-4.8, -.5), high=.1, yaw=-5, tuck=7, hike=5, chest=7, lean=3,
+                           arm_l=(1.6, 1.5, -4.0), arm_r=(-.6, 4.0, 5.5))),
+        # out: the sole ahead at the height of the hip
+        (t_out, dict(REST, flex=88, knee=9, toe=58, plant=0, hip=(-4.7, 1.1), high=.7, yaw=-13, tuck=13, hike=7, chest=11, lean=8,
+                     arm_l=(2.4, 2.2, -6.0), arm_r=(-.4, 5.5, 7.0))),
+        # folded again, the thigh still up
+        (t_out + 3.6, dict(REST, flex=70, knee=104, toe=10, plant=0, hip=(-4.8, -.3), high=.1, yaw=-5, tuck=7, hike=5, chest=6, lean=3,
+                           arm_l=(1.4, 1.4, -3.6), arm_r=(-.5, 3.6, 4.8))),
+        # coming down under the hip
+        (t_out + 8.0, dict(REST, flex=24, knee=48, toe=-8, plant=0, hip=(-3.4, -.2), high=0, yaw=-1, tuck=2, hike=2.0, chest=2, lean=1,
+                           arm_l=(.6, .5, -1.3), arm_r=(-.2, 1.3, 1.7))),
+        # set down, toes first
+        (t_out + 11.4, dict(REST, toe=-10, hip=(-1.0, 0), high=-.1, arm_l=(.1, .1, -.3), arm_r=(0, .3, .4))),
+        (float(STARTUP + LIVE + RECOVERY), dict(REST)),
+    ]
 
 
 def keys(t_out):
+    if STEPPING:
+        return keys_step(t_out)
     return [
         (0.0, dict(REST)),
         # the weight going over the right foot, the left heel off the ground
@@ -257,7 +334,7 @@ def main():
             k['flex'], k['knee'] = flex_rest, knee_rest
         for name in ('hip', 'arm_l', 'arm_r'):
             k[name] = np.asarray(k[name], float)
-    names = ('flex', 'knee', 'toe', 'plant', 'give', 'yaw', 'tuck', 'hike', 'chest', 'lean', 'hip', 'arm_l', 'arm_r')
+    names = ('flex', 'knee', 'toe', 'plant', 'give', 'yaw', 'tuck', 'hike', 'chest', 'lean', 'hip', 'arm_l', 'arm_r', 'high')
 
     def at(t):
         """The keys' values at a tick, along a curve through the keys (a cubic with the mean of the slopes either
@@ -297,7 +374,7 @@ def main():
         m = rig.fk(rot, pos, world)
         d = ankle_s['r'] - pt(m, 'leg_r')
         need = leg_r.reach(stand_knee + c['give'])[0]
-        info['hip_y'] = d[1] + math.sqrt(max(0.0, need * need - d[0] * d[0] - d[2] * d[2]))
+        info['hip_y'] = c['high'] if STEPPING else d[1] + math.sqrt(max(0.0, need * need - d[0] * d[0] - d[2] * d[2]))
         shift(pos, np.array([0, info['hip_y'], 0]))
         m = rig.fk(rot, pos, world)
         # chest: turned back against the pelvis, and tipped
@@ -311,7 +388,9 @@ def main():
         m = rig.fk(rot, pos, world)
         parent_q = wq(m, 'torso_lower')
         # right leg: to the foot where it stands
-        qu, ql, qw_, ang, err = leg_r.solve(pt(m, 'leg_r'), ankle_s['r'], knee_r_pole + .3 * Z - .1 * X, parent_q)
+        # (with the step in: out ahead of the body and down a stride on, where it stays as the body comes over it)
+        ahead, up = stride(t)
+        qu, ql, qw_, ang, err = leg_r.solve(pt(m, 'leg_r'), ankle_s['r'] + Y * up + Z * (ahead - advance(t)), knee_r_pole + .3 * Z - .1 * X, parent_q)
         rot['leg_r'], rot['shin_r'] = qu, ql
         rot['ankle_r'] = R.qmul(R.qconj(R.qmul(qw_, ql)), R.qmul(foot_w['r'], R.qconj(rot0['foot_r'])))
         pos['shin_r'] = R.Rig.hinge_offset(ql, rig.pivot['shin_r'], body.knee['r'])
@@ -323,7 +402,12 @@ def main():
         aside = side_rest * (1 - swing)
         free = hip + line * math.sqrt(max(0.0, length * length - aside * aside)) + X * aside
         down = D(max(0.0, -c['toe']))
-        stood = ankle_s['l'] + Y * BALL * math.sin(down) + Z * BALL * (1 - math.cos(down))
+        # (with the step in, the left foot stays where it stood on the ground as the body goes forward; after the
+        # kick it is set down under the body where the body then is)
+        if STEPPING:
+            stood = ankle_s['l'] - Z * (advance(t) if t < t_out else 0.0) + Y * (TOE * math.sin(down) - SOLE * (1 - math.cos(down))) + Z * (TOE * (1 - math.cos(down)) + SOLE * math.sin(down))
+        else:
+            stood = ankle_s['l'] - Z * (advance(t) if t < t_out else 0.0) + Y * BALL * math.sin(down) + Z * BALL * (1 - math.cos(down))
         plant = min(1.0, max(0.0, c['plant']))
         target = free + (stood - free) * plant
         thigh = np.array([0, -math.cos(D(c['flex'])), math.sin(D(c['flex']))])
@@ -374,6 +458,20 @@ def main():
     print('left foot off the ground ticks %.1f to %.1f; then the hips are %.1f..%.1f to the left of the right ankle, %.1f..%.1f ahead of it; the head %.1f..%.1f ahead' % (
         times[air[0]], times[air[-1]], (mid[air, 0] - ankle_s['r'][0]).min(), (mid[air, 0] - ankle_s['r'][0]).max(),
         (mid[air, 2] - ankle_s['r'][2]).min(), (mid[air, 2] - ankle_s['r'][2]).max(), (head[air, 2] - ankle_s['r'][2]).min(), (head[air, 2] - ankle_s['r'][2]).max()))
+    if STEPPING:
+        l_world = np.array([pt(p[2], 'ankle_l') + Z * advance(times[i]) for i, p in enumerate(posed)])
+        r_world = np.array([pt(p[2], 'ankle_r') + Z * advance(times[i]) for i, p in enumerate(posed)])
+        l_on = [i for i in range(FRAMES) if at(times[i])['plant'] > .5 and times[i] < 7]
+        r_on = [i for i in range(FRAMES) if times[i] >= R_ON]
+        lead = [stride(t)[0] - advance(t) for t in times]
+        print('the step in: the body goes %.1f ahead between ticks %.1f and %.1f; the right foot is off the ground ticks %.1f to %.1f, up to %.1f high and %.1f ahead of the body, and is set down %.1f ahead of where it stood (the body then %.1f on its way); right leg out of reach by %.2f at the most' % (
+            advance(99), STEP_FROM, STEP_TO, R_OFF, R_ON, R_LIFT, max(lead), r_world[r_on[0], 2] - ankle_s['r'][2], advance(R_ON),
+            max(p[3]['leg_err_r'] for p in posed)))
+        print('  while it is planted the left ankle moves %.2f over the ground (ticks 0 to %.1f); the right, once set down, %.2f; left knee %.0f..%.0f through the stride, right %.0f..%.0f' % (
+            np.linalg.norm((l_world[l_on] - l_world[0])[:, [0, 2]], axis=1).max(), times[l_on[-1]],
+            np.linalg.norm((r_world[r_on] - r_world[r_on[0]])[:, [0, 2]], axis=1).max(),
+            min(posed[i][3]['knee_l'] for i in l_on), max(posed[i][3]['knee_l'] for i in l_on),
+            min(p[3]['knee_r'] for p in posed), max(p[3]['knee_r'] for p in posed)))
     # speeds by the tick, from a fine sampling of the motion itself
     fine = [pose(t) for t in np.arange(0, total + 1e-9, .25)]
     watch = ('torso_lower', 'torso_upper', 'leg_l', 'shin_l', 'ankle_l', 'leg_r', 'shin_r', 'arm_l', 'forearm_l', 'arm_r', 'forearm_r', 'head')
@@ -401,7 +499,9 @@ def main():
     shifted += [n for n in posed[0][1] if n not in pos0]
     frames = []
     for i, (rot, pos, m, info) in enumerate(posed):
-        row = {'rotation_delta_wxyz': [], 'position_delta_xyz': {}, 'foot_contact': [bool(ank[i, 1] <= ankle_s['l'][1] + .8), True]}
+        on = at(times[i])
+        feet = [bool(on['plant'] > .5), bool(stride(times[i])[1] < .15)] if STEPPING else [bool(ank[i, 1] <= ankle_s['l'][1] + .8), True]
+        row = {'rotation_delta_wxyz': [], 'position_delta_xyz': {}, 'foot_contact': feet}
         for n in moved:
             delta = R.qnorm(R.qmul(R.baked_to_clip(R.qnorm(rot[n])), R.qconj(R.baked_to_clip(R.qnorm(rot0[n])))))
             row['rotation_delta_wxyz'].append([round(float(x), 6) for x in delta])
@@ -413,19 +513,28 @@ def main():
                 row['position_delta_xyz'][n] = [round(float(x), 4) for x in (-t[0] * 16, t[1] * 16, t[2] * 16)]
         frames.append(row)
     clip = {'duration_seconds': SECONDS, 'loop': False, 'leading_side': 'l', 'contact_phase': CONTACT,
-            'trajectory_m': [[0.0, 0.0, 0.0]] * FRAMES, 'step_contacts': [f['foot_contact'] for f in frames],
+            'trajectory_m': [[0.0, 0.0, round(-advance(t) / BLOCKS_A_METRE, 6)] for t in times], 'step_contacts': [f['foot_contact'] for f in frames],
             'contact_bone': 'foot_l', 'bones': moved, 'frames': frames}
     print('%d frames; %d bones turned from the base frame: %s; offsets changed: %s' % (FRAMES, len(moved), ' '.join(moved), ' '.join(shifted)))
     doc = {'source': 'Project SEELE original kick (tools/finale/kick.py), MIT', 'sample_rate': 60,
            'form': 'each frame as its difference from the first frame of r32_knife_forward',
            'row': {'startup': STARTUP, 'live': LIVE, 'recovery': RECOVERY, 'lead': LEAD, 'tail': TAIL},
-           'clips': {'r32_kick_r64': clip}}
+           'clips': {'r32_kick_step_r64' if STEPPING else 'r32_kick_r64': clip}}
+    if os.path.exists(out):
+        old = json.load(open(out, encoding='utf8'))
+        old['clips'].update(doc['clips'])
+        doc = old
     json.dump(doc, open(out, 'w', encoding='utf8'), separators=(',', ':'))
     print('wrote', out, os.path.getsize(out), 'bytes')
     if len(sys.argv) > 2 and sys.argv[2] != '-':
         shown = [0.0] + [k[0] for k in ks[1:-1]] + [.5 * (ks[3][0] + ks[4][0]), .5 * (ks[4][0] + ks[5][0]), .5 * (ks[5][0] + ks[6][0]), float(total)]
         shown = sorted(set(round(t, 2) for t in shown))
-        images = [P.views(actors, pose(t)[2], 'kick %.1f' % t, knife=False) for t in shown]
+
+        def drawn(t):
+            """The pose where the body has got to over the ground (the step in)."""
+            rot, pos, m, info = pose(t)
+            return rig.fk(rot, pos, R.entity_matrix([0, 0, advance(t)], 0, S.SCALE))
+        images = [P.views(actors, drawn(t), 'kick %.1f' % t, knife=False) for t in shown]
         R.sheet([row[v] for v in range(2) for row in images], len(shown)).save(sys.argv[2])
         print('wrote', sys.argv[2])
 

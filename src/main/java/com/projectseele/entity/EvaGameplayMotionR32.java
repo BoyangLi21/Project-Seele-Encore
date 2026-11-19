@@ -45,7 +45,10 @@ public final class EvaGameplayMotionR32
         if(!Unit03SourceRigR53.sharesGroundActions(e)||e.isBerserk()||!ready(e)||e.isNervLogisticsLocked()||e.isVisuallyAirborneForRender()
                 ||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)||e.rifleStanceLevel(0)>.01F
                 ||EvaCombatR31.action(e)!=EvaCombatR31.NONE)return false;
-        return java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(activeGroundClip(e,0));
+        String clip=activeGroundClip(e,0);
+        // R64 (flow, "body"): the charge covers its own ground (the run it comes out of ends with the press).
+        if(clip.equals("hook")&&bodyClipR64(e,clip)!=null)return false;
+        return java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(clip);
     }
     private static int takeoffTicks(EvaUnit01Entity e)
     {
@@ -135,7 +138,7 @@ public final class EvaGameplayMotionR32
                 byte[] bytes=CombatMotionResourcesR44.read(file,"eva-gameplay-"+key);
                 var data=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
                 if(data.get("schema").getAsInt()!=2||data.get("rig_key").getAsInt()!=key)throw new IllegalArgumentException("Gameplay rig contract");
-                if(key==EvaUnit01Entity.UNIT_01){addClipsR64(data,"eva_knife_r64.json");addClipsR64(data,"eva_kick_r64.json");}
+                if(key==EvaUnit01Entity.UNIT_01){addClipsR64(data,"eva_knife_r64.json");addClipsR64(data,"eva_kick_r64.json");addClipsR64(data,"eva_kick_hard_r64.json");addClipsR64(data,"eva_unarmed_r64.json");}
                 com.projectseele.ProjectSeele.LOGGER.info("EVA gameplay profile resolved: rig={} file={} sha256={}",key,file.toAbsolutePath().normalize(),
                         java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
                 // Kept for the whole session and read in place: share equal numbers instead of holding 88 bytes for each.
@@ -174,7 +177,20 @@ public final class EvaGameplayMotionR32
                 for(var element:clip.getAsJsonArray("frames"))
                 {
                     var change=element.getAsJsonObject();var frame=guard.deepCopy();
-                    var rotations=frame.getAsJsonArray("rotation_wxyz");var deltas=change.getAsJsonArray("rotation_delta_wxyz");
+                    var rotations=frame.getAsJsonArray("rotation_wxyz");
+                    if(change.has("rotation_wxyz"))
+                    {
+                        // A frame written whole (a public capture laid on its row: tools/finale/hardkick.py): its
+                        // bones as they are, no bone moved off its joint; the frame beside it gives only the bones
+                        // the capture has not got.
+                        var whole=change.getAsJsonArray("rotation_wxyz");
+                        for(int b=0;b<at.length;b++)rotations.set(at[b],whole.get(b));
+                        frame.add("root_m",change.get("root_m"));frame.add("bone_position_xyz",new JsonObject());
+                        frame.add("foot_contact",change.get("foot_contact"));
+                        frames.add(frame);
+                        continue;
+                    }
+                    var deltas=change.getAsJsonArray("rotation_delta_wxyz");
                     for(int b=0;b<at.length;b++)rotations.set(at[b],afterR64(deltas.get(b).getAsJsonArray(),rotations.get(at[b]).getAsJsonArray()));
                     if(change.has("root_delta_m"))frame.add("root_m",addedR64(frame.getAsJsonArray("root_m"),change.getAsJsonArray("root_delta_m")));
                     var offsets=frame.has("bone_position_xyz")?frame.getAsJsonObject("bone_position_xyz"):new JsonObject();
@@ -254,8 +270,10 @@ public final class EvaGameplayMotionR32
     {
         var p=profile(variant(e));if(p==null)return false;
         var clips=p.getAsJsonObject("clips");
-        // R64 (flow, "kick"): the kick this project authored stands where the profile has none.
-        return clips.has("r32_"+name)||name.equals("kick")&&clips.has("r32_kick_r64")&&EvaCombatModelR64.flowKick(e);
+        // R64 (flow, "kick"): the kick this project authored stands where the profile has none. (flow, "step"
+        // without it): so does the hard kick laid on its row.
+        return clips.has("r32_"+name)||name.equals("kick")&&(clips.has("r32_kick_r64")&&EvaCombatModelR64.flowKick(e)
+                ||clips.has("r32_kick_hard_r64")&&EvaCombatModelR64.flowHardKick(e));
     }
     public static boolean knifeReady(EvaUnit01Entity e)
     {return hasClip(e,"knife_forward")&&hasClip(e,"knife_reverse");}
@@ -310,9 +328,46 @@ public final class EvaGameplayMotionR32
         var frames=clip(e,name).getAsJsonArray("frames");var f=frames.get(Math.min(frames.size()-1,Math.round(Mth.clamp(phase,0,1)*(frames.size()-1)))).getAsJsonObject();
         return f.getAsJsonArray("foot_contact").get(side.equals("l")?0:1).getAsBoolean();
     }
+    /**
+     * R64 (flow, "body"): the blow in hand is one written with a leap (tools/finale/moves.py marks its clip), and
+     * where it has got to neither foot is on the ground. Such a frame is drawn as high as it is written.
+     */
+    public static boolean flownR64(EvaUnit01Entity e,float partial)
+    {
+        if(!directed(e)||!EvaCombatSupportR33.strike(e))return false;
+        String name=activeGroundClip(e,partial);if(name.isEmpty())return false;
+        var clip=clip(e,name);if(clip==null||!clip.has("leaps"))return false;
+        var frames=clip.getAsJsonArray("frames");
+        var feet=frames.get(Math.min(frames.size()-1,Math.round(Mth.clamp(activeGroundPhase(e,partial),0,1)*(frames.size()-1)))).getAsJsonObject().getAsJsonArray("foot_contact");
+        return !feet.get(0).getAsBoolean()&&!feet.get(1).getAsBoolean();
+    }
+    /** Review: which clip the kick is drawn by now, the share of its stride, the share of the pose the row has, and how much the body is taken to be walking. */
+    public static String diagKickR64(EvaUnit01Entity e,float partial)
+    {
+        var clock=e.rowStandR64("kick");
+        return resolve(e,"kick")+" step "+EvaRowClockR64.step(e)+(clock==null?" no row":" told "+clock.step()+" share "+EvaRowClockR64.share(clock,e.liveActionPhaseDrawnR63(partial)))
+                +" walking "+e.rifleMoveBlend(partial);
+    }
+    /** R64 (flow, "body"): the Unit's own bare-handed blows are in its profile and the switch has them. */
+    public static boolean bodyReadyR64(EvaUnit01Entity e)
+    {
+        if(!EvaCombatModelR64.flowBody(e)||!ready(e))return false;
+        var clips=profile(variant(e)).getAsJsonObject("clips");
+        return clips.has("r32_pounce_r64")&&clips.has("r32_knee_r64")&&clips.has("r32_charge_r64");
+    }
+    /** R64 (flow, "body"): the blow that stands in a punch's place, or null. Crouched or prone the punches are as they were. */
+    private static String bodyClipR64(EvaUnit01Entity e,String name)
+    {
+        if(!name.equals("jab")&&!name.equals("cross")&&!name.equals("hook")||!bodyReadyR64(e)||actionStanceR44(e)>0)return null;
+        return name.equals("jab")?"pounce_r64":name.equals("cross")?"knee_r64":"charge_r64";
+    }
     private static String resolve(EvaUnit01Entity e,String name)
     {
-        if(name.equals("kick")&&!profile(variant(e)).getAsJsonObject("clips").has("r32_kick"))return "kick_r64";
+        String body=bodyClipR64(e,name);
+        if(body!=null)return body;
+        if(name.equals("kick")&&!profile(variant(e)).getAsJsonObject("clips").has("r32_kick"))
+            return EvaCombatModelR64.flowHardKick(e)&&profile(variant(e)).getAsJsonObject("clips").has("r32_kick_hard_r64")?"kick_hard_r64"
+                    :EvaCombatModelR64.flowStep(e)&&EvaRowClockR64.step(e)>0&&profile(variant(e)).getAsJsonObject("clips").has("r32_kick_step_r64")?"kick_step_r64":"kick_r64";
         int stance=actionStanceR44(e);
         if(stance>0&&java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(name))return (stance>=3?"prone_":"crouch_")+name;
         if(name.equals("jab")&&e.getOrdinaryAttackStage()==3&&hasClip(e,"jab_loop"))return "jab_loop";
@@ -400,6 +455,20 @@ public final class EvaGameplayMotionR32
         var points=clip(e,name).getAsJsonArray("trajectory_m");
         float f=Math.min(EvaRootClosureR63.holdFrom(points,()->forwardR63(points)),Mth.clamp(phase,0,1)*(points.size()-1));int a=(int)f,b=Math.min(a+1,points.size()-1);
         var x=points.get(a).getAsJsonArray();var y=points.get(b).getAsJsonArray();return new Vec3(Mth.lerp(f-a,x.get(0).getAsDouble(),y.get(0).getAsDouble()),0,Mth.lerp(f-a,x.get(2).getAsDouble(),y.get(2).getAsDouble()));
+    }
+    /**
+     * R64 (flow, "step"): how far the whole of a clip's step in carries the body beyond the clip's own path, at a
+     * phase; null for a clip that has none written beside its path (tools/finale/hardkick.py writes one: the game
+     * adds the share of it the mark's distance asks for).
+     */
+    @javax.annotation.Nullable
+    public static Vec3 strideR64(EvaUnit01Entity e,String name,float phase)
+    {
+        var clip=clip(e,name);if(!clip.has("stride_m"))return null;
+        var points=clip.getAsJsonArray("stride_m");
+        float f=Mth.clamp(phase(e,name,phase),0,1)*(points.size()-1);int a=(int)f,b=Math.min(a+1,points.size()-1);
+        var x=points.get(a).getAsJsonArray();var y=points.get(b).getAsJsonArray();
+        return new Vec3(Mth.lerp(f-a,x.get(0).getAsDouble(),y.get(0).getAsDouble()),0,Mth.lerp(f-a,x.get(2).getAsDouble(),y.get(2).getAsDouble()));
     }
     /** How far each point of a root path lies ahead of its first (blocks): the clips advance along -z. */
     static double[] forwardR63(com.google.gson.JsonArray points)
@@ -788,7 +857,7 @@ public final class EvaGameplayMotionR32
      */
     private static void offArmR64(EvaUnit01Entity e,EvaBodyPose.Sample pose,EvaBodyPose.Sample base,String name)
     {
-        if(!EvaCombatModelR64.flowStand(e)||!name.equals("jab")&&!name.equals("cross")&&!name.equals("hook"))return;
+        if(!EvaCombatModelR64.flowStand(e)||!name.equals("jab")&&!name.equals("cross")&&!name.equals("hook")||bodyClipR64(e,name)!=null)return;
         String off=side(e,name).equals("l")?"r":"l";
         for(String part:new String[]{"clavicle_","arm_","forearm_","wrist_","hand_"})
         {
