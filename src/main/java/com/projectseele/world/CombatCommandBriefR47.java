@@ -30,21 +30,26 @@ public final class CombatCommandBriefR47
         boolean observed, berserk, critical;
     }
 
-    private static void say(ServerLevel level, EvaUnit01Entity eva, String speaker, String line)
-    {
-        say(level, eva, Component.literal(speaker), Component.literal(line));
-    }
-
-    private static void monitor(ServerLevel level, EvaUnit01Entity eva, String key)
+    private static Component radioUnit(EvaUnit01Entity eva)
     {
         int slot = TvSortiesR32.slot(eva);
-        Component unit = switch (slot)
+        return switch (slot)
         {
             case 0, 1, 2 -> Component.translatable("radio.projectseele.unit." + slot);
             default -> Component.literal(TvSortiesR32.name(slot));
         };
+    }
+
+    private static void combat(ServerLevel level, EvaUnit01Entity eva, String key)
+    {
+        Component line = eva == null ? Component.translatable(key) : Component.translatable(key, radioUnit(eva));
+        say(level, eva, StaffDialogueCatalogR24.speaker("葛城美里 · 作战通信"), line);
+    }
+
+    private static void monitor(ServerLevel level, EvaUnit01Entity eva, String key)
+    {
         say(level, eva, Component.translatable("radio.projectseele.monitor.channel"),
-                Component.translatable(key, unit));
+                Component.translatable(key, radioUnit(eva)));
     }
 
     private static void say(ServerLevel level, EvaUnit01Entity eva, Component speaker, Component line)
@@ -80,14 +85,14 @@ public final class CombatCommandBriefR47
         if (now < pulse.attackAfter || now < pulse.lineAfter) return;
         String action = switch (kind)
         {
-            case "rifle", "cannon" -> "射击确认。注意目标的反击。";
-            case "knife", "sword" -> "近战攻击确认。保持退路。";
-            case "smash", "punch" -> "攻击确认。别停在目标正面。";
+            case "rifle", "cannon" -> "radio.projectseele.combat.shot";
+            case "knife", "sword" -> "radio.projectseele.combat.blade";
+            case "smash", "punch" -> "radio.projectseele.combat.strike";
             default -> null;
         };
         if (action == null) return;
         pulse.attackAfter = now + 160; pulse.lineAfter = now + 50;
-        say(level, eva, "葛城美里 · 作战通信", TvSortiesR32.name(TvSortiesR32.slot(eva)) + "，" + action);
+        combat(level, eva, action);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -109,7 +114,7 @@ public final class CombatCommandBriefR47
             long now = level.getGameTime();
             if (now < pulse.attackAfter || now < pulse.lineAfter) return;
             pulse.attackAfter = now + 160; pulse.lineAfter = now + 50;
-            say(level, eva, "葛城美里 · 作战通信", TvSortiesR32.name(TvSortiesR32.slot(eva)) + "有效命中。继续观察目标。" );
+            combat(level, eva, "radio.projectseele.combat.hit");
         }
     }
 
@@ -120,7 +125,7 @@ public final class CombatCommandBriefR47
         var target = event.getEntity();
         var campaign = TvCampaignSavedData.get(level);
         if (campaign.angel == null || !campaign.angel.equals(target.getUUID()) || DEATHS.put(target, true) != null) return;
-        say(level, null, "葛城美里 · 作战通信", "目标生命反应消失。各机保持警戒，准备返回机库。");
+        combat(level, null, "radio.projectseele.combat.target_down");
     }
 
     @SubscribeEvent

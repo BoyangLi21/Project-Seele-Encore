@@ -2963,5 +2963,10 @@
   "ops.projectseele.bridge.the_personnel_platform_has_changed_at_s_gate_position_retained": "The personnel platform has changed at %s. Gate position retained.",
   "hud.projectseele.combat.pummel_throw_keys": "%s Pummel  /  %s / %s Throw",
   "hud.projectseele.cockpit.unit_sync_status": "%s  /  %s",
-  "ops.projectseele.telemetry_report.sync_status_hp": "\n%s   HP %s/%s"
+  "ops.projectseele.telemetry_report.sync_status_hp": "\n%s   HP %s/%s",
+  "radio.projectseele.combat.shot": "%s, shot confirmed. Watch for a counterattack.",
+  "radio.projectseele.combat.blade": "%s, close-range attack confirmed. Keep a way out.",
+  "radio.projectseele.combat.strike": "%s, attack confirmed. Keep moving. Stay clear of the target’s front.",
+  "radio.projectseele.combat.hit": "%s scored a hit. Keep watching the target.",
+  "radio.projectseele.combat.target_down": "The target’s life signs are gone. All units, stay alert and prepare to return to the hangar."
 }

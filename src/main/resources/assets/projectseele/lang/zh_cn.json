@@ -2963,5 +2963,10 @@
   "ops.projectseele.bridge.the_personnel_platform_has_changed_at_s_gate_position_retained": "本机人员平台完整组件已改变，门保持现状：%s",
   "hud.projectseele.combat.pummel_throw_keys": "%s 捶击  /  %s / %s 投掷",
   "hud.projectseele.cockpit.unit_sync_status": "%s  /  %s",
-  "ops.projectseele.telemetry_report.sync_status_hp": "\n%s   耐久 %s/%s"
+  "ops.projectseele.telemetry_report.sync_status_hp": "\n%s   耐久 %s/%s",
+  "radio.projectseele.combat.shot": "%s，射击确认。注意目标的反击。",
+  "radio.projectseele.combat.blade": "%s，近战攻击确认。保持退路。",
+  "radio.projectseele.combat.strike": "%s，攻击确认。别停在目标正面。",
+  "radio.projectseele.combat.hit": "%s有效命中。继续观察目标。",
+  "radio.projectseele.combat.target_down": "目标生命反应消失。各机保持警戒，准备返回机库。"
 }
