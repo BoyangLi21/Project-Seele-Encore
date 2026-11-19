@@ -49,7 +49,25 @@ public final class NervSharedSpaceReservationsR54Test
         }
         field(d,"epoch",7L);field(d,"installed",true);field(d,"fingerprint","synthetic-reservation-identity");
         field(d,"units",units);field(d,"nodes",nodes);field(d,"resources",resources);field(d,"legs",legs);field(d,"routes",routes);
-        field(d,"dynamicSpaces",NervDynamicAirspaceR52.parse(new JsonObject()));return d;
+        field(d,"dynamicSpaces",NervDynamicAirspaceR52.parse(new JsonObject()));
+        var profile = new MotionProfile("continuous_upright",16,32,32,"bay0");
+        var hakone = new Route("hakone",0,3,0,Region.SURFACE,"port0","",List.of("leg0"),profile);
+        var surface = new Route("surface",0,2,0,Region.SURFACE,"port0","",List.of("leg0"),profile);
+        var geofront = new Route("geofront",0,1,0,Region.GEOFRONT,"port0","",List.of("leg0"),profile);
+        var legacy = new Route("legacyHakone",0,3,0,Region.SURFACE,"port0","",List.of("leg0"));
+        for (var route : List.of(hakone,surface,geofront,legacy)) routes.put(route.id(),route);
+        field(d,"hakoneBank",3);
+        var buildIndex=NervRouteDirectoryR52.class.getDeclaredMethod("indexHakoneResources");
+        buildIndex.setAccessible(true);
+        field(d,"hakoneResources",buildIndex.invoke(d));
+        Set<String> manifest = d.resources(hakone);
+        check(manifest == d.resources(hakone) && manifest.equals(legs.get("leg0").resources()),
+                "Hakone must reuse all declared hardware and SPACE");
+        for (var other : List.of(surface,geofront,legacy,
+                new Route("hakone",0,3,0,Region.SURFACE,"port0","",List.of("leg0"),profile)))
+            check(d.resources(other) != d.resources(other) && d.resources(other).equals(manifest),
+                    "Other banks, legacy and unregistered routes must keep the original collection");
+        return d;
     }
     private static void sharedSpaceProgresses()throws Exception
     {
