@@ -182,13 +182,6 @@ public final class StaffOperationsR48
             return result(false,"请先完成准备，等机体在发射井停稳待命后，再选择地下紧急部署。");
         return undergroundExit(caller,operator,variant,true);
     }
-    public static EvaLogisticsDirector.ActionResult undergroundDoorOpenR52(ServerPlayer caller,NervStaffEntity operator,int variant)
-    {
-        if(variant<0||variant>2)return result(false,"请指定零号机、初号机或二号机。");
-        if(!StaffUndergroundChoiceR52.deployedDoorReady(EvaLogisticsDirector.status(caller.serverLevel(),variant).phase()))
-            return result(false,"此门控用于已出动机体。要从发射井出库，请在准备与发射中选择地下紧急部署。");
-        return undergroundExit(caller,operator,variant,true);
-    }
     /** Strict caller ownership is retained even when the account has administrator permission. */
     public static EvaLogisticsDirector.ActionResult undergroundExit(ServerPlayer caller,NervStaffEntity operator,int variant,boolean open)
     {

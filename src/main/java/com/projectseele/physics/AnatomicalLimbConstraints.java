@@ -118,12 +118,15 @@ public final class AnatomicalLimbConstraints
         }
     }
     public static void reachHand(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile,String side,Vector3f target)
+    {reachHand(pose,profile,side,target,null);}
+
+    public static void reachHand(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile,String side,Vector3f target,Vector3f elbowDirection)
     {
         for(var element:profile.definition().getAsJsonArray("bodies"))
         {
             var row=element.getAsJsonObject();if(!row.get("name").getAsString().equals("forearm_"+side))continue;var m=row.getAsJsonArray("joint");
             var joint=new Vector3f(m.get(3).getAsFloat(),m.get(7).getAsFloat(),m.get(11).getAsFloat()).div(CombatBodyProfiles.MODEL_TO_PHYSICS);var axis=new Vector3f(m.get(2).getAsFloat(),m.get(6).getAsFloat(),m.get(10).getAsFloat()).normalize();
-            solve(pose,"arm_"+side,"forearm_"+side,"hand_"+side,joint,axis,row.getAsJsonArray("hinge").get(1).getAsFloat(),target);return;
+            solve(pose,"arm_"+side,"forearm_"+side,"hand_"+side,joint,axis,row.getAsJsonArray("hinge").get(1).getAsFloat(),target,null,elbowDirection);return;
         }
     }
     public static Vector3f elbowJoint(CombatBodyProfiles.Profile profile,String side,Vector3f fallback)
@@ -178,6 +181,9 @@ public final class AnatomicalLimbConstraints
     private static void solve(EvaBodyPose.Sample p,String upper,String lower,String end,Vector3f joint,Vector3f axis,float maximum,Vector3f goal)
     {solve(p,upper,lower,end,joint,axis,maximum,goal,null);}
     private static void solve(EvaBodyPose.Sample p,String upper,String lower,String end,Vector3f joint,Vector3f axis,float maximum,Vector3f goal,Vector3f extendedEnd)
+    {solve(p,upper,lower,end,joint,axis,maximum,goal,extendedEnd,null);}
+
+    private static void solve(EvaBodyPose.Sample p,String upper,String lower,String end,Vector3f joint,Vector3f axis,float maximum,Vector3f goal,Vector3f extendedEnd,Vector3f elbowDirection)
     {
         Vector3f origin=point(p,upper),target=goal==null?point(p,end):new Vector3f(goal),oldJoint=p.matrix(upper).transformPosition(new Vector3f(joint));
         Quaternionf endOrientation=p.matrix(end).getUnnormalizedRotation(new Quaternionf()).normalize();
@@ -189,7 +195,8 @@ public final class AnatomicalLimbConstraints
         Vector3f direction=new Vector3f(target).sub(origin);if(direction.lengthSquared()<1e-9F)return;float length=Mth.clamp(direction.length(),shortest,longest);direction.normalize();
         target.set(origin).fma(length,direction);float angle=neutral+(float)Math.acos(Mth.clamp(((length*length-la*la-lb*lb)/2-c)/Math.max(amplitude,1e-8F),-1,1));
         Quaternionf hinge=new Quaternionf().rotationAxis(angle,axis);
-        float along=(la*la-lb*lb+length*length)/(2*length);Vector3f bend=oldJoint.sub(origin);bend.fma(-bend.dot(direction),direction);
+        float along=(la*la-lb*lb+length*length)/(2*length);Vector3f bend=elbowDirection==null?oldJoint.sub(origin):new Vector3f(elbowDirection);
+        bend.fma(-bend.dot(direction),direction);
         if(bend.lengthSquared()<1e-8F)bend.set(0,0,-1).fma(direction.z,direction);bend.normalize();
         Vector3f middle=new Vector3f(origin).fma(along,direction).fma((float)Math.sqrt(Math.max(0,la*la-along*along)),bend);
         Quaternionf upperWorld;

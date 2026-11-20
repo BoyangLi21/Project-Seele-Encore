@@ -13,7 +13,7 @@ public final class StaffUndergroundMenuR52Test
             if(choice.unit()!=unit||choice.prepareFirst()!=prepare)throw new AssertionError("Unit/destination lost by UI request");
         }
         for(String bad:new String[]{"UNDERGROUND_DEPLOY:-1:ready","UNDERGROUND_DEPLOY:3:prepare","UNDERGROUND_DEPLOY:0:launch",
-                "UNDERGROUND_DEPLOY:1:prepare:launch","UNDERGROUND:1:ready","UNDERGROUND_DEPLOY:x:ready"})
+                "UNDERGROUND_DEPLOY:1:prepare:launch","UNDERGROUND:1:ready","UNDERGROUND:1:door_open","UNDERGROUND:1:close","UNDERGROUND_DEPLOY:x:ready"})
         {
             boolean rejected=false;try{StaffUndergroundChoiceR52.parse(bad);}catch(IllegalArgumentException expected){rejected=true;}
             if(!rejected)throw new AssertionError("Malformed or surface-launch request admitted: "+bad);
@@ -28,8 +28,6 @@ public final class StaffUndergroundMenuR52Test
                 ||!StaffUndergroundChoiceR52.readyContinuation("deploy","SILO_READY").equals("launch")
                 ||!StaffUndergroundChoiceR52.readyContinuation("prepare","SILO_READY").isEmpty())
             throw new AssertionError("Preparation confused underground/surface/prepare-only destinations");
-        if(StaffUndergroundChoiceR52.deployedDoorReady("SILO_READY")||!StaffUndergroundChoiceR52.deployedDoorReady("DEPLOYED"))
-            throw new AssertionError("Door-only operation still implicitly deployed a waiting EVA");
         for(boolean npc:new boolean[]{false,true})
         {
             String driver=npc?"npc":"human";
@@ -38,6 +36,6 @@ public final class StaffUndergroundMenuR52Test
             if(!StaffConversationScreen.sortieRequest("sachiel",1,npc,"melee").equals("CAMPAIGN:sortie:sachiel:1:"+driver+":melee"))
                 throw new AssertionError("Ordinary sortie dispatch changed");
         }
-        System.out.println("PASS: 3 units x2 underground choices; malformed requests rejected; prepare waits for SILO_READY; underground never maps to surface launch; door-only requires DEPLOYED; existing human/NPC Unit02 sword dispatch retained");
+        System.out.println("PASS: 3 units x2 underground choices; malformed requests rejected; prepare waits for SILO_READY; underground never maps to surface launch; retired standalone gate requests rejected; existing human/NPC Unit02 sword dispatch retained");
     }
 }

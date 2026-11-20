@@ -310,6 +310,24 @@ public final class EvaAnatomicalHandsR45
             body.rotations.get(hand).slerp(desired,weight);body.dirty();
         }
     }
+    /** Shared by the body pose and the final render pass so both leave the same owner on a supported wrist. */
+    public static float crawlWristWeight(EvaUnit01Entity e,float partial)
+    {
+        float weight=EvaPoseBlendR51.smooth((e.rifleStanceLevel(partial)-2.5F)*2);
+        if(weight<=0||e.getWeapon()!=EvaUnit01Entity.WEAPON_KNIFE&&e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS
+                ||e.hasLiveActionForRender(partial)||e.isFirstBattleActive()||e.isBerserk()||!e.isPoweredOn()||!enabled(e))return 0;
+        return weight;
+    }
+
+    /** The forearm supports the crawl. The fingers point along its final direction after ground support. */
+    static void alignCrawlWrists(EvaUnit01Entity e,EvaBodyPose.Sample body,float partial)
+    {
+        float weight=crawlWristWeight(e,partial);
+        if(weight<=0)return;
+        alignPunchWristR53(e,body,"l",weight,false);
+        if(e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS)alignPunchWristR53(e,body,"r",weight,false);
+    }
+
     public static void alignPunchWristR53(EvaUnit01Entity e,EvaBodyPose.Sample body,float partial)
     {
         if(!enabled(e)||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||e.isNervLogisticsLocked())return;

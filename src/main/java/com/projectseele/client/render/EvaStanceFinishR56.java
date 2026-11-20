@@ -84,6 +84,13 @@ final class EvaStanceFinishR56
         boolean emptyLeft=weapon==EvaUnit01Entity.WEAPON_FISTS||weapon==EvaUnit01Entity.WEAPON_KNIFE;
         boolean emptyRight=weapon==EvaUnit01Entity.WEAPON_FISTS;
         float raw=Math.max(eva.rifleProneBlend(partial),EvaFixedCannonBodyR55.applies(eva)?1F:0F);
+        // The shared prone pose has already seated each bare hand on its measured cuff. The
+        // transition still reaches for the floor, then hands its wrist back to the crawl.
+        float transition=1;
+        if(com.projectseele.entity.EvaGameplayMotionR32.sharedBody(eva,partial)
+                &&!com.projectseele.anim.EvaAnimator.owns(eva,partial))
+            transition-=com.projectseele.entity.EvaAnatomicalHandsR45.crawlWristWeight(eva,partial);
+        if(transition<=0)return;
         if(prone>.01F&&root!=null)
         {
             // Going down, and getting up, the free hands reach for the ground
@@ -91,8 +98,8 @@ final class EvaStanceFinishR56
             // they arrive. Turning them by the prone progress alone bent the
             // wrists of arms still hanging at the sides.
             float reach=smooth((raw-.08F)/.3F)*(1-smooth((raw-.75F)/.22F));
-            if(emptyLeft)plantHand(model,root,"l",reach,prone);
-            if(emptyRight)plantHand(model,root,"r",reach,prone);
+            if(emptyLeft)plantHand(model,root,"l",reach*transition,prone*transition);
+            if(emptyRight)plantHand(model,root,"r",reach*transition,prone*transition);
         }
         float crouch=smooth(eva.rifleCrouchBlend(partial))*(1-prone);
         if(crouch>.01F&&weapon==EvaUnit01Entity.WEAPON_FISTS)
@@ -103,7 +110,7 @@ final class EvaStanceFinishR56
         if(emptyLeft)relaxWrist(model,"l",relaxed);
         if(emptyRight)relaxWrist(model,"r",relaxed);
         // Last, whatever drew them: from the first of the way down to the last of the way up.
-        float held=smooth(Math.max(raw,eva.rifleStanceLevel(partial))/WRIST_HELD_BY);
+        float held=transition*smooth(Math.max(raw,eva.rifleStanceLevel(partial))/WRIST_HELD_BY);
         if(held>.01F&&root!=null)
         {
             if(emptyLeft)holdWrist(model,root,"l",held);

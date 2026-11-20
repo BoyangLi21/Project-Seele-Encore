@@ -191,22 +191,17 @@ public final class StaffConversationR24
             catch(IllegalArgumentException error){session.reply="ops.projectseele.staff.select_a_valid_unit_and_an_underground_deployment";}
             send(player,npc,session,false);return;
         }
-        if(request.startsWith("ARMEDSORTIE:")||request.startsWith("UNDERGROUND:"))
+        if(request.startsWith("ARMEDSORTIE:"))
         {
             try
             {
                 String[] parts=request.split(":",-1);
                 if(parts.length!=3)throw new IllegalArgumentException();
                 int variant=Integer.parseInt(parts[1]);
-                boolean armed=parts[0].equals("ARMEDSORTIE");
-                if(armed&&(variant!=0&&variant!=2||!Set.of("human","npc").contains(parts[2]))
-                        ||!armed&&(variant<0||variant>2||!Set.of("open","close","door_open").contains(parts[2])))
+                if ((variant != 0 && variant != 2) || !Set.of("human", "npc").contains(parts[2]))
                     throw new IllegalArgumentException();
                 session.pilotContact=-1;
-                var result=armed
-                        ?StaffOperationsR48.armedSortie(player,npc,variant,parts[2].equals("npc"))
-                        :parts[2].equals("door_open")?StaffOperationsR48.undergroundDoorOpenR52(player,npc,variant)
-                        :StaffOperationsR48.undergroundExit(player,npc,variant,parts[2].equals("open"));
+                var result=StaffOperationsR48.armedSortie(player,npc,variant,parts[2].equals("npc"));
                 session.reply=result.message();
             }
             catch(IllegalArgumentException error)

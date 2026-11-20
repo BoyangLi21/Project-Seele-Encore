@@ -20,6 +20,8 @@ public final class EvaMoveTableR64
 {
     /** What drives the body through the blow: a punch clip by its stage, the two-handed slam, the side kick, a knife clip. */
     public static final int PUNCH=0,SLAM=1,KICK=2,KNIFE=3;
+    // 0..3 are the original fists, 4..9 are already used by the client's kick, knife and slam root tracks.
+    public static final int POUNCE_STAGE=10,KNEE_STAGE=11,CHARGE_STAGE=12;
     /** How hard it lands: a flinch, a stagger caught in two steps, a knock-back caught in four, a fall. */
     public static final int LIGHT=0,MEDIUM=1,HEAVY=2,FINISHER=3;
 
@@ -62,26 +64,24 @@ public final class EvaMoveTableR64
     private static void row(Row r){ROWS.put(r.name(),r);}
     static
     {
-        // Bare hands. The string is jab, cross, a second and harder jab, slam on the light press; the heavy press is
-        // the side kick, from standing or out of any of the first three. The slam and the kick end a string.
+        // Ordinary light presses alternate the two punches from the shipped R63 profile.
         // (The bundle's hook clip was tried as the third blow and left out: it is an older, upright clip, and between
         // the cross and the slam the body stood up for it, knees from 40 degrees to 11, and sank again.)
         //      name     kind  st  su ac rec  lead   tail   dmg  rad  knock level    stop push   track feint cH  cW  eH  eW  move armor    cd  slow   light    heavy
         row(new Row("jab",   PUNCH,0,  3, 3, 11, .066F,.093F, 20, 3.2F,1.1, LIGHT,   2,  .012F, 9,    2,    7,  10, 6,  8,  10,  2,9,    0,  false, "cross", "kick"));
-        row(new Row("cross", PUNCH,1,  4, 3, 12, .091F,.047F, 20, 3.2F,1.1, LIGHT,   3,  .014F, 8,    2,    8,  12, 7,  10, 12,  3,10,   0,  false, "jab2",  "kick"));
+        row(new Row("cross", PUNCH,1,  4, 3, 12, .091F,.047F, 20, 3.2F,1.1, LIGHT,   3,  .014F, 8,    2,    8,  12, 7,  10, 12,  3,10,   0,  false, "jab",   "kick"));
         row(new Row("jab2",  PUNCH,0,  4, 3, 10, .066F,.093F, 20, 3.2F,1.1, MEDIUM,  4,  .018F, 7,    2,    8,  12, 7,  10, 12,  3,10,   0,  false, "slam",  "kick"));
         row(new Row("slam",  SLAM, 0,  9, 4, 25, .030F,.055F, 35, 4F,  2.0, FINISHER,8,  .030F, 5,    4,    -1, -1, 18, 22, 24,  5,13,   0,  true,  null,    null));
         // R64 (flow, "body"): the Unit's own bare hands (tools/finale/unarmed.py), which the light press goes to in
-        // place of the jab where the switch has them. In the original Unit-01 does not box: it throws itself on an
+        // a separate follow-up after an evade. In the original Unit-01 does not box: it throws itself on an
         // Angel, drives a knee into it, takes hold of it. The string is pounce, knee, slam: three presses for the
         // former four. Pounce and knee retain the damage and cooldown of the two light attacks they replace.
         // The charge is also a light opener and shares its damage and cooldown. It is selected out
-        // of a run. They play in the punches' three places (stage 0, 1, 2), so whatever goes by a punch's stage
-        // goes on as it did.
+        // of a run. Their own synchronized stages identify the clip for pose, root travel and contact.
         //      name     kind  st  su ac rec  lead   tail   dmg  rad  knock level    stop push   track feint cH  cW  eH  eW  move armor    cd  slow   light    heavy
-        row(new Row("pounce",PUNCH,0,  6, 3, 12, .030F,.100F, 20, 3.2F,1.1, LIGHT,   2,  .012F, 9,    2,    10, 12, 9,  11, 11,  2,9,    0,  false, "knee",  "kick"));
-        row(new Row("knee",  PUNCH,1,  6, 3, 13, .030F,.090F, 20, 3.2F,1.1, LIGHT,   3,  .014F, 8,    2,    10, 13, 9,  11, 12,  3,10,   0,  false, "slam",  "kick"));
-        row(new Row("charge",PUNCH,2,  4, 6, 12, .030F,.230F, 20, 3.2F,1.1, LIGHT,   2,  .012F, 6,    0,    -1, -1, 12, 14, 14,  2,10,    0, false,  null,    null));
+        row(new Row("pounce",PUNCH,POUNCE_STAGE,  6, 3, 12, .030F,.100F, 20, 3.2F,1.1, LIGHT,   2,  .012F, 9,    2,    10, 12, 9,  11, 11,  2,9,    0,  false, "knee",  "kick"));
+        row(new Row("knee",  PUNCH,KNEE_STAGE,  6, 3, 13, .030F,.090F, 20, 3.2F,1.1, LIGHT,   3,  .014F, 8,    2,    10, 13, 9,  11, 12,  3,10,   0,  false, "slam",  "kick"));
+        row(new Row("charge",PUNCH,CHARGE_STAGE,  4, 6, 12, .030F,.230F, 20, 3.2F,1.1, LIGHT,   2,  .012F, 6,    0,    -1, -1, 12, 14, 14,  2,10,    0, false,  null,    null));
         // (The kick's recovery was 7 ticks: the leg came back from its highest to the ground in 10, and the owner
         // said after his second play that it comes back too fast. 13: the same part of the clip at a little over
         // half its captured pace, 15 ticks to the ground. An evade or a step still leaves it from the ticks they did.)
@@ -133,7 +133,10 @@ public final class EvaMoveTableR64
     {
         if(weapon==EvaUnit01Entity.WEAPON_KNIFE)
             return get(cuts?heavy?"knife_slash":afterEvade?"knife_counter":"knife_cut":heavy?"knife_reverse":afterEvade?"knife_counter":"knife_slash");
-        return get(heavy?"kick":body?running?"charge":"pounce":"jab");
+        if(heavy)return get("kick");
+        if(body&&running)return get("charge");
+        if(afterEvade)return get(body?"pounce":"jab2");
+        return get("jab");
     }
 
     private EvaMoveTableR64(){}

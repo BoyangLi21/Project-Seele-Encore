@@ -10,6 +10,14 @@ public final class OpenSeaR64Test
 
     public static void main(String[] args)
     {
+        // The adjacent cliff columns and the shoreline south of the second viewpoint
+        // are surveyed ground. A new chunk must produce the same profile as the patched save.
+        int[][] banks = {{3279, -2106, 97}, {3280, -2106, 96}, {3306, -2145, 65}, {3306, -2144, 62}};
+        if (PlaytestLandscapeR64.hasSurvey()) for (int[] column : banks)
+        {
+            var regenerated = HakoneSurfaceField.sample(column[0], column[1], 70);
+            check(regenerated.ground() == column[2], "playtest bank at " + column[0] + "," + column[1] + " = " + regenerated.ground());
+        }
         // Straight out from the east edge of the saved chunks (x 4511) through open water.
         int z = 800, previous = 0;
         for (int d : new int[] {1, 48, 100, 300, 800, 1600, 3000})

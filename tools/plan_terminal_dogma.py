@@ -1,14 +1,14 @@
 """Plan the R64 Terminal Dogma changes (D1-D3) as write_deep_cells rows and signs, read-only on a world copy.
 
 D1  Heaven's Door: an antechamber in the old void behind the chamber's north wall on the cross's axis, reached
-    from the arrival porch, and a 25 x 29 gate in the north wall with its two leaves left ajar; the 7-wide gap
+    from the retained B lift via a west-side approach, and a 25 x 29 gate in the north wall with its two leaves left ajar; the 7-wide gap
     lines up with the crucifix and Lilith.  Original blocks only.
 D2  The grey kiosk inside the chamber next to the porch (x 16..30, z 262..277) goes; the gallery floor continues.
 D5  The cross arms move up six blocks to meet Lilith's palms at her new scale (the scale itself is entity data,
     written with write_entity_fields.py).
 D3  The LCL lake is deepened to 14 blocks under the unchanged surface (the leg-like growths stay just above it,
     as in the TV series where the lake pools below the cross); a tiled bed at the bottom.
-The crucifix, the lift and the existing porch entrance are left as they are.  write_deep_cells runs the lift,
+The B lift is retained. The old X12 porch and direct gallery approach are retired.  write_deep_cells runs the lift,
 launch and city protection checks when the rows are written.
 
     plan_terminal_dogma.py --world W --out DIR      (writes DIR/rows.json, DIR/signs.json, DIR/summary.json)
@@ -37,7 +37,6 @@ BED = 'minecraft:deepslate_tiles'
 ANTE_X = (15, 45)            # shell, interior 16..44
 ANTE_Z = (239, 257)          # north shell at 239; the chamber's north wall (z 258..260) closes the south side
 ANTE_Y = (-1231, -1198)      # floor and ceiling
-PORCH_DOOR = dict(x=15, z=(252, 256), y=(-1230, -1227))
 WALL_Z = (258, 260)
 GATE_X = (18, 42)
 GATE_Y = (-1230, -1202)
@@ -100,6 +99,61 @@ def leaf_block(x, y, z):
     return WALL
 
 
+def gate_approach():
+    """Retire the X12 porch and take the existing B lift to the west side of Heaven's Door."""
+    want = {}
+    for x in range(-32, 16):
+        for z in range(257, 262):
+            infill = BED
+            if z == 257:
+                infill = 'minecraft:stone'
+            elif z == 261:
+                infill = AIR
+            for y in range(-1231, -1225):
+                want[x, y, z] = infill
+            if z == 261:
+                want[x, -1231, z] = DECK
+    for x in range(8, 16):
+        for z in range(250, 258):
+            for y in range(-1231, -1224):
+                want[x, y, z] = 'minecraft:stone'
+        for z in range(258, 261):
+            for y in range(-1233, -1224):
+                want[x, y, z] = BED
+    for x in range(9, 32):
+        for z in range(261, 278):
+            if x > 15 and z < 270:
+                continue
+            want[x, -1231, z] = DECK
+            for y in range(-1230, -1224):
+                want[x, y, z] = AIR
+    for z in range(239, 258):
+        for y in range(-1230, -1197):
+            want[15, y, z] = WALL
+        want[15, -1231, z] = FLOOR
+    # The lift exits south. Turn north outside the shaft, then run east into the antechamber.
+    inside = {(x, z) for x in range(-42, -32) for z in range(258, 261)}
+    inside |= {(x, z) for x in range(-35, -32) for z in range(245, 261)}
+    inside |= {(x, z) for x in range(-35, 16) for z in range(245, 248)}
+    shell = {(x + dx, z + dz) for x, z in inside for dx in (-1, 0, 1) for dz in (-1, 0, 1)}
+    for x, z in shell:
+        # Keep the native B landing, including its south door, call and sign.
+        if (x < -38 and z >= 257) or x == 16:
+            continue
+        ceiling_light = (z == 246 and x % 8 == 0) or (x == -34 and z % 8 == 0)
+        for y in range(-1231, -1225):
+            state = WALL
+            if (x, z) in inside:
+                if y == -1231:
+                    state = FLOOR
+                elif y == -1226:
+                    state = LAMP if ceiling_light else WALL
+                else:
+                    state = AIR
+            want[x, y, z] = state
+    return want
+
+
 def plan(world):
     w = Cells(world)
     want = {}
@@ -108,8 +162,6 @@ def plan(world):
     for x in range(ANTE_X[0], ANTE_X[1] + 1):
         for z in range(ANTE_Z[0], ANTE_Z[1] + 1):
             for y in range(ANTE_Y[0], ANTE_Y[1] + 1):
-                if x == ANTE_X[0] and z >= 250:
-                    continue                         # the porch's own east wall (doorway below)
                 shell = x in ANTE_X or z == ANTE_Z[0] or y in ANTE_Y
                 if not shell:
                     want[x, y, z] = AIR
@@ -120,9 +172,6 @@ def plan(world):
                     want[x, y, z] = LAMP if lamp else WALL
                 else:
                     want[x, y, z] = WALL
-    for z in range(PORCH_DOOR['z'][0], PORCH_DOOR['z'][1] + 1):
-        for y in range(PORCH_DOOR['y'][0], PORCH_DOOR['y'][1] + 1):
-            want[PORCH_DOOR['x'], y, z] = AIR
 
     # D1 gate in the north wall
     for x in range(FRAME_X[0], FRAME_X[-1] + 1):
@@ -177,6 +226,7 @@ def plan(world):
     want[30, LINTEL_Y[1], WALL_Z[1] + 1] = 'minecraft:dark_oak_wall_sign[facing=south,waterlogged=false]'
     want[30, LINTEL_Y[1], WALL_Z[0] - 1] = 'minecraft:dark_oak_wall_sign[facing=north,waterlogged=false]'
 
+    want.update(gate_approach())
     rows, kinds, skipped = [], Counter(), Counter()
     for (x, y, z), after in sorted(want.items()):
         before = w.get(x, y, z)

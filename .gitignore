@@ -68,3 +68,5 @@ forge*changelog.txt
 /src/main/resources/assets/projectseele/facility/r52_upright_guideway_paths.json
 # Derived from a private supplied carrier mesh; local runtime overlay only.
 /src/main/resources/assets/projectseele/mesh/carrier_mast_slot_r54.json
+# Surveyed surface changes are generated with tools/package_r64_playtest_terrain.py for local map builds.
+/src/main/resources/data/projectseele/worldgen/playtest_landscape_r64/

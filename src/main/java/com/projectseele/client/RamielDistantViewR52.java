@@ -83,7 +83,7 @@ public final class RamielDistantViewR52
             float haze=hazeR64(distance);
             if(haze<=0){RenderSystem.setShaderFogStart(Math.max(fogStart,distance+64));RenderSystem.setShaderFogEnd(Math.max(fogEnd,distance+512));}
             else{RenderSystem.setShaderFogStart(0);RenderSystem.setShaderFogEnd(distance/haze);}
-            boolean terrainDepth = distance >= 128 && RamielTerrainDepthR64.begin(event.getProjectionMatrix());
+            boolean terrainDepth = distance >= 128 && !GiantFarViewR61.usingTerrainDepth() && RamielTerrainDepthR64.begin(event.getProjectionMatrix());
             try {
                 RamielRenderer.renderObservedR52(state,event.getPartialTick(),view.ageClientTicks(),poses,BUFFERS);
                 BUFFERS.endBatch();

@@ -292,9 +292,10 @@ public final class EvaRowClockR64Test
                 check(first.get(0).getAsBoolean()&&first.get(1).getAsBoolean()&&end.get(0).getAsBoolean()&&end.get(1).getAsBoolean(),name+" begins and ends on both feet");
             }
             check(EvaMoveTableR64.get("pounce").light().equals("knee")&&EvaMoveTableR64.get("knee").light().equals("slam"),"the string is pounce, knee, slam");
-            check(EvaMoveTableR64.opener(0,false,false,false,true,false).name().equals("pounce")&&EvaMoveTableR64.opener(0,false,false,false,true,true).name().equals("charge")
+            check(EvaMoveTableR64.opener(0,false,false,false,true,false).name().equals("jab")
+                    &&EvaMoveTableR64.opener(0,false,true,false,true,false).name().equals("pounce")&&EvaMoveTableR64.opener(0,false,false,false,true,true).name().equals("charge")
                     &&EvaMoveTableR64.opener(0,false,false,false,false,true).name().equals("jab")&&EvaMoveTableR64.opener(0,true,false,false,true,true).name().equals("kick"),
-                    "the light press is the pounce, out of a run the charge, the jab where the switch has not the Unit's own blows; the heavy press is the kick");
+                    "standing light is a punch, light after an evade is a pounce, sprinting light is a charge, heavy is a kick");
         }
         catch(java.io.IOException e){throw new IllegalStateException(e);}
     }

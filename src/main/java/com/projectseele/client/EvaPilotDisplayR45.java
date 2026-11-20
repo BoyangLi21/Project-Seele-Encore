@@ -30,7 +30,7 @@ public final class EvaPilotDisplayR45
     /**
      * R64: the same readings as floating windows on the wall of the plug, as the original shows them: the internal
      * power counted down in large figures at the top, the synchronisation and condition of the unit at the left of
-     * the pilot, the weapon at the right. The lower corners belong to the yokes and the hands on them.
+     * the pilot, the weapon at the right. The side windows sit at the lower corners.
      */
     private static void windows(GuiGraphics g, Font font, EvaUnit01Entity eva, float partial, int width, int height)
     {
@@ -67,7 +67,8 @@ public final class EvaPilotDisplayR45
         }
 
         // The unit: which one, how well the pilot is synchronised with it, what is left of the body and the field.
-        int ly = Math.max(py + 46, height * 2 / 5 - 20);
+        int ly = height - margin - 50;
+        int ry = height - margin - 29;
         // R64: with the cannon's sight down over the pilot's face the wall's side windows are behind its shell.
         if (sight > com.projectseele.client.cockpit.PlugCannonSightR64.COVERING)
         {
@@ -88,13 +89,13 @@ public final class EvaPilotDisplayR45
         gauge(g, margin + 58, ly + 41, panel - 63, Mth.clamp(eva.getAtFieldEnergy() / 200F, 0, 1), eva.isAtFieldOn() ? GREEN : AMBER);
 
         int rx = width - margin - panel;
-        window(g, rx, ly, panel, 29, eva.isAtFieldOn() ? GREEN : AMBER);
-        line(g, font, Component.translatable(eva.getWeaponTranslationKey()).getString(), rx + 5, ly + 4, panel - 10, WHITE);
+        window(g, rx, ry, panel, 29, eva.isAtFieldOn() ? GREEN : AMBER);
+        line(g, font, Component.translatable(eva.getWeaponTranslationKey()).getString(), rx + 5, ry + 4, panel - 10, WHITE);
         String stance = eva.isPilotProne() ? I18n.get("hud.projectseele.cockpit.prone") : eva.isPilotCrouching() ? I18n.get("hud.projectseele.cockpit.crouch") : eva.isPilotSprinting() ? I18n.get("hud.projectseele.cockpit.sprint") : I18n.get("hud.projectseele.plug.drive");
         String radio = I18n.get("hud.projectseele.radio_key", Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString());
-        line(g, font, stance + "  /  " + radio, rx + 5, ly + 16, panel - 10, MUTED);
+        line(g, font, stance + "  /  " + radio, rx + 5, ry + 16, panel - 10, MUTED);
         // What is said to the pilot has its own window in the corner above (PilotChatPanelR64).
-        com.projectseele.client.cockpit.PlugCannonSightR64.serviceBelow(font, g, eva, rx + 5, ly + 34);
+        com.projectseele.client.cockpit.PlugCannonSightR64.serviceBelow(font, g, eva, rx + 5, ry - 33);
 
         alerts(g, font, eva, partial, width, height, py + 18, hull, stopped);
     }

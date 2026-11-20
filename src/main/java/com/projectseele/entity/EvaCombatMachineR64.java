@@ -25,7 +25,7 @@ import java.util.Map;
  * the live ticks, and the limb's swept capsule is tested on each live tick until it lands. A blow that has not
  * landed when the live ticks end is told once as a miss.
  * <p>
- * Server only. The old core keeps every case the table has no row for yet: crouched and prone blows, the aerial
+ * Server only. The old core keeps every case the table has no row for: crouched fists, the aerial
  * blows, the grapple, the sword, and every Unit but Unit-01.
  */
 public final class EvaCombatMachineR64
@@ -78,6 +78,8 @@ public final class EvaCombatMachineR64
         button=pressed;held=0;
         return true;
     }
+
+    void clearStanceBuffer(){button=-1;last=null;sinceEnd=1000;}
 
     private int n(int ticks){return ticks<=0?ticks:Math.max(1,Math.round(ticks/rate));}
     private boolean ready(Row next){return e.level().getGameTime()>=readyAt.getOrDefault(next.name(),0L);}
@@ -202,7 +204,7 @@ public final class EvaCombatMachineR64
         // R64 (flow): the row's clock, for the clients that play it themselves (nothing is told where they do not).
         if(EvaCombatModelR64.flowClock(e))EvaRowClockR64.begin(e,serial,next.name(),EvaUnit01Entity.rowClipR64(next),startup,active,recovery,open,close,curve,
                 next.kind()==EvaMoveTableR64.KICK?EvaCombatModelR64.flowKickClip(e)&&EvaGameplayMotionR32.kickReady(e)
-                        :next.kind()==EvaMoveTableR64.PUNCH&&EvaGameplayMotionR32.bodyReadyR64(e));
+                        :stride!=null);
         else EvaRowClockR64.end(e);
         if(strides)EvaRowClockR64.step(e,step);
         // The Unit's turn for this tick has been made (the ridden body turns before the blows are looked at):

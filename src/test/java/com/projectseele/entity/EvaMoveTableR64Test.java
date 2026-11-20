@@ -50,19 +50,21 @@ public final class EvaMoveTableR64Test
         }
         check(rows==13,"thirteen rows");
 
-        // The light string from standing: four blows, 95 points, and it ends.
+        for(boolean body:new boolean[]{false,true})
+        {
+            Row punch=EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,false,false,true,body,false);
+            for(int i=0;i<8;i++)
+            {
+                check(punch.name().equals(i%2==0?"jab":"cross")&&punch.stage()==i%2,"held light alternates the two R63 fist clips");
+                check("kick".equals(punch.heavy()),"either fist may lead into the heavy kick");
+                punch=EvaMoveTableR64.get(punch.light());
+            }
+        }
+        check(EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,false,true,true,false,false).name().equals("jab2"),
+                "without the body special the evade counter still leads to a slam");
         Set<String> seen=new HashSet<>();
         float damage=0;int blows=0;
-        for(Row r=EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,false,false,true);r!=null;r=EvaMoveTableR64.get(r.light()))
-        {
-            check(seen.add(r.name()),"the light string does not come back to "+r.name());
-            damage+=r.damage();blows++;
-            check(r.heavy()==null||r.heavy().equals("kick"),r.name()+": the heavy press out of a punch is the kick");
-        }
-        check(blows==4&&damage==95F,"jab, cross, jab, slam: 95 points, found "+blows+" blows and "+damage);
-        // R64 (flow, "body"): the Unit's own string from standing: three blows, 75 points, and it ends.
-        seen.clear();damage=0;blows=0;
-        for(Row r=EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,false,false,true,true,false);r!=null;r=EvaMoveTableR64.get(r.light()))
+        for(Row r=EvaMoveTableR64.opener(EvaUnit01Entity.WEAPON_FISTS,false,true,true,true,false);r!=null;r=EvaMoveTableR64.get(r.light()))
         {
             check(seen.add(r.name()),"the Unit's own string does not come back to "+r.name());
             damage+=r.damage();blows++;
@@ -102,7 +104,7 @@ public final class EvaMoveTableR64Test
         check(EvaMoveTableR64.opener(knife,false,false,false).name().equals("knife_slash"),"knife light without the cuts");
         check(EvaMoveTableR64.opener(knife,false,true,false).name().equals("knife_counter"),"knife light after an evade without the cuts");
         check(EvaMoveTableR64.opener(knife,true,false,false).name().equals("knife_reverse"),"knife heavy without the cuts");
-        System.out.println("Frames core table: "+rows+" rows, strings end, clips run forward PASS");
+        System.out.println("Frames core table: "+rows+" rows, punch loop and finishers, clips run forward PASS");
     }
 
     private EvaMoveTableR64Test(){}

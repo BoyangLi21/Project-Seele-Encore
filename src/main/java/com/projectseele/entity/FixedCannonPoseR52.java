@@ -78,11 +78,21 @@ public final class FixedCannonPoseR52
             var current=handMatrix.getUnnormalizedRotation(new Quaternionf()).normalize();
             var orientation=grip==null?new Quaternionf().rotationTo(new Vector3f(offset).normalize(),desired).mul(current):palmOrientationR54(current,grip,desired);
             String parent=pose.rig.get(hand).parent();pose.rotations.put(hand,pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(orientation));pose.dirty();
+            // The old support elbow followed the previous prone pose. On the far grip this is the
+            // inward IK solution: the forearm goes through the chest. Keep it on the shoulder's outer
+            // side, leading towards the muzzle as the wrist reaches across the front of the body.
+            Vector3f elbowDirection=null;
+            if(side.equals("l"))
+            {
+                var left=pose.matrix("arm_l").transformPosition(new Vector3f(pose.rig.get("arm_l").pivot()));
+                var right=pose.matrix("arm_r").transformPosition(new Vector3f(pose.rig.get("arm_r").pivot()));
+                elbowDirection=left.sub(right).normalize().add(0,0,-.8F);
+            }
             for(int i=0;i<3;i++)
             {
                 handMatrix=pose.matrix(hand);wrist=handMatrix.transformPosition(new Vector3f(pose.rig.get(hand).pivot()));
                 offset=handMatrix.transformPosition(new Vector3f(contact)).sub(wrist);
-                AnatomicalLimbConstraints.reachHand(pose,profile,side,new Vector3f(goal).sub(offset));pose.dirty();
+                AnatomicalLimbConstraints.reachHand(pose,profile,side,new Vector3f(goal).sub(offset),elbowDirection);pose.dirty();
             }
         }
         float weight=EvaPoseBlendR51.smooth((now+partial-memory.started)/12F);

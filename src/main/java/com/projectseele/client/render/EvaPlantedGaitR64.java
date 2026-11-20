@@ -252,6 +252,9 @@ public final class EvaPlantedGaitR64
         /** Swinging: how much higher than its own arc it goes to clear what stands in its way; a footfall has been chosen. */
         double clear;
         boolean targeted,settled;
+        // Body position at the last stationary footfall, even if a wall displaced its nominal target.
+        double restBodyX=Double.NaN,restBodyZ;
+        float restBodyYaw;
         /** Swinging: the share of its step it takes (less where the whole step had nothing to stand on). */
         double share=1;
         /** Swinging: seconds until it lands, and how long the swing was to be as it began. */
@@ -510,7 +513,7 @@ public final class EvaPlantedGaitR64
         s.forwardSpeed=s.vx*fx+s.vz*fz;
         double sideSpeed=s.vx*lx+s.vz*lz;
         s.lateral=going>1e-3?Math.min(1,Math.abs(sideSpeed)/going):0;
-        s.moving=going>MOVE_AT;
+        s.moving=going>MOVE_AT&&eva.groundGaitTravelR64(going);
         if(s.skidding)
         {
             s.skidAge+=dt;
@@ -625,7 +628,7 @@ public final class EvaPlantedGaitR64
                     // quickly, where the other foot stands and stays until it is down again.
                     double otherLocal=frac(s.phase-other.offset);
                     boolean stays=other.down&&(otherLocal<s.duty?(s.duty-otherLocal)*s.cycle:0)>QUICK_SWING+.04;
-                    boolean over=!due&&f.reachShort>.6&&stays&&f.stood>MIN_STANCE;
+                    boolean over=!due&&s.moving&&f.reachShort>.6&&stays&&f.stood>MIN_STANCE;
                     if(due||over)lift(s,f,over);
                     if(due){f.liftLocal=local;f.swingTime=(1-local)*s.cycle;f.travelling=s.moving;}
                 }
@@ -690,6 +693,8 @@ public final class EvaPlantedGaitR64
     /** How overdue a standing foot is for a step back under the body: 1 is due. */
     private static double lag(State s,Foot f)
     {
+        if(!s.moving&&Math.hypot(s.atX-f.restBodyX,s.atZ-f.restBodyZ)<TIDY_AT
+                &&Math.abs(Mth.wrapDegrees(s.yaw-f.restBodyYaw))<TIDY_TURN)return 0;
         boolean tidy=s.still>TIDY_AFTER;
         double side=f.lat*s.rig.footHalf();
         double x=s.atX+leftX(s.yaw)*side,z=s.atZ+leftZ(s.yaw)*side;
@@ -872,6 +877,7 @@ public final class EvaPlantedGaitR64
     {
         double step=Math.hypot(f.toX-f.fromX,f.toZ-f.fromZ);
         f.down=true;f.x=f.toX;f.y=f.toY;f.z=f.toZ;f.yaw=f.toYaw;f.slope=f.toSlope;f.stood=0;f.strike=Math.max(0,f.landWith);f.swing=0;f.quick=false;
+        f.restBodyX=s.moving?Double.NaN:s.atX;f.restBodyZ=s.atZ;f.restBodyYaw=s.yaw;
         f.roll=Mth.clamp(.2*s.stanceSeconds,.05,.2);
         // The weight comes down on the foot: the pelvis gives by this much and comes back (a damped spring).
         double give=s.moving?Mth.lerp(Mth.clamp((.62-s.duty)/.32,0,1),DIP_WALK,DIP_RUN)*Mth.clamp(s.speed/20,.3,1):DIP_SPOT;
@@ -1259,7 +1265,7 @@ public final class EvaPlantedGaitR64
                 Matrix4f world=new Matrix4f(root).mul(EvaRigTransforms.model(feet[i]));
                 Vector3f at=world.transformPosition(EvaRigTransforms.pivot(feet[i]));
                 Vector3f toes=EvaRigTransforms.rotation(world).transform(new Vector3f(0,0,-1));
-                f.down=true;f.swing=0;f.quick=false;f.stood=1;f.strike=0;f.support=1;f.reachShort=0;
+                f.restBodyX=Double.NaN;f.down=true;f.swing=0;f.quick=false;f.stood=1;f.strike=0;f.support=1;f.reachShort=0;
                 f.yaw=Math.hypot(toes.x,toes.z)>.2?(float)(Mth.atan2(-toes.x,toes.z)*Mth.RAD_TO_DEG):s.yaw;
                 f.x=at.x;f.z=at.z;
                 Footing ground=footing(s,eva,rig,f.x,f.z,f.yaw,at.y-rig.ankle());

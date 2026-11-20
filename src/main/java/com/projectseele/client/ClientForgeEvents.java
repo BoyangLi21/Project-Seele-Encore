@@ -175,6 +175,14 @@ public final class ClientForgeEvents
             player.setXRot(eva.clampPilotViewPitch(player.getXRot(),1));
             player.setYRot(eva.clampPilotViewYaw(player.getYRot(),1));
         }
+        if (eva != null && minecraft.options.getCameraType().isFirstPerson()
+                && com.projectseele.world.EvaPilotResolver.sealedInAirframe(player)
+                && eva.isPoweredOn() && !eva.isActivationCinematicActive()
+                && com.projectseele.client.cockpit.PilotMountView.fixed(eva)) {
+            float bodyYaw = com.projectseele.entity.EvaAirTransportR31.frameYaw(eva,1);
+            player.setYRot(com.projectseele.client.cockpit.PilotMountView.yaw(player.getYRot(),bodyYaw));
+            player.setXRot(com.projectseele.client.cockpit.PilotMountView.pitch(player.getXRot()));
+        }
 
         // While piloting, Shift belongs to the Unit's legs. Clear vanilla's
         // dismount input before LocalPlayer processes it; V is the explicit

@@ -71,9 +71,9 @@ public final class HakoneSurfaceField
         if (!OuterBoundaryTerrain.enabled()) return sampleField(x, z, nativeGround);
         // Beyond the survey and the saved chunks the outer terrain decides alone; it
         // already starts from the nearest known ground.
-        if (OuterBoundaryTerrain.unknown(x, z)) return OuterBoundaryTerrain.surface(x, z);
+        if (OuterBoundaryTerrain.unknown(x, z)) return PlaytestLandscapeR64.surface(x, z, OuterBoundaryTerrain.surface(x, z));
         Surface field = sampleField(x, z, nativeGround);
-        return field == null ? null : OuterBoundaryTerrain.surveyedSea(x, z, field);
+        return field == null ? null : PlaytestLandscapeR64.surface(x, z, OuterBoundaryTerrain.surveyedSea(x, z, field));
     }
 
     private static Surface sampleField(int x, int z, int nativeGround)

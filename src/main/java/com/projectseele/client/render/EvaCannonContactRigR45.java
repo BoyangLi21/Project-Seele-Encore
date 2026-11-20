@@ -40,7 +40,7 @@ final class EvaCannonContactRigR45
                 new Vector3f(forward).fma(-.56F,up),new Vector3f(up).fma(.56F,forward),frame.rightPad());
         var support=EvaRifleGripR45.fitPalm(grips.getOrDefault("cannon_l",grips.get("l")),body.rig.get("hand_l").pivot(),right,forward,frame.leftPad());
         solve(model,"r",dominant,new Vector3f(right).add(0,-.7F,0),renderedRoot);
-        solve(model,"l",support,new Vector3f(right).negate().add(0,-.7F,0),renderedRoot);
+        solve(model,"l",support,new Vector3f(right).negate().fma(.8F,forward).fma(-.35F,up),renderedRoot);
         absolute(model.getBone("cannon").orElseThrow(),frame.weaponToWorld(),renderedRoot);
         var head=model.getBone("head").orElseThrow();
         var gaze=new Quaternionf().setFromNormalized(new Matrix3f().setColumn(0,right)

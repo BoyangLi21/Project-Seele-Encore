@@ -105,9 +105,21 @@ class Plan:
         self.s, self.name, self.cells, self.rep = site, name, {}, Counter()
 
     def put(self, x, y, z, st, replace=SOFT):
-        cur = self.s.w.get(x, y, z) or AIR
-        if (x, y, z) in self.cells or (x, y, z) in self.s.taken:
+        pos = (x, y, z)
+        if pos in self.s.taken:
             return
+        prior = self.cells.get(pos)
+        if prior is not None:
+            # Grading clears the old hillside before the trucks, tyres and tents are placed.
+            # Keep the measured terrain as the inverse even when two operations share a cell.
+            original, cleared = prior
+            if cleared == AIR and st != AIR and any(k in AIR for k in replace):
+                if st == original:
+                    del self.cells[pos]
+                else:
+                    self.cells[pos] = (original, st)
+            return
+        cur = self.s.w.get(x, y, z) or AIR
         if cur == st:
             return
         if not any(k in cur for k in replace):

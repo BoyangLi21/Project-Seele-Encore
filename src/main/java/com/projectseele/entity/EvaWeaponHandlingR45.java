@@ -55,7 +55,6 @@ public final class EvaWeaponHandlingR45
             body.positions.put(name,new org.joml.Vector3f(body.positions.get(name)).lerp(end.positions.get(name),upright));
         }
         body.dirty();
-        if(upright<1)EvaProneKnifeR56.stab(e,body,partial,1-upright);
         return body;
     }
     public static boolean request(EvaUnit01Entity e,int weapon)

@@ -819,9 +819,10 @@ public final class EvaBodyPose
         EvaTripoHandsR48.apply(entity,body,partial);
         EvaAnatomicalHandsR45.alignPunchWristR53(entity,body,partial);
         EvaOrdinaryStandingSupportR52.apply(entity,body,partial);
-        FixedCannonPoseR52.apply(entity,body,partial);
         EvaProneLegSupportR52.apply(entity,body,partial);
         EvaProneArmSupportR53.apply(entity,body,partial);
+        EvaAnatomicalHandsR45.alignCrawlWrists(entity,body,partial);
+        FixedCannonPoseR52.apply(entity,body,partial);
         EvaCombatSupportR33.rememberFinalFeetR44(entity,body,partial);
         return body;
     }

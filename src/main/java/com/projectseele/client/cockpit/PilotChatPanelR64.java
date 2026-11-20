@@ -154,10 +154,10 @@ public final class PilotChatPanelR64
     private static void draw(GuiGraphics g, Font font, EvaUnit01Entity eva, boolean sequence, long now, int width, int height)
     {
         // The same measures as the cockpit's windows (EvaPilotDisplayR45): the countdown is 104 wide at the top,
-        // in the middle; the weapon's window stands at the right, two fifths down. The cabin sequence writes its
+        // in the middle; the weapon and cannon readouts occupy the lower right. The cabin sequence writes its
         // line a fifth down, across the middle (PilotSequenceDisplayR64).
         int margin = Math.max(8, Math.min(16, width / 45)), top = Math.max(4, margin - 4);
-        int side = Math.min(132, width / 2 - margin * 2), below = Math.max(top + 46, height * 2 / 5 - 20);
+        int side = Math.min(132, width / 2 - margin * 2), below = Math.max(top + 46, height - margin - 62);
         int room = width - margin - ((width + 104) / 2 + 6), line = Math.max(26, height / 5);
         int x, y, w, most;
         int[] sight = PlugCannonSightR64.down() > PlugCannonSightR64.SETTLING ? PlugCannonSightR64.window(width, height) : null;
@@ -176,8 +176,8 @@ public final class PilotChatPanelR64
         else if (room < 110 || eva != null && (ClientForgeEvents.isCannonScopeActive(eva) || PlugCannonSightR64.down() > 0))
         {
             // No room beside the countdown in a narrow window, and the cannon's scope moves the countdown into
-            // the corner: under the weapon's window.
-            w = side; x = width - margin - w; y = below + 34; most = ROWS - 2;
+            // the corner: above the weapon and cannon readouts.
+            w = side; x = width - margin - w; y = sequence ? line + 30 : top + 38; most = Mth.clamp((below - y - 12) / 10, 1, ROWS - 2);
         }
         else
         {

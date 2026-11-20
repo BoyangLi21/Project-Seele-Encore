@@ -47,7 +47,7 @@ public final class EvaGameplayMotionR32
                 ||EvaCombatR31.action(e)!=EvaCombatR31.NONE)return false;
         String clip=activeGroundClip(e,0);
         // R64 (flow, "body"): the charge covers its own ground (the run it comes out of ends with the press).
-        if(clip.equals("hook")&&bodyClipR64(e,clip)!=null)return false;
+        if(clip.equals("pounce_r64")||clip.equals("knee_r64"))return true;
         return java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(clip);
     }
     private static int takeoffTicks(EvaUnit01Entity e)
@@ -355,16 +355,8 @@ public final class EvaGameplayMotionR32
         var clips=profile(variant(e)).getAsJsonObject("clips");
         return clips.has("r32_pounce_r64")&&clips.has("r32_knee_r64")&&clips.has("r32_charge_r64");
     }
-    /** R64 (flow, "body"): the blow that stands in a punch's place, or null. Crouched or prone the punches are as they were. */
-    private static String bodyClipR64(EvaUnit01Entity e,String name)
-    {
-        if(!name.equals("jab")&&!name.equals("cross")&&!name.equals("hook")||!bodyReadyR64(e)||actionStanceR44(e)>0)return null;
-        return name.equals("jab")?"pounce_r64":name.equals("cross")?"knee_r64":"charge_r64";
-    }
     private static String resolve(EvaUnit01Entity e,String name)
     {
-        String body=bodyClipR64(e,name);
-        if(body!=null)return body;
         if(name.equals("kick")&&!profile(variant(e)).getAsJsonObject("clips").has("r32_kick"))
             return EvaCombatModelR64.flowHardKick(e)&&profile(variant(e)).getAsJsonObject("clips").has("r32_kick_hard_r64")?"kick_hard_r64"
                     :EvaCombatModelR64.flowStep(e)&&EvaRowClockR64.step(e)>0&&profile(variant(e)).getAsJsonObject("clips").has("r32_kick_step_r64")?"kick_step_r64":"kick_r64";
@@ -440,17 +432,29 @@ public final class EvaGameplayMotionR32
         return EvaBodyPose.gameplayClip(e,resolve(e,name),contactPhase(e,name));
     }
     public static String side(EvaUnit01Entity e,String name){return clip(e,name).get("leading_side").getAsString();}
-    public static String ordinary(int stage){return switch(stage){case 1->"cross";case 2->"hook";default->"jab";};}
+    public static String ordinary(int stage)
+    {
+        return switch(stage){
+            case 1 -> "cross";
+            case 2 -> "hook";
+            case EvaMoveTableR64.POUNCE_STAGE -> "pounce_r64";
+            case EvaMoveTableR64.KNEE_STAGE -> "knee_r64";
+            case EvaMoveTableR64.CHARGE_STAGE -> "charge_r64";
+            default -> "jab";
+        };
+    }
     public static float phase(EvaUnit01Entity e,String name,float progress)
     {
         if(name.startsWith("sword_")||name.startsWith("evade_")||name.startsWith("roll_"))return progress;
-        if(name.equals("kick")||name.startsWith("knife_"))return progress;
+        if(name.equals("kick")||name.startsWith("knife_")||name.endsWith("_r64"))return progress;
         if(directed(e)&&name.startsWith("berserk")||EvaCombatSupportR33.ready(e)&&java.util.Set.of("jab","cross","hook","heavy").contains(name))return progress;
         float contact=contactPhase(e,name),at=name.equals("heavy")?.50F:.45F;
         return progress<at?Mth.lerp(progress/at,0,contact):Mth.lerp((progress-at)/(1-at),contact,1);
     }
     public static Vec3 root(EvaUnit01Entity e,String name,float phase)
     {
+        if(e.isPilotCrouching()&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS
+                &&(name.equals("jab")||name.equals("cross"))&&!lowAttackReadyR44(e))return Vec3.ZERO;
         phase=phase(e,name,phase);
         var points=clip(e,name).getAsJsonArray("trajectory_m");
         float f=Math.min(EvaRootClosureR63.holdFrom(points,()->forwardR63(points)),Mth.clamp(phase,0,1)*(points.size()-1));int a=(int)f,b=Math.min(a+1,points.size()-1);
@@ -857,7 +861,7 @@ public final class EvaGameplayMotionR32
      */
     private static void offArmR64(EvaUnit01Entity e,EvaBodyPose.Sample pose,EvaBodyPose.Sample base,String name)
     {
-        if(!EvaCombatModelR64.flowStand(e)||!name.equals("jab")&&!name.equals("cross")&&!name.equals("hook")||bodyClipR64(e,name)!=null)return;
+        if(!EvaCombatModelR64.flowStand(e)||!name.equals("jab")&&!name.equals("cross")&&!name.equals("hook"))return;
         String off=side(e,name).equals("l")?"r":"l";
         for(String part:new String[]{"clavicle_","arm_","forearm_","wrist_","hand_"})
         {
@@ -906,15 +910,17 @@ public final class EvaGameplayMotionR32
             pose=EvaBodyPose.blend(from,pose,entry);
         }
         if(progress>.86F&&!phrases(e)){var end=guardWeight(e)>.5F?EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F):base;pose=EvaBodyPose.blend(pose,end,(progress-.86F)/.14F);}
-        if(Unit03SourceRigR53.sharesGroundActions(e)&&e.rifleStanceLevel(partial)<.01F
+        boolean crouchedPunch=e.isPilotCrouching()&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS
+                &&(name.equals("jab")||name.equals("cross"))&&!lowAttackReadyR44(e);
+        if(crouchedPunch||Unit03SourceRigR53.sharesGroundActions(e)&&e.rifleStanceLevel(partial)<.01F
                 &&e.rifleMoveBlend(partial)>.001F
-                &&java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(name))
+                &&java.util.Set.of("jab","cross","hook","pounce_r64","knee_r64","heavy","knife_forward","knife_reverse").contains(name))
         {
             // Movement owns the pelvis and legs. The captured strike owns the
             // chest/arms, rebased against that pelvis, rather than freezing the
             // full lower body while the authoritative entity keeps travelling.
             var chest=pose.matrix("torso_upper").getUnnormalizedRotation(new Quaternionf()).normalize();
-            float mobility=Mth.clamp(e.rifleMoveBlend(partial),0,1);
+            float mobility=crouchedPunch?1:Mth.clamp(e.rifleMoveBlend(partial),0,1);
             mobility=mobility*mobility*(3-2*mobility);
             Vector3f pelvis=new Vector3f(),basePelvis=new Vector3f();
             for(String side:List.of("l","r"))

@@ -4,6 +4,7 @@ import com.projectseele.entity.EntryPlugCarrierEntity;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.world.EvaPilotResolver;
 import com.projectseele.client.UltramanClientState;
+import com.projectseele.client.cockpit.PilotMountView;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -70,6 +71,8 @@ public abstract class CameraMixin
             float partialTick, CallbackInfo callback)
     {
         var directed=com.projectseele.client.FirstBattleClient.camera((Camera)(Object)this,partialTick);
+        boolean inPlug = !detached && subject.getVehicle() instanceof EntryPlugCarrierEntity;
+        if (!inPlug || directed != null) PilotMountView.leave();
         if(directed!=null)
         {
             Vec3 p=directed.position(),d=directed.target().subtract(p);this.setPosition(p.x,p.y,p.z);
@@ -215,7 +218,10 @@ public abstract class CameraMixin
             return;
         }
         projectseele$carrierCameraId=-1;projectseele$loosePlugCamera=false;projectseele$plugOrbitOffset=Vec3.ZERO;
-        if(!detached&&controlled!=null&&com.projectseele.entity.EvaAirTransportR31.active(controlled))
+        boolean capsuleView = inPlug && subject.getVehicle() instanceof EntryPlugCarrierEntity physical
+                && (!physical.isLockedToEva() || controlled == null || !controlled.isPoweredOn() || controlled.isActivationCinematicActive());
+        if (!capsuleView) PilotMountView.leave();
+        if(!detached&&!capsuleView&&controlled!=null&&com.projectseele.entity.EvaAirTransportR31.active(controlled))
         {
             Vec3 optical=controlled.getPilotCameraSeatPosition(subject,partialTick).add(0,subject.getEyeHeight(),0);
             // The facility's route holds the unit in this branch until the tick it is let go, and the eye
@@ -223,8 +229,9 @@ public abstract class CameraMixin
             optical=com.projectseele.client.render.EvaRackReleaseR63.seat(controlled,partialTick,optical);
             optical=com.projectseele.client.PilotOpticsContinuity.apply(controlled,partialTick,optical);
             Camera camera=(Camera)(Object)this;
-            float localYaw=camera.getYRot()-com.projectseele.entity.EvaAirTransportR31.frameYaw(controlled,partialTick)+180;
-            Vec3 local=Vec3.directionFromRotation(camera.getXRot(),localYaw);
+            float bodyYaw=com.projectseele.entity.EvaAirTransportR31.frameYaw(controlled,partialTick);
+            float localYaw=PilotMountView.yaw(camera.getYRot(),bodyYaw)-bodyYaw+180;
+            Vec3 local=Vec3.directionFromRotation(PilotMountView.pitch(camera.getXRot()),localYaw);
             var body=com.projectseele.entity.EvaBodyPose.sample(controlled,partialTick);
             var frame=com.projectseele.entity.EvaRifleKinematics.world(controlled,partialTick).mul(body.matrix("head"));
             Vec3 direction=new Vec3(frame.transformDirection(local.toVector3f()).normalize());
@@ -232,14 +239,24 @@ public abstract class CameraMixin
             this.setPosition(optical.x,optical.y,optical.z);
             this.setRotation(yaw,(float)-Math.toDegrees(Math.atan2(direction.y,direction.horizontalDistance())));return;
         }
-        if(!detached&&controlled!=null&&controlled.isPoweredOn()&&!controlled.isActivationCinematicActive())
+        if(!detached&&!capsuleView&&controlled!=null&&controlled.isPoweredOn()&&!controlled.isActivationCinematicActive())
         {
             Vec3 optical=controlled.getPilotCameraSeatPosition(subject,partialTick).add(0,subject.getEyeHeight()+com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick),0);
             optical=com.projectseele.client.render.EvaRackReleaseR63.seat(controlled,partialTick,optical);
             optical=com.projectseele.client.PilotOpticsContinuity.apply(controlled,partialTick,optical);
             // R64: the pilot sits in the plug, not in the head; the eye takes a share of the head's bob and sway.
             optical=com.projectseele.client.cockpit.PilotViewSteadyR64.apply(controlled,partialTick,optical);
+            if (PilotMountView.fixed(controlled)) {
+                Camera camera=(Camera)(Object)this;
+                float bodyYaw=com.projectseele.entity.EvaAirTransportR31.frameYaw(controlled,partialTick);
+                this.setRotation(PilotMountView.yaw(camera.getYRot(),bodyYaw),PilotMountView.pitch(camera.getXRot()));
+            }
             this.setPosition(optical.x,optical.y,optical.z);return;
+        }
+        if (!detached && !inPlug && controlled != null && PilotMountView.fixed(controlled)) {
+            Camera camera = (Camera)(Object)this;
+            float bodyYaw = com.projectseele.entity.EvaAirTransportR31.frameYaw(controlled,partialTick);
+            this.setRotation(PilotMountView.yaw(camera.getYRot(),bodyYaw),PilotMountView.pitch(camera.getXRot()));
         }
         if(controlled==null)com.projectseele.client.PilotOpticsContinuity.clear();
         if (detached
@@ -249,6 +266,7 @@ public abstract class CameraMixin
         }
         Vec3 eye = plug.getInterpolatedPilotEyePosition(partialTick);
         EvaUnit01Entity eva = plug.getLinkedEva();
+        float opticalBlend = 0;
         if (plug.isLockedToEva() && eva != null
                 && eva.isActivationCinematicActive())
         {
@@ -265,6 +283,12 @@ public abstract class CameraMixin
             Vec3 evaEye = eva.getPilotCameraSeatPosition(subject,partialTick)
                     .add(0.0D, subject.getEyeHeight(), 0.0D);
             eye = eye.lerp(evaEye, blend);
+            opticalBlend = blend;
+        }
+        if (plug.hasCanonicalPose()) {
+            float bodyYaw = eva == null ? subject.getYRot() : com.projectseele.entity.EvaAirTransportR31.frameYaw(eva,partialTick);
+            var view = PilotMountView.plug(plug,subject,partialTick,opticalBlend,bodyYaw);
+            this.setRotation(view.yaw(),view.pitch());
         }
         this.setPosition(eye.x, eye.y, eye.z);
     }

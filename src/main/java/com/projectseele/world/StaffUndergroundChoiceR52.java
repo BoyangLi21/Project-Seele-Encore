@@ -28,5 +28,4 @@ public final class StaffUndergroundChoiceR52
         return requested.equals(PREPARE_AND_DEPLOY)?"underground":requested.equals("deploy")||requested.startsWith("deploy_")?"launch":"";
     }
     public static boolean deploymentReady(String phase){return "SILO_READY".equals(phase);}
-    public static boolean deployedDoorReady(String phase){return "DEPLOYED".equals(phase);}
 }

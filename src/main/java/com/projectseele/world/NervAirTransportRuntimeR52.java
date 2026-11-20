@@ -262,6 +262,7 @@ public final class NervAirTransportRuntimeR52
             var data=new CompoundTag();data.putString("AssemblyKindR52",kind.name());data.putBoolean("Returning",intent==Intent.RECOVER);data.putString("Intent",intent.name());var preview=ground.owner().previewFlight(level,original,kind,data);if(preview==null)return "机体须先在地面上站稳，才能安排空运。";
             Vec3 actualFoot=preview.root().transformPoint(preview.binding().contactCentre());var region=manifest.region(actualFoot);if(region==null)return "当前位置尚未开放空运接载。";
             var candidates=manifest.missions().values().stream().filter(m->(m.intent()==intent||intent==Intent.DELIVER&&m.intent()==Intent.FAR_MOUNTAIN)&&m.variants().contains(variant)&&m.region()==region)
+                    .filter(m->!manifest.missions().containsKey(m.id()+NervSurfaceFlightsR64.SUFFIX))
                     .filter(m->receiverId!=null?m.receiver().equals(receiverId):intent==Intent.RECOVER||NervAirDeliveryTargetR53.selected(m)||nearDestination(m,x,z))
                     .toList();
             var plans=new HashMap<Mission,CompoundTag>();var costs=new HashMap<Mission,Long>();
@@ -286,7 +287,9 @@ public final class NervAirTransportRuntimeR52
                     cost+=NervEmptyCarrierTransferR52.arrivalTicks(level,original,m.receiver());
                 cost+=160L*doors.size();plan.put("AirCorridorTicksR53",clocks);plans.put(m,plan);costs.put(m,cost);
             }
-            candidates=candidates.stream().filter(plans::containsKey).sorted(Comparator.<Mission>comparingLong(costs::get)
+            candidates=candidates.stream().filter(plans::containsKey).sorted(Comparator.<Mission,Boolean>comparing(m->region==NervRouteDirectoryR52.Region.SURFACE
+                    &&manifest.receiver(m.receiver()).region()==region&&manifest.node(manifest.aircraft().get(m.aircraft()).stand()).region()!=region)
+                    .thenComparingLong(costs::get)
                     .thenComparing(m->manifest.node(manifest.aircraft().get(m.aircraft()).stand()).region()!=region)
                     .thenComparing(Mission::id)).toList();
             String blocked=receiverId!=null&&intent==Intent.RECOVER?"当前位置尚无通往所选接收口的已登记回收航路。":"当前位置尚未配置空运接载区。";
@@ -395,10 +398,12 @@ public final class NervAirTransportRuntimeR52
         Set<String> sourceSpaces(NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,boolean movingCargo,double rotorFrom,double rotorTo,Set<String> fallback){if(!NervTraversalPolicyR53.strict(level)||manifest.directory().dynamicSpacesR52().domains().isEmpty())return fallback;return sourceSpaces(NervFlightProofR52.prepareSourceSweepR52(level,geometry,p,from,to,rotorFrom,rotorTo,movingCargo),fallback);}
         Set<String> sourceSpaces(NervFlightProofR52.PreparedSourceSweepR52 prepared,Set<String> fallback){if(!NervTraversalPolicyR53.strict(level)||manifest.directory().dynamicSpacesR52().domains().isEmpty())return fallback;return manifest.directory().dynamicSpacesR52().required(manifest.dimension(),prepared.envelopes(),ground().bindings());}
         NervFlightProofR52.CheckedFlightStep proof(UUID plane,NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,Set<String> spaces,boolean movingCargo)
-        {return proof(plane,p,from,to,spaces,movingCargo,false);}
+        {return proof(plane,p,from,to,spaces,movingCargo,false,false);}
         NervFlightProofR52.CheckedFlightStep towProof(UUID plane,NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,Set<String> spaces)
-        {return proof(plane,p,from,to,spaces,true,true);}
-        NervFlightProofR52.CheckedFlightStep proof(UUID plane,NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,Set<String> spaces,boolean movingCargo,boolean compressCanopy)
+        {return proof(plane,p,from,to,spaces,true,true,false);}
+        NervFlightProofR52.CheckedFlightStep corridorProof(Corridor corridor,UUID plane,NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,Set<String> spaces,boolean movingCargo)
+        {return proof(plane,p,from,to,spaces,movingCargo,false,corridor.id().startsWith(NervSurfaceFlightsR64.CORRIDOR));}
+        NervFlightProofR52.CheckedFlightStep proof(UUID plane,NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,Set<String> spaces,boolean movingCargo,boolean compressCanopy,boolean direct)
         {
             flightProofAttemptsR53.add(plane);
             // A waiting ground payload is reserved, not carried by the distant
@@ -412,7 +417,9 @@ public final class NervAirTransportRuntimeR52
             double clock=level.getEntity(plane) instanceof UNTransportEntity entity?NervAircraftFrameR52.rotorClock(entity):0;
             // Keep the waiting EVA's space from the initial reservation until
             // pickup; the hold flag is set only after that reservation is used.
-            try{var job=saved.aircraft(plane);var prepared=NervFlightProofR52.prepareSourceSweepR52(level,geometry,p,from,to,clock,clock+1,movingCargo);var actual=sourceSpaces(prepared,spaces);if(NervTraversalPolicyR53.strict(level)&&!manifest.directory().dynamicSpacesR52().domains().isEmpty()&&!movingCargo&&p!=null&&from.cargo()==null&&to.cargo()==null&&(job==null||!job.payloadTransferred()&&!job.carrying())){var union=new HashSet<>(actual);union.addAll(manifest.directory().dynamicSpacesR52().required(manifest.dimension(),p.cargoEnvelopes(p.root(),p.root()),ground().bindings()));actual=Set.copyOf(union);}
+            try{var job=saved.aircraft(plane);var prepared=NervFlightProofR52.prepareSourceSweepR52(level,geometry,p,from,to,clock,clock+1,movingCargo);
+                var actual=direct?manifest.directory().dynamicSpacesR52().required(manifest.dimension(),prepared.envelopes(),ground().bindings()):sourceSpaces(prepared,spaces);
+                if((direct||NervTraversalPolicyR53.strict(level))&&!manifest.directory().dynamicSpacesR52().domains().isEmpty()&&!movingCargo&&p!=null&&from.cargo()==null&&to.cargo()==null&&(job==null||!job.payloadTransferred()&&!job.carrying())){var union=new HashSet<>(actual);union.addAll(manifest.directory().dynamicSpacesR52().required(manifest.dimension(),p.cargoEnvelopes(p.root(),p.root()),ground().bindings()));actual=Set.copyOf(union);}
                 tickets(actual);
                 if(p==null&&job!=null&&job.payloadTransferred())return NervFlightProofR52.checkAircraftStep(level,manifest,geometry,plane,job.original(),job.kind(),from,to,actual,ground().bindings(),clock,clock+1,prepared);
                 var checked=NervFlightProofR52.checkStep(level,manifest,geometry,plane,p,from,to,actual,ground().bindings(),clock,clock+1,movingCargo,prepared);
@@ -631,7 +638,7 @@ public final class NervAirTransportRuntimeR52
             if(stage.equals("RETREAT")||stage.equals("CANCEL")){from=new Frame(from.plane(),current.cargo(),new Rig(from.rig().hoist(),0,1));to=new Frame(to.plane(),current.cargo(),new Rig(to.rig().hoist(),0,1));}
             if(loaded&&data.contains(NervAirClearancePlanR53.KEY)){clearanceStepR53(job,m,c,p,plane,current,data);return;}
             int age=job.age();if(age>c.ticks()||loaded!=job.carrying()||plane.carrying()!=job.carrying()){hold(job,"保存时钟/真实携载状态不一致，原位保持");return;}var expected=from.interpolate(to,ease((double)age/c.ticks()));if(!NervAirTransportManifestR52.same(expected.plane(),current.plane())||!expected.rig().equals(current.rig())||loaded&&!NervAirTransportManifestR52.same(expected.cargo(),current.cargo())){hold(job,"航段同 fraction 与原实体不符；不重定位");return;}
-            var next=from.interpolate(to,ease((double)Math.min(c.ticks(),age+1)/c.ticks()));var occupied=new HashSet<>(c.spaces());if(!loaded&&data.getBoolean("FlightWaitingR52"))occupied.addAll(readList(data,"PickupHeldSpaces"));var checked=loaded&&job.leg()==0?towProof(job.aircraft(),p,current,next,occupied):proof(job.aircraft(),p,current,next,occupied,loaded||data.getBoolean("FlightWaitingR52"));
+            var next=from.interpolate(to,ease((double)Math.min(c.ticks(),age+1)/c.ticks()));var occupied=new HashSet<>(c.spaces());if(!loaded&&data.getBoolean("FlightWaitingR52"))occupied.addAll(readList(data,"PickupHeldSpaces"));var checked=loaded&&job.leg()==0?towProof(job.aircraft(),p,current,next,occupied):corridorProof(c,job.aircraft(),p,current,next,occupied,loaded||data.getBoolean("FlightWaitingR52"));
             // A body clear of the floor can still sit below a hatch side frame.
             // Search a real lateral-then-upward route instead of allowing the
             // next vertical step to pass through that new obstruction.
@@ -768,7 +775,7 @@ public final class NervAirTransportRuntimeR52
             var from=NervAirClearancePlanR53.point(plan,segment);var to=NervAirClearancePlanR53.point(plan,segment+1);
             if(age<0||age>=ticks||!sameFlightFrameR53(current,from.interpolate(to,ease(age/(double)ticks)))){hold(job,"绕行实际样本与持久时钟不符");return;}
             var next=from.interpolate(to,ease((age+1D)/ticks));
-            var checked=proof(job.aircraft(),p,current,next,corridor.spaces(),true);
+            var checked=corridorProof(corridor,job.aircraft(),p,current,next,corridor.spaces(),true);
             if(checked==null||!ground().pool().retargetFlightSpaces(job.task(),corridor.spaces(),corridor.gates(),access(job.original(),job.kind(),job.aircraft(),checked,false)))
             {hold(job,"完整载荷绕行等待实际净空或占域释放");return;}
             if(!(level.getEntity(job.original().eva()) instanceof EvaUnit01Entity cargo)||!cargo.isAlive()||cargo.getUnitVariant()!=job.original().variant())

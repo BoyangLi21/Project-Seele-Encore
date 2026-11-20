@@ -2,6 +2,9 @@ package com.projectseele.entity;
 
 import net.minecraft.util.Mth;
 import org.joml.Vector3f;
+import org.joml.Quaternionf;
+import com.projectseele.physics.AnatomicalLimbConstraints;
+import com.projectseele.physics.CombatBodyProfiles;
 import static com.projectseele.entity.EvaKeyPosesR57.*;
 
 /**
@@ -180,8 +183,18 @@ final class EvaClimbChoreographyR57
             // Below the top the toes, a unit ahead of the ankle, stay out of the
             // face; the hold lets go as the sole rises clear of the edge.
             target.z=Math.max(target.z,face+1.3F*(1-ease((target.y-top-.6F)/.6F)));
-            reach(pose,"leg_r","shin_r","foot_r",target,new Vector3f(0,1,-1),foot);
-            level(pose,"foot_r",foot*rise_);
+            // The mesh turns on its knee socket, above the shin bone's pivot. Solve that hinge on the
+            // authored thigh plane so bringing the ankle level with the hip cannot flip the knee pole.
+            var thigh=new Quaternionf(pose.rotations.get("leg_r"));
+            var shin=new Quaternionf(pose.rotations.get("shin_r"));
+            var sole=new Quaternionf(pose.rotations.get("foot_r"));
+            var orientation=pose.matrix("foot_r").getNormalizedRotation(new Quaternionf())
+                    .slerp(pose.matrix("root").getNormalizedRotation(new Quaternionf()),rise_);
+            AnatomicalLimbConstraints.reachFoot(pose,CombatBodyProfiles.get(e),"r",target,orientation);
+            pose.rotations.put("leg_r",thigh.slerp(pose.rotations.get("leg_r"),foot));
+            pose.rotations.put("shin_r",shin.slerp(pose.rotations.get("shin_r"),foot));
+            pose.rotations.put("foot_r",sole.slerp(pose.rotations.get("foot_r"),foot));
+            EvaBodyPose.preserveJointCentres(pose);
         }
         return pose;
     }

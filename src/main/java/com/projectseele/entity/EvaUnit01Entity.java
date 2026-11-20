@@ -1563,7 +1563,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     &&this.hasLiveActionForRender(0)&&this.isMeleeWeapon();
             // A mounted body's position can arrive two ticks at a time; at a full
             // dash that is over 11 blocks, which must not read as standing still.
-            boolean moving=distance>.006&&distance<32&&!this.isPilotControlLocked()
+            boolean moving=distance>.006&&distance<32&&this.groundGaitTravelR64(distance*20)&&!this.isPilotControlLocked()
                     &&(!actionDisplacement||this.pilotMovementRequested);
             rifleZeroTravelTicksR45=moving?0:Math.min(TRAVEL_GAP_R63+1,rifleZeroTravelTicksR45+1);
             float oldMove=this.entityData.get(DATA_RIFLE_MOVE),oldRun=this.entityData.get(DATA_RIFLE_RUN);
@@ -3451,8 +3451,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void meleeAttack(ServerPlayer pilot)
     { this.combatR64().toldPress(false);meleeAttack((LivingEntity)pilot); }
 
+    private boolean proneMeleeBlocked()
+    {
+        return this.isPilotProne()&&(this.getWeapon()==WEAPON_FISTS||this.getWeapon()==WEAPON_KNIFE);
+    }
+
     private void meleeAttack(LivingEntity pilot)
     {
+        if(this.proneMeleeBlocked())return;
         if(this.getWeapon()==WEAPON_SWORD_R45){EvaSwordActionsR45.request(this,pilot,false);return;}
         if(this.combatR64().press(pilot,EvaCombatMachineR64.LIGHT))return;
         if(CombatFeelR31.restrained(this)){EvaCombatIntentR32.offer(this,pilot,0);return;}
@@ -3469,7 +3475,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         boolean prone = this.isPilotProne();
         boolean crouching = this.isPilotCrouching();
         boolean liveOrdinaryAttack = this.getWeapon() == WEAPON_FISTS
-                && ((!prone && !crouching) || EvaGameplayMotionR32.lowAttackReadyR44(this));
+                && (!crouching || EvaGameplayMotionR32.ready(this));
         if(liveOrdinaryAttack&&!prone&&!crouching&&this.getOrdinaryAttackStage()<0&&pilot instanceof ServerPlayer player&&this.needsClosingStepR32(player))return;
         if (this.getWeapon() == WEAPON_KNIFE && ((!prone && !crouching) || EvaGameplayMotionR32.lowAttackReadyR44(this))
                 && this.knifeVisualTicks > 0)
@@ -3602,11 +3608,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(EvaGameplayMotionR32.ready(this)&&!EvaGameplayMotionR32.directed(this))EvaMovementSounds.swing(this,.8F);
         boolean continuing = this.ordinaryAttackComboGraceTicks > 0;
         boolean selectedThreeStage=EvaGameplayMotionR32.selectedThreeStageR45(this);
-        int stage = forcedR64>=0 ? forcedR64 : continuing
+        boolean crouched=this.isPilotCrouching();
+        int stage = forcedR64>=0 ? forcedR64 : crouched ? (this.leftSwing?1:0) : continuing
                 ? Math.floorMod(this.ordinaryAttackComboStage + 1,
                         selectedThreeStage?3:EvaGameplayMotionR32.phrases(this)?2:ORDINARY_ATTACK_FRAME_INTERVALS.length)
                 : 0;
-        int visualStage = forcedR64<0&&(!EvaGameplayMotionR32.phrases(this)||selectedThreeStage)&&continuing&&stage==0?3:stage;
+        int visualStage = forcedR64<0&&!crouched&&(!EvaGameplayMotionR32.phrases(this)||selectedThreeStage)&&continuing&&stage==0?3:stage;
         int visualTicks = this.ordinaryAttackVisualTicks(visualStage);
         this.ordinaryAttackComboStage = stage;
         this.ordinaryAttackComboGraceTicks = Math.max(
@@ -3687,6 +3694,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void smashAttack(LivingEntity pilot)
     {
+        if(this.proneMeleeBlocked())return;
         if(this.getWeapon()==WEAPON_SWORD_R45){EvaSwordActionsR45.request(this,pilot,true);return;}
         if(this.combatR64().press(pilot,EvaCombatMachineR64.HEAVY))return;
         if(CombatFeelR31.restrained(this)){EvaCombatIntentR32.offer(this,pilot,1);return;}
@@ -4106,6 +4114,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void cancelLiveActionsForStanceChange()
     {
+        this.combatR64().clearStanceBuffer();
         this.clearLegacyRecoveryR51();
         this.cancelOrdinaryGroupCAttack();
         this.cancelHeavyMotion();
@@ -4341,7 +4350,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(EvaFieldActionsR45.active(this))return "evade";
         if(this.isHeavyMotionActive())return "slam";
         int stage=this.getOrdinaryAttackStage();
-        if(stage>=0)return stage==1?"cross":stage==2?"hook":"jab";
+        if(stage>=0)return EvaGameplayMotionR32.ordinary(stage);
         if(this.entityData.get(DATA_KICK_ACTIVE))return "kick";
         int knife=this.entityData.get(DATA_KNIFE_TYPE);
         return knife<0?"":EvaGameplayMotionR32.knifeClip(knife);
@@ -4572,7 +4581,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
     private Vec3 actionRootSample(int family, float phase)
     {
-        if(EvaGameplayMotionR32.ready(this)&&(family>=0&&family<4||family==7))
+        if(EvaGameplayMotionR32.ready(this)&&(family>=0&&family<4||family==7
+                ||family>=EvaMoveTableR64.POUNCE_STAGE&&family<=EvaMoveTableR64.CHARGE_STAGE))
         {
             Vec3 root=EvaGameplayMotionR32.root(this,family==7?"heavy":EvaGameplayMotionR32.ordinary(family),phase);
             return family!=7&&EvaCombatModelR64.flowStep(this)?root.scale(EvaRowClockR64.stride(this)):root;
@@ -8429,13 +8439,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         Vec3 held = this.riddenInputR58;
         if(EvaMotionModelR64.walks(this))
         {
-            // R64 (M3): left standing with its toes (or its heels) over a drop it could not step down, it steps
-            // back (or on) until both feet have ground under them.
-            if(EDGE_BACK_R64&&wanted.lengthSqr()<1e-4D)
-            {
-                int edge=this.edgeR64();
-                if(edge!=0)wanted=new Vec3(0,0,-edge*EvaMotionModelR64.EDGE_INPUT);
-            }
+            // On release brake momentum towards a drop. A hole between two trees must never generate
+            // fresh input in the opposite direction or walk the chassis back and forth between edges.
+            if(EDGE_BACK_R64&&wanted.lengthSqr()<1e-4D&&Math.abs(held.z)>.001D&&this.edgeR64()*held.z>0)
+                held=new Vec3(held.x,0,0);
             // R64 (M1): to full speed and back in a set time, along the line from what is held to what is asked.
             double most=1D/(this.isPilotSprinting()?EvaMotionModelR64.RUN_RAMP_TICKS:EvaMotionModelR64.WALK_RAMP_TICKS);
             // R64: braking out of a landing the keys are let go of in three ticks (a run's ten carried a fast run 60 blocks on).
@@ -8980,7 +8987,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
         // Hysteresis prevents stair edges and one late position packet from
         // toggling idle/walk every other client tick.
-        if (this.clientVisualMoving)
+        if(!this.groundGaitTravelR64(this.clientVisualHorizontalSpeed))this.clientVisualMoving=false;
+        else if (this.clientVisualMoving)
         {
             if (this.clientVisualHorizontalSpeed < 0.16D)
             {
@@ -9079,6 +9087,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         return this.level().isClientSide
                 ? this.clientVisualMoving : state.isMoving();
+    }
+
+    /** Tiny position corrections on irregular support do not start a mounted gait with the keys released. */
+    public boolean groundGaitTravelR64(double blocksPerSecond)
+    {
+        if(blocksPerSecond>2||!(this.getPilotEntity() instanceof Player pilot))return true;
+        if(this.level().isClientSide&&!pilot.isLocalPlayer())return this.entityData.get(DATA_RIFLE_MOVE)>.05F;
+        return Math.abs(pilot.xxa)>.01F||Math.abs(pilot.zza)>.01F;
     }
 
     public boolean isVisuallyMovingForRender()

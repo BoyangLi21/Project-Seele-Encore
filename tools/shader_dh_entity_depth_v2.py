@@ -2,8 +2,8 @@
 
 Entities are depth-tested against the vanilla depth buffer only. Distant Horizons draws far terrain into its own depth
 buffer, so an entity beyond the real chunks (an EVA in a distant hangar, a launch-shaft door) was drawn over far
-buildings and hills. The two entity programs now drop fragments that lie more than one block behind the far terrain
-at the same pixel. Only these two files change; every other entry of the author's archive, licence files included,
+buildings and hills. The entity and block-entity programs now drop fragments that lie more than one block behind the far terrain
+at the same pixel. Only these programs change; every other entry of the author's archive, licence files included,
 stays byte for byte.
 
 tools/package_r60.py applies it to the shipped pack under the pack's own file name, so oculus.properties and the
@@ -11,7 +11,7 @@ pack's .zip.txt settings stay matched. Standalone (prints both SHA-256 and the c
 
   python tools/shader_dh_entity_depth_v2.py <pack.zip> <out.zip>
 
-From perf's r64-kit/r64/pack_v2_patch.py; the inserted code is unchanged.
+Based on perf's R64 pack patch, extended to block entities and normalized depth coordinates.
 """
 import hashlib
 import sys
@@ -22,9 +22,9 @@ SNIPPET = '''
     #ifdef DISTANT_HORIZONS
         // SEELE: far terrain has its own depth buffer, which this program's depth test never sees.
         // Drop what lies behind it, so entities beyond the real chunks stop showing through far buildings and hills.
-        float seeleDhZ = texelFetch(dhDepthTex, ivec2(gl_FragCoord.xy), 0).r;
+        vec2 seeleUv = gl_FragCoord.xy / vec2(viewWidth, viewHeight);
+        float seeleDhZ = texture(dhDepthTex1, seeleUv).r;
         if (seeleDhZ < 1.0) {
-            vec2 seeleUv = gl_FragCoord.xy / vec2(viewWidth, viewHeight);
             vec4 seeleDhView = dhProjectionInverse * (vec4(seeleUv, seeleDhZ, 1.0) * 2.0 - 1.0);
             vec4 seeleView = gbufferProjectionInverse * (vec4(seeleUv, gl_FragCoord.z, 1.0) * 2.0 - 1.0);
             if (seeleView.z / seeleView.w < seeleDhView.z / seeleDhView.w - SEELE_DH_MARGIN) discard;
@@ -32,12 +32,21 @@ SNIPPET = '''
     #endif
 '''
 # Margin in blocks: far terrain is coarser than the real terrain, so an entity right against it keeps one block.
-TARGETS = {'shaders/program/gbuffers_entities.glsl': '1.0', 'shaders/program/gbuffers_spidereyes.glsl': '1.0'}
+TARGETS = {'shaders/program/gbuffers_entities.glsl': '1.0', 'shaders/program/gbuffers_spidereyes.glsl': '1.0',
+           'shaders/program/gbuffers_block.glsl': '1.0'}
 
 
 def patch_text(text, margin):
     """The program with the test at the top of its first main(), the fragment program in these files; unchanged if present."""
     if MARK in text:
+        if 'texelFetch(dhDepthTex, ivec2(gl_FragCoord.xy), 0)' in text:
+            # Upgrade an already patched R64 rehearsal archive.
+            first = text.index('    #ifdef DISTANT_HORIZONS', text.index('void main() {'))
+            if MARK not in text[first:text.index('    #endif', first)]:
+                raise ValueError('unexpected old entity depth program')
+            end = text.index('    #endif', first) + len('    #endif')
+            newline = '\r\n' if '\r\n' in text else '\n'
+            return text[:first] + SNIPPET.strip('\n').replace('SEELE_DH_MARGIN', margin).replace('\n', newline) + text[end:]
         return text
     newline = '\r\n' if '\r\n' in text else '\n'
     marker = 'void main() {'

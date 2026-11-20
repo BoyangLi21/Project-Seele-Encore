@@ -121,7 +121,6 @@ public final class StaffConversationScreen extends Screen
             addButton(I18n.get("screen.projectseele.phone.assign_pilots"),x+16+half,controlsY,half,()->switchTab(9),denial("board"));
             addButton(I18n.get("screen.projectseele.phone.weapons_and_silos"),x+12,controlsY+22,half,()->switchTab(10),denial("weapons"));
             addButton(I18n.get("screen.projectseele.phone.raise_or_lower_city"),x+16+half,controlsY+22,half,()->{switchTab(5);send("TOPIC:city");},denial("city_rise"));
-            addButton(I18n.get("screen.projectseele.phone.underground_gates"),x+12,controlsY+44,panelWidth-24,()->switchTab(11),denial("deploy"));
         }
         else if (tab == 8)
         {
@@ -161,13 +160,6 @@ public final class StaffConversationScreen extends Screen
             addButton(I18n.get("screen.projectseele.phone.deploy_nearest_rifle_silo"),x+12,controlsY,panelWidth-24,()->send("WEAPONS"),denial("weapons"));
             addButton(I18n.get("screen.projectseele.phone.deploy_unit_00_shield_silo"),x+12,controlsY+22,panelWidth-24,()->send("WEAPONS:shield"),denial("weapons"));
             addButton(I18n.get("screen.projectseele.phone.deploy_unit_02_sword_silo"),x+12,controlsY+44,panelWidth-24,()->send("WEAPONS:sword"),denial("weapons"));
-        }
-        else if(tab==11)
-        {
-            selectUnit(controlsY,column);
-            int half=(panelWidth-28)/2;
-            addButton(I18n.get("screen.projectseele.phone.open_deployed_unit_s_gate"),x+12,controlsY+22,half,()->send("UNDERGROUND:"+unit+":door_open"),denial("deploy"));
-            addButton(I18n.get("screen.projectseele.phone.close_underground_gate"),x+16+half,controlsY+22,half,()->send("UNDERGROUND:"+unit+":close"),denial("deploy"));
         }
         else if(tab==2)
         {
@@ -320,7 +312,7 @@ public final class StaffConversationScreen extends Screen
         button.active=denial.isEmpty();
         if(!button.active)button.setTooltip(Tooltip.create(Component.literal(label+"\n"+denial)));
     }
-    private int rootTab(){return switch(tab){case 3->0;case 5,8,9,10,11->1;case 7,12,13,14,15->2;default->tab;};}
+    private int rootTab(){return switch(tab){case 3->0;case 5,8,9,10->1;case 7,12,13,14,15->2;default->tab;};}
     private int controlsBottom(){return y+panelHeight-60;}
     private void applyControlScroll()
     {
@@ -393,7 +385,7 @@ public final class StaffConversationScreen extends Screen
         return switch(tab)
         {
             case 3 -> 0;
-            case 5,8,9,10,11 -> 1;
+            case 5,8,9,10 -> 1;
             case 7,12 -> 2;
             case 13,14,15 -> 7;
             default -> -1;
@@ -416,7 +408,8 @@ public final class StaffConversationScreen extends Screen
         {
             case 12 -> 6;
             case 3,6,8,13,14 -> 4;
-            case 1,2,4,7,9,10 -> 3;
+            case 2,4,7,9,10 -> 3;
+            case 1 -> 2;
             default -> 2;
         };
         return y+Math.max(Math.max(142,Math.min(170,panelHeight-120)),panelHeight-(rows*22+76));
@@ -506,7 +499,7 @@ public final class StaffConversationScreen extends Screen
         transcript.append(StaffDialogueCatalogR24.replyComponent(view.reply()).getString());
         replyScroll=PhoneUiR54.text(graphics,font,theme,transcript.toString(),x+16,replyTop,panelWidth-32,
                 Math.max(0,bottom-replyTop),replyScroll);
-        String section=switch(tab){case 0->I18n.get("screen.projectseele.phone.topics");case 1->I18n.get("screen.projectseele.phone.command_groups");case 2->I18n.get("screen.projectseele.phone.operations");case 3->I18n.get("screen.projectseele.phone.walking_directions");case 4->I18n.get("screen.projectseele.phone.contacts");case 5->I18n.get("screen.projectseele.phone.raise_or_lower_city");case 6->I18n.get("screen.projectseele.phone.transport_destination_x_y_z");case 7->I18n.get("screen.projectseele.phone.city_coordination_file");case 8->I18n.get("screen.projectseele.phone.prep_and_launch");case 9->I18n.get("screen.projectseele.phone.assign_pilots");case 10->I18n.get("screen.projectseele.phone.weapons_and_silos");case 11->I18n.get("screen.projectseele.phone.underground_gates");case 12->I18n.get("screen.projectseele.phone.mission_and_sortie_crew");case 13->I18n.get("screen.projectseele.phone.read_and_share_records");case 14->I18n.get("screen.projectseele.phone.city_power_and_retesting");case 15->I18n.get("screen.projectseele.phone.units_and_confirmation");default->I18n.get("screen.projectseele.phone.actions");};
+        String section=switch(tab){case 0->I18n.get("screen.projectseele.phone.topics");case 1->I18n.get("screen.projectseele.phone.command_groups");case 2->I18n.get("screen.projectseele.phone.operations");case 3->I18n.get("screen.projectseele.phone.walking_directions");case 4->I18n.get("screen.projectseele.phone.contacts");case 5->I18n.get("screen.projectseele.phone.raise_or_lower_city");case 6->I18n.get("screen.projectseele.phone.transport_destination_x_y_z");case 7->I18n.get("screen.projectseele.phone.city_coordination_file");case 8->I18n.get("screen.projectseele.phone.prep_and_launch");case 9->I18n.get("screen.projectseele.phone.assign_pilots");case 10->I18n.get("screen.projectseele.phone.weapons_and_silos");case 12->I18n.get("screen.projectseele.phone.mission_and_sortie_crew");case 13->I18n.get("screen.projectseele.phone.read_and_share_records");case 14->I18n.get("screen.projectseele.phone.city_power_and_retesting");case 15->I18n.get("screen.projectseele.phone.units_and_confirmation");default->I18n.get("screen.projectseele.phone.actions");};
         String meta=pageDenials.isEmpty()?"":pageDenials.size()==1?I18n.get("screen.projectseele.phone.disabled")+pageDenials.iterator().next():I18n.get("screen.projectseele.phone.hover_over_a_disabled_action_for_details");
         if(controlsScrollMax>0)meta=meta.isEmpty()?I18n.get("screen.projectseele.phone.scroll_for_more"):meta+I18n.get("screen.projectseele.phone.scroll_for_more_inline");
         PhoneUiR54.card(graphics,font,theme,x+8,controlsTop()-21,panelWidth-16,
