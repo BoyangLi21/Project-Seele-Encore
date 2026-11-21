@@ -54,6 +54,7 @@ final class EvaPoseContinuity
         int diagLines;
         final Map<String, int[]> diagCounts = new HashMap<>();
         Map<String, float[]> offsets;
+        Map<String, float[]> kickEntry;
         /** The simulation owned the body on the last frame drawn. */
         boolean physical;
         /** The undamped pose of the last frame of a running blend. */
@@ -136,6 +137,7 @@ final class EvaPoseContinuity
             if (given && !physical)
             {
                 state.offsets = null;
+                state.kickEntry = null;
                 state.lastTarget = null;
             }
             state.physical = physical;
@@ -146,6 +148,10 @@ final class EvaPoseContinuity
                     : state.offsets == null && popped(model, state, now - state.lastNanos) ? POP_NANOS : 0L;
             if (blend > 0)
             {
+                boolean kick=entity.getUnitVariant()==0&&!entity.isExperimentalUnit()
+                        &&!key.equals(state.key)&&key.contains(":kick:");
+                state.kickEntry=kick?new HashMap<>(state.last):null;
+                if(kick)blend=Math.max(blend,180_000_000L);
                 Map<String, float[]> offsets = new HashMap<>();
                 State s = state;
                 forEach(model, bone ->
@@ -184,7 +190,9 @@ final class EvaPoseContinuity
             if (t >= 1)
             {
                 state.offsets = null;
+                state.kickEntry = null;
             }
+            else if(state.kickEntry!=null)blendKickEntry(model,state.kickEntry,t*t*(3-2*t));
             else
             {
                 blend(model, state.offsets, 1 - t * t * (3 - 2 * t));
@@ -193,7 +201,7 @@ final class EvaPoseContinuity
         // Pops were only caught with no blend running, so a target that jumped
         // mid-blend (a combo strike taking over the previous one) reached the
         // screen in one frame. Restart the blend from the last drawn pose.
-        if (raw != null && state.offsets != null && now != state.blendFrame && !given && targetJumped(raw, state, now - state.lastNanos))
+        if (raw != null && state.kickEntry==null && state.offsets != null && now != state.blendFrame && !given && targetJumped(raw, state, now - state.lastNanos))
         {
             Map<String, float[]> offsets = new HashMap<>();
             for (var entry : raw.entrySet())
@@ -612,6 +620,22 @@ final class EvaPoseContinuity
             return 200_000_000L;
         }
         return 150_000_000L;
+    }
+
+    /** Interpolate to the current kick sample. An offset from its first sample follows every later
+     * turn at full speed, even when the entry blend had barely begun. */
+    private static void blendKickEntry(BakedGeoModel model,Map<String,float[]> previous,float weight)
+    {
+        forEach(model,bone->{
+            float[] p=previous.get(bone.getName());
+            if(p==null)return;
+            var q=new Quaternionf().rotationZYX(p[2],p[1],p[0]).slerp(rotation(bone),weight);
+            var angles=QuaternionChannels.euler(q);
+            bone.setRotX(angles.x);bone.setRotY(angles.y);bone.setRotZ(angles.z);
+            bone.setPosX(p[3]+(bone.getPosX()-p[3])*weight);
+            bone.setPosY(p[4]+(bone.getPosY()-p[4])*weight);
+            bone.setPosZ(p[5]+(bone.getPosZ()-p[5])*weight);
+        });
     }
 
     private static boolean strike(String pose)

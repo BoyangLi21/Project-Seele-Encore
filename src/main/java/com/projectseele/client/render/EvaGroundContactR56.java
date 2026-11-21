@@ -71,7 +71,12 @@ final class EvaGroundContactR56
         float walking=eva.isPilotProne()?0:Mth.clamp(eva.rifleMoveBlend(partial),0,1);
         settleFoot(eva,model,root,hulls,"l",floorL,right,now,walking);
         settleFoot(eva,model,root,hulls,"r",floorR,left,now,walking);
-        float support=clearanceAboveFeet(eva,model,root,hulls,ground),sinkWanted=0;
+        // Lying and crawling, the body is set down by its trunk and legs, and its arms are brought to the ground
+        // after it. Set down by whatever was lowest, it lay on a hand in 89 frames of 100 of a crawl: the hands
+        // are placed by the stance, not by the crawl's clip, and the belly the clip lays on the ground stood
+        // between half a block under it and 1.6 over it with every stroke.
+        boolean prone=PRONE_BODY_R63&&eva.isPilotProne();
+        float support=clearanceAboveFeet(eva,model,root,hulls,ground,!prone),sinkWanted=0;
         for(String side:new String[]{"l","r"})
         {
             double under=EvaFootPlacement.groundUnder(eva,side);
@@ -102,6 +107,7 @@ final class EvaGroundContactR56
         }
         float drawn=base.getPosY()+easeGrounding(eva,-gap*16/EvaScale.RENDER_SCALE,walking,now,uneven)+EvaBodyWeightR59.pelvis(eva,partial,now,walking)-sink*16/EvaScale.RENDER_SCALE;
         base.setPosY(drawn);
+        if(prone)for(String side:new String[]{"l","r"})raiseArmR63(model,root,hulls,side,ground);
         if(com.projectseele.client.visual.EvaConnectedActionReview.ENABLED)
         {
             // Review witness: drawn plane, floor, per sole height over its floor and ground under it, support,
@@ -411,12 +417,73 @@ final class EvaGroundContactR56
      * feet below it counted as underground, and the whole body was raised off its feet: 1.2 blocks
      * on the review hill, the soles left that far over the ground they had just been set on.
      */
-    private static float clearanceAboveFeet(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls,float ground)
+    private static final boolean PRONE_BODY_R63=!"false".equals(System.getProperty("projectseele.proneBodyGroundR63"));
+    /**
+     * An arm of a prone body with a point under the ground is turned up about its shoulder, as one piece, until
+     * that point lies on the ground: elbow, forearm and hand keep the shape the pose gave them.
+     */
+    private static void raiseArmR63(BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls,String side,float ground)
+    {
+        var arm=model.getBone("arm_"+side).orElse(null);
+        if(arm==null)return;
+        Vector3f low=null;
+        for(String name:new String[]{"arm_"+side,"forearm_"+side,"hand_"+side})
+        {
+            var bone=model.getBone(name).orElse(null);var points=hulls.get(name);
+            if(bone==null||points==null||bone.isHidden())continue;
+            var matrix=new Matrix4f(root).mul(EvaRigTransforms.model(bone));
+            for(var point:points){var at=matrix.transformPosition(new Vector3f(point));if(low==null||at.y<low.y)low=at;}
+        }
+        if(low!=null)raiseSupportPointR65(arm,root,low,ground);
+    }
+
+    static void keepRecoveryHandsUp(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root,float partial)
+    {
+        if(root==null||!EvaHandSurfaceR45.applies(eva))return;
+        for(String side:List.of("l","r"))
+        {
+            var arm=model.getBone("arm_"+side).orElse(null);var hand=model.getBone("hand_"+side).orElse(null);
+            if(arm==null||hand==null||hand.isHidden())continue;
+            for(int pass=0;pass<3;pass++)
+            {
+                var low=LocalTriangleMeshLayer.lowestHand(eva,hand,root,partial);
+                if(low==null)break;
+                double y=EvaFootPlacement.ground(eva,low);
+                // Account for the small difference between the collision-space transform and the
+                // interpolated draw position at the fingers of the full-size rig (up to .067 blocks).
+                float contact=(float)y+.08F;
+                if(!Double.isFinite(y)||low.y>=contact-.02)break;
+                raiseSupportPointR65(arm,root,low,contact);
+            }
+        }
+    }
+
+    private static void raiseSupportPointR65(software.bernie.geckolib.cache.object.GeoBone arm,Matrix4f root,Vector3f low,float ground)
+    {
+        if(low.y>=ground-.02F)return;
+        Vector3f shoulder=EvaRigTransforms.point(arm,EvaRigTransforms.pivot(arm),root),out=new Vector3f(low).sub(shoulder);
+        float flat=(float)Math.hypot(out.x,out.z);
+        // A point straight under the shoulder is not raised by turning the arm about it.
+        if(flat<.0001F)return;
+        // About the level axis square to the arm; the turn that brings the point up to the ground, found by halving.
+        var axis=new Vector3f(out.z,0,-out.x).div(flat);float need=ground-shoulder.y;
+        float least=0,most=.7F;
+        if(new Vector3f(out).rotateAxis(.05F,axis.x,axis.y,axis.z).y<out.y)axis.negate();
+        if(new Vector3f(out).rotateAxis(most,axis.x,axis.y,axis.z).y<need)return;
+        for(int i=0;i<14;i++)
+        {
+            float mid=(least+most)/2;
+            if(new Vector3f(out).rotateAxis(mid,axis.x,axis.y,axis.z).y<need)least=mid;else most=mid;
+        }
+        var turned=new Quaternionf().rotationAxis(most,axis.x,axis.y,axis.z).mul(EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(arm))));
+        EvaRigTransforms.rotate(arm,EvaRigTransforms.rotation(EvaRigTransforms.parent(arm,root)).invert().mul(turned));
+    }
+    private static float clearanceAboveFeet(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls,float ground,boolean arms)
     {
         float least=Float.POSITIVE_INFINITY;
         for(String name:PARTS)
         {
-            if(name.startsWith("foot_"))continue;
+            if(name.startsWith("foot_")||!arms&&(name.startsWith("arm_")||name.startsWith("forearm_")||name.startsWith("hand_")))continue;
             var bone=model.getBone(name).orElse(null);var points=hulls.get(name);
             if(bone==null||points==null||bone.isHidden())continue;
             float floor=ground;
@@ -425,7 +492,9 @@ final class EvaGroundContactR56
                 double under=EvaFootPlacement.groundUnder(eva,name.endsWith("_l")?"l":"r");
                 if(Double.isFinite(under)&&under<ground-.5)floor=(float)under;
             }
-            least=Math.min(least,lowest(new Matrix4f(root).mul(EvaRigTransforms.model(bone)),points)-floor);
+            // Prone, a part lies as low as it is drawn, which is lower than its outline where its rim follows
+            // another bone (EvaProneSkinR63, measured as the last frame was drawn).
+            least=Math.min(least,lowest(new Matrix4f(root).mul(EvaRigTransforms.model(bone)),points)-(arms?0:EvaProneSkinR63.gap(eva,name))-floor);
         }
         return least;
     }

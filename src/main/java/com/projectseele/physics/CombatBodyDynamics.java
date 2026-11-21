@@ -41,6 +41,7 @@ public final class CombatBodyDynamics
     {
         CombatBodyProfiles.Profile profile;ArticulatedBody simulation;EvaBodyPose.Sample template,pose,resting;
         boolean groundImpact,thrown;int fuseSaidR63;
+        final SupportedRecovery recoverySupport=new SupportedRecovery();
         Vec3 origin,position;float yaw;AABB bounds,terrainCoverage;long started;int age,stable,recoveryAge=-1;float recoveryStart,recoveryYaw,groundY;Vector3f recoveryOffset,endShift;
     }
     private static final class ClientState
@@ -339,7 +340,9 @@ public final class CombatBodyDynamics
                     var beat=CombatFeelR31.beat(entity);
                     if(s.stable>0&&s.age>10&&s.thrown)
                     {s.thrown=false;CombatFeelR31.send(entity,CombatFeelR31.DOWN,beat==null?Vec3.ZERO:beat.direction(),beat==null?1:beat.strength(),64,0);}
-                    if(s.age>18&&s.stable>=5&&entity.isAlive()&&!(entity instanceof EvaUnit01Entity eva&&EvaShutdownR30.disabled(eva)))beginRecovery(entity,s);
+                    boolean overdue=entity instanceof EvaPrototypeEntity un&&un.getUNSerial()==0
+                            &&s.recoverySupport.ready(s.age,frame.supportContacts(),s.position.distanceToSqr(beforeR63));
+                    if(s.age>18&&(s.stable>=5||overdue)&&entity.isAlive()&&!(entity instanceof EvaUnit01Entity eva&&EvaShutdownR30.disabled(eva)))beginRecovery(entity,s);
                 }
                 else recover(entity,s);
                 if(!SERVER.containsKey(entity))continue;
@@ -401,6 +404,18 @@ public final class CombatBodyDynamics
         s.recoveryYaw=(float)(Math.atan2(to.x,to.z)-Math.atan2(from.x,from.z));rotate(start,s.recoveryYaw);s.recoveryOffset=hip(s.pose).sub(hip(start));
         var end=CombatBodyProfiles.recovery(s.profile,1);rotate(end,s.recoveryYaw);end.positions.get("root").add(s.recoveryOffset);end.dirty();var live=raw(entity,0);rotate(live,s.recoveryYaw);
         s.endShift=hip(end).sub(hip(live));s.endShift.y=0;s.groundY=(float)((s.bounds.minY-s.origin.y)*SCALE);
+    }
+
+    /** The original UN rig can stay grounded while its internal joint velocities keep the normal
+     * rest test from passing. Track the displacement of the body resting on terrain. */
+    static final class SupportedRecovery
+    {
+        private int quietTicks;
+        boolean ready(int age,int terrainContacts,double displacementSquared)
+        {
+            quietTicks=terrainContacts>1&&displacementSquared<.25*.25?quietTicks+1:0;
+            return age>=240&&quietTicks>=10;
+        }
     }
     private static EvaBodyPose.Sample mix(EvaBodyPose.Sample a,EvaBodyPose.Sample b,float weight)
     {var p=CombatBodyProfiles.copy(a);for(String n:p.rig.keySet()){p.rotations.get(n).slerp(b.rotations.get(n),weight);p.positions.get(n).lerp(b.positions.get(n),weight);}p.dirty();return p;}

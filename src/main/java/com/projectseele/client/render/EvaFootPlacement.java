@@ -67,7 +67,7 @@ public final class EvaFootPlacement
             java.util.Arrays.fill(w,0);
         }
     }
-    private static double ground(EvaUnit01Entity eva,Vector3f point)
+    static double ground(EvaUnit01Entity eva,Vector3f point)
     {
         // Reach a kerb up to a full step above the sole, or the ground a step below.
         Vec3 from=new Vec3(point.x,point.y+STEP+1,point.z),to=new Vec3(point.x,point.y-STEP-1,point.z);

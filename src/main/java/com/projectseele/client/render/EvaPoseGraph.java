@@ -420,6 +420,8 @@ public final class EvaPoseGraph
         // continuity residuals decayed apart from rotation); seat each back on its real elbow/knee centre.
         seatHinges(model);
         EvaCombatPoseR31.finishHeldStrike(entity,model,partialTick,modelToWorld);
+        if(physical&&com.projectseele.physics.CombatBodyDynamics.phase(entity)==2)
+            EvaGroundContactR56.keepRecoveryHandsUp(entity,model,modelToWorld,partialTick);
         EvaGroundContactR56.witnessLowestR63(entity,model,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         EvaPoseTransition.recordFinal(entity,model);
