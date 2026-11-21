@@ -4,8 +4,10 @@
 
 Writes shaft_r66.json (shaft box, top and bottom openings, bulkhead planes, ledges, climbable faces) and annotated
 sections. Nothing here writes a world. EVA collision box: 17 wide, 60 tall (EvaScale NORMAL_* x WORLD_MULTIPLIER).
-Ledges form a spiral; the planner checks that an EVA standing on any ledge, against its wall, has 61 blocks clear over
-it (no other ledge, no wall), and that the open middle of the shaft stays at least 17 wide for free fall.
+Two kinds of platform, after the motion side's measurements (Fable, fable-r66-shaft-interface-20261122): stations
+22 x 14 to stand and fight on, every ~55 blocks, with 62 clear over an EVA standing on one; and 12 x 6 hand ledges in a
+spiral every 16 blocks, only to hang on. Rung grooves ring the walls every 8 blocks (1 block deep into the lining). The
+planner checks the station clearance against every other platform and that the middle stays at least 17 wide.
 """
 import json, sys
 from pathlib import Path
@@ -20,6 +22,22 @@ BULKHEADS = [-1091, -1126, -1161, -1196, -1231]   # 35 apart (owner: every 30-40
 DOOR_HALL = dict(x=(94, 95), z=(230, 254), y=(-1051, -989))     # 25 wide, 63 tall opening in the hall's east wall
 GALLERY = dict(x=(96, 103), z=(230, 254), y=(-1264, -1202))     # bottom, into the lobby's east wall
 FACES = ['N', 'E', 'S', 'W']
+STATION_LEN, STATION_DEPTH = 22, 14
+STATIONS = [('N', -1100), ('S', -1155), ('N', -1210)]
+RUNG_STEP = 8
+NORMAL = {'N': [0, 0, 1], 'S': [0, 0, -1], 'W': [1, 0, 0], 'E': [-1, 0, 0]}
+
+
+def station_box(face, top):
+    a = (X1 - X0 + 1 - STATION_LEN) // 2
+    L, D = STATION_LEN, STATION_DEPTH
+    if face == 'N':
+        return (X0 + a, top - 1, Z0, X0 + a + L - 1, top, Z0 + D - 1)
+    if face == 'S':
+        return (X0 + a, top - 1, Z1 - D + 1, X0 + a + L - 1, top, Z1)
+    if face == 'W':
+        return (X0, top - 1, Z0 + a, X0 + D - 1, top, Z0 + a + L - 1)
+    return (X1 - D + 1, top - 1, Z0 + a, X1, top, Z0 + a + L - 1)
 
 
 def ledge_box(face, top, gap=3):
@@ -55,26 +73,28 @@ def overlaps(a, b):
 
 def main(survey, out):
     out = Path(out); out.mkdir(parents=True, exist_ok=True)
+    stations = [dict(kind='station', face=f, top_y=t, box=station_box(f, t)) for f, t in STATIONS]
+
+    def blocks(st, other):
+        """Does platform `other` sit inside the 61 blocks over an EVA standing on station `st`?"""
+        if other is st or not (st['top_y'] < other['top_y'] - 1 <= st['top_y'] + EVA_H + 1):
+            return False
+        x0, y0, z0, x1, y1, z1 = other['box']
+        return overlaps(eva_box(st['face'], st['box']), (x0, z0, x1 + 1, z1 + 1))
+
     ledges = []
     top = LIP - 14
     i = 0
-    while top > FLOOR + EVA_H + 4:
+    while top > FLOOR + 8:
         face = FACES[i % 4]
-        if all(abs(top - b) > 4 for b in BULKHEADS):
-            ledges.append(dict(face=face, top_y=top, box=ledge_box(face, top)))
+        L = dict(kind='hand_ledge', face=face, top_y=top, box=ledge_box(face, top))
+        if all(abs(top - b) > 4 for b in BULKHEADS) and all(abs(top - s['top_y']) > 6 for s in stations)                 and not any(blocks(s, L) for s in stations):
+            ledges.append(L)
         top -= LEDGE_STEP
         i += 1
-    # clearance check: EVA on a ledge needs EVA_H + 1 clear above, no other ledge in its footprint
-    faults = []
-    for L in ledges:
-        foot = eva_box(L['face'], L['box'])
-        for M in ledges:
-            if M is L or not (L['top_y'] < M['top_y'] - 1 <= L['top_y'] + EVA_H):
-                continue
-            x0, y0, z0, x1, y1, z1 = M['box']
-            if overlaps(foot, (x0, z0, x1 + 1, z1 + 1)):
-                faults.append((L['top_y'], L['face'], M['top_y'], M['face']))
-    clear = (X1 - X0 + 1) - 2 * LEDGE_DEPTH
+    faults = [(s['top_y'], o['top_y']) for s in stations for o in stations + ledges if blocks(s, o)]
+    rungs = list(range(LIP - 4, FLOOR + 8, -RUNG_STEP))
+    clear = (X1 - X0 + 1) - STATION_DEPTH          # rungs are grooves in the wall, so nothing else narrows it
     plan = dict(schema='projectseele.r66.central-dogma-shaft.v0-proposal',
                 note='proposal only; nothing written to any world',
                 eva_box=dict(width=EVA_W, height=EVA_H),
@@ -82,13 +102,18 @@ def main(survey, out):
                            wall_lining='2 blocks nerv_shaft_panel, light strips every 8 blocks'),
                 hall_doorway=dict(DOOR_HALL, guard='inside the launch route reservation (space cell x64..95 z224..255): needs an approved writer exception'),
                 bottom_gallery=GALLERY,
+                entry=dict(edge='W', note='the EVA comes in from the hall through the doorway and the aisle (x 96..103) and steps east off the west lip; the other three sides of the entry bay are wall'),
+                bottom_gallery_floor='same height as the shaft floor, no threshold',
                 bulkheads=[dict(id=f'bulkhead_{k}', y=[y, y + 1], cells=[X0, y, Z0, X1, y + 1, Z1], closed_state='projectseele:nerv_launch_armor',
-                                open_state='minecraft:air') for k, y in enumerate(BULKHEADS)],
-                ledges=ledges, ledge_rule=dict(length=LEDGE_LEN, depth=LEDGE_DEPTH, step=LEDGE_STEP, clear_middle=clear),
-                climbable_faces=[dict(face=f, y=[FLOOR + 1, LIP]) for f in FACES],
+                                open_state='minecraft:air', breakable=True, debris_box=[X0, y - 1, Z0, X1, y + 2, Z1]) for k, y in enumerate(BULKHEADS)],
+                stations=stations, station_rule=dict(length=STATION_LEN, depth=STATION_DEPTH, clear_over=EVA_H + 2),
+                ledges=ledges, ledge_rule=dict(length=LEDGE_LEN, depth=LEDGE_DEPTH, step=LEDGE_STEP),
+                clear_middle_min=clear,
+                rungs_y=rungs, rung_rule='a continuous 1-block groove cut into the wall lining on all four faces (a hand grips its lower edge); grooves keep the shaft 32 wide, beams would leave only 17 beside a station',
+                climbable_faces=[dict(face=f, normal=NORMAL[f], y=[FLOOR + 1, LIP]) for f in FACES],
                 clearance_faults=faults)
     (out / 'shaft_r66.json').write_text(json.dumps(plan, indent=1), 'utf8')
-    print('ledges', len(ledges), 'faults', len(faults), 'clear middle', clear)
+    print('stations', len(stations), 'ledges', len(ledges), 'rungs', len(rungs), 'faults', len(faults), 'clear middle', clear)
 
     data = np.load(survey); cls, origin = data['classes'], data['origin']
     ox, oy, oz = (int(v) for v in origin)
@@ -117,12 +142,15 @@ def main(survey, out):
         for k, y in enumerate(BULKHEADS):
             d.rectangle([(H(a0), Y(y + 1)), (H(a1 + 1), Y(y - 1))], fill=(200, 40, 40))
             d.text((H(a1 + 1) + 4, Y(y + 1) - 4), f'隔墙{k + 1} y{y}', font=font, fill=(255, 90, 90))
-        for L in ledges:
+        for k in rungs:
+            d.line([(H(a0), Y(k)), (H(a1 + 1), Y(k))], fill=(150, 150, 150), width=1)
+        for L in stations + ledges:
             x0, y0, z0, x1, y1, z1 = L['box']
             b0, b1 = (x0, x1) if axis == 'ew' else (z0, z1)
             c0, c1 = (z0, z1) if axis == 'ew' else (x0, x1)
             if c0 <= fixed <= c1 or True:
-                d.rectangle([(H(b0), Y(y1)), (H(b1 + 1), Y(y0 - 1))], fill=(255, 170, 0) if c0 <= fixed <= c1 else (255, 220, 150))
+                col = (230, 120, 0) if L['kind'] == 'station' else (255, 170, 0)
+                d.rectangle([(H(b0), Y(y1)), (H(b1 + 1), Y(y0 - 1))], fill=col if c0 <= fixed <= c1 else (255, 220, 150))
         if axis == 'ew':
             g = GALLERY; d.rectangle([(H(g['x'][0]), Y(g['y'][1])), (H(g['x'][1] + 1), Y(g['y'][0] - 1))], outline=(0, 160, 0), width=3)
             h = DOOR_HALL; d.rectangle([(H(h['x'][0]), Y(h['y'][1])), (H(h['x'][1] + 1), Y(h['y'][0] - 1))], outline=(0, 160, 0), width=3)
