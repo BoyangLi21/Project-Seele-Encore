@@ -1068,7 +1068,9 @@ public final class EvaPlantedGaitR64
         // A step back under a standing body is set down, not stamped.
         float load=s.moving?1+.28F*run:.55F;
         SoundEvent sound=(soil?ModSounds.EVA_FOOT_SOIL:ModSounds.EVA_FOOT_CONCRETE).get();
-        level.playLocalSound(f.x,f.y,f.z,SoundEvent.createFixedRangeEvent(sound.getLocation(),384F),SoundSource.PLAYERS,2.5F*load,1F,false);
+        // Six takes and a little pitch spread, so a walk is not the same few steps over and over.
+        level.playLocalSound(f.x,f.y,f.z,SoundEvent.createFixedRangeEvent(sound.getLocation(),384F),SoundSource.PLAYERS,2.5F*load,
+                .96F+.08F*eva.getRandom().nextFloat(),false);
         trodden(s,eva,f);
         if(EvaSprintR50.blend(eva,1)>.5F&&!state.isAir())
         {
