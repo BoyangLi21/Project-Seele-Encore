@@ -45,6 +45,15 @@ public final class SurfaceAngelAssaultR52
         else if(boss instanceof MataraelEntity)boss.addTag(MataraelEntity.MISSION_TAG);
         else if(boss instanceof SahaquielEntity)boss.addTag(SahaquielEntity.MISSION_TAG);
         else boss.addTag("seele_tv_shamshel_r24");
+        // R66: Shamshel hovers; when the measured spawn is blocked (the city has grown round it since), it appears
+        // higher up over the same point instead of not at all.
+        if(boss instanceof ShamshelEntity)
+        {
+            int lift=0;
+            while(lift<96&&!level.noCollision(boss,boss.getBoundingBox()))
+            {lift+=4;boss.moveTo(site.spawn().x,site.spawn().y+lift,site.spawn().z,site.yaw(),0);}
+            if(lift>0)ProjectSeele.LOGGER.info("R66 SHAMSHEL spawn raised {} blocks to clear the city",lift);
+        }
         // Sahaquiel leaves for the sky on its first tick; its broad body never stands at the walkers' spawn.
         if(!(boss instanceof SahaquielEntity)&&!level.noCollision(boss,boss.getBoundingBox())){data.notice="远端原使徒完整躯干净空受阻，未挪到旧近城出生点。";data.setDirty();return null;}
         if(!level.addFreshEntity(boss))return null;
@@ -73,6 +82,8 @@ public final class SurfaceAngelAssaultR52
         if(step.lengthSqr()<=1e-8)return null;
         Vec3 move=step.normalize().scale(Math.min(speed,step.length()));
         Vec3 before=boss.position();boss.move(MoverType.SELF,flies?move:move.add(0,-MARCH_PRESS,0));
+        // R66: a hovering Angel rises over what it runs into (street furniture, roofs) rather than stopping there
+        if(flies&&boss.horizontalCollision)boss.move(MoverType.SELF,new Vec3(0,Math.max(speed,.3),0));
         return boss.position().subtract(before);
     }
     private static void hold(Mob boss)
@@ -109,7 +120,7 @@ public final class SurfaceAngelAssaultR52
         if((boss instanceof ShamshelEntity||boss instanceof IsrafelEntity||boss instanceof MataraelEntity)&&data.phase.equals("combat")&&!data.sorties.isEmpty())
         {
             boolean anyStanding=data.sorties.values().stream().map(s->TvSortiesR32.unit(level,s.unit))
-                    .anyMatch(e->e!=null&&e.isAlive()&&!EvaShutdownR30.disabled(e));
+                    .anyMatch(e->e!=null&&e.isAlive()&&!EvaShutdownR30.disabled(e)&&(e.isBerserk()||!e.isPowerDepleted()));
             var tag=boss.getPersistentData();int down=anyStanding?0:tag.getInt("R66AllDownTicks")+1;tag.putInt("R66AllDownTicks",down);
             if(down>=100)
             {
@@ -173,7 +184,11 @@ public final class SurfaceAngelAssaultR52
     static boolean beginsCombatR53(String phase,double distanceSquared,double engagementRange)
     {return phase.equals("approach")&&distanceSquared<=engagementRange*engagementRange;}
     private static boolean arrived(Mob boss,Vec3 point,double radius)
-    {return boss.position().subtract(point).horizontalDistance()<=radius&&Math.abs(boss.getY()-point.y)<=1.6;}
+    {
+        // R66: a hovering Angel that had to rise over the city counts a point by where it is over the ground
+        if(boss instanceof ShamshelEntity)return boss.position().subtract(point).horizontalDistance()<=radius;
+        return boss.position().subtract(point).horizontalDistance()<=radius&&Math.abs(boss.getY()-point.y)<=1.6;
+    }
     private static void cancelPlateAttack(Mob boss)
     {if(boss instanceof SachielEntity s){s.cancelStrikeR31();s.cancelArmorBeamR52();}if(boss instanceof ShamshelEntity s)s.cancelSweepR31();if(boss instanceof MataraelEntity m)m.stopAcidOnArmorR66();boss.getPersistentData().putBoolean("SurfaceArmorAttackR52",false);}
     private static void contact(ServerLevel level,Mob boss,SurfaceAngelPlanR52.Site site)

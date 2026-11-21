@@ -374,8 +374,14 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
             return false;
         }
         if(coreBurntR66||this.level().isClientSide||com.projectseele.config.SeeleConfig.SHAMSHEL_CORE_FINISH_FRACTION.get()<=0
-                ||com.projectseele.combat.AtFieldRules.bypassesAtField(source))
+                ||com.projectseele.combat.AtFieldRules.bypassesAtField(source)
+                // a berserk unit does not hold a knife to the core; it tears the Angel apart (episode 2's ending)
+                ||source.getEntity() instanceof EvaUnit01Entity berserk&&berserk.isBerserk())
+        {
+            if(source.getEntity() instanceof EvaUnit01Entity berserk&&berserk.isBerserk()&&this.getHealth()<=coreFloorR66()+1e-3F&&this.tickCount%20==0)
+                com.projectseele.ProjectSeele.LOGGER.info("R66 SHAMSHEL torn apart by a berserk unit: health {}",this.getHealth());
             return super.hurt(source,amount);
+        }
         // R66: below the floor only the knife at the core can finish it.
         boolean knife=source.getEntity() instanceof EvaUnit01Entity eva&&eva.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE;
         float floor=coreFloorR66();

@@ -232,8 +232,8 @@ public final class AngelSortieReviewR66
             Vec3 across = b.subtract(a).multiply(1, 0, 1);
             if (across.lengthSqr() < 1e-4) across = new Vec3(1, 0, 0);
             Vec3 side = new Vec3(-across.z, 0, across.x).normalize();
-            double reach = Math.max(110, a.distanceTo(b) * 1.15);
-            pos = aim.add(side.scale(reach)).add(0, reach * .32, 0);
+            double reach = Math.max(90, a.distanceTo(b) * 1.1);
+            pos = aim.add(side.scale(reach)).add(0, reach * .5, 0);
         }
         else
         {
@@ -241,6 +241,11 @@ public final class AngelSortieReviewR66
             float yaw = subject.getYRot() * Mth.DEG_TO_RAD;
             pos = aim.add(Math.cos(yaw) * 100, 40, Math.sin(yaw) * 100);
         }
+        // never inside rock or a wall: stop in front of whatever lies between the subject and the wanted place
+        var clip = mc.level.clip(new net.minecraft.world.level.ClipContext(aim, pos, net.minecraft.world.level.ClipContext.Block.VISUAL,
+                net.minecraft.world.level.ClipContext.Fluid.NONE, mc.player));
+        if (clip.getType() != net.minecraft.world.phys.HitResult.Type.MISS)
+            pos = clip.getLocation().add(aim.subtract(clip.getLocation()).normalize().scale(1.5));
         // ease the camera so cuts between the two framings do not jump
         camPos = camPos == null ? pos : camPos.lerp(pos, .06);
         camAim = camAim == null ? aim : camAim.lerp(aim, .12);
@@ -250,6 +255,11 @@ public final class AngelSortieReviewR66
         camera.setXRot((float) (-Mth.atan2(d.y, d.horizontalDistance()) * Mth.RAD_TO_DEG));
         camera.yRotO = camera.getYRot();
         camera.xRotO = camera.getXRot();
+        // a living entity is viewed through its head: the view turns with yHeadRot, not yRot
+        camera.setYHeadRot(camera.getYRot());
+        camera.yHeadRotO = camera.getYRot();
+        camera.setYBodyRot(camera.getYRot());
+        camera.yBodyRotO = camera.getYRot();
         camera.xo = camera.getX(); camera.yo = camera.getY(); camera.zo = camera.getZ();
         camera.xOld = camera.getX(); camera.yOld = camera.getY(); camera.zOld = camera.getZ();
         if (mc.getCameraEntity() != camera) mc.setCameraEntity(camera);
@@ -275,6 +285,7 @@ public final class AngelSortieReviewR66
         try
         {
             frames.write(frame + "," + ticks + "," + mc.level.getGameTime() + "," + String.format(Locale.ROOT, "%.4f", event.renderTickTime) + "\n");
+            if (frame % 100 == 0) frames.flush();
         }
         catch (Exception ignored) {}
     }
