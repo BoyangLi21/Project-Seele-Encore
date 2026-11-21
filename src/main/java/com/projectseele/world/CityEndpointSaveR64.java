@@ -1,8 +1,11 @@
 package com.projectseele.world;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import com.projectseele.mixin.CityChunkMapAccessor;
+import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -19,6 +22,8 @@ final class CityEndpointSaveR64
     private final List<ChunkPos> chunks;
     private final CityEntitySaveFence fence;
     private int cursor;
+    private List<ChunkHolder> others;
+    private int otherCursor;
     private CompletableFuture<Void> writes;
 
     CityEndpointSaveR64(ServerLevel level, List<ChunkPos> chunks)
@@ -40,6 +45,27 @@ final class CityEndpointSaveR64
                 try {
                     if (!((boolean) SAVE_CHUNK.invoke(source.chunkMap, chunk)))
                         throw new IllegalStateException("Could not queue city chunk save at " + pos);
+                } catch (ReflectiveOperationException | RuntimeException error) {
+                    chunk.setUnsaved(true);
+                    throw error;
+                }
+            }
+            if (System.nanoTime() >= deadline) return false;
+        }
+        // Every other loaded chunk with unsaved changes, under the same deadline: the full level save below
+        // would otherwise serialize them all on the server thread in one tick (R65).
+        if (others == null)
+        {
+            others = new ArrayList<>();
+            for (ChunkHolder holder : ((CityChunkMapAccessor) source.chunkMap).seele$chunksR65()) others.add(holder);
+        }
+        while (otherCursor < others.size())
+        {
+            ChunkAccess chunk = others.get(otherCursor++).getChunkToSave().getNow(null);
+            if (chunk != null && chunk.isUnsaved())
+            {
+                try {
+                    SAVE_CHUNK.invoke(source.chunkMap, chunk);
                 } catch (ReflectiveOperationException | RuntimeException error) {
                     chunk.setUnsaved(true);
                     throw error;

@@ -15,6 +15,7 @@
     "DhServerLogoutR53Mixin",
     "FacilityTrackingRangeR54Mixin",
     "PhysicalBodyVehiclePackets",
+    "CityChunkMapAccessor",
     "CityChunkStorageFenceMixin",
     "CityEntityStorageFenceMixin",
     "CitySaveEventMixin",
