@@ -435,14 +435,14 @@ def survey_ponds(work):
     return sorted(leaks)
 
 
-def seal_ponds(work):
+def seal_ponds(work,scan_faces=survey_ponds):
     """Place clay only on confirmed open faces of the measured pond basins."""
     done=work/"pond-seals.json"
     if done.exists():
-        if survey_ponds(work):
+        if scan_faces(work):
             raise ValueError("Previously sealed basin has an exposed face")
         return
-    gaps=survey_ponds(work)
+    gaps=scan_faces(work)
     groups=defaultdict(lambda:defaultdict(list))
     for x,y,z in gaps:
         groups[(x//512,z//512)][(x//16,z//16)].append((x,y,z))
@@ -494,7 +494,7 @@ def seal_ponds(work):
             temp=current.with_name(current.name+".sealed")
             link_or_copy(net/(tag+ext),temp)
             os.replace(temp,current)
-    remaining=survey_ponds(work)
+    remaining=scan_faces(work)
     if remaining:
         raise ValueError(f"Unsealed water faces: {remaining[:10]}")
     report=dict(clay_cells=len(gaps),exposed_faces_after=0,bounds=[[min(p[i] for p in gaps),max(p[i] for p in gaps)] for i in range(3)] if gaps else [])
