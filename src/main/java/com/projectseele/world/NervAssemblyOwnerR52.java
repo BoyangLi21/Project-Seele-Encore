@@ -928,7 +928,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         {var nearby=strict?box:box.inflate(32);scope.add(nearby);addContinuousChunksR53(chunks,nearby);}
         if(strict){try{chunks.addAll(CarrierRearGuideMotionR53.continuousSupportChunks(paths,rearLift,mount.state()));}
         catch(java.io.IOException invalid){hold(o,"continuous_rear_support_scope="+invalid.getMessage());return null;}}
-        var ids=new HashSet<String>();if(strict)ids.addAll(directory.resources(route));else for(var path:paths)ids.addAll(path.leg().resources());
+        var ids=new HashSet<String>();if(strict)ids.addAll(directory.resources(route));else for(var path:paths)ids.addAll(directory.legResources(path.leg()));
         var context=NervRouteRuntimeR52.flightContext(level);
         // Complete machinery is loaded only when its authored cells enter this window.
         for(String id:ids)

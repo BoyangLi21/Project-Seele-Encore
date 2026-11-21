@@ -103,6 +103,7 @@ public final class NervRouteDirectoryR52
     private final Map<String,Route> routes;
     private final int hakoneBank;
     private final Map<Route,Set<String>> hakoneResources;
+    private final Map<Leg,Set<String>> hakoneLegResources;
     private final Map<String,Port> ports;
     private final NervDynamicAirspaceR52 dynamicSpaces;
     private final Map<String,RampArc> rampArcs=new HashMap<>();
@@ -117,6 +118,11 @@ public final class NervRouteDirectoryR52
         this.units=Map.copyOf(units);this.nodes=Map.copyOf(nodes);this.resources=Map.copyOf(resources);this.legs=Map.copyOf(legs);this.routes=Map.copyOf(routes);this.ports=Map.copyOf(ports);this.continuousLegs=routes.values().stream().filter(Route::continuousUpright).flatMap(r->r.legs().stream()).collect(java.util.stream.Collectors.toUnmodifiableSet());this.dynamicSpaces=Objects.requireNonNull(dynamicSpaces);validate();for(var domain:dynamicSpaces.domains())require(knowsDimension(domain.dimension()),"Dynamic SPACE domain must use an actual Root directory dimension");
         hakoneBank = bankForIntentR52("hakone");
         hakoneResources = indexHakoneResources();
+        var indexedLegs = new IdentityHashMap<Leg,Set<String>>();
+        for (Route route : hakoneResources.keySet())
+            for (String legId : route.legs())
+                indexedLegs.computeIfAbsent(leg(legId), Leg::resources);
+        hakoneLegResources = Collections.unmodifiableMap(indexedLegs);
         if(!dynamicSpaces.domains().isEmpty())for(var resource:resources.values())if(resource.kind()==ResourceKind.SPACE)require(NervDynamicAirspaceR52.canonicalBox(resource.id())!=null&&resource.component().equals(resource.id()),"Ground and dynamic air SPACE must use the same canonical32m identity");
     }
     public long epoch(){return epoch;}
@@ -147,6 +153,12 @@ public final class NervRouteDirectoryR52
             if (route.bank() == hakoneBank && route.continuousUpright())
                 indexed.put(route, collectResources(route));
         return Collections.unmodifiableMap(indexed);
+    }
+
+    Set<String> legResources(Leg leg)
+    {
+        Set<String> cached = hakoneLegResources.get(leg);
+        return cached != null ? cached : leg.resources();
     }
 
     public Set<String> resources(Route route)

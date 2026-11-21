@@ -243,7 +243,7 @@ public final class NervRouteNativeR52 implements NativeAccess
     {
         if(route==null||!route.continuousUpright()||paths==null||paths.isEmpty()||paths.size()>2048||!sameAssembly(original,currentKind)||currentKind==Kind.HULL_ONLY_RECOVERY&&!route.recovery())return continuousHeldR53(original,"original_assembly_or_route");
         if(currentKind==Kind.OCCUPIED&&!EntryPlugDirector.hasLaunchLock(level,original.variant(),(EvaUnit01Entity)level.getEntity(original.eva())))return continuousHeldR53(original,"occupied_launch_lock");
-        var ids=new HashSet<String>();for(var path:paths){if(!path.directory().fingerprint().equals(directory.fingerprint())||!route.legs().contains(path.leg().id())||path.leg().motion()==Motion.FOOT_BEARING_TURN)return continuousHeldR53(original,"route_slice");ids.addAll(path.leg().resources());}
+        var ids=new HashSet<String>();for(var path:paths){if(!path.directory().fingerprint().equals(directory.fingerprint())||!route.legs().contains(path.leg().id())||path.leg().motion()==Motion.FOOT_BEARING_TURN)return continuousHeldR53(original,"route_slice");ids.addAll(directory.legResources(path.leg()));}
         if(!NervTraversalPolicyR53.strict(level))
         {
             if(!owner.actualFrameMatches(level,original,paths.get(0).sample(0),ownerData))return continuousHeldR53(original,"actual_source_frame");
@@ -273,7 +273,7 @@ public final class NervRouteNativeR52 implements NativeAccess
     {
         if(!sameOriginalAssembly(original)||currentKind==Kind.HULL_ONLY_RECOVERY&&!route.recovery()
                 ||currentKind==Kind.OCCUPIED&&!EntryPlugDirector.hasLaunchLock(level,original.variant(),(EvaUnit01Entity)level.getEntity(original.eva())))return false;
-        for(String id:leg.resources())if(!resourceReady(id,toFraction>fromFraction&&directory.resource(id).kind()==ResourceKind.DOOR))return false;
+        for(String id:directory.legResources(leg))if(!resourceReady(id,toFraction>fromFraction&&directory.resource(id).kind()==ResourceKind.DOOR))return false;
         try
         {
             var binding=owner.originalBinding(level,original,ownerData);if(binding==null)return false;
