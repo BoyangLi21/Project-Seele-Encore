@@ -59,6 +59,32 @@ public final class NervSiloHatchGeometryR52
             throw new IllegalArgumentException("Original service-hatch source required");
         var known=RETIRED_SERVICE_CACHE.get(spec);if(known==null){known=load(EvaOriginalMeshGeometryR52::classpathBytes,spec,true);RETIRED_SERVICE_CACHE.put(spec,known);}return known;
     }
+    private record PendingR65(Spec spec,boolean retired){}
+    private static final java.util.Set<PendingR65> PENDING_R65=new java.util.HashSet<>();
+    /** The cached geometry, or null after asking the background executor to read it. Reading parses the whole
+     * facility source, a few hundred MB of garbage; a renderer must not do that on its own thread (R65). The read
+     * does not hold the class lock, so the render thread never waits here. A failed read is not retried. */
+    public static NervSiloHatchGeometryR52 classpathIfLoadedR65(Spec spec,boolean retiredService)
+    {
+        if(retiredService&&(spec==null||!spec.serviceColumnPorts()||spec.uprightGuidePorts()||spec.separationSign()!=-1||spec.openingX()!=33||spec.openingZ()!=33))
+            throw new IllegalArgumentException("Original service-hatch source required");
+        var key=new PendingR65(spec,retiredService);
+        synchronized(NervSiloHatchGeometryR52.class)
+        {
+            var known=(retiredService?RETIRED_SERVICE_CACHE:CACHE).get(spec);
+            if(known!=null||!PENDING_R65.add(key))return known;
+        }
+        net.minecraft.Util.backgroundExecutor().execute(()->
+        {
+            try
+            {
+                var loaded=load(EvaOriginalMeshGeometryR52::classpathBytes,spec,retiredService);
+                synchronized(NervSiloHatchGeometryR52.class){(retiredService?RETIRED_SERVICE_CACHE:CACHE).putIfAbsent(spec,loaded);PENDING_R65.remove(key);}
+            }
+            catch(IOException|RuntimeException failure){com.projectseele.ProjectSeele.LOGGER.error("Declared hatch exact source unreadable",failure);}
+        });
+        return null;
+    }
     public boolean retiredServiceLeavesR53(){return retiredServiceLeaves;}
     /** The original upright carrier leaves the opened service pit through its
      * front collar. Keep the side corners, rear half and all separate cassettes.
