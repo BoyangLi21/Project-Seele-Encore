@@ -23,10 +23,13 @@ final class TvCageEnclosureR44
     private static final Map<String, RigidMachineryPartR44> PARTS = new HashMap<>();
     private static final List<Component> COMPONENTS = new ArrayList<>();
     private static boolean attempted;
+    private record LoadedR65(Map<String, RigidMachineryPartR44> parts, List<Component> components, String source, String sha) {}
+    private static java.util.concurrent.CompletableFuture<LoadedR65> pendingR65;
 
     static void clearCache()
     {
         attempted = false;
+        pendingR65 = null;
         PARTS.clear();
         COMPONENTS.clear();
     }
@@ -40,10 +43,40 @@ final class TvCageEnclosureR44
         return result;
     }
 
+    /** Starts the background parse when a world is joined, long before the first launch draws the cage (R65). */
+    static void preloadR65()
+    {
+        if (!attempted && pendingR65 == null)
+            pendingR65 = java.util.concurrent.CompletableFuture.supplyAsync(TvCageEnclosureR44::parseR65, net.minecraft.Util.backgroundExecutor());
+    }
+
+    /** Publishes the parsed cage on the render thread; until the background parse is done the cage is not drawn. */
     private static void load()
     {
         if (attempted) return;
+        preloadR65();
+        if (!pendingR65.isDone()) return;
         attempted = true;
+        try
+        {
+            var loaded = pendingR65.join();
+            PARTS.putAll(loaded.parts());
+            COMPONENTS.addAll(loaded.components());
+            ProjectSeele.LOGGER.info("R44 TV cage visual resource source={} sha256={} parts={} components={}",
+                    loaded.source(), loaded.sha(), PARTS.size(), COMPONENTS.size());
+        }
+        catch (Exception error)
+        {
+            PARTS.clear();
+            COMPONENTS.clear();
+            ProjectSeele.LOGGER.error("R44 TV cage candidate rejected; retaining complete previous machinery", error);
+        }
+    }
+
+    private static LoadedR65 parseR65()
+    {
+        Map<String, RigidMachineryPartR44> parts = new HashMap<>();
+        List<Component> components = new ArrayList<>();
         var path = new ResourceLocation(ProjectSeele.MODID, "mesh/tv_shoulder_shells_r44.json");
         var resource = Minecraft.getInstance().getResourceManager().getResource(path);
         try (var stream = resource.orElseThrow().open())
@@ -54,14 +87,14 @@ final class TvCageEnclosureR44
                     || !root.get("frame").getAsString().equals("fixed_gantry_local_metres_world_axes"))
                 throw new IllegalArgumentException("Unexpected cage coordinate convention");
             for (var item : root.getAsJsonObject("parts").entrySet())
-                PARTS.put(item.getKey(), RigidMachineryPartR44.triangles(item.getValue().getAsJsonArray()));
+                parts.put(item.getKey(), RigidMachineryPartR44.triangles(item.getValue().getAsJsonArray()));
             int[] shoulders = new int[3];
             for (var item : root.getAsJsonArray("components"))
             {
                 var row = item.getAsJsonObject();
                 String part = row.get("part").getAsString(), motion = row.get("motion").getAsString();
                 int variant = row.has("variant") ? row.get("variant").getAsInt() : -1;
-                if (!PARTS.containsKey(part) || variant < -1 || variant > 2)
+                if (!parts.containsKey(part) || variant < -1 || variant > 2)
                     throw new IllegalArgumentException("Unresolved cage component");
                 Vec3 normal = Vec3.ZERO, translation = Vec3.ZERO;
                 double outboard = 0;
@@ -92,21 +125,18 @@ final class TvCageEnclosureR44
                     }
                     default -> throw new IllegalArgumentException("Unknown cage motion " + motion);
                 }
-                COMPONENTS.add(new Component(part, variant, motion, normal, outboard, translation, from, to));
+                components.add(new Component(part, variant, motion, normal, outboard, translation, from, to));
             }
             for (int count : shoulders)
                 if (count != 2) throw new IllegalArgumentException("All six shoulder housings are required");
-            if (!PARTS.containsKey("cage_frame_lower_r44"))
+            if (!parts.containsKey("cage_frame_lower_r44"))
                 throw new IllegalArgumentException("A complete replacement fixed support frame is required");
-            ProjectSeele.LOGGER.info("R44 TV cage visual resource source={} sha256={} parts={} components={}",
-                    resource.orElseThrow().sourcePackId(), java.util.HexFormat.of().formatHex(
-                            java.security.MessageDigest.getInstance("SHA-256").digest(encoded)), PARTS.size(), COMPONENTS.size());
+            return new LoadedR65(parts, components, resource.orElseThrow().sourcePackId(), java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(encoded)));
         }
         catch (Exception error)
         {
-            PARTS.clear();
-            COMPONENTS.clear();
-            ProjectSeele.LOGGER.error("R44 TV cage candidate rejected; retaining complete previous machinery", error);
+            throw new java.util.concurrent.CompletionException(error);
         }
     }
 
