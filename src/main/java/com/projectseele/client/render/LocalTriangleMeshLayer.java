@@ -137,26 +137,13 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 :ModelRenderTypesR49.optics(selectedTexture,this.fullBright))
                 :(triangles?ModelRenderTypesR49.entityTriangles(selectedTexture):ModelRenderTypesR49.entity(selectedTexture)));
         var skin = mesh.joints().get(bone.getName());
-        PosedMeshCacheR52 skinPose = null;
-        boolean skinReused = false;
-        float[] values;
-        if (skin == null) values = part.vertices();
-        else
-        {
-            var root = bone;
-            while (root.getParent() != null) root = root.getParent();
-            skinPose = SKIN_POSES.computeIfAbsent(skin, ignored -> new PosedMeshCacheR52(bone.getName(),
-                    skin.influences().isEmpty()?Set.of(skin.other()):skin.influences().keySet(),
-                    skin.corrective()==null?Set.of():skin.corrective().targets().keySet()));
-            skinPose.prepare(animatable, root, com.projectseele.entity.FirstBattleSignals.clientFrameTime(), partialTick);
-            if (skinPose.sampled(skin)) { values = skin.scratch(); skinReused = true; }
-            else
-            {
-                values = skinVertices(mesh,part,bone,skinPose.commonAncestor());
-                if (values == skin.scratch()) skinPose.remember(skin);
-            }
-        }
+        PosedMeshCacheR52 skinPose=skin==null?null:prepareSkin(animatable,bone,skin,partialTick);
+        float[] values=posedVertices(mesh,part,bone,skin,skinPose);
         int stride = mesh.stride();
+        // R63: a prone body is set on the ground by its drawn surface; see EvaProneSkinR63.
+        if(skin!=null&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva&&EvaProneSkinR63.wanted(eva,bone.getName())
+                &&!ShaderShadowPassR44.active()&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
+            EvaProneSkinR63.measure(eva,bone.getName(),part.vertices(),values,stride,renderer.renderedMeshTransform(pose,eva,partialTick));
         if(!this.fullBright&&animatable instanceof EvaUnit01Entity eva&&eva.isFirstBattleActive()
                 &&this.getRenderer() instanceof EvaUnit01Renderer renderer)
             EvaContactShadowsR24.capture(eva,bone.getName(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),renderer.renderedMeshTransform(pose,eva,partialTick));
@@ -201,6 +188,42 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         float z = (values[index + 2] + part.pivotZ()) / 16.0F;
         MeshVertexWriter.emitTinted(buffer,pose,normal,x,y,z,values[index+3],values[index+4],
                 packedLight,packedOverlay,-values[index+5],values[index+6],values[index+7],part.red(),part.green(),part.blue());
+    }
+
+    private static PosedMeshCacheR52 prepareSkin(Object owner,GeoBone bone,JointSkin skin,float partial)
+    {
+        var root=bone;while(root.getParent()!=null)root=root.getParent();
+        var cache=SKIN_POSES.computeIfAbsent(skin,ignored->new PosedMeshCacheR52(bone.getName(),
+                skin.influences().isEmpty()?Set.of(skin.other()):skin.influences().keySet(),
+                skin.corrective()==null?Set.of():skin.corrective().targets().keySet()));
+        cache.prepare(owner,root,com.projectseele.entity.FirstBattleSignals.clientFrameTime(),partial);
+        return cache;
+    }
+
+    private static float[] posedVertices(MeshData mesh,MeshPart part,GeoBone bone,JointSkin skin,PosedMeshCacheR52 cache)
+    {
+        if(skin==null)return part.vertices();
+        if(cache.sampled(skin))return skin.scratch();
+        float[] vertices=skinVertices(mesh,part,bone,cache.commonAncestor());
+        if(vertices==skin.scratch())cache.remember(skin);
+        return vertices;
+    }
+
+    /** Lowest point of the actuated fingers and palm together, in the current world pose. */
+    static Vector3f lowestHand(EvaUnit01Entity eva,GeoBone bone,Matrix4f root,float partial)
+    {
+        MeshData mesh=getMesh(EvaHandSurfaceR45.mesh(eva));if(mesh==null)return null;
+        String name=bone.getName();var part=mesh.parts().get(name);if(part==null)return null;
+        var skin=mesh.joints().get(name);
+        float[] points=posedVertices(mesh,part,bone,skin,skin==null?null:prepareSkin(eva,bone,skin,partial));
+        var world=new Matrix4f(root).mul(EvaRigTransforms.model(bone));
+        float a=-world.m01(),b=world.m11(),c=world.m21(),low=Float.POSITIVE_INFINITY;int at=0;
+        for(int i=0;i<points.length;i+=mesh.stride())
+        {
+            float y=a*points[i]+b*points[i+1]+c*points[i+2];
+            if(y<low){low=y;at=i;}
+        }
+        return world.transformPosition(new Vector3f(-points[at]-part.pivotX(),points[at+1]+part.pivotY(),points[at+2]+part.pivotZ()).div(16));
     }
 
     public static void clearCache()
