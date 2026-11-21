@@ -4284,8 +4284,49 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         Vec3 point=EvaGameplayMotionR32.contact(this,rowClipR64(row),1),previous=EvaGameplayMotionR32.previousContact(this,point);
         this.combatR64().sweeps(true);
-        try{return this.strikeZoneR32(pilot,new AABB(previous,point).inflate(radius),damage,row.knock(),point,previous,radius,true);}
+        try{if(this.strikeZoneR32(pilot,new AABB(previous,point).inflate(radius),damage,row.knock(),point,previous,radius,true))return true;}
         finally{this.combatR64().sweeps(false);}
+        // R65: the slam is swung round in an arc 25 to 32 blocks out, and the knee before it lands the Unit 20 from
+        // an Angel's middle: the fists went round behind the Angel and the blow counted as air (measured: the mark
+        // no nearer than 11.8 blocks to a Sachiel's middle through the live ticks, the forearms through its trunk).
+        // What strikes a body inside the arc is the arm, as the leg's length strikes for the kick above.
+        if(row.name().equals("charge"))return this.chargeMeetsR65(row,pilot,point,damage,radius);
+        if(row.kind()!=EvaMoveTableR64.SLAM)return false;
+        for(String side:new String[]{"l","r"})
+        {
+            Vec3[] arm=EvaGameplayMotionR32.forearmR65(this,side,1);
+            this.strikeAngelsOnlyR60=true;
+            try{if(this.strikeZoneR32(pilot,new AABB(arm[0],arm[1]).inflate(radius),damage,row.knock(),arm[1],arm[0],radius,true))return true;}
+            finally{this.strikeAngelsOnlyR60=false;}
+        }
+        return false;
+    }
+    /**
+     * R65: the charge lands where the two trunks meet. Its mark is the shoulder, the Unit's own front, and two
+     * bodies are held apart by their trunks' fronts (CombatSpacingR32: 0.8 blocks between them). At the shoulder's
+     * height a Sachiel's trunk is narrower than where its front is: the mark stood 2.6 to 5.1 blocks from it with
+     * a reach of 3.2, and met it only where the arm happened to come back past one of its limbs (of nine charges
+     * measured two met nothing, four landed in ticks 7 to 9 of 5 to 9, three in ticks 5 and 6; with the body 3
+     * blocks lower it was the same). So what the spacing rule calls contact is contact: an Angel ahead whose
+     * trunk's front is within 1.5 blocks of where that rule stops this one is struck, at the shoulder's mark.
+     */
+    private boolean chargeMeetsR65(EvaMoveTableR64.Row row,LivingEntity pilot,Vec3 point,float damage,double radius)
+    {
+        Vec3 ahead=Vec3.directionFromRotation(0,this.getYRot()).multiply(1,0,1).normalize();
+        for(var other:this.level().getEntitiesOfClass(LivingEntity.class,this.getBoundingBox().inflate(36,8,36),e->e!=this&&e.isAlive()&&e instanceof Angel))
+        {
+            Vec3 delta=other.position().subtract(this.position()).multiply(1,0,1);double apart=delta.length();
+            if(apart<1e-4||Math.abs(this.getY()-other.getY())>12)continue;
+            Vec3 toward=delta.scale(1/apart);
+            if(toward.dot(ahead)<.7)continue;
+            double here=com.projectseele.physics.CombatBodyContacts.torsoFrontage(this,toward),there=com.projectseele.physics.CombatBodyContacts.torsoFrontage(other,toward.scale(-1));
+            if(!Double.isFinite(here)||!Double.isFinite(there)||apart>Math.max(18,Math.min(34,here+there+.8))+1.5)continue;
+            Vec3 chest=new Vec3(other.getX(),point.y,other.getZ());
+            this.strikeAngelsOnlyR60=true;
+            try{if(this.strikeZoneR32(pilot,new AABB(point,chest).inflate(radius),damage,row.knock(),point,null,radius,true))return true;}
+            finally{this.strikeAngelsOnlyR60=false;}
+        }
+        return false;
     }
     /** The frames core sets the row's place in its clip (the moment of first contact, for the hold). */
     void rowPhaseR64(float phase){this.entityData.set(DATA_LIVE_ACTION_PHASE,Mth.clamp(phase,0,1));}

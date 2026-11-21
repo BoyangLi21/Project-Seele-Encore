@@ -1002,6 +1002,12 @@ public final class EvaGameplayMotionR32
         var pose=EvaBodyPose.sample(e,partial);
         return new Vec3[]{posedPoint(e,pose,"leg_"+side,partial),posedPoint(e,pose,"foot_"+side,partial)};
     }
+    /** The forearm of one side as it is posed, elbow to wrist (R65: the slam's arm, see EvaUnit01Entity.rowContactR64). */
+    public static Vec3[] forearmR65(EvaUnit01Entity e,String side,float partial)
+    {
+        var pose=EvaBodyPose.sample(e,partial);
+        return new Vec3[]{posedPoint(e,pose,"forearm_"+side,partial),posedPoint(e,pose,"hand_"+side,partial)};
+    }
     private static Vec3 posedPoint(EvaUnit01Entity e,EvaBodyPose.Sample pose,String bone,float partial)
     {
         var local=pose.matrix(bone).transformPosition(new Vector3f(pose.rig.get(bone).pivot())).mul(EvaScale.RENDER_SCALE).rotateY((180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD);

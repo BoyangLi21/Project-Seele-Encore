@@ -1422,15 +1422,20 @@ public final class EvaConnectedActionReview
      * pounce, knee, slam at one 36 ahead (340, 349, 359); the charge: a run from 480 at a mark 80 ahead, the light
      * press when it is 32 off; a grab at one 24 ahead (640), three blows on it (670, 684, 698) and the throw (722).
      * Where the two bodies stand is logged as in the kick's tour.
+     * Since R65 a light press from a stand is the old jab again, and the pounce is what a light press within twelve
+     * ticks of an evade's end gives. With tourEnd=1000 the tour goes on: an evade back (760), a mark 36 ahead of
+     * where it ends and the string pounce, knee, slam (778, 787, 797); an evade back (860), a mark 44 ahead and
+     * the pounce alone with its whole stride (878). With tourEnd=1160, two more charges: runs from 925 and 1040 at
+     * marks 90 ahead, pressed 40 and 26 blocks off.
      */
     private static final boolean BODY_R64=Boolean.getBoolean("projectseele.tourBodyR64");
     private static boolean bodyChargedR64;
     private static void bodyR64(Minecraft mc,EvaUnit01Entity eva)
     {
-        boolean run=tick>=480&&tick<540;
+        boolean run=tick>=480&&tick<540||tick>=925&&tick<990||tick>=1040&&tick<1105;
         mc.options.keyUp.setDown(run);mc.player.input.up=run;mc.player.input.forwardImpulse=run?1:0;mc.player.zza=run?1:0;mc.player.xxa=0;
         // (the run's key is held through the run: let go, the client tells the server the run is over)
-        mc.options.keySprint.setDown(run&&tick>=482);
+        mc.options.keySprint.setDown(run&&tick!=480&&tick!=481&&tick!=925&&tick!=926&&tick!=1040&&tick!=1041);
         mc.player.setYRot(0);mc.player.setXRot(0);
         if(at(10))dummyR64(mc,eva,30,0);
         if(at(110))dummyR64(mc,eva,38,0);
@@ -1438,16 +1443,23 @@ public final class EvaConnectedActionReview
         if(at(310))dummyR64(mc,eva,36,0);
         if(at(40)||at(140)||at(240)||at(340)||at(349)||at(359))lightR64();
         if(at(450)){dummyR64(mc,eva,80,0);bodyChargedR64=false;}
-        if(at(482))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
-        if(at(540))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(at(905)||at(1020)){dummyR64(mc,eva,90,0);bodyChargedR64=false;}
+        if(at(482)||at(927)||at(1042))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(540)||at(990)||at(1105))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
         if(at(610))dummyR64(mc,eva,24,0);
         if(at(640))send(ServerboundEvaControlPacket.ACTION_GRAPPLE);
         if(at(670)||at(684)||at(698))lightR64();
         if(at(722))heavyR64();
+        if(at(750)||at(850)||at(902))removeTargetR63(mc,"sachiel");
+        if(at(760)||at(860))evadeBackR64();
+        if(at(776))dummyR64(mc,eva,36,0);
+        if(at(778)||at(787)||at(797))lightR64();
+        if(at(876))dummyR64(mc,eva,44,0);
+        if(at(878))lightR64();
         if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
         var near=mc.level.getEntitiesOfClass(com.projectseele.entity.SachielEntity.class,eva.getBoundingBox().inflate(140)).stream()
                 .min(java.util.Comparator.comparingDouble(eva::distanceToSqr)).orElse(null);
-        if(run&&!bodyChargedR64&&near!=null&&Math.hypot(near.getX()-eva.getX(),near.getZ()-eva.getZ())<32){bodyChargedR64=true;lightR64();}
+        if(run&&!bodyChargedR64&&near!=null&&Math.hypot(near.getX()-eva.getX(),near.getZ()-eva.getZ())<(tick<600?32:tick<1000?40:26)){bodyChargedR64=true;lightR64();}
         if(tick%2==0||eva.hasLiveActionForRender(0)||com.projectseele.entity.EvaCombatR31.active(eva))
             ProjectSeele.LOGGER.info("R64DUMMY tick {} game {} target at {} {} unit at {} {} yaw {} feet {} grab {} {}",tick,mc.level.getGameTime(),
                     near==null?"-":String.format(java.util.Locale.ROOT,"%.2f",near.getX()),near==null?"-":String.format(java.util.Locale.ROOT,"%.2f",near.getZ()),

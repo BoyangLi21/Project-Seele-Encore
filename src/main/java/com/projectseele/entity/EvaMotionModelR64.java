@@ -200,12 +200,20 @@ public final class EvaMotionModelR64
      * Whether the new model walks this Unit now, as far as both sides know: piloted freely on its feet, bare
      * handed or with the knife, nothing else owning the body. The client asks more of what it draws.
      */
-    public static boolean walks(EvaUnit01Entity e)
+    public static boolean walks(EvaUnit01Entity e){return stands(e)&&!e.hasLiveActionForRender(0);}
+    /**
+     * The planted model stands this Unit, whatever its arms are doing. R65: a punch thrown where the Unit stands
+     * (EvaGameplayMotionR32.activeSupportedPunchR64) is a blow in hand, and walks() says no for as long as one is:
+     * the model let go of the legs for every punch, the feet were drawn to where the server's own standing pose
+     * has them (2.5 blocks from where the model stood them, each foot sliding there as the first punch began),
+     * and stepped back when the punches were over, the "reset" the owner named on 2026-11-18.
+     */
+    public static boolean stands(EvaUnit01Entity e)
     {
         return planted(e)&&e.isPoweredOn()&&!e.isFirstBattleActive()&&!e.isBerserk()&&!e.isCrucified()&&!e.isNervLogisticsLocked()
                 &&!e.isLaunchSequenceActive()&&e.getActivationTicks()<=0&&e.getVisualPose()==0
                 &&(e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE)
-                &&!e.isPilotProne()&&!e.isPilotCrouching()&&!e.hasLiveActionForRender(0)
+                &&!e.isPilotProne()&&!e.isPilotCrouching()
                 &&!com.projectseele.physics.CombatBodyDynamics.active(e);
     }
 

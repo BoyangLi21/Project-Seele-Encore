@@ -175,7 +175,10 @@ def main():
         clip, row, make, bone, point, leading = MOVES[name]
         keys, shown, steps = make(stage)
         at = (stage.body.knee['r'] + np.array([0, -.4, 0]) if point == 'knee_r'
-              else stage.rig.pivot['arm_l'] + np.array([.4, 0, 0]) if point == 'shoulder_l' else point)
+              # (R65: the outside of the shoulder's armour, 4.5 blocks out from the joint. At 2 blocks out the mark came
+              # no nearer than 3.6 blocks to a Sachiel's side, the two bodies being held apart by their trunks, and the
+              # blow's reach is 3.2: it met nothing.)
+              else stage.rig.pivot['arm_l'] + np.array([.9, 0, 0]) if point == 'shoulder_l' else point)
         clips[clip] = stage.clip(name, row, keys, bone, at, shown=shown, leading=leading, steps=steps,
                                  sheet=os.path.join(sheets, 'unarmed_%s.png' % name) if sheets else None)
     if out != '-':

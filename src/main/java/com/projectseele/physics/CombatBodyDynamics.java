@@ -325,13 +325,13 @@ public final class CombatBodyDynamics
                     Vector3f offset=new Vector3f(moved.x-hip.x,frame.min().y,moved.z-hip.z);s.position=world(s,offset);
                     s.pose=CombatBodyProfiles.render(s.template,frame.deformation(),offset);
                     stitch(s.pose,s.profile);
-                    if(DIAG_R63&&(s.age<=120||s.position.distanceTo(beforeR63)>3))
+                    if(DIAG_R63&&(s.age<=120||s.age%4==0||s.position.distanceTo(beforeR63)>3))
                     {
                         StringBuilder near=new StringBuilder();
                         for(var other:entity.level().getEntitiesOfClass(LivingEntity.class,s.bounds.inflate(45),e->e!=entity&&(e instanceof EvaUnit01Entity||e instanceof SachielEntity)&&e.isAlive()))
                             near.append(String.format(java.util.Locale.ROOT," %s at %.1f moved %.2f%s",other.getType().toShortString(),other.position().distanceTo(s.position),
                                     other.position().distanceTo(new Vec3(other.xo,other.yo,other.zo)),other instanceof SachielEntity a?" strike "+a.isStrikeActive()+" mode "+a.strikeMode()+" age "+a.strikeAge(0):""));
-                        ProjectSeele.LOGGER.info("R63BODY {} age {} at {} moved {} torso speed {} contacts {}; {};{}",entity.getType().toShortString(),s.age,
+                        ProjectSeele.LOGGER.info("R63BODY {} age {} stable {} at {} moved {} torso speed {} contacts {}; {};{}",entity.getType().toShortString(),s.age,s.stable,
                                 String.format(java.util.Locale.ROOT,"%.1f %.1f %.1f",s.position.x,s.position.y,s.position.z),
                                 String.format(java.util.Locale.ROOT,"%.2f",s.position.distanceTo(beforeR63)),String.format(java.util.Locale.ROOT,"%.2f",frame.speed()),
                                 frame.supportContacts(),s.simulation.actorContactsR63(),near);
@@ -340,8 +340,13 @@ public final class CombatBodyDynamics
                     var beat=CombatFeelR31.beat(entity);
                     if(s.stable>0&&s.age>10&&s.thrown)
                     {s.thrown=false;CombatFeelR31.send(entity,CombatFeelR31.DOWN,beat==null?Vec3.ZERO:beat.direction(),beat==null?1:beat.strength(),64,0);}
-                    boolean overdue=entity instanceof EvaPrototypeEntity un&&un.getUNSerial()==0
-                            &&s.recoverySupport.ready(s.age,frame.supportContacts(),s.position.distanceToSqr(beforeR63));
+                    // R65: every Unit, not UN-00 alone. Measured on the R65 jar, twice of twice: a felled Unit-01 lay
+                    // 260 ticks and more (54 to 122 on 2026-11-15/16). It lay on the ground, moving 0.12 blocks a tick,
+                    // while its trunk's speed stood at 1.05 (the rest test asks for under 0.40 five ticks running, and
+                    // had it in 3 ticks of 81): the body sinks by its weight and is lifted back every tick.
+                    boolean overdue=entity instanceof EvaUnit01Entity unit
+                            &&s.recoverySupport.ready(s.age,frame.supportContacts(),s.position.distanceToSqr(beforeR63),
+                                    unit instanceof EvaPrototypeEntity un&&un.getUNSerial()==0?SupportedRecovery.UN_LEAST:SupportedRecovery.UNIT_LEAST_R65);
                     if(s.age>18&&(s.stable>=5||overdue)&&entity.isAlive()&&!(entity instanceof EvaUnit01Entity eva&&EvaShutdownR30.disabled(eva)))beginRecovery(entity,s);
                 }
                 else recover(entity,s);
@@ -410,11 +415,14 @@ public final class CombatBodyDynamics
      * rest test from passing. Track the displacement of the body resting on terrain. */
     static final class SupportedRecovery
     {
+        /** The least age at which a body lying quietly gets up: UN-00, and (R65) every other Unit. */
+        static final int UN_LEAST=240,UNIT_LEAST_R65=100;
         private int quietTicks;
-        boolean ready(int age,int terrainContacts,double displacementSquared)
+        boolean ready(int age,int terrainContacts,double displacementSquared){return ready(age,terrainContacts,displacementSquared,UN_LEAST);}
+        boolean ready(int age,int terrainContacts,double displacementSquared,int least)
         {
             quietTicks=terrainContacts>1&&displacementSquared<.25*.25?quietTicks+1:0;
-            return age>=240&&quietTicks>=10;
+            return age>=least&&quietTicks>=10;
         }
     }
     private static EvaBodyPose.Sample mix(EvaBodyPose.Sample a,EvaBodyPose.Sample b,float weight)
