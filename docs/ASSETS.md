@@ -576,4 +576,4 @@ GeoFront 倒挂城市的楼群布局，以及后续的湖面和螺旋路线，�
 - `eva_at_pressure_r65_0..3`、`eva_at_tear_r65_0..1`：AT 力场受击和破裂。受击是硬冲击加一圈非谐和的玻璃质共鸣，受压时音高略降并带闪烁；破裂是共鸣被向下扯断、碎成碎片，下面压着低沉的塌陷声。替换原来借用的沙袋击打声 `eva_contact_body_r36_*` 和 `eva_at_tear`。
 - `facility_alarm_loop_r65`（循环警报）、`facility_siren_r65`（单次）：双转子防空警报经号角扬声器，加全城多处喇叭的迟到回声。循环版 8 秒两次升降，相位连续、回声按循环卷积，接缝无跳变；单次版是同一音色的一次升降，带自然收尾。替换 `facility_siren`（2.6 秒的号声衰减到 −55 dB 后循环，每 2.6 秒跳回满音量）。
 
-被替换的 23 个旧文件仍留在仓库里，`sounds.json` 已不再引用；回退只需改回 `sounds.json`。改前改后的对照、频谱图和测量见交审说明。
+被替换的 23 个旧文件（`eva_contact_body_r36_0..5`、`eva_foot_concrete_r47_0..5`、`eva_foot_soil_r47_0..5`、`eva_joint_load_r47_0..2`、`eva_at_tear`、`facility_siren`）已从仓库删除，需要回退时从 git 历史取回并改回 `sounds.json`。改前改后的对照、频谱图和测量见交审说明。
