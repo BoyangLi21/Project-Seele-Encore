@@ -265,6 +265,16 @@ public final class NervPilotCombatR30
             if(spacing.lengthSqr()<.001&&eva.position().subtract(goal).horizontalDistance()>14)spacing=goal.subtract(eva.position()).multiply(1,0,1).normalize().scale(.5);
             eva.autonomousDriveR30(pilot,steer(l,eva,b,spacing),aim,false);say(owner,pilot,b,"finale_spacing");return;
         }
+        // R66: Shamshel brought low falls only to a knife held on its core; the pilot closes in and stays, as in episode 3.
+        if(angel instanceof ShamshelEntity shamshel&&shamshel.coreFinishReadyR66())
+        {
+            eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_KNIFE);
+            Vec3 core=shamshel.coreWorldR66(1),to=core.subtract(eva.position()).multiply(1,0,1);
+            b.retreat=0;
+            eva.autonomousDriveR30(pilot,steer(l,eva,b,to.length()>8?to.normalize():Vec3.ZERO),core,false);
+            if(b.age%12==0)eva.autonomousAttackR30(pilot,0);
+            say(owner,pilot,b,"melee");return;
+        }
         if(b.retreat>0||telegraph&&range<55)
         {
             if(b.retreat>0)b.retreat--;Vec3 dodge=toward.yRot((b.age/120%2==0?1:-1)*(float)Math.PI*.5F).add(toward.scale(-.65)).normalize();

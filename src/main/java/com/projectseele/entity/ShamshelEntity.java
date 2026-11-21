@@ -36,6 +36,16 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     private static final EntityDataAccessor<Float> YAW=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Integer> SWEEP_MODE=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<org.joml.Vector3f> ARMOR_AIM_R52=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.VECTOR3);
+    // R66: the wrapped unit's entity id (-1 when none) and the knife's hold on the core in thousandths
+    private static final EntityDataAccessor<Integer> WRAP_TARGET=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> PIN=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.INT);
+    /** The core's centre in the whip rig's pixels (see ShamshelRendererR66). */
+    public static final org.joml.Vector3f CORE_PIXELS=new org.joml.Vector3f(0,128,-31);
+    private int wrapCooldown=120,wrapAge=-1,pinTicks;
+    private UUID wrapVictim,pinner;
+    private boolean configuredR66,fieldFromSaveR66,coreBurntR66;
+    public int wrapTargetIdR66(){return entityData.get(WRAP_TARGET);}
+    public float pinProgressR66(){return entityData.get(PIN)/1000F;}
     private final EvaPoseSignalClock sweepClock=new EvaPoseSignalClock();
     private final Set<UUID> hitVictims=new HashSet<>();
     @Override public float getAtField(){return entityData.get(FIELD);}
@@ -46,7 +56,7 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     public Vec3 armorAimR52(){return new Vec3(entityData.get(ARMOR_AIM_R52));}
     public float sweepAge(float partial){return level().isClientSide?sweepClock.sample(FirstBattleSignals.clientFrameTime()):entityData.get(SWEEP);}
     @Override protected void defineSynchedData()
-    {super.defineSynchedData();entityData.define(FIELD,700F);entityData.define(SWEEP,-1);entityData.define(SIDE,-1);entityData.define(YAW,0F);entityData.define(SWEEP_MODE,0);entityData.define(ARMOR_AIM_R52,new org.joml.Vector3f());}
+    {super.defineSynchedData();entityData.define(FIELD,700F);entityData.define(SWEEP,-1);entityData.define(SIDE,-1);entityData.define(YAW,0F);entityData.define(SWEEP_MODE,0);entityData.define(WRAP_TARGET,-1);entityData.define(PIN,0);entityData.define(ARMOR_AIM_R52,new org.joml.Vector3f());}
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key)
     {super.onSyncedDataUpdated(key);if(key.equals(SWEEP)&&sweepClock!=null&&level().isClientSide)sweepClock.accept(entityData.get(SWEEP),false,true);}
     private int sweepCooldown = 30;
@@ -108,6 +118,8 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
         var reaction=CombatFeelR31.beat(this);
         this.setNoGravity(reaction==null||reaction.kind()!=CombatFeelR31.THROWN&&reaction.kind()!=CombatFeelR31.DOWN);
         if(level().isClientSide)return;
+        configureR66();
+        if(tickPinR66()||tickWrapR66())return;
         if(CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))
         {if(EvaCombatR31.holds(this)||reaction!=null&&reaction.kind()>=CombatFeelR31.STAGGER&&reaction.kind()<=CombatFeelR31.THROWN)cancelSweepR31();return;}
         if(isSweeping()){tickSweep();return;}
@@ -182,7 +194,10 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
                         if(contact.isEmpty())continue;
                         hitVictims.add(victim.getUUID());Vec3 motion=points.get(i).subtract(previous.get(i));
                         Vec3 direction=motion.lengthSqr()>1e-6?motion.normalize():end.subtract(from).normalize();
-                        boolean accepted=com.projectseele.event.EvaHitFeedback.hurt(victim,damageSources().mobAttack(this),30F,contact.orElse(from),direction);
+                        // R66: the forward lash coils round a unit instead of striking it, then flings it (episode 3).
+                        if(sweepMode()==1&&victim instanceof EvaUnit01Entity eva&&wrapVictim==null&&wrapCooldown<=0)
+                        {beginWrapR66(eva);return;}
+                        boolean accepted=com.projectseele.event.EvaHitFeedback.hurt(victim,damageSources().mobAttack(this),(float)(double)com.projectseele.config.SeeleConfig.SHAMSHEL_WHIP_DAMAGE.get(),contact.orElse(from),direction);
                         if(accepted)CombatFoleyR36.impact(this,victim,contact.orElse(from),false,false);
                         if(accepted&&!(victim instanceof EvaUnit01Entity))
                             victim.push(direction.x*.8,.22,direction.z*.8);
@@ -192,6 +207,108 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
             }
         }
         if(age>=ShamshelWhipMotion.cycle(sweepMode())){entityData.set(SWEEP,-1);sweepCooldown=8;}
+    }
+
+    private void configureR66()
+    {
+        if(configuredR66)return;
+        configuredR66=true;
+        var max=getAttribute(Attributes.MAX_HEALTH);double wanted=com.projectseele.config.SeeleConfig.SHAMSHEL_MAX_HEALTH.get();
+        if(max!=null&&Math.abs(max.getBaseValue()-wanted)>1e-3){float share=getHealth()/getMaxHealth();max.setBaseValue(wanted);setHealth((float)(wanted*share));}
+        if(!fieldFromSaveR66)entityData.set(FIELD,(float)(double)com.projectseele.config.SeeleConfig.SHAMSHEL_AT_FIELD.get());
+    }
+
+    /** The core's centre in the world, following the body's pitch and turn. */
+    public Vec3 coreWorldR66(float partial)
+    {
+        float age=level().isClientSide?sweepAge(partial):entityData.get(SWEEP);
+        return new Vec3(ShamshelWhipMotion.bodyMatrix(this,age,partial).transformPosition(new org.joml.Vector3f(CORE_PIXELS).div(16)));
+    }
+
+    private void beginWrapR66(EvaUnit01Entity eva)
+    {
+        int hold=com.projectseele.config.SeeleConfig.SHAMSHEL_WRAP_HOLD_TICKS.get();
+        wrapVictim=eva.getUUID();wrapAge=0;entityData.set(WRAP_TARGET,eva.getId());
+        entityData.set(SWEEP,-1);hitVictims.clear();
+        Vec3 toward=eva.position().subtract(position()).multiply(1,0,1);
+        CombatFeelR31.send(eva,CombatFeelR31.STAGGER,toward.lengthSqr()>1e-4?toward.normalize():getLookAngle(),.15F,hold+8,hold);
+        playSound(com.projectseele.registry.ModSounds.SHAMSHEL_WHIP_CRACK.get(),2.0F,.8F);
+        com.projectseele.ProjectSeele.LOGGER.info("R66 SHAMSHEL wrap eva={} hold={}",eva.getUUID(),hold);
+    }
+
+    private void releaseWrapR66()
+    {wrapVictim=null;wrapAge=-1;entityData.set(WRAP_TARGET,-1);}
+
+    /** True while a unit is held in the whip; the body hovers and does nothing else. */
+    private boolean tickWrapR66()
+    {
+        if(wrapCooldown>0)wrapCooldown--;
+        if(wrapVictim==null)return false;
+        var held=((ServerLevel)level()).getEntity(wrapVictim);
+        if(!(held instanceof EvaUnit01Entity eva)||!eva.isAlive()||eva.distanceToSqr(this)>96*96){releaseWrapR66();return false;}
+        wrapAge++;
+        setDeltaMovement(getDeltaMovement().scale(.5));
+        Vec3 aim=eva.position().subtract(position());
+        setYRot(net.minecraft.util.Mth.approachDegrees(getYRot(),(float)Math.toDegrees(Math.atan2(-aim.x,aim.z)),4));yBodyRot=yHeadRot=getYRot();
+        if(wrapAge<com.projectseele.config.SeeleConfig.SHAMSHEL_WRAP_HOLD_TICKS.get())return true;
+        Vec3 away=aim.multiply(1,0,1);if(away.lengthSqr()<1e-4)away=getLookAngle().multiply(1,0,1);away=away.normalize();
+        Vec3 velocity=away.scale(com.projectseele.config.SeeleConfig.SHAMSHEL_THROW_SPEED.get()).add(0,com.projectseele.config.SeeleConfig.SHAMSHEL_THROW_LIFT.get(),0);
+        com.projectseele.event.EvaHitFeedback.hurt(eva,damageSources().mobAttack(this),(float)(double)com.projectseele.config.SeeleConfig.SHAMSHEL_WRAP_DAMAGE.get(),eva.getBoundingBox().getCenter(),away);
+        CombatFeelR31.send(eva,CombatFeelR31.THROWN,velocity,1F,70,0);
+        eva.setDeltaMovement(velocity);eva.hurtMarked=true;
+        if(com.projectseele.config.SeeleConfig.SHAMSHEL_THROW_SEVERS_CABLE.get())eva.severUmbilicalR66();
+        playSound(com.projectseele.registry.ModSounds.SHAMSHEL_WHIP_CRACK.get(),2.4F,.65F);
+        com.projectseele.ProjectSeele.LOGGER.info("R66 SHAMSHEL fling eva={} velocity={}",eva.getUUID(),velocity);
+        releaseWrapR66();wrapCooldown=com.projectseele.config.SeeleConfig.SHAMSHEL_WRAP_COOLDOWN_TICKS.get();
+        return true;
+    }
+
+    private float coreFloorR66()
+    {return (float)(getMaxHealth()*com.projectseele.config.SeeleConfig.SHAMSHEL_CORE_FINISH_FRACTION.get());}
+
+    /** Field down and health at the floor (or the core already under a knife): only the core finish is left. */
+    public boolean coreFinishReadyR66()
+    {return getAtField()<=0&&com.projectseele.config.SeeleConfig.SHAMSHEL_CORE_FINISH_FRACTION.get()>0&&(pinner!=null||getHealth()<=coreFloorR66()+1e-3F);}
+
+    private void beginPinR66(EvaUnit01Entity eva)
+    {
+        if(pinner!=null)return;
+        pinner=eva.getUUID();pinTicks=Math.max(pinTicks,1);
+        cancelSweepR31();releaseWrapR66();
+        playSound(com.projectseele.registry.ModSounds.SHAMSHEL_WHIP_CHARGE.get(),2.2F,.6F);
+        com.projectseele.ProjectSeele.LOGGER.info("R66 SHAMSHEL core pinned by eva={}",eva.getUUID());
+    }
+
+    /**
+     * The original's last blow: the knife held against the core until it goes dark. The unit must stay with the
+     * knife at the core; the whips run it through meanwhile. Stepping away lets the core recover twice as fast.
+     */
+    private boolean tickPinR66()
+    {
+        if(pinner==null)return false;
+        int hold=com.projectseele.config.SeeleConfig.SHAMSHEL_CORE_HOLD_TICKS.get();
+        var held=((ServerLevel)level()).getEntity(pinner);
+        Vec3 core=coreWorldR66(1);
+        boolean holding=held instanceof EvaUnit01Entity eva&&eva.isAlive()&&eva.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE
+                &&eva.getBoundingBox().inflate(14).contains(core);
+        if(holding)
+        {
+            pinTicks++;
+            EvaUnit01Entity eva=(EvaUnit01Entity)held;
+            if(pinTicks%20==0)com.projectseele.event.EvaHitFeedback.hurt(eva,damageSources().mobAttack(this),(float)(double)com.projectseele.config.SeeleConfig.SHAMSHEL_CORE_STAB_DAMAGE.get(),eva.getBoundingBox().getCenter(),eva.position().subtract(position()).normalize());
+            ((ServerLevel)level()).sendParticles(net.minecraft.core.particles.ParticleTypes.ELECTRIC_SPARK,core.x,core.y,core.z,12,1.6,1.6,1.6,.25);
+        }
+        else pinTicks-=2;
+        entityData.set(PIN,Math.max(0,Math.min(1000,pinTicks*1000/Math.max(1,hold))));
+        setDeltaMovement(Vec3.ZERO);
+        if(pinTicks<=0){pinner=null;pinTicks=0;entityData.set(PIN,0);return false;}
+        if(pinTicks>=hold)
+        {
+            coreBurntR66=true;
+            com.projectseele.ProjectSeele.LOGGER.info("R66 SHAMSHEL core dark after {} ticks",pinTicks);
+            hurt(held instanceof EvaUnit01Entity eva?damageSources().mobAttack(eva):damageSources().generic(),getHealth()+1000);
+        }
+        return true;
     }
 
     @Override
@@ -207,6 +324,8 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
         tag.putFloat("AtField",getAtField());tag.putInt("SweepCooldown",sweepCooldown);tag.putInt("SweepAge",entityData.get(SWEEP));
         tag.putInt("SweepSide",sweepSide());tag.putFloat("SweepYaw",sweepYaw());
         tag.putInt("SweepModeR31",sweepMode());tag.putInt("SweepChoiceR31",sweepChoice);
+        tag.putInt("WrapCooldownR66",wrapCooldown);tag.putInt("PinTicksR66",pinTicks);
+        if(pinner!=null)tag.putUUID("PinnerR66",pinner);
         var armor=armorAimR52();tag.putDouble("ArmorAimX_R52",armor.x);tag.putDouble("ArmorAimY_R52",armor.y);tag.putDouble("ArmorAimZ_R52",armor.z);
         var hits=new net.minecraft.nbt.ListTag();hitVictims.forEach(id->hits.add(net.minecraft.nbt.StringTag.valueOf(id.toString())));tag.put("SweepHits",hits);
         if (this.siegeBeacon != null)
@@ -219,7 +338,9 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     public void readAdditionalSaveData(CompoundTag tag)
     {
         super.readAdditionalSaveData(tag);
-        if(tag.contains("AtField"))entityData.set(FIELD,Math.max(0,Math.min(700,tag.getFloat("AtField"))));
+        if(tag.contains("AtField")){entityData.set(FIELD,Math.max(0,Math.min((float)(double)com.projectseele.config.SeeleConfig.SHAMSHEL_AT_FIELD.get(),tag.getFloat("AtField"))));fieldFromSaveR66=true;}
+        wrapCooldown=Math.max(0,tag.getInt("WrapCooldownR66"));pinTicks=Math.max(0,tag.getInt("PinTicksR66"));
+        pinner=tag.hasUUID("PinnerR66")?tag.getUUID("PinnerR66"):null;
         if(tag.contains("SweepCooldown"))sweepCooldown=Math.max(0,Math.min(34,tag.getInt("SweepCooldown")));
         int savedMode=Math.max(0,Math.min(ShamshelWhipMotion.GROUND,tag.getInt("SweepModeR31")));
         if(tag.contains("SweepAge"))entityData.set(SWEEP,Math.max(-1,Math.min(ShamshelWhipMotion.cycle(savedMode)-1,tag.getInt("SweepAge"))));
@@ -252,7 +373,16 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
             }
             return false;
         }
-        return super.hurt(source,amount);
+        if(coreBurntR66||this.level().isClientSide||com.projectseele.config.SeeleConfig.SHAMSHEL_CORE_FINISH_FRACTION.get()<=0
+                ||com.projectseele.combat.AtFieldRules.bypassesAtField(source))
+            return super.hurt(source,amount);
+        // R66: below the floor only the knife at the core can finish it.
+        boolean knife=source.getEntity() instanceof EvaUnit01Entity eva&&eva.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE;
+        float floor=coreFloorR66();
+        boolean accepted=false;
+        if(this.getHealth()>floor+1e-3F)accepted=super.hurt(source,Math.min(amount,this.getHealth()-floor));
+        if(this.getHealth()<=floor+1e-3F&&knife){beginPinR66((EvaUnit01Entity)source.getEntity());return true;}
+        return accepted;
     }
 
     @Override

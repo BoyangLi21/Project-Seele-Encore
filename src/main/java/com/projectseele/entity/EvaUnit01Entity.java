@@ -7804,6 +7804,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         return true;
     }
 
+    /** R66: a whip that flings the unit tears its cable out, as in the episode-3 fight. */
+    public void severUmbilicalR66()
+    {
+        if (this.isUmbilicalConnected() && !this.isNervLogisticsLocked()) this.severUmbilicalFromDamage();
+    }
+
     private void severUmbilicalFromDamage()
     {
         this.entityData.set(DATA_UMBILICAL_SEVERED, true);

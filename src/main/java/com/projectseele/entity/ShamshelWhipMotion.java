@@ -98,8 +98,10 @@ public final class ShamshelWhipMotion
         return new Vector3f((float)Math.atan2(m.m12(),m.m22()),y,(float)Math.atan2(m.m01(),m.m00()));
     }
     public static List<Vec3> points(ShamshelEntity actor, float age, float partial)
+    {return points(actor,actor.sweepSide(),age,partial);}
+    /** Either whip's chain; the idle one hangs in its breathing pose. */
+    public static List<Vec3> points(ShamshelEntity actor, int side, float age, float partial)
     {
-        int side=actor.sweepSide();
         var matrix=bodyMatrix(actor,age,partial);
         List<Vec3> points=new ArrayList<>();
         for(int i=0;i<4;i++)

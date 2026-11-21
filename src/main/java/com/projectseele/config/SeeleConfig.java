@@ -23,6 +23,20 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.BooleanValue RUNTIME_WORLD_REPAIR;
     public static final ForgeConfigSpec.BooleanValue TRANSPARENT_GEOFRONT_SHELL;
 
+    // ----- common: Shamshel (R66) -----
+    public static final ForgeConfigSpec.DoubleValue SHAMSHEL_MAX_HEALTH;
+    public static final ForgeConfigSpec.DoubleValue SHAMSHEL_AT_FIELD;
+    public static final ForgeConfigSpec.DoubleValue SHAMSHEL_WHIP_DAMAGE;
+    public static final ForgeConfigSpec.DoubleValue SHAMSHEL_WRAP_DAMAGE;
+    public static final ForgeConfigSpec.IntValue SHAMSHEL_WRAP_HOLD_TICKS;
+    public static final ForgeConfigSpec.IntValue SHAMSHEL_WRAP_COOLDOWN_TICKS;
+    public static final ForgeConfigSpec.DoubleValue SHAMSHEL_THROW_SPEED;
+    public static final ForgeConfigSpec.DoubleValue SHAMSHEL_THROW_LIFT;
+    public static final ForgeConfigSpec.BooleanValue SHAMSHEL_THROW_SEVERS_CABLE;
+    public static final ForgeConfigSpec.DoubleValue SHAMSHEL_CORE_FINISH_FRACTION;
+    public static final ForgeConfigSpec.IntValue SHAMSHEL_CORE_HOLD_TICKS;
+    public static final ForgeConfigSpec.DoubleValue SHAMSHEL_CORE_STAB_DAMAGE;
+
     // ----- common: Ramiel -----
     public static final ForgeConfigSpec.DoubleValue RAMIEL_MAX_HEALTH;
     public static final ForgeConfigSpec.DoubleValue RAMIEL_ARMOR;
@@ -220,6 +234,46 @@ public final class SeeleConfig
         ALARM_ENABLED = common
                 .comment("Whether Angels acquiring a player target raises the server-wide alarm.")
                 .define("alarmEnabled", true);
+        common.pop();
+
+        common.push("shamshel");
+        SHAMSHEL_MAX_HEALTH = common
+                .comment("Shamshel max health (episode 3). Applied when the Angel first ticks.")
+                .defineInRange("maxHealth", 620.0D, 1.0D, 10000.0D);
+        SHAMSHEL_AT_FIELD = common
+                .comment("Shamshel A.T. Field pool. Only EVA melee wears it down; rifles and cannons are stopped.")
+                .defineInRange("atField", 700.0D, 0.0D, 10000.0D);
+        SHAMSHEL_WHIP_DAMAGE = common
+                .comment("Damage of a whip sweep that strikes a unit or a person.")
+                .defineInRange("whipDamage", 30.0D, 0.0D, 500.0D);
+        SHAMSHEL_WRAP_DAMAGE = common
+                .comment("Damage when a wrapped unit is flung away (the ankle wrap of the original fight).")
+                .defineInRange("wrapDamage", 40.0D, 0.0D, 500.0D);
+        SHAMSHEL_WRAP_HOLD_TICKS = common
+                .comment("Ticks a unit stays held in the whip before it is flung.")
+                .defineInRange("wrapHoldTicks", 24, 1, 200);
+        SHAMSHEL_WRAP_COOLDOWN_TICKS = common
+                .comment("Ticks between two wraps.")
+                .defineInRange("wrapCooldownTicks", 320, 20, 6000);
+        SHAMSHEL_THROW_SPEED = common
+                .comment("Horizontal speed (blocks per tick) of a flung unit.")
+                .defineInRange("throwSpeed", 2.4D, 0.0D, 8.0D);
+        SHAMSHEL_THROW_LIFT = common
+                .comment("Upward speed (blocks per tick) of a flung unit.")
+                .defineInRange("throwLift", 2.6D, 0.0D, 8.0D);
+        SHAMSHEL_THROW_SEVERS_CABLE = common
+                .comment("A flung unit loses its umbilical cable and runs on internal power, as in the original.")
+                .define("throwSeversCable", true);
+        SHAMSHEL_CORE_FINISH_FRACTION = common
+                .comment("Below this share of health the Angel no longer loses health from blows;",
+                        "only a progressive knife held against the core finishes it.")
+                .defineInRange("coreFinishHealthFraction", 0.35D, 0.0D, 1.0D);
+        SHAMSHEL_CORE_HOLD_TICKS = common
+                .comment("Ticks the knife must stay on the core before it goes dark.")
+                .defineInRange("coreHoldTicks", 60, 1, 1200);
+        SHAMSHEL_CORE_STAB_DAMAGE = common
+                .comment("Damage the whips deal to the unit holding the knife, once a second.")
+                .defineInRange("coreStabDamage", 8.0D, 0.0D, 200.0D);
         common.pop();
 
         common.push("positron_rifle");

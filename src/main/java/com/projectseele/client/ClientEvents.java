@@ -110,8 +110,8 @@ public class ClientEvents
                 UltramanAvatarRenderer::new);
         event.registerEntityRenderer(ModEntities.SACHIEL.get(), context -> new HybridAddonRenderer<>(context,
                 ColossalHumanoidRenderer.Style.SACHIEL, "sachiel", 5.0F));
-        event.registerEntityRenderer(ModEntities.SHAMSHEL.get(),
-                context -> new HybridAddonRenderer<>(context, ColossalHumanoidRenderer.Style.SHAMSHEL,"shamshel",5.0F));
+        // R66: original geometry only; the installed private mesh is never drawn.
+        event.registerEntityRenderer(ModEntities.SHAMSHEL.get(), com.projectseele.client.render.ShamshelRendererR66::new);
         event.registerEntityRenderer(ModEntities.ZERUEL.get(),
                 context -> new HybridAddonRenderer<>(context, ColossalHumanoidRenderer.Style.ZERUEL,"zeruel",5.0F));
         event.registerEntityRenderer(ModEntities.ISRAFEL.get(), context -> new HybridAddonRenderer<>(context,

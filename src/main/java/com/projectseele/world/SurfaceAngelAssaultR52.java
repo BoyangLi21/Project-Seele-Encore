@@ -97,6 +97,19 @@ public final class SurfaceAngelAssaultR52
         retain(level,boss.position());for(double x:new double[]{boss.getBoundingBox().minX,boss.getBoundingBox().maxX})
             for(double z:new double[]{boss.getBoundingBox().minZ,boss.getBoundingBox().maxZ})retain(level,new Vec3(x,boss.getY(),z));
         if(data.phase.equals("alert")&&TvMissionAlertR30.tick(level,data,owner)){data.phase="approach";data.setDirty();}
+        // R66: Shamshel's fight can be lost: every assigned unit down or shut off for five seconds.
+        if(boss instanceof ShamshelEntity&&data.phase.equals("combat")&&!data.sorties.isEmpty())
+        {
+            boolean anyStanding=data.sorties.values().stream().map(s->TvSortiesR32.unit(level,s.unit))
+                    .anyMatch(e->e!=null&&e.isAlive()&&!EvaShutdownR30.disabled(e));
+            var tag=boss.getPersistentData();int down=anyStanding?0:tag.getInt("R66AllDownTicks")+1;tag.putInt("R66AllDownTicks",down);
+            if(down>=100)
+            {
+                hold(boss);data.phase="failure";data.notice="全部机体失去战斗力，夏姆榭尔仍在进攻。机体回收后可以重试。";data.setDirty();
+                ProjectSeele.LOGGER.info("R66 SHAMSHEL mission failed: every unit down");
+                return boss;
+            }
+        }
         final Mob original=boss;
         var defender=data.sorties.values().stream().filter(s->TvSortiesR32.readyAssigned(level,s)).map(s->TvSortiesR32.assignedUnit(level,s))
                 .filter(e->e.distanceToSqr(original)<=site.engagementRange()*site.engagementRange()&&original.hasLineOfSight(e))
