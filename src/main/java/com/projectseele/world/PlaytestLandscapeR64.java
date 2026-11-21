@@ -11,6 +11,8 @@ import java.util.zip.GZIPInputStream;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
@@ -28,12 +30,15 @@ final class PlaytestLandscapeR64
 
     static HakoneSurfaceField.Surface surface(int x, int z, HakoneSurfaceField.Surface original)
     {
-        if (original == null || original.water() > original.ground()) return original;
+        if (original == null) return null;
         Region region = INDEX.region(x >> 9, z >> 9);
         if (region == null) return original;
         Patch patch = region.data().chunks[((z >> 4) & 31) * 32 + ((x >> 4) & 31)];
-        if (patch == null || patch.heights == null) return original;
-        int y = patch.heights[(z & 15) * 16 + (x & 15)];
+        if (patch == null) return original;
+        int local = (z & 15) * 16 + (x & 15);
+        if (patch.lakes != null && patch.lakes[local] != null) return patch.lakes[local];
+        if (patch.heights == null || original.water() > original.ground()) return original;
+        int y = patch.heights[local];
         return y == NONE || y == original.ground() ? original : new HakoneSurfaceField.Surface(y, original.water());
     }
 
@@ -56,7 +61,10 @@ final class PlaytestLandscapeR64
             {
                 int xz = Byte.toUnsignedInt(runs[at]), ends = Byte.toUnsignedInt(runs[at + 1]);
                 BlockState old = states[Byte.toUnsignedInt(runs[at + 2])], placed = states[Byte.toUnsignedInt(runs[at + 3])];
+                if (old == null || placed == null) continue;
                 int x = (cx << 4) + (xz & 15), z = (cz << 4) + (xz >> 4);
+                var lake = patch.lakes == null ? null : patch.lakes[xz];
+                boolean sediment = placed.is(Blocks.GRAVEL) || placed.is(Blocks.STONE) || placed.is(Blocks.CLAY);
                 for (int y = section.base + (ends >> 4); y <= section.base + (ends & 15); y++)
                 {
                     cursor.set(x, y, z);
@@ -64,7 +72,9 @@ final class PlaytestLandscapeR64
                     if (now == placed || now.hasBlockEntity()) continue;
                     // Generated variants can differ in snowy soil or leaf distance. Authored
                     // facilities and unrelated blocks never qualify as a measured old state.
-                    if (now.is(old.getBlock()) || (old.isAir() && now.isAir()))
+                    // The base generator gives a freshly surveyed lake a gravel bed.
+                    boolean nativeBed = lake != null && y == lake.ground() && sediment && now.is(Blocks.GRAVEL);
+                    if (nativeBed || now.is(old.getBlock()) || (old.isAir() && now.isAir()))
                         chunk.setBlockState(cursor, placed, false);
                 }
             }
@@ -72,7 +82,36 @@ final class PlaytestLandscapeR64
     }
 
     private record Section(int base, byte[] runs) {}
-    private record Patch(short[] heights, Section[] sections) {}
+    private record Patch(short[] heights, Section[] sections, HakoneSurfaceField.Surface[] lakes) {}
+
+    // These terrain journals contain contiguous source water from bed + 1 to the surface.
+    // Decode the same profile for base-height queries and block generation.
+    private static HakoneSurfaceField.Surface[] lakeColumns(Section[] sections, boolean[] water)
+    {
+        if (water == null) return null;
+        HakoneSurfaceField.Surface[] lakes = null;
+        for (Section section : sections)
+        {
+            byte[] runs = section.runs;
+            for (int at = 0; at < runs.length; at += 4)
+            {
+                if (!water[Byte.toUnsignedInt(runs[at + 3])]) continue;
+                if (lakes == null) lakes = new HakoneSurfaceField.Surface[256];
+                int local = Byte.toUnsignedInt(runs[at]);
+                int ends = Byte.toUnsignedInt(runs[at + 1]);
+                int bed = section.base + (ends >> 4) - 1;
+                int top = section.base + (ends & 15);
+                var previous = lakes[local];
+                if (previous != null)
+                {
+                    bed = Math.min(bed, previous.ground());
+                    top = Math.max(top, previous.water());
+                }
+                lakes[local] = new HakoneSurfaceField.Surface(bed, top);
+            }
+        }
+        return lakes;
+    }
 
     private static final class Data
     {
@@ -93,7 +132,17 @@ final class PlaytestLandscapeR64
                 try
                 {
                     for (int i = 0; i < found.length; i++)
-                        found[i] = BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK.asLookup(), names[i], false).blockState();
+                    {
+                        String state = names[i];
+                        if (!state.startsWith("minecraft:") && !state.startsWith("projectseele:"))
+                        {
+                            // Optional ores can occur in the surveyed land. Skip just their
+                            // edits when that block is absent from the installed mod pack.
+                            ResourceLocation id = ResourceLocation.read(new com.mojang.brigadier.StringReader(state));
+                            if (!BuiltInRegistries.BLOCK.containsKey(id)) continue;
+                        }
+                        found[i] = BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK.asLookup(), state, false).blockState();
+                    }
                 }
                 catch (com.mojang.brigadier.exceptions.CommandSyntaxException failure)
                 {
@@ -124,7 +173,16 @@ final class PlaytestLandscapeR64
                     int count = in.readUnsignedShort();
                     if (count < 1 || count > 255) throw new IOException("Invalid landscape palette");
                     String[] names = new String[count];
-                    for (int i = 0; i < count; i++) names[i] = in.readUTF();
+                    boolean[] water = null;
+                    for (int i = 0; i < count; i++)
+                    {
+                        names[i] = in.readUTF();
+                        if (names[i].equals("minecraft:water[level=0]") || names[i].equals("minecraft:water"))
+                        {
+                            if (water == null) water = new boolean[count];
+                            water[i] = true;
+                        }
+                    }
                     result = new Data(names);
                     int chunks = in.readUnsignedShort();
                     for (int i = 0; i < chunks; i++)
@@ -148,7 +206,7 @@ final class PlaytestLandscapeR64
                             in.readFully(runs);
                             sections[s] = new Section(base, runs);
                         }
-                        result.chunks[index] = new Patch(heights, sections);
+                        result.chunks[index] = new Patch(heights, sections, lakeColumns(sections, water));
                     }
                     if (in.read() != -1) throw new IOException("Trailing landscape data");
                 }

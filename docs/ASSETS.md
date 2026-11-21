@@ -519,6 +519,10 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 - 加工：只用标高瓦片的无数据值（海）判定海陆，换算到 1:4 游戏坐标，求出每 16 格到海岸线的带符号距离（`tools/plan_outer_boundary.py`）。实测矩形内仍用 `hakone_surface.bin.gz` 自己的海岸，两者 99.84% 一致。下载范围以外的海岸是按公开地名坐标手标的估算线，不是政府数据。
 - 原始瓦片只放在本地 `F:/eva/.claude/map-edges-work/f12/gsi-z12/`，不进仓库。这不是国土地理院发布的原始成果。
 
+## R64 箱根外缘地形与林带
+
+R64 试玩地图的外缘山脊、谷地衔接同样使用上文登记的国土地理院 DEM10B 缓存。项目沿用箱根的 1:4 坐标，在 8 格间距采样高程，以存档中的道路、设施和水体为约束加工过渡地形。外缘增植的林带依据存档已有树冠密度推算。出典：国土地理院。[地理院標高タイル](https://maps.gsi.go.jp/development/demtile.html)
+
 ## R60 箱根森林分布
 
 地图上森林的位置和类型取自环境省生物多样性センター「現存植生図2024」（[G空間情報センター](https://www.geospatial.jp/ckan/dataset/biodic_veg2024)，公共データ利用規約 第1.0版／PDL 1.0，[规约原文](https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)）的关东、中部区块，2026-11-08 下载。

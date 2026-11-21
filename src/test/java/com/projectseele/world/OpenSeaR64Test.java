@@ -10,13 +10,23 @@ public final class OpenSeaR64Test
 
     public static void main(String[] args)
     {
-        // The adjacent cliff columns and the shoreline south of the second viewpoint
-        // are surveyed ground. A new chunk must produce the same profile as the patched save.
-        int[][] banks = {{3279, -2106, 97}, {3280, -2106, 96}, {3306, -2145, 65}, {3306, -2144, 62}};
-        if (PlaytestLandscapeR64.hasSurvey()) for (int[] column : banks)
+        if (PlaytestLandscapeR64.hasSurvey())
         {
-            var regenerated = HakoneSurfaceField.sample(column[0], column[1], 70);
-            check(regenerated.ground() == column[2], "playtest bank at " + column[0] + "," + column[1] + " = " + regenerated.ground());
+            // Read back from the R64 world at the eastern cliff and at the actual lake beds.
+            for (int[] bank : new int[][] {{3279, -2106, 83}, {3280, -2106, 82}})
+            {
+                var surface = HakoneSurfaceField.sample(bank[0], bank[1], 70);
+                check(surface.ground() == bank[2] && surface.water() <= surface.ground(),
+                        "bank at " + bank[0] + "," + bank[1] + " = " + surface);
+            }
+            int[][] lakes = {{3306, -2145, 61}, {3306, -2144, 61}, {-1191, -2163, 59},
+                    {-2749, -1559, 59}, {2799, -1796, 59}};
+            for (int[] lake : lakes)
+            {
+                var surface = HakoneSurfaceField.sample(lake[0], lake[1], 70);
+                check(surface.ground() == lake[2] && surface.water() == 62,
+                        "lake at " + lake[0] + "," + lake[1] + " = " + surface);
+            }
         }
         // Straight out from the east edge of the saved chunks (x 4511) through open water.
         int z = 800, previous = 0;

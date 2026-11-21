@@ -15,6 +15,7 @@ AIR='minecraft:air'
 DIRT='minecraft:dirt'
 STONE='minecraft:stone'
 TREE_SPECIES=('oak','birch','spruce')
+WATER_BEDS=('minecraft:dirt','minecraft:clay','minecraft:gravel','minecraft:sand','minecraft:stone','minecraft:mud','minecraft:coarse_dirt')
 @lru_cache(maxsize=32)
 def tree_shape(species,height):
     name=TREE_SPECIES[species]
@@ -39,12 +40,16 @@ def tree_cells(trees,plan,rx,rz):
     return chunks
 
 def stage(job):
-    source,survey,plan,trees,out,rx,rz=job
+    source,survey,plan,trees,out,rx,rz,*options=job
+    preserve_caves = bool(options and options[0])
+    clear_flooded_cane = len(options)>1 and options[1]
     tag=f'r.{rx}.{rz}'
     receipt=out/(tag+'.json')
     if receipt.exists():return
     geom=np.load(plan/(tag+'.npz'));survey_region=np.load(survey/(tag+'.npz'))
     hh,goal=geom['h'],geom['target']
+    new_water=geom['water_y'] if 'water_y' in geom else np.zeros(hh.shape,np.int16)
+    water_bed=geom['water_bed'] if 'water_bed' in geom else None
     vegetation=survey_region['v'];tops=survey_region['t'];stem=survey_region['r']
     h=surround(plan,rx,rz,'h',-32768);target=surround(plan,rx,rz,'target',-32768)
     root=surround(survey,rx,rz,'r',False)
@@ -58,7 +63,7 @@ def stage(job):
         crown=np.where(dist<=7,target[iz,ix].astype(int)-h[iz,ix],0)[12:-12,12:-12]
     else:crown=np.zeros(hh.shape,int)
     trees_in=tree_cells(trees,plan,rx,rz)
-    wanted=(hh!=goal)|((crown!=0)&(vegetation>0))
+    wanted=(hh!=goal)|((crown!=0)&(vegetation>0))|(new_water!=0)
     chunks={(cx+rx*32,cz+rz*32) for cz,cx in zip(*np.nonzero(wanted.reshape(32,16,32,16).any((1,3))))}|set(trees_in)
     path=source/REGION/(tag+'.mca')
     if not chunks or not path.exists():
@@ -82,6 +87,7 @@ def stage(job):
             lows.append(max(-128,int(np.minimum(oldh,to)[eligible].min())-66))
             highs.append(int(np.maximum.reduce((top,top+motion,top+to-oldh))[eligible].max())+1)
         if not lows:continue
+        if new_water[cut].any():highs.append(int(new_water[cut].max()))
         low=min(lows)//16; high=max(highs)//16
         secs={int(sec['Y']):sec for sec in nbt['sections'] if 'block_states' in sec}
         if any(sy not in secs for sy in range(low,high+1)):raise ValueError(f'missing block section {cx,cz,low,high}')
@@ -118,6 +124,10 @@ def stage(job):
         foot=y0+rock_index
         footing=geology[rock_index,iz,ix]
         obstruct=((~geology)&(cat!=0)&inside).any(0) | (~found) | (~footing)
+        if preserve_caves:
+            # The broad perimeter pass grades solid skin only. A natural cave
+            # discovered beneath the proposed grade retains its complete roof.
+            obstruct |= ((cat == 0) & inside).any(0)
         blocked+=int((work&obstruct).sum())
         work &= ~obstruct
         to=np.where(work,to,oldh)
@@ -154,6 +164,35 @@ def stage(job):
             if kind(pal[v].partition('[')[0]) in (0,1) or (state.partition('[')[0].endswith('_log') and pal[v].partition('[')[0].endswith('_leaves') and cat[y-y0,j,i]<=1):
                 new[y-y0,j,i]=local(state)
             elif pal[v]!=state:clipped_trees+=1
+        wet=new_water[cut]
+        if wet.any():
+            if np.any((wet!=0)&(to!=goal[cut])):
+                raise ValueError(f'Obstructed cove bed in {cx},{cz}: '+str(np.argwhere((wet!=0)&(to!=goal[cut])).tolist()))
+            layer=(wet!=0)&(ys>to)&(ys<=wet)
+            if np.any(layer & (cat>=4)):
+                raise ValueError(f'Cove would replace protected material in {cx},{cz}')
+            water_id=local('minecraft:water[level=0]')
+            new[layer]=water_id
+            if clear_flooded_cane:
+                # Water replaces the original soil. Follow only the contiguous
+                # cane rooted on that exact column, including across sections.
+                is_cane=np.array([s.partition('[')[0]=='minecraft:sugar_cane' for s in pal])
+                rows,cols=np.where(wet!=0)
+                yy=wet[rows,cols].astype(int)+1-y0
+                while len(yy):
+                    inside=yy<len(new)
+                    yy,rows,cols=yy[inside],rows[inside],cols[inside]
+                    cane=is_cane[new[yy,rows,cols]]
+                    yy,rows,cols=yy[cane],rows[cane],cols[cane]
+                    new[yy,rows,cols]=0
+                    yy+=1
+            if water_bed is not None:
+                bed_codes=water_bed[cut]
+                for n in np.unique(bed_codes[wet!=0]):
+                    if n<1 or n>len(WATER_BEDS):
+                        raise ValueError('Unknown lakebed sediment')
+                    where=(wet!=0)&(bed_codes==n)&(ys==to)
+                    new[where]=local(WATER_BEDS[n-1])
         changed=new!=old
         if not changed.any():continue
         # Cells with block-entity data cannot be part of this natural-surface patch.
