@@ -240,6 +240,15 @@ def apply(a):
             if before.split('[')[0] not in allowed or after.split('[')[0] not in allowed:
                 raise SystemExit(f'{(x, y, z)}: launch space repaint must stay wall block to wall block ({before} -> {after})')
         positions = [p for p in positions if p not in inside]
+    if getattr(a, 'bank2_exterior', False):
+        from plan_r64_silo_exterior import on_facade, BLACK
+        from query_blocks import AIR
+        if signs or given or any(before not in AIR or after != BLACK or not on_facade(x,y,z)
+                                 for x,y,z,before,after in rows):
+            raise ValueError('This operation only adds exterior black cladding on the surveyed launch bank')
+        # The broad 32-block route reservations include the outside of the
+        # solid casing. All rows above are strictly on its four outside faces.
+        positions = []
     launch.assert_positions(positions)
     folder = a.world / REGION
     if given:
@@ -403,5 +412,6 @@ if __name__ == '__main__':
     parser.add_argument('--campfire-entities', action='store_true', help='give every campfire a row places its (empty) block entity, so it smokes')
     parser.add_argument('--allow-launch-repaint', action='store_true',
                         help='launch tunnel walls: rows inside the launch space may only turn one wall block into another (no air, seals or rail anchors)')
+    parser.add_argument('--bank2-exterior', action='store_true', help='install the measured exterior cladding of the second launch bank')
     parser.add_argument('--refresh-heightmaps', action='store_true', help='drop the stored heightmaps of touched chunks, for terrain cut or raised')
     apply(parser.parse_args())

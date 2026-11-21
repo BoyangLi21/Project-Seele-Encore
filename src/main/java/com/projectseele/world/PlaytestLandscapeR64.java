@@ -36,7 +36,7 @@ final class PlaytestLandscapeR64
         Patch patch = region.data().chunks[((z >> 4) & 31) * 32 + ((x >> 4) & 31)];
         if (patch == null) return original;
         int local = (z & 15) * 16 + (x & 15);
-        if (patch.lakes != null && patch.lakes[local] != null) return patch.lakes[local];
+        if (patch.profiles != null && patch.profiles[local] != null) return patch.profiles[local];
         if (patch.heights == null || original.water() > original.ground()) return original;
         int y = patch.heights[local];
         return y == NONE || y == original.ground() ? original : new HakoneSurfaceField.Surface(y, original.water());
@@ -63,7 +63,7 @@ final class PlaytestLandscapeR64
                 BlockState old = states[Byte.toUnsignedInt(runs[at + 2])], placed = states[Byte.toUnsignedInt(runs[at + 3])];
                 if (old == null || placed == null) continue;
                 int x = (cx << 4) + (xz & 15), z = (cz << 4) + (xz >> 4);
-                var lake = patch.lakes == null ? null : patch.lakes[xz];
+                var lake = patch.profiles == null ? null : patch.profiles[xz];
                 boolean sediment = placed.is(Blocks.GRAVEL) || placed.is(Blocks.STONE) || placed.is(Blocks.CLAY);
                 for (int y = section.base + (ends >> 4); y <= section.base + (ends & 15); y++)
                 {
@@ -73,7 +73,7 @@ final class PlaytestLandscapeR64
                     // Generated variants can differ in snowy soil or leaf distance. Authored
                     // facilities and unrelated blocks never qualify as a measured old state.
                     // The base generator gives a freshly surveyed lake a gravel bed.
-                    boolean nativeBed = lake != null && y == lake.ground() && sediment && now.is(Blocks.GRAVEL);
+                    boolean nativeBed = lake != null && lake.water() > lake.ground() && y == lake.ground() && sediment && now.is(Blocks.GRAVEL);
                     if (nativeBed || now.is(old.getBlock()) || (old.isAir() && now.isAir()))
                         chunk.setBlockState(cursor, placed, false);
                 }
@@ -82,7 +82,7 @@ final class PlaytestLandscapeR64
     }
 
     private record Section(int base, byte[] runs) {}
-    private record Patch(short[] heights, Section[] sections, HakoneSurfaceField.Surface[] lakes) {}
+    private record Patch(short[] heights, Section[] sections, HakoneSurfaceField.Surface[] profiles) {}
 
     // These terrain journals contain contiguous source water from bed + 1 to the surface.
     // Decode the same profile for base-height queries and block generation.
@@ -153,6 +153,39 @@ final class PlaytestLandscapeR64
         }
     }
 
+    // A delta cannot describe water that was already in the old lake, or the
+    // final dry ground on a filled inlet. Read the surveyed beds and banks last.
+    private static void readShoreProfiles(Data data, int rx, int rz) throws IOException
+    {
+        String file = "/data/projectseele/worldgen/playtest_shores_r64/" + rx + "_" + rz + ".bin.gz";
+        InputStream raw = PlaytestLandscapeR64.class.getResourceAsStream(file);
+        if (raw == null) return;
+        try (var in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(raw))))
+        {
+            if (in.readInt() != 0x53485231) throw new IOException("Invalid shore profiles");
+            int chunks = in.readUnsignedShort(), lastChunk = -1;
+            for (int i = 0; i < chunks; i++)
+            {
+                int index = in.readUnsignedShort(), count = in.readUnsignedShort();
+                if (index <= lastChunk || index >= 1024 || count < 1 || count > 256)
+                    throw new IOException("Invalid shore chunk");
+                lastChunk = index;
+                Patch patch = data.chunks[index];
+                var profiles = patch != null && patch.profiles != null ? patch.profiles : new HakoneSurfaceField.Surface[256];
+                int lastPosition = -1;
+                for (int j = 0; j < count; j++)
+                {
+                    int position = in.readUnsignedByte(), bed = in.readShort(), water = in.readShort();
+                    if (position <= lastPosition || (water != NONE && water <= bed)) throw new IOException("Invalid surveyed shore column");
+                    profiles[position] = new HakoneSurfaceField.Surface(bed, water);
+                    lastPosition = position;
+                }
+                data.chunks[index] = patch == null ? new Patch(null, new Section[0], profiles) : new Patch(patch.heights, patch.sections, profiles);
+            }
+            if (in.read() != -1) throw new IOException("Trailing shore data");
+        }
+    }
+
     private static final class Region
     {
         final int x, z;
@@ -209,6 +242,7 @@ final class PlaytestLandscapeR64
                         result.chunks[index] = new Patch(heights, sections, lakeColumns(sections, water));
                     }
                     if (in.read() != -1) throw new IOException("Trailing landscape data");
+                    readShoreProfiles(result, x, z);
                 }
                 catch (IOException failure) { throw new IllegalStateException("Missing or invalid landscape region " + x + "," + z, failure); }
                 resident = new SoftReference<>(result);

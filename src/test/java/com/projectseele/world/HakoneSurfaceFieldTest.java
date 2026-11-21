@@ -67,6 +67,19 @@ public final class HakoneSurfaceFieldTest
         var lakeBeds = new java.util.HashMap<Long, Integer>();
         if (PlaytestLandscapeR64.hasSurvey())
             for (int[] lake : measured) lakeBeds.put(BlockPos.asLong(lake[0], 0, lake[1]), lake[2]);
+        if (PlaytestLandscapeR64.class.getResource("/data/projectseele/worldgen/playtest_shores_r64/-7_-3.bin.gz") != null)
+        {
+            lakeBeds.put(BlockPos.asLong(-1304, 0, -2178), 61);
+            lakeBeds.put(BlockPos.asLong(-1230, 0, -2178), 57);
+            lakeBeds.put(BlockPos.asLong(-1230, 0, -2137), 53);
+            lakeBeds.put(BlockPos.asLong(-1193, 0, -2178), 57);
+            lakeBeds.put(BlockPos.asLong(-2747, 0, -1563), 56);
+            lakeBeds.put(BlockPos.asLong(-2710, 0, -1563), 60);
+            lakeBeds.put(BlockPos.asLong(-2673, 0, -1563), 61);
+            lakeBeds.put(BlockPos.asLong(-3228, 0, -1317), 58);
+            lakeBeds.put(BlockPos.asLong(-3228, 0, -1276), 61);
+            lakeBeds.put(BlockPos.asLong(2914, 0, -1850), 59);
+        }
         for (int x = -9000; x < 12000; x += 37)
             for (int z = -8000; z < 10000; z += 41)
             {
@@ -74,7 +87,7 @@ public final class HakoneSurfaceFieldTest
                 var outer = HakoneSurfaceField.sample(x, z, 45);
                 if (outer.ground() > 300 || outer.ground() < -120)
                     throw new AssertionError("Outer height out of range at " + x + "," + z);
-                if (outer.water() != HakoneSurfaceField.SEA_Y)
+                if (outer.water() != HakoneSurfaceField.SEA_Y && outer.water() != HakoneSurfaceField.NO_WATER)
                 {
                     Integer bed = lakeBeds.remove(BlockPos.asLong(x, 0, z));
                     if (outer.water() != 62 || bed == null || bed != outer.ground())

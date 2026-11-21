@@ -19,8 +19,9 @@ public final class OpenSeaR64Test
                 check(surface.ground() == bank[2] && surface.water() <= surface.ground(),
                         "bank at " + bank[0] + "," + bank[1] + " = " + surface);
             }
-            int[][] lakes = {{3306, -2145, 61}, {3306, -2144, 61}, {-1191, -2163, 59},
-                    {-2749, -1559, 59}, {2799, -1796, 59}};
+            boolean revisedShore = PlaytestLandscapeR64.class.getResource("/data/projectseele/worldgen/playtest_shores_r64/-3_-5.bin.gz") != null;
+            int[][] lakes = {{3306, -2145, 61}, {3306, -2144, 61}, {-1191, -2163, revisedShore ? 57 : 59},
+                    {-2749, -1559, revisedShore ? 54 : 59}, {2799, -1796, 59}};
             for (int[] lake : lakes)
             {
                 var surface = HakoneSurfaceField.sample(lake[0], lake[1], 70);
