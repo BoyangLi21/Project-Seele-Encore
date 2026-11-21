@@ -1,0 +1,98 @@
+package com.projectseele.world;
+
+import com.projectseele.registry.ModBlocks;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
+
+/** Two sliding leaves in the existing Terminal Dogma bulkhead. Width is recoverable from the saved blocks. */
+public final class HeavensDoor
+{
+    private static final int WEST = 18, EAST = 42, WIDTH = EAST - WEST + 1;
+    private static final int BOTTOM = -1230, TOP = -1202, NORTH = 258, SOUTH = 260;
+    private static int width, target;
+    private static boolean moving;
+
+    private HeavensDoor() {}
+
+    public static boolean use(ServerPlayer player, BlockPos hit)
+    {
+        ServerLevel level = player.serverLevel();
+        if (player.isSpectator() || !level.dimension().equals(FacilitySchemaV2.DIMENSION)
+                || hit.getX() < WEST - 2 || hit.getX() > EAST + 2
+                || hit.getY() < BOTTOM || hit.getY() > TOP + 3
+                || hit.getZ() < NORTH - 1 || hit.getZ() > SOUTH + 1) return false;
+        if ((hit.getZ() < NORTH || hit.getZ() > SOUTH)
+                && !(hit.getX() == 30 && hit.getY() == TOP + 3)) return false;
+        if (!loaded(level) || !level.getBlockState(new BlockPos(WEST - 1, BOTTOM, NORTH)).is(Blocks.POLISHED_BASALT)
+                || !level.getBlockState(new BlockPos(EAST + 1, BOTTOM, SOUTH)).is(Blocks.POLISHED_BASALT)) return false;
+        if (moving) target = target == WIDTH ? 0 : WIDTH;
+        else
+        {
+            width = 0;
+            for (int x = WEST; x <= EAST; x++)
+                if (level.getBlockState(new BlockPos(x, TOP, NORTH)).isAir()) width++;
+            target = width == WIDTH ? 0 : WIDTH;
+        }
+        moving = true;
+        return true;
+    }
+
+    public static void tick(ServerLevel level)
+    {
+        if (!moving || level.getGameTime() % 3 != 0) return;
+        if (!loaded(level)) { moving = false; return; }
+        int next = width + Integer.signum(target - width) * Math.min(2, Math.abs(target - width));
+        if (next < width)
+            for (int x = WEST; x <= EAST; x++)
+                if (material(x, TOP, NORTH, width) == Blocks.AIR && material(x, TOP, NORTH, next) != Blocks.AIR
+                        && !level.getEntities((Entity)null, new AABB(x, BOTTOM, NORTH, x + 1, TOP + 1, SOUTH + 1),
+                        e -> !e.isSpectator() && e.isPickable()).isEmpty())
+                {
+                    target = WIDTH;
+                    return;
+                }
+        // Check the entire moving face before writing a step. A player modification leaves its surroundings intact.
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int x = WEST; x <= EAST; x++)
+            for (int y = BOTTOM; y <= TOP; y++)
+                for (int z = NORTH; z <= SOUTH; z++)
+                    if (!level.getBlockState(pos.set(x, y, z)).is(material(x, y, z, width)))
+                    {
+                        moving = false;
+                        return;
+                    }
+        for (int x = WEST; x <= EAST; x++)
+            for (int y = BOTTOM; y <= TOP; y++)
+                for (int z = NORTH; z <= SOUTH; z++)
+                {
+                    Block to = material(x, y, z, next);
+                    if (to != material(x, y, z, width)) level.setBlock(pos.set(x, y, z), to.defaultBlockState(), 2);
+                }
+        width = next;
+        moving = width != target;
+    }
+
+    private static boolean loaded(ServerLevel level)
+    {
+        return level.hasChunkAt(new BlockPos(WEST, TOP, NORTH)) && level.hasChunkAt(new BlockPos(EAST, TOP, SOUTH));
+    }
+
+    private static Block material(int x, int y, int z, int opening)
+    {
+        int left = 30 - (opening + 1) / 2, right = 31 + opening / 2;
+        if (x > left && x < right) return Blocks.AIR;
+        int templateX = x <= left ? x + 26 - left : x + 34 - right;
+        if (templateX == 26 || templateX == 34) return Blocks.RED_CONCRETE;
+        if (y >= -1217 && y <= -1215) return Blocks.BLACK_CONCRETE;
+        if ((z == NORTH || z == SOUTH) && (y == -1227 || y == -1206)
+                && (templateX == 20 || templateX == 24 || templateX == 36 || templateX == 40)) return Blocks.IRON_BLOCK;
+        return ModBlocks.NERV_STRUCTURAL_PANEL.get();
+    }
+
+    public static void reset() { moving = false; }
+}

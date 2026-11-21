@@ -198,6 +198,7 @@ public class GameEvents
             if (geoFront != null)
             {
                 CommandRoomSlidingDoorDirector.tick(geoFront);
+                com.projectseele.world.HeavensDoor.tick(geoFront);
                 if (!r52Declared&&!terminalDogmaSpecimenChecked
                         && event.getServer().getTickCount() % 100 == 0)
                 {
@@ -327,6 +328,12 @@ public class GameEvents
         if (event.getHand() == InteractionHand.MAIN_HAND
                 && event.getEntity() instanceof ServerPlayer player)
         {
+            if (com.projectseele.world.HeavensDoor.use(player, event.getPos()))
+            {
+                event.setCanceled(true);
+                event.setCancellationResult(InteractionResult.SUCCESS);
+                return;
+            }
             // These finite handlers also run at HIGHEST. Preserve their
             // actual swipe/manual input regardless of listener registration order.
             if (com.projectseele.world.SeeleConferenceAccessR47.protectedReader(player.serverLevel(), event.getPos())
@@ -682,6 +689,7 @@ public class GameEvents
         NervCommandTelemetry.reset();
         NervOperationsConsole.reset();
         CommandRoomSlidingDoorDirector.resetRuntime();
+        com.projectseele.world.HeavensDoor.reset();
         LiftSlidingDoorDirector.resetRuntime();
         TrainingPilotDirector.resetRuntime();
         EvaLogisticsDirector.releaseRouteTickets(event.getServer());
