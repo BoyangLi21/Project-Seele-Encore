@@ -39,12 +39,13 @@ import subprocess
 import sys
 import time
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 
 ROOT = Path(__file__).resolve().parents[1]
 FORMAL = Path('F:/eva/artifacts/r53_repair_20261015/client/saves/HOTFIX_20261025')
 SHIP = Path('F:/eva/artifacts/r53_repair_20261015/client')
 # The world the starting LOD database was built from. R64 starts from R63r's (batch 455, the R63 far view).
-REFERENCE_SERVER_ZIP = Path('F:/eva/delivery/Project_SEELE_Encore_R63r_20261115_Server.zip')
+REFERENCE_SERVER_ZIP = Path('F:/eva/delivery/Project_SEELE_Encore_R63r_20261115_Server_Fix1.zip')
 # The R64 outer ring map-edges baked with the R64 generator on its D: copy (2026-11-17, 39,160 sections, LZ4 rows).
 RING_DB = Path('D:/eva-ringbake/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite')
 WORK = Path('E:/eva-r63-rebake')
@@ -222,10 +223,10 @@ def saved_chunks(world):
     return saved
 
 
-def chunk_changes(world, server_zip=REFERENCE_SERVER_ZIP):
+def chunk_changes(world, server_zip=None):
     """Chunks that differ from the reference server zip's world: changed payload, added, removed."""
     changed, added, removed = set(), set(), set()
-    with zipfile.ZipFile(server_zip) as z:
+    with zipfile.ZipFile(server_zip or REFERENCE_SERVER_ZIP) as z:
         old = {n[len(R62_PREFIX):] for n in z.namelist() if n.startswith(R62_PREFIX) and n.endswith('.mca')}
         new = {p.name for p in (world / GEO / 'region').glob('r.*.*.mca')}
         for name in sorted(old | new):
@@ -413,9 +414,31 @@ def client_args(game, extra_props, out_name, heap='6G', world=COPY):
     return path
 
 
-def client_log():
+def client_run_log(game, started):
+    """Read this launch across Log4j's date rollover, stopping at its own Forge launch line."""
+    logs = game / 'logs'
+    latest = logs / 'latest.log'
+    current = latest.read_bytes()
+    launch = b'ModLauncher running: args ['
+    if launch in current or datetime.date.fromtimestamp(started) >= datetime.date.fromtimestamp(latest.stat().st_mtime):
+        return current
+    archives = sorted((p for p in logs.glob('????-??-??-*.log.gz') if p.stat().st_mtime >= started),
+                      key=lambda path: path.stat().st_mtime, reverse=True)
+    parts = [current]
+    for path in archives:
+        part = gzip.decompress(path.read_bytes())
+        marker = part.rfind(launch)
+        if marker >= 0:
+            parts.append(part[part.rfind(b'\n', 0, marker) + 1:])
+            return b''.join(reversed(parts))
+        parts.append(part)
+    return current
+
+
+def client_log(game=None, text=None):
     """What the last client run's log says: a broken mod load still exits with code 0."""
-    text = (WORK / 'client/logs/latest.log').read_text('utf8', 'replace')
+    if text is None:
+        text = ((game or WORK / 'client') / 'logs/latest.log').read_text('utf8', 'replace')
     bad = [m for m in ('Failed to register automatic subscribers', 'Unhandled game exception', 'broken mod state',
                        'Missing required mod', 'Registry Object not present', 'Hand joint missing', 'missing registry entries',
                        'Encountered an unexpected exception', 'This crash report has been saved') if m.lower() in text.lower()]
@@ -424,7 +447,32 @@ def client_log():
                 out_of_memory=text.count('OutOfMemoryError'), ok='Project SEELE initialized' in text and world and not bad)
 
 
-def run_client(args_file, minutes, purpose, exclusive=False):
+def wait_for_segment(p, seconds, commit_floor):
+    """Give a constrained Windows host time for Minecraft's normal world and SQLite shutdown."""
+    deadline = time.monotonic() + seconds
+    low = 0
+    while True:
+        try:
+            return 'exit=%d' % p.wait(max(0, min(12, deadline - time.monotonic())))
+        except subprocess.TimeoutExpired:
+            if time.monotonic() >= deadline:
+                raise
+        rc, status = slot('status')
+        match = re.search(r'free commit ([\d.]+) GB', status)
+        if rc or not match:
+            continue
+        free = float(match[1])
+        low = low + 1 if free <= commit_floor else 0
+        if low < 2 and free >= commit_floor - 1.5:
+            continue
+        close = subprocess.run(['powershell', '-NoProfile', '-Command', '(Get-Process -Id %d).CloseMainWindow()' % p.pid],
+                               capture_output=True, text=True, errors='replace')
+        if close.returncode == 0 and close.stdout.strip() == 'True':
+            print('Closing the current LOD client normally with %.1f GiB host commit available' % free, flush=True)
+            return 'saved-for-commit=%.1f,exit=%d' % (free, p.wait(90))
+
+
+def run_client(args_file, minutes, purpose, exclusive=False, commit_floor=None, game=None):
     """One client under a slot, or with the whole machine (slot.py exclusive, which waits for running clients
     to end); returns the exit text. Never starts without an 'ok:' from slot.py."""
     while True:
@@ -438,8 +486,10 @@ def run_client(args_file, minutes, purpose, exclusive=False):
             continue
         raise SystemExit('No slot (rc %d): %s' % (rc, text.strip()[-400:]))
     try:
-        p = subprocess.Popen([str(JAVAW), '@' + str(args_file)], cwd=str(WORK / 'client'))
+        p = subprocess.Popen([str(JAVAW), '@' + str(args_file)], cwd=str(game or WORK / 'client'))
         try:
+            if commit_floor is not None:
+                return wait_for_segment(p, minutes * 60, commit_floor)
             code = p.wait(minutes * 60)
             return 'exit=%d' % code
         except subprocess.TimeoutExpired:
@@ -509,11 +559,12 @@ def city_state(world):
     return out
 
 
-def raise_city(name, heap='6G', exclusive=False):
+def raise_city(name, heap='6G', exclusive=False, game=None, label=None):
     """Raise Tokyo-3 on one of our mirrors with a short client run: /seele city raise needs a player, so the probe
     runs it through execute as @p. Render distance 2 and no DH, so the run saves no extra outer chunks and writes
     no LOD rows; the R45 lift saves the moved chunks itself before it commits."""
-    game = WORK / 'client'
+    game = game or WORK / 'client'
+    label = label or name
     world = game / 'saves' / name
     before = city_state(world)
     if before.get('Depth') == 0 and before.get('Phase') == 'IDLE':
@@ -526,7 +577,7 @@ def raise_city(name, heap='6G', exclusive=False):
               # A raise took 99-112 s on the R64 copies (2026-11-17); wait well past it, then save.
               dict(op='cmd', text='time set 6000', wait=6000),
               dict(op='cmd', text='save-all flush', wait=400)]
-    script = guard(WORK / ('scripts/city-raise-%s.json' % name))
+    script = guard(WORK / ('scripts/city-raise-%s.json' % label))
     script.parent.mkdir(parents=True, exist_ok=True)
     script.write_text(json.dumps(steps), 'utf8')
     Path(str(script) + '.log').unlink(missing_ok=True)
@@ -537,13 +588,13 @@ def raise_city(name, heap='6G', exclusive=False):
     moved = hold_mods(game, ['DistantHorizons-*.jar', 'oculus-*.jar'], held)
     try:
         guard(options).write_text(re.sub(r'(?m)^renderDistance:\d+', 'renderDistance:2', kept), 'utf8')
-        args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'raise-%s.args' % name, heap, world=name)
-        result = run_client(args, 20, 'R64 bake: raise Tokyo-3 on the mirror ' + name, exclusive)
+        args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'raise-%s.args' % label, heap, world=name)
+        result = run_client(args, 20, 'R64 bake: raise Tokyo-3 on the mirror ' + label, exclusive, game=game)
     finally:
         options.write_text(kept, 'utf8')
         restore_mods(game, held)
         shutil.copyfile(WORK / 'jars/final.jar', game / JAR)
-    log = client_log()
+    log = client_log(game)
     text = (game / 'logs/latest.log').read_text('utf8', 'replace')
     after = city_state(world)
     ok = log['ok'] and after.get('Depth') == 0 and after.get('Target') == 0 and after.get('Phase') == 'IDLE'
@@ -555,12 +606,16 @@ def raise_city(name, heap='6G', exclusive=False):
 
 def step_check(a):
     problems, notes = [], []
+    ring_db = Path(a.ring_db or RING_DB)
     for name, path in (('formal world', FORMAL / 'level.dat'), ('shipped client jar', SHIP / JAR), ('reference server zip', REFERENCE_SERVER_ZIP),
-                       ('outer ring LOD database', RING_DB), ('args template', ARGS_TEMPLATE), ('probe jar', PROBE_JAR),
+                       ('outer ring LOD database', ring_db), ('args template', ARGS_TEMPLATE), ('probe jar', PROBE_JAR),
                        ('javaw', JAVAW), ('slot tool', SLOT)):
         if not path.exists():
             problems.append('missing ' + name + ': ' + str(path))
-    missing = jar_classes(SHIP / JAR) if (SHIP / JAR).exists() else list(R63_CLASSES)
+    if problems:
+        save('check', dict(problems=problems))
+        raise SystemExit('Required bake inputs are missing')
+    missing = jar_classes(SHIP / JAR)
     if missing:
         problems.append('shipped jar lacks R63 classes: ' + ', '.join(missing))
     jar_time = datetime.datetime.fromtimestamp((SHIP / JAR).stat().st_mtime).isoformat(timespec='minutes')
@@ -585,7 +640,7 @@ def step_check(a):
     changed, added, removed = chunk_changes(FORMAL)
     newest = max(p.stat().st_mtime for p in (FORMAL / GEO / 'region').glob('*.mca'))
     formal_db = FORMAL / GEO / 'data/DistantHorizons.sqlite'
-    core_rows, ring_rows = rows_of(formal_db), rows_of(RING_DB, live=True)
+    core_rows, ring_rows = rows_of(formal_db), rows_of(ring_db, live=True)
     plan = plan_merge(core_rows, ring_rows, saved, changed | added)
     points = viewpoints(plan['rebuild'])
     sg = plan['saved_grid']
@@ -594,19 +649,34 @@ def step_check(a):
     ring_want = {(x, z) for x in range(-6464 // 64, 7584 // 64 + 1) for z in range(-5408 // 64, 5920 // 64 + 1)
                  if classify(0, x, z, sg) == 'ring'}
     core_minutes = sum(min(25, max(6, math.ceil(c / SECTIONS_PER_MINUTE) + 2)) for _, _, c in points) + CLIENT_START_MIN
+    # The four-reader R64 manifest checked 80,724 files in 307 s. Each mirror checks source and copy.
+    mirror_minutes = 2 + math.ceil(2 * world_files / 15750)
+    stages = dict(mirror_min=mirror_minutes, xaero_mirror_min=mirror_minutes, prepare_min=3, core_client_min=core_minutes, fill_pass_min=25,
+                  city_raises_min=16 if a.city_raised else 0, xaero_min=12,
+                  xaero_pregen_min=math.ceil(a.pregen_chunks / 42 / 60), pack_min=5)
     estimate = dict(
-        mirror_min=8, prepare_min=3, core_client_min=core_minutes, fill_pass_min=25, xaero_min=12, pack_min=5,
-        total_hours=round((8 + 3 + core_minutes + 25 + 12 + 5) / 60, 1),
+        **stages, xaero_pregen_chunks=a.pregen_chunks, reference_pregen_chunks_per_second=42,
+        total_hours=round(sum(stages.values()) / 60, 1),
         ring_left_sections=len(ring_want - ring_l0), ring_left_hours_at_63_per_min=round(len(ring_want - ring_l0) / 63 / 60, 1))
-    disk = dict(work_drive=str(WORK.drive), work_free_gb=free_gb(WORK.drive + '/'), f_free_gb=free_gb('F:/'), e_free_gb=free_gb('E:/'),
+    with zipfile.ZipFile(REFERENCE_SERVER_ZIP) as reference:
+        seed_bytes = reference.getinfo('SEELE_R53_WORLD/' + GEO + '/data/DistantHorizons.sqlite').file_size
+    ring_bytes = ring_db.stat().st_size
+    lod_bytes = seed_bytes + ring_bytes
+    # Budget full-size copies: ring snapshot, mutable core, export, SQLite journal, two ZIPs and aged LOD.
+    work_bytes = (2 if a.city_raised else 1) * inst_bytes + 2 * world_bytes + ring_bytes + 3 * lod_bytes + a.pregen_chunks * 10 * 1024
+    delivery_bytes = world_bytes + 2 * inst_bytes + 3 * lod_bytes
+    disk = dict(work_drive=str(WORK.drive), work_free_gb=free_gb(WORK.drive + '/'), delivery_drive=str(a.delivery.resolve().drive), delivery_free_gb=free_gb(a.delivery),
                 instance_gb=round(inst_bytes / 2**30, 2), world_gb=round(world_bytes / 2**30, 2),
-                work_need_gb=round((inst_bytes + 2 * world_bytes) / 2**30 + 2.0, 1),
-                delivery_need_gb=4.5, note='WORK: instance + mirror (+ second mirror state for xaero reuses the same folder) + LOD copies; '
-                                           'delivery: two zips about 3.2 GB plus the aged LOD temp copy')
+                seed_bytes=seed_bytes, ring_bytes=ring_bytes, work_need_gb=round(work_bytes / 2**30, 1),
+                delivery_need_gb=round(delivery_bytes / 2**30, 1),
+                note='Work includes two mirrors, ring snapshot, mutable/export/journal LOD and estimated chunk generation. '
+                     'Delivery budgets both archives and the aged database. Unpacked join-test copies are additional.')
+    if WORK.resolve().drive.lower() == a.delivery.resolve().drive.lower():
+        disk['work_need_gb'] += disk['delivery_need_gb']
     if disk['work_free_gb'] < disk['work_need_gb'] + 5:
         problems.append('not enough free space for WORK on ' + str(WORK.drive))
-    if disk['f_free_gb'] < disk['delivery_need_gb'] + 5:
-        problems.append('not enough free space on F: for the zips')
+    if disk['delivery_free_gb'] < disk['delivery_need_gb'] + 5:
+        problems.append('not enough free space on ' + disk['delivery_drive'] + ' for the zips')
     data = dict(
         problems=problems, notes=notes, formal_world=str(FORMAL), world_lock_free=lock_free, world_files=world_files,
         newest_region=datetime.datetime.fromtimestamp(newest).isoformat(timespec='seconds'),
@@ -732,14 +802,19 @@ def latest_batch():
 def manifest(root):
     """sha256 of every file the mirror copies, and one digest over all of them (sorted paths)."""
     import hashlib
+    def fail(error):
+        raise error
+
+    root = Path(root)
+    paths = sorted(Path(base) / name for base, _, names in os.walk(root, onerror=fail) for name in names
+                   if name not in MIRROR_SKIP and not name.endswith('.sqlite-shm'))
     files = {}
-    for path in sorted(Path(root).rglob('*')):
-        if path.is_file() and path.name not in MIRROR_SKIP and not path.name.endswith('.sqlite-shm'):
-            digest = hashlib.sha256()
-            with path.open('rb') as handle:
-                for block in iter(lambda: handle.read(1 << 20), b''):
-                    digest.update(block)
-            files[path.relative_to(root).as_posix()] = digest.hexdigest()
+    # R64 has over 75,000 tiny rigid-city files. Overlap their opens while preserving the original digest order.
+    with ThreadPoolExecutor(max_workers=4) as readers:
+        for start in range(0, len(paths), 512):
+            batch = paths[start:start + 512]
+            for path, digest in zip(batch, readers.map(sha256_file, batch)):
+                files[path.relative_to(root).as_posix()] = digest
     whole = hashlib.sha256(''.join(f'{k}\t{v}\n' for k, v in files.items()).encode()).hexdigest()
     region = hashlib.sha256(''.join(f'{k}\t{v}\n' for k, v in files.items() if k.startswith(GEO + '/region/')).encode()).hexdigest()
     return files, whole, region
@@ -749,8 +824,8 @@ def region_fingerprint(world):
     return {p.name: [p.stat().st_size, p.stat().st_mtime_ns] for p in sorted((world / GEO / 'region').glob('*.mca'))}
 
 
-def mirror_world(locked=True, name=COPY):
-    game = WORK / 'client'
+def mirror_world(locked=True, name=COPY, game=None, label=None):
+    game = game or WORK / 'client'
     target = guard(game / 'saves' / name)
     _, _, links = tree_bytes(FORMAL)
     if links:
@@ -765,14 +840,15 @@ def mirror_world(locked=True, name=COPY):
         src, whole, region = manifest(FORMAL) if locked else ({}, None, None)
         fingerprint = region_fingerprint(FORMAL)
         newest = max(p.stat().st_mtime for p in (FORMAL / GEO / 'region').glob('*.mca'))
+        locked_seconds = round(time.time() - t) if locked else 0
     if locked:
         dst, mirror_whole, _ = manifest(target)
         if dst != src:
             differ = sorted(k for k in src.keys() | dst.keys() if src.get(k) != dst.get(k))
             raise SystemExit('Mirror differs from the formal world in %d files, e.g. %s' % (len(differ), differ[:5]))
-        json.dump(dict(files=src), guard(WORK / 'logs' / ('manifest-%s.json' % name)).open('w'), indent=0)
+        json.dump(dict(files=src), guard(WORK / 'logs' / ('manifest-%s.json' % (label or name))).open('w'), indent=0)
     return dict(target=str(target), robocopy=tail, files=len(src), sha256_all_files=whole, sha256_geofront_regions=region,
-                region_fingerprint=fingerprint, recorded_batch=latest_batch(), seconds_locked=round(time.time() - t),
+                region_fingerprint=fingerprint, recorded_batch=latest_batch(), seconds_locked=locked_seconds, seconds_total=round(time.time() - t),
                 formal_newest_region=datetime.datetime.fromtimestamp(newest).isoformat(timespec='seconds'))
 
 
@@ -902,6 +978,53 @@ def coverage(world, db):
                 rows=len(rows))
 
 
+def segmented_core(a, game, world, db):
+    """Resume the prepared database in short clients. Each pass starts from the sections actually missing."""
+    runs, stalled = [], set()
+    before = coverage(world, db)
+    if before['quick_check'] != 'ok':
+        raise SystemExit('The prepared LOD database failed quick_check')
+    cover = before
+    while len(cover['core_missing']) > a.fill_threshold:
+        points = viewpoints(cover['core_missing'], minimum=1)
+        point = next((p for p in points if p[:2] not in stalled), None)
+        if point is None:
+            break
+        number = len(runs) + 1
+        script = WORK / 'scripts' / ('r63-dh-resume-%02d.json' % number)
+        plan = probe_script([point], script, hover=a.segment_minutes)
+        args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'resume-%02d.args' % number, a.heap)
+        started = time.time()
+        result = run_client(args, a.segment_minutes + CLIENT_START_MIN + 10, 'R64 DH resume at %s,%s' % point[:2], a.exclusive, a.commit_floor_gib)
+        native_log = guard(WORK / 'logs' / ('resume-%02d-%d.log' % (number, started)))
+        shutil.copyfile(game / 'logs/latest.log', native_log)
+        log = client_log()
+        script_log = Path(str(script) + '.log')
+        done = script_log.is_file() and script_log.read_text('utf8', 'replace').rstrip().endswith('done')
+        saved = (result.startswith('saved-for-commit=') and result.endswith('exit=0')
+                 and 'All dimensions are saved' in native_log.read_text('utf8', 'replace'))
+        previous = len(cover['core_missing'])
+        cover = coverage(world, db)
+        remaining = len(cover['core_missing'])
+        runs.append(dict(viewpoint=plan[0], seconds=round(time.time() - started, 1), client=result, script_done=done, pressure_saved=saved,
+                         client_log=log, native_log=str(native_log), missing_before=previous, missing_after=remaining))
+        save('core-progress', dict(started_missing=len(before['core_missing']), missing=remaining, runs=runs))
+        if not (result == 'exit=0' and done or saved) or not log['ok'] or log['out_of_memory'] or cover['quick_check'] != 'ok':
+            raise SystemExit('Interrupted LOD segment; the saved database can be resumed with core --segment-minutes')
+        if remaining >= previous:
+            stalled.add(point[:2])
+    missing = len(cover['core_missing'])
+    if missing > a.fill_threshold:
+        raise SystemExit('LOD coverage stalled with %d missing sections; see core-progress.json' % missing)
+    out = snapshot(db, WORK / 'out/geofront_lod.sqlite', live=True)
+    gate = dict(script_done=all(r['script_done'] for r in runs), pressure_saves=sum(r['pressure_saved'] for r in runs),
+                quick_check=cover['quick_check'], core_missing=missing,
+                pending_parent_updates=cover['pending_parent_updates'])
+    save('core', dict(ok=True, segmented=True, resumed_missing=len(before['core_missing']), segments=runs, gate=gate,
+                      output=str(out), output_bytes=out.stat().st_size, core_level0=cover['core_level0'],
+                      missing_sample=cover['core_missing'][:20]))
+
+
 def step_core(a):
     game = WORK / 'client'
     world = game / 'saves' / COPY
@@ -919,6 +1042,8 @@ def step_core(a):
         minutes = a.minutes or prep['client_minutes'] + 10
         # 4 threads in a 6 GB heap lost the first, nearest tasks to OutOfMemoryError in the 2026-11-13 trial.
         set_toml(game / 'config/DistantHorizons.toml', {'numberOfThreads': str(a.dh_threads)})
+        if a.segment_minutes:
+            return segmented_core(a, game, world, db)
         args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'core.args', a.heap)
         result = run_client(args, minutes, 'R63 DH core rebake', a.exclusive)
         log = client_log()
@@ -1007,58 +1132,164 @@ def step_fill(a):
         raise SystemExit('Fill did not pass its gate')
 
 
+def resume_xaero_strips(a, game, name):
+    import runpy
+    audit = runpy.run_path(str(Path(__file__).with_name('xaero_chunk_status.py')))
+    bounds = audit['chunk_bounds'](a.xaero_pregen)
+    region = game / 'saves' / name / GEO / 'region'
+    prior_mask, baseline = audit['scan'](FORMAL / GEO / 'region', bounds)
+    mask, saved = audit['scan'](region, bounds)
+    if not all(old <= now for old, now in zip(prior_mask, mask)):
+        raise SystemExit('An original FULL chunk is missing from the stopped Xaero world')
+    strips = list(audit['incomplete_strips'](mask, bounds, a.pregen_strip_chunks))
+    receipt = dict(bounds=list(bounds), source=baseline, at_resume=saved, strips=[])
+    save('xaero-strip-progress', receipt)
+    native_total = 0
+    for i, (x0, z0, x1, z1) in enumerate(strips, 1):
+        expected = (x1 - x0 + 1) * (z1 - z0 + 1)
+        block_bounds = '%d,%d,%d,%d' % (x0 * 16, z0 * 16, x1 * 16 + 15, z1 * 16 + 15)
+        tag = 'xaero-strip-%02d-%d' % (i, time.time())
+        args = client_args(game, {'projectseele.xaeroBakePregen': block_bounds}, tag + '.args', a.heap, world=name)
+        started = time.time()
+        result = run_client(args, a.pregen_minutes, 'Xaero pregeneration strip %d of %d' % (i, len(strips)), a.exclusive, game=game)
+        native = guard(WORK / 'logs' / (tag + '.log'))
+        native.write_bytes(client_run_log(game, started))
+        text = native.read_text('utf8', 'replace')
+        done = re.search(r'Xaero bake pregeneration finished: (\d+) chunks in (\d+) s', text)
+        if (result != 'exit=0' or not done or int(done[1]) != expected or not client_log(game, text)['ok']
+                or 'All dimensions are saved' not in text):
+            raise SystemExit('Xaero strip did not finish and save normally; inspect ' + str(native))
+        _, verify = audit['scan'](region, (x0, z0, x1, z1))
+        if verify['full'] != expected:
+            raise SystemExit('A completed Xaero strip contains non-FULL chunks: ' + str(verify))
+        native_total += expected
+        receipt['strips'].append(dict(index=i, started=started, finished=time.time(), native_seconds=int(done[2]),
+                                      visited=expected, saved=verify, native_log=str(native)))
+        save('xaero-strip-progress', receipt)
+    _, final = audit['scan'](region, bounds)
+    receipt['final'] = final
+    save('xaero-strip-progress', receipt)
+    if final['full'] != final['coordinates'] or final['coordinates'] != a.pregen_chunks:
+        raise SystemExit('Final region files do not contain every requested FULL chunk: ' + str(final))
+    return dict(expected=a.pregen_chunks, generated=final['full'], seconds=sum(s['native_seconds'] for s in receipt['strips']),
+                log=str(log_path('xaero-strip-progress')), full_in_source=baseline['full'], full_before_resume=saved['full'],
+                new_full=final['full'] - baseline['full'], resumed_native_visits=native_total, final_scan=final)
+
+
+def export_xaero_map(game, baked, result, started):
+    native = guard(WORK / 'logs/xaero-maps-native.log')
+    native.write_bytes(client_run_log(game, started))
+    logtext = native.read_text('utf8', 'replace')
+    zips = sorted(baked.rglob('*.zip')) if baked.exists() else []
+    caves = sum('caves' in p.relative_to(baked).parts for p in zips)
+    surface = len(zips) - caves
+    finished = (result == 'exit=0' and client_log(game, logtext)['ok'] and 'Xaero map bake finished' in logtext
+                and 'Xaero map bake surface finished, full cave layer started' in logtext and surface > 0 and caves > 0)
+    out = WORK / 'out/xaero/projectseele$geofront'
+    if finished and zips:
+        if out.exists():
+            shutil.rmtree(guard(out))
+        shutil.copytree(baked, guard(out))
+    return dict(ok=finished, finished=finished, region_zips=len(zips), surface_region_zips=surface,
+                cave_region_zips=caves, output=str(out), native_log=str(native))
+
+
 def step_xaero(a):
     # Its own mirror, so a minimap redo never wipes the prepared LOD database in MAP_REVIEW.
     game = WORK / 'client'
-    info = mirror_world(name=XAERO_COPY)
-    info.pop('region_fingerprint')
+    starts = {'resume_check' if a.resume_pregen else 'mirror': time.time()}
+    name = XAERO_COPY
+    if a.city_raised:
+        # The map probe only opens MAP_REVIEW. Give Xaero its own client and canonical review save.
+        game = guard(WORK / 'xaero-client')
+        if not a.resume_pregen:
+            wait_no_exclusive('copying the Xaero client')
+            robocopy(WORK / 'client', game, '/E', '/XD', *INSTANCE_SKIP, '/XF', 'session.lock', '*.log')
+        name = COPY
+    if a.resume_pregen:
+        old = json.loads(log_path('xaero').read_bytes())
+        info = old['mirror']
+        native = (WORK / 'logs/xaero-pregen-native.log').read_text('utf8', 'replace')
+        world = game / 'saves' / name
+        original_args = (WORK / 'logs/xaero-pregen.args').read_text('ascii')
+        if (Path(info['target']).resolve() != world.resolve() or not world_lock_free(world) or not world_unchanged_since_mirror()
+                or info['sha256_all_files'] != json.loads(log_path('mirror').read_bytes())['sha256_all_files']
+                or not (WORK / 'logs/manifest-R63_XAERO.json').is_file() or 'All dimensions are saved' not in native
+                or '"-Dprojectseele.xaeroBakePregen=%s"' % a.xaero_pregen not in original_args):
+            raise SystemExit('Cannot prove this is the stopped Xaero mirror of the requested world and bounds')
+    else:
+        info = mirror_world(name=name, game=game, label=XAERO_COPY)
+        info.pop('region_fingerprint')
     raised = None
     if a.city_raised:
         # The minimap shows the same city as the far view.
-        raised = raise_city(XAERO_COPY, a.raise_heap, a.exclusive)
+        starts['raise_city'] = time.time()
+        if a.resume_pregen and city_state(game / 'saves' / name) != {'Depth': 0, 'Target': 0, 'Phase': 'IDLE'}:
+            raise SystemExit('The resumed Xaero city is not raised and idle')
+        raised = raise_city(name, a.raise_heap, a.exclusive, game=game, label=XAERO_COPY)
+        if not a.resume_pregen and (game / 'logs/latest.log').is_file():
+            shutil.copyfile(game / 'logs/latest.log', guard(WORK / 'logs/xaero-raise-native.log'))
         if not (raised.get('ok') or raised.get('skipped')):
             save('xaero', dict(ok=False, raise_city=raised, mirror=info))
             raise SystemExit('The city did not reach the raised state on the minimap mirror')
-    baked = game / 'xaero/world-map' / XAERO_COPY.replace('_', '^us^') / 'projectseele$geofront'
+    baked = game / 'xaero/world-map' / name.replace('_', '^us^') / 'projectseele$geofront'
     if baked.exists():
         shutil.move(str(baked), str(guard(baked.with_name('projectseele$geofront.before-' + time.strftime('%H%M%S')))))
     shutil.copyfile(WORK / 'jars/final.jar', guard(game / JAR))
     held = WORK / 'mods-held'
     moved = hold_mods(game, ['DistantHorizons-*.jar', 'oculus-*.jar'], held)
     pregen = None
+    pregen_result = None
     try:
-        if a.xaero_pregen:
+        if a.resume_pregen:
+            starts['pregen'] = time.time()
+            pregen_result = resume_xaero_strips(a, game, name)
+            pregen = 'verified-from-region-files'
+        elif a.xaero_pregen:
             # The outer ring was never saved as chunks; generate them on this mirror only, in a run of its own.
-            args = client_args(game, {'projectseele.xaeroBakePregen': a.xaero_pregen}, 'xaero-pregen.args', world=XAERO_COPY)
-            pregen = run_client(args, a.pregen_minutes, 'Xaero bake outer ring pregeneration', a.exclusive)
-            text = (game / 'logs/latest.log').read_text('utf8', 'replace')
-            if 'Xaero bake pregeneration finished' not in text or not client_log()['ok']:
-                save('xaero', dict(ok=False, pregen=pregen, pregen_finished=False, mirror=info))
+            starts['pregen'] = time.time()
+            args = client_args(game, {'projectseele.xaeroBakePregen': a.xaero_pregen}, 'xaero-pregen.args', world=name)
+            pregen = run_client(args, a.pregen_minutes, 'Xaero bake outer ring pregeneration', a.exclusive, game=game)
+            native_log = WORK / 'logs/xaero-pregen-native.log'
+            guard(native_log).write_bytes(client_run_log(game, starts['pregen']))
+            text = native_log.read_text('utf8', 'replace')
+            match = re.search(r'Xaero bake pregeneration finished: (\d+) chunks in (\d+) s', text)
+            pregen_result = dict(expected=a.pregen_chunks, generated=int(match[1]) if match else None,
+                                 seconds=int(match[2]) if match else None, log=str(native_log))
+            if pregen_result['generated'] != a.pregen_chunks or not client_log(game, text)['ok'] or pregen != 'exit=0':
+                save('xaero', dict(ok=False, pregen=pregen, pregen_result=pregen_result, pregen_finished=False, mirror=info))
                 raise SystemExit('Outer ring pregeneration did not finish')
-        args = client_args(game, {'projectseele.xaeroBake': 'true'}, 'xaero.args', world=XAERO_COPY)
-        result = run_client(args, 25 if not a.xaero_pregen else 90, 'R63 Xaero minimap bake', a.exclusive)
+        starts['bake_maps'] = time.time()
+        args = client_args(game, {'projectseele.xaeroBake': 'true'}, 'xaero.args', world=name)
+        result = run_client(args, 25 if not a.xaero_pregen else 90, 'R63 Xaero minimap bake', a.exclusive, game=game)
     finally:
         restore_mods(game, held)
-    logtext = (game / 'logs/latest.log').read_text('utf8', 'replace')
-    finished = 'Xaero map bake finished' in logtext and client_log()['ok']
-    zips = sorted(baked.rglob('*.zip')) if baked.exists() else []
-    out = WORK / 'out/xaero/projectseele$geofront'
-    if finished and zips:
-        if out.exists():
-            shutil.rmtree(guard(out))
-        shutil.copytree(baked, guard(out))
-    save('xaero', dict(ok=finished and bool(zips), client=result, pregen=pregen, finished=finished, region_zips=len(zips), held_mods=moved,
-                       mirror=info, raise_city=raised, output=str(out)))
-    if not (finished and zips):
+    exported = export_xaero_map(game, baked, result, starts['bake_maps'])
+    start_times = list(starts.values())
+    phases = {name: dict(start=start, end=end, seconds=round(end - start, 1))
+              for (name, start), end in zip(starts.items(), start_times[1:] + [time.time()])}
+    save('xaero', dict(**exported, client=result, pregen=pregen, held_mods=moved,
+                       pregen_result=pregen_result, mirror=info, raise_city=raised, phases=phases))
+    if not exported['ok']:
         raise SystemExit('Minimap bake did not finish')
 
 
 def step_report(a):
     core = json.loads(log_path('core').read_text('utf8'))
     xaero = json.loads(log_path('xaero').read_text('utf8'))
-    cmd = ['<frpy>', 'tools/package_r60.py', '--date', time.strftime('%Y%m%d'), '--map-note', '"<一行地图状态>"',
-           '--server-address', '<服务器地址>', '--xaero-map', '"%s"' % xaero['output'], '--geofront-lod', '"%s"' % core['output']]
-    save('report', dict(check_first=' '.join(cmd + ['--check']), then_pack=' '.join(cmd + ['--pack'])))
+    cmd = [sys.executable, '-I', str(ROOT / 'tools/package_r60.py'), '--date', a.date,
+           '--world', str(FORMAL), '--client', str(SHIP), '--delivery', str(a.delivery), '--server-template', str(REFERENCE_SERVER_ZIP),
+           '--map-note', '<一行地图状态>', '--server-address', '<服务器地址>', '--xaero-map', xaero['output'], '--geofront-lod', core['output']]
+    if a.client_template:
+        cmd += ['--client-template', str(a.client_template)]
+    if a.compare_build:
+        cmd += ['--compare-build', str(a.compare_build)]
+    if a.release_source:
+        cmd += ['--release-source', str(a.release_source)]
+    if a.logged_world_folder:
+        cmd += ['--logged-world-folder', a.logged_world_folder]
+    save('report', dict(check_first=subprocess.list2cmdline(cmd + ['--check', str(WORK / 'logs/package-check.json')]),
+                        then_pack=subprocess.list2cmdline(cmd + ['--pack'])))
 
 
 def main():
@@ -1076,6 +1307,8 @@ def main():
     p.add_argument('--db', help='prepare: database to change in place (default: the mirror\'s GeoFront database); must be under WORK')
     p.add_argument('--ring-db', help='prepare: outer ring database (default: the map-edges R64 ring copy on D:)')
     p.add_argument('--minutes', type=int, help='core: client time limit (default: the plan plus 10)')
+    p.add_argument('--segment-minutes', type=int, help='core: resume the prepared LOD database with one viewpoint per fresh client, hovering this many minutes')
+    p.add_argument('--commit-floor-gib', type=float, default=6.5, help='core --segment-minutes: save and close if available Windows commit falls below this reserve')
     p.add_argument('--fill-threshold', type=int, default=50, help='core: missing core sections tolerated without a fill pass')
     p.add_argument('--points', type=int, help='prepare: keep only the first N viewpoints (trial runs)')
     p.add_argument('--exclusive', action='store_true', help='core, xaero: run with the whole machine (slot.py exclusive); core then defaults to 8G and 4 DH threads')
@@ -1083,16 +1316,54 @@ def main():
     p.add_argument('--dh-threads', type=int, help='core: DH worker threads (default 4 with --exclusive, else 3: 4 at 6G ran out of heap in the trial)')
     p.add_argument('--no-lock', action='store_true', help='mirror: copy without holding session.lock (trial runs only, never for packing)')
     p.add_argument('--batch', type=int, help='mirror: the batch the formal world should be at; refuse if the batch table says otherwise')
+    p.add_argument('--client-template', type=Path, help='report: PCL ZIP to pass to the packager')
+    p.add_argument('--compare-build', type=Path, help='report: compiled jar to pass to the packager')
+    p.add_argument('--date', default=time.strftime('%Y%m%d'), help='report: release date YYYYMMDD, including when a bake spans midnight')
+    p.add_argument('--release-source', type=Path, help='report: source checkout matching the jar to be packaged')
+    p.add_argument('--logged-world-folder', help='report: source folder name in the shipped client DH logs for renamed mirrors')
+    p.add_argument('--source-world', type=Path, default=FORMAL, help='Stopped world used for checks and every mirror')
+    p.add_argument('--source-client', type=Path, default=SHIP, help='Client instance supplying the exact jar and assets to ship')
+    p.add_argument('--reference-server', type=Path, default=REFERENCE_SERVER_ZIP, help='Server zip whose world matches the starting LOD database')
+    p.add_argument('--batch-log', type=Path, default=BATCH_LOG, help='Execution order table corresponding to --source-world')
+    p.add_argument('--delivery', type=Path, default=Path('F:/eva/delivery'), help='Volume used for package disk estimates')
     p.add_argument('--work', help='work folder (default E:/eva-r63-rebake)')
     p.add_argument('--slot-name', help='slot.py name for the client runs (default r63-pack; trial runs by another session use their own)')
-    p.add_argument('--xaero-pregen', help='xaero: x0,z0,x1,z1 block bounds to generate and save on the mirror first (outer ring: -6464,-5408,7584,5920)')
-    p.add_argument('--pregen-minutes', type=int, default=240, help='xaero --xaero-pregen: client time limit for the pregeneration run')
+    p.add_argument('--xaero-pregen', help='check, xaero: inclusive x0,z0,x1,z1 block bounds to pregenerate (outer ring: -6464,-5408,7584,5920)')
+    p.add_argument('--pregen-minutes', type=int, default=360, help='xaero --xaero-pregen: client time limit for the pregeneration run (the R64 outer ring takes over four hours)')
+    p.add_argument('--resume-pregen', action='store_true', help='xaero: resume a normally saved pregeneration on its existing, verified mirror')
+    p.add_argument('--pregen-strip-chunks', type=int, default=80000, help='xaero --resume-pregen: approximate maximum number of distinct chunk positions per new client')
     a = p.parse_args()
+    if not re.fullmatch(r'[0-9]{8}', a.date):
+        p.error('--date must use YYYYMMDD')
+    if a.resume_pregen and (a.step != 'xaero' or not a.xaero_pregen or not a.city_raised or a.pregen_strip_chunks < 1):
+        p.error('--resume-pregen requires xaero --city-raised, the original --xaero-pregen bounds and positive strip size')
+    if a.segment_minutes is not None and a.segment_minutes < 1:
+        p.error('--segment-minutes must be at least 1')
+    if a.commit_floor_gib <= 0:
+        p.error('--commit-floor-gib must be positive')
+    a.pregen_chunks = 0
+    if a.xaero_pregen is not None:
+        try:
+            x0, z0, x1, z1 = map(int, a.xaero_pregen.split(','))
+        except ValueError:
+            p.error('--xaero-pregen requires four integer coordinates x0,z0,x1,z1')
+        if x0 > x1 or z0 > z1:
+            p.error('--xaero-pregen requires x0 <= x1 and z0 <= z1')
+        # Match XaeroMapBake's inclusive chunk rectangle, including already saved chunks.
+        a.pregen_chunks = ((x1 >> 4) - (x0 >> 4) + 1) * ((z1 >> 4) - (z0 >> 4) + 1)
     # Review session, 2026-11-13: with the machine to ourselves R62's 8 GB / 4 threads; shared, 6 GB / 3 threads.
     a.heap = a.heap or ('8G' if a.exclusive else '6G')
     a.dh_threads = a.dh_threads or (4 if a.exclusive else 3)
+    globals().update(FORMAL=a.source_world.resolve(), SHIP=a.source_client.resolve(),
+                     REFERENCE_SERVER_ZIP=a.reference_server.resolve(), BATCH_LOG=a.batch_log.resolve())
     if a.work:
         globals()['WORK'] = Path(a.work)
+    if FORMAL == WORK.resolve() or WORK.resolve().is_relative_to(FORMAL) or FORMAL.is_relative_to((WORK / 'client').resolve()):
+        raise SystemExit('The source world and working client must be separate')
+    if a.step == 'instance':
+        target_client = (WORK / 'client').resolve()
+        if SHIP.is_relative_to(target_client) or target_client.is_relative_to(SHIP):
+            raise SystemExit('The source client and working client must be separate')
     if a.slot_name:
         globals()['SLOT_NAME'] = a.slot_name
     globals()['step_' + a.step](a)
