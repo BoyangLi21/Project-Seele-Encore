@@ -49,6 +49,8 @@ An open-source, non-commercial Evangelion fan mod for **Minecraft 1.20.1 / Forge
 
 ## 从源码启动
 
+从入口类了解子系统可阅读[架构导览](docs/ARCHITECTURE.zh.md)。安装依赖、准备地图输入和制作配套发布包见[构建与打包](docs/BUILD_AND_PACK.zh.md)。
+
 需要 **Git、JDK 17、Python 3.11+**。使用仓库自带的 Gradle 8.8 wrapper，无需单独安装 Gradle。
 
 Windows PowerShell：

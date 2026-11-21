@@ -4,6 +4,8 @@
 
 ## 启动代码
 
+从入口类了解子系统可阅读[架构导览](docs/ARCHITECTURE.zh.md)。安装依赖、准备地图输入和制作配套发布包见[构建与打包](docs/BUILD_AND_PACK.zh.md)。
+
 需要 Git、JDK 17；下面的依赖下载助手使用 Python 3.11 或更新版本的标准库。
 
 ```powershell
