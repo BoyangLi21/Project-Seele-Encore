@@ -110,6 +110,10 @@ THUMB_BIND_Y = -0.90
 THUMB_BIND_OUT_X = 0.32
 THUMB_BIND_OUT_Z = 0.29
 FINGER_ROOT_EMBED = 0.005
+THUMB_FIST_RUNTIME_ROTVEC_DEGREES = {
+    "l": (-59.326567, -140.163194, -6.397107),
+    "r": (-59.107334, 140.223847, 6.348767),
+}
 
 
 def clean_finger_source_direction(digit, side):
@@ -556,6 +560,58 @@ def discover_finger_rig(positions, triangles):
                     tip[axis] + direction[axis]
                     * CLEAN_FINGER_LENGTHS[digit][1]
                     for axis in range(3))
+
+    # The source thumb is welded into the 49-triangle hand island.  The old
+    # classifier moved only the five triangles beyond the cut plane, leaving
+    # the proximal thumb on hand_* and rotating a detached cap plus one thin
+    # seam triangle.  Move exactly the first welded face ring with that cap;
+    # this preserves the authored source thumb instead of adding replacement
+    # geometry, and gives its existing root bone one continuous rigid piece.
+    for side in ("l", "r"):
+        root_name = f"finger_thumb_{side}"
+        native_faces = {
+            face_index for face_index, owner in face_bones.items()
+            if owner == root_name
+        }
+        native_points = {
+            tuple(round(value, 6) for value in positions[ref[0]])
+            for face_index in native_faces
+            for ref in triangles[face_index]
+        }
+        welded_ring = []
+        for face_index, triangle in enumerate(triangles):
+            if face_index in face_bones:
+                continue
+            points = {
+                tuple(round(value, 6) for value in positions[ref[0]])
+                for ref in triangle
+            }
+            if points & native_points:
+                welded_ring.append(face_index)
+        if not 8 <= len(welded_ring) <= 12:
+            raise RuntimeError(
+                f"unexpected native thumb welded ring on {side}: "
+                f"{len(welded_ring)} faces")
+        for face_index in welded_ring:
+            face_bones[face_index] = root_name
+
+    # Place the rigid source thumb hinge on its measured palm seam.  The old
+    # hard-coded hand-centre pivot was about 0.05 source units away, so even a
+    # correct rotation orbited the thumb and opened a visible gap.
+    thumb_owners = complete_face_owners(positions, triangles, face_bones)
+    thumb_roots, thumb_frames, _ = fingerfix.recover_finger_frames(
+        positions, triangles, face_bones, thumb_owners, source_pivots,
+        ("thumb",), FINGER_ROOT_EMBED)
+    fingerfix.validate_axis_frames(thumb_frames)
+    for side in ("l", "r"):
+        root_name = f"finger_thumb_{side}"
+        tip_name = f"finger_thumb_tip_{side}"
+        root = thumb_roots[root_name]
+        tangent = thumb_frames[root_name]["bind_tangent_source"]
+        source_pivots[root_name] = root
+        source_pivots[tip_name] = tuple(
+            root[axis] + tangent[axis] * CLEAN_FINGER_LENGTHS["thumb"][0]
+            for axis in range(3))
     return face_bones, source_pivots, finger_frames
 
 
@@ -1150,6 +1206,33 @@ def _position(keys):
     return {"position": {time: value for time, value in keys.items()}}
 
 
+def _thumb_flex_rotation(side, legacy_angle):
+    """Blend the rigid native thumb from bind into solved opposition."""
+    factor = max(0.0, min(1.0, legacy_angle / 58.0))
+    rotvec = tuple(math.radians(value) * factor
+                   for value in THUMB_FIST_RUNTIME_ROTVEC_DEGREES[side])
+    angle = math.sqrt(sum(value * value for value in rotvec))
+    if angle <= 1.0e-8:
+        return [0.0, 0.0, 0.0]
+    x, y, z = (value / angle for value in rotvec)
+    cosine = math.cos(angle)
+    sine = math.sin(angle)
+    one_minus = 1.0 - cosine
+    matrix = (
+        (cosine + x * x * one_minus,
+         x * y * one_minus - z * sine,
+         x * z * one_minus + y * sine),
+        (y * x * one_minus + z * sine,
+         cosine + y * y * one_minus,
+         y * z * one_minus - x * sine),
+        (z * x * one_minus - y * sine,
+         z * y * one_minus + x * sine,
+         cosine + z * z * one_minus),
+    )
+    return [round(value, 5)
+            for value in fingerfix._runtime_matrix_to_geo_rotation(matrix)]
+
+
 def _set_hand_curl(bones, side, curl=22, thumb=17, tip_curl=12, thumb_tip=4,
                    cup=0, thumb_cup=None, tip_cup=0, distal_curl=0,
                    thumb_distal=0):
@@ -1169,8 +1252,11 @@ def _set_hand_curl(bones, side, curl=22, thumb=17, tip_curl=12, thumb_tip=4,
     for digit in FINGER_ORDER:
         angle = thumb if digit == "thumb" else curl
         lateral = thumb_cup if digit == "thumb" else cup
+        root_rotation = (_thumb_flex_rotation(side, angle)
+                         if digit == "thumb"
+                         else [0, lateral, angle * flex_sign])
         bones[f"finger_{digit}_{side}"] = _rotation(
-            {"0.0": [0, lateral, angle * flex_sign]})
+            {"0.0": root_rotation})
         tip_angle = thumb_tip if digit == "thumb" else tip_curl
         bones[f"finger_{digit}_tip_{side}"] = _rotation(
             {"0.0": [0, tip_cup, tip_angle * flex_sign]})

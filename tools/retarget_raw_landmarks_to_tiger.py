@@ -56,6 +56,10 @@ TARGET_LEFT = np.asarray((-1.0, 0.0, 0.0))
 TARGET_UP = np.asarray((0.0, 1.0, 0.0))
 TARGET_FRONT = np.asarray((0.0, 0.0, -1.0))
 MODEL_UNITS_PER_METRE = 112.0
+TIGER_THUMB_FIST_AUTHORED = {
+    "l": [0.2390750, 0.3781518, 0.8934102, -0.0407756],
+    "r": [0.2393413, 0.3768066, -0.8939208, 0.0404731],
+}
 
 
 def normalize(value):
@@ -148,12 +152,17 @@ def main() -> None:
             row["name"] for row in geometry
             if row["name"].startswith("finger_")
             and "_axis_" not in row["name"]
+            and not row["name"].startswith("finger_thumb_tip_")
         ]
     output_bones = list(BONES) + finger_bones
 
     def fist_rotation(bone):
         if "thumb" in bone:
-            angle = 38.0 if "_tip_" in bone else 58.0
+            # The thumb is the retained asymmetric Tiger source island, not
+            # one of the canonical-Z long-finger chains. This opposition pose
+            # maps its distal surface onto the index/middle stack while its
+            # measured palm-seam pivot keeps the original mesh continuous.
+            return TIGER_THUMB_FIST_AUTHORED[bone[-1]]
         elif "_distal_" in bone:
             angle = 58.0
         elif "_tip_" in bone:

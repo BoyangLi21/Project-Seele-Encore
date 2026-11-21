@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
 import bpy
-from mathutils import Matrix, Quaternion, Vector
+from mathutils import Euler, Matrix, Quaternion, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -169,7 +170,10 @@ def make_contact_marker(name: str,
 
 def deformation_matrices(frame_data: dict, db_bones: list[str],
                          bone_order: list[str], pivots: dict[str, Vector],
-                         parents: dict[str, str]) -> dict[str, Matrix]:
+                         parents: dict[str, str],
+                         bind_rotations: dict[str, Quaternion] | None = None,
+                         ) -> dict[str, Matrix]:
+    bind_rotations = bind_rotations or {}
     rotations = {
         name: quaternion_to_blender(frame_data["rotation_wxyz"][index])
         for index, name in enumerate(db_bones)
@@ -182,7 +186,8 @@ def deformation_matrices(frame_data: dict, db_bones: list[str],
     matrices = {}
     for name in bone_order:
         pivot = target_to_blender(pivots[name])
-        rotation = rotations.get(name, Quaternion((1.0, 0.0, 0.0, 0.0)))
+        rotation = rotations.get(name, bind_rotations.get(
+            name, Quaternion((1.0, 0.0, 0.0, 0.0))))
         position = (target_to_blender(root_runtime) if name == "root"
                     else Vector((0.0, 0.0, 0.0)))
         if name in animated_positions:
@@ -199,10 +204,28 @@ def deformation_matrices(frame_data: dict, db_bones: list[str],
     return matrices
 
 
+def geometry_bind_rotations(bones: list[dict]) -> dict[str, Quaternion]:
+    """Convert static Bedrock bone rotations through the exact Gecko basis."""
+    result = {}
+    for bone in bones:
+        raw = bone.get("rotation")
+        if raw is None:
+            continue
+        authored = Euler(tuple(
+            math.radians(float(value)) for value in raw), "XYZ"
+        ).to_quaternion()
+        result[bone["name"]] = quaternion_to_blender([
+            authored.w, authored.x, authored.y, authored.z
+        ])
+    return result
+
+
 def make_clip_action(armature: bpy.types.Object, motion: dict,
                      clip_name: str, bone_order: list[str],
                      pivots: dict[str, Vector],
-                     parents: dict[str, str]) -> bpy.types.Action:
+                     parents: dict[str, str],
+                     bind_rotations: dict[str, Quaternion],
+                     ) -> bpy.types.Action:
     clip = motion["clips"][clip_name]
     db_bones = motion["bones"]
     action = bpy.data.actions.new(f"EVA::{clip_name}")
@@ -210,7 +233,8 @@ def make_clip_action(armature: bpy.types.Object, motion: dict,
     armature.animation_data.action = action
     for local_index, frame_data in enumerate(clip["frames"], start=1):
         matrices = deformation_matrices(
-            frame_data, db_bones, bone_order, pivots, parents
+            frame_data, db_bones, bone_order, pivots, parents,
+            bind_rotations
         )
         # PoseBone.matrix is armature-space. Multiplying the desired runtime
         # deformation by the edit-bone rest matrix lets Blender derive the
@@ -240,12 +264,15 @@ def make_clip_action(armature: bpy.types.Object, motion: dict,
 def build_nla_review(armature: bpy.types.Object, motion: dict,
                      gap_frames: int, bone_order: list[str],
                      pivots: dict[str, Vector],
-                     parents: dict[str, str]) -> dict[str, tuple[int, int]]:
+                     parents: dict[str, str],
+                     bind_rotations: dict[str, Quaternion],
+                     ) -> dict[str, tuple[int, int]]:
     sequence = [name for name in CORE_SEQUENCE if name in motion["clips"]]
     sequence.extend(sorted(set(motion["clips"]) - set(sequence)))
     actions = {
         name: make_clip_action(
-            armature, motion, name, bone_order, pivots, parents
+            armature, motion, name, bone_order, pivots, parents,
+            bind_rotations
         )
         for name in sequence
     }
@@ -293,6 +320,7 @@ def main() -> None:
     add_stage(stage)
 
     bones, pivots, parents = load_geo(args.geo)
+    bind_rotations = geometry_bind_rotations(bones)
     master, armature = build_armature(
         bones, pivots, parents, rig_collection, args.display_scale
     )
@@ -311,7 +339,8 @@ def main() -> None:
     armature.animation_data_create()
     ranges = build_nla_review(
         armature, motion, args.gap_frames,
-        [bone["name"] for bone in bones], pivots, parents
+        [bone["name"] for bone in bones], pivots, parents,
+        bind_rotations
     )
     if args.source_human is not None and args.source_human.is_file():
         add_source_human(args.source_human, ranges, source_collection)

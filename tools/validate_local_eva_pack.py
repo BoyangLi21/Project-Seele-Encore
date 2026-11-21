@@ -69,8 +69,8 @@ STANDARD_EVA_MESH_PARTS = {
 } | STANDARD_EVA_FINGER_MESH_PARTS
 
 STANDARD_EVA_FOOT_PARENTS = {
-    "foot_l": "shin_l",
-    "foot_r": "shin_r",
+    "foot_l": "ankle_l",
+    "foot_r": "ankle_r",
 }
 STANDARD_EVA_BONE_PARENTS = {
     **STANDARD_EVA_FOOT_PARENTS,

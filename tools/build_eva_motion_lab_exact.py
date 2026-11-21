@@ -29,7 +29,10 @@ from build_eva_motion_lab_3d import (
     runtime_pivot,
     target_to_blender,
 )
-from build_eva_motion_lab_armature import deformation_matrices
+from build_eva_motion_lab_armature import (
+    deformation_matrices,
+    geometry_bind_rotations,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -131,6 +134,7 @@ def key_transform(obj: bpy.types.Object, matrix: Matrix, frame: int,
 
 def animate_exact(motion: dict, bone_order: list[str],
                   pivots: dict[str, Vector], parents: dict[str, str],
+                  bind_rotations: dict[str, Quaternion],
                   parts: dict[str, bpy.types.Object],
                   joints: dict[str, bpy.types.Object],
                   contacts: dict[str, tuple[bpy.types.Object, bpy.types.Object]],
@@ -175,7 +179,8 @@ def animate_exact(motion: dict, bone_order: list[str],
                     for axis in range(3)
                 ]
             matrices = deformation_matrices(
-                display_frame, db_bones, bone_order, pivots, parents
+                display_frame, db_bones, bone_order, pivots, parents,
+                bind_rotations
             )
             for bone_name, obj in parts.items():
                 key_transform(obj, matrices[bone_name], frame, clip_name)
@@ -313,6 +318,7 @@ def main() -> None:
     master.scale = (args.display_scale,) * 3
     visual_collection.objects.link(master)
     bones, pivots, parents = load_geo(args.geo)
+    bind_rotations = geometry_bind_rotations(bones)
     parts = build_parts(args.mesh, master, visual_collection,
                         make_material(args.texture))
     attachment_names: set[str] = set()
@@ -366,6 +372,7 @@ def main() -> None:
     motion = json.loads(args.motion_db.read_text(encoding="utf-8"))
     ranges = animate_exact(
         motion, [bone["name"] for bone in bones], pivots, parents,
+        bind_rotations,
         parts, joints, contacts, hand_contacts, args.gap_frames,
         attachment_names
     )

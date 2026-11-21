@@ -22,19 +22,26 @@ The three 60 Hz, 81-frame clips are:
 | `ordinary_attack_hook_right` | ACCAD Male2 E6 HookRight | 16–56 | 1.3333333 s |
 
 These are separate captures, not a mirrored or time-shifted copy. Their
-combined resource contains 3 clips, 52 bones, and 243 frames.
+combined resource contains 3 clips, 50 bones, and 243 frames.
 
 ## Hand treatment
 
 ACCAD's body landmark files do not contain finger capture. The R05 hand layer
 therefore uses the DFKI Hand Motion Embodiment grasp reference (CC BY 4.0) to
-hold a compact anatomical fist throughout each strike. It affects only the 28
+hold a compact anatomical fist throughout each strike. It affects only the 26
 finger bones already present in the active Tiger rig:
 
 - the four native long digits per hand, including their existing root, tip,
   and distal joints;
-- the existing native thumb root and thumb tip on each hand;
+- the existing native thumb root on each hand; its empty compatibility tip
+  socket has no mesh and is not animated;
 - no new digit, thumb segment, or detached mesh is generated.
+
+The source thumb was previously split incorrectly: only 5 of its 15 connected
+triangles followed the thumb bone, while the proximal 10 remained on the palm.
+R05 reunites all 15 original triangles, places the pivot on the measured palm
+seam, and rotates the rigid source thumb into a numerically solved opposition
+pose against the index/middle stack. No replacement thumb geometry is added.
 
 The body capture is not edited by this layer.
 
@@ -46,7 +53,7 @@ The body capture is not edited by this layer.
 | right cross | 0.999923 | 28.5168° |
 | right hook | 0.999923 | 20.9038° |
 
-All clips report 52 active bones, 28 native finger bones, zero manual pose
+All clips report 50 active bones, 26 visible finger-control bones, zero manual pose
 keyframes, and no IK or physics correction.
 
 ## Motion Lab review

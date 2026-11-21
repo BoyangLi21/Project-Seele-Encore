@@ -424,11 +424,13 @@ public final class EvaMotionEngineV2
         for (int index = 0; index < db.bones.length; index++)
         {
             String name = db.bones[index];
-            // The reviewed local mesh uses custom Z-axis curl helpers and a
-            // retained source thumb. Human finger quaternions cannot replace
-            // those bones until the hand is converted to one skinned rig;
-            // keep Gecko's reviewed fist/grip layer authoritative meanwhile.
-            if (name.startsWith("finger_"))
+            // Normal gameplay keeps Gecko's weapon-specific finger layer.
+            // The isolated ordinary-attack review owns its audited static
+            // fist explicitly so the body clip cannot silently show an open
+            // hand. The long digits use mirrored axis adapters; the retained
+            // native thumb is already given its per-side hinge in the review
+            // database.
+            if (name.startsWith("finger_") && !ordinaryAttackReview)
             {
                 continue;
             }
