@@ -270,7 +270,7 @@ public final class SeeleConfig
                 .comment("How a piloted EVA moves. legacy: as up to R63. planted: a foot on the ground stays where it was set down,",
                         "the body is carried by its feet, and it gathers way, brakes and turns with weight (Unit-01 only for now;",
                         "the other Units keep the old model). The server's value goes for everyone on it. In game: /seele motion.")
-                .defineInList("model", "legacy", java.util.List.of("legacy", "planted"));
+                .defineInList("model", "planted", java.util.List.of("legacy", "planted"));
         EVA_GAIT_TIER = common
                 .comment("The planted model's gait, Unit-01's speed in blocks a second and its steps a second:",
                         "A: walk 32 at 1.35, run 66 at 2.0 (steps of 0.8 leg).",
@@ -293,7 +293,7 @@ public final class SeeleConfig
                         "everyone on it. In game: /seele combat. The Angels follow it: under frames Sachiel walks at the Unit, stands",
                         "and regards it, then strikes with the lance and the palm and seizes a blow that misses; Ramiel gathers",
                         "light where it faces its target before it fires; a body driven into a wall or the ground raises dust.")
-                .defineInList("model", "legacy", java.util.List.of("legacy", "frames"));
+                .defineInList("model", "frames", java.util.List.of("legacy", "frames"));
         EVA_HIT_STOP = common
                 .comment("Under the frames core, the pause at a hit. tiered: by how hard the blow is (light 2 to 3 ticks, heavy 4",
                         "to 6, a finisher 8), both bodies held. flat: as up to R63. In game: /seele combat hitstop.")
