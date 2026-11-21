@@ -12,7 +12,7 @@
     "subtitle": "subtitles.projectseele.alarm",
     "sounds": [
       {
-        "name": "projectseele:facility_siren",
+        "name": "projectseele:facility_alarm_loop_r65",
         "stream": false
       }
     ]
@@ -81,27 +81,27 @@
     "subtitle": "subtitles.projectseele.eva_foot_concrete",
     "sounds": [
       {
-        "name": "projectseele:eva_foot_concrete_r47_0",
+        "name": "projectseele:eva_foot_concrete_r65_0",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r47_1",
+        "name": "projectseele:eva_foot_concrete_r65_1",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r47_2",
+        "name": "projectseele:eva_foot_concrete_r65_2",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r47_3",
+        "name": "projectseele:eva_foot_concrete_r65_3",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r47_4",
+        "name": "projectseele:eva_foot_concrete_r65_4",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r47_5",
+        "name": "projectseele:eva_foot_concrete_r65_5",
         "attenuation_distance": 384
       }
     ]
@@ -110,27 +110,27 @@
     "subtitle": "subtitles.projectseele.eva_foot_soil",
     "sounds": [
       {
-        "name": "projectseele:eva_foot_soil_r47_0",
+        "name": "projectseele:eva_foot_soil_r65_0",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r47_1",
+        "name": "projectseele:eva_foot_soil_r65_1",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r47_2",
+        "name": "projectseele:eva_foot_soil_r65_2",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r47_3",
+        "name": "projectseele:eva_foot_soil_r65_3",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r47_4",
+        "name": "projectseele:eva_foot_soil_r65_4",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r47_5",
+        "name": "projectseele:eva_foot_soil_r65_5",
         "attenuation_distance": 384
       }
     ]
@@ -261,40 +261,24 @@
     "subtitle": "subtitles.projectseele.eva_at_pressure",
     "sounds": [
       {
-        "name": "projectseele:eva_contact_body_r36_0",
+        "name": "projectseele:eva_at_pressure_r65_0",
         "attenuation_distance": 384,
-        "volume": 0.65,
-        "pitch": 1.15
+        "volume": 0.65
       },
       {
-        "name": "projectseele:eva_contact_body_r36_1",
+        "name": "projectseele:eva_at_pressure_r65_1",
         "attenuation_distance": 384,
-        "volume": 0.65,
-        "pitch": 1.15
+        "volume": 0.65
       },
       {
-        "name": "projectseele:eva_contact_body_r36_2",
+        "name": "projectseele:eva_at_pressure_r65_2",
         "attenuation_distance": 384,
-        "volume": 0.65,
-        "pitch": 1.15
+        "volume": 0.65
       },
       {
-        "name": "projectseele:eva_contact_body_r36_3",
+        "name": "projectseele:eva_at_pressure_r65_3",
         "attenuation_distance": 384,
-        "volume": 0.65,
-        "pitch": 1.15
-      },
-      {
-        "name": "projectseele:eva_contact_body_r36_4",
-        "attenuation_distance": 384,
-        "volume": 0.65,
-        "pitch": 1.15
-      },
-      {
-        "name": "projectseele:eva_contact_body_r36_5",
-        "attenuation_distance": 384,
-        "volume": 0.65,
-        "pitch": 1.15
+        "volume": 0.65
       }
     ]
   },
@@ -302,7 +286,12 @@
     "subtitle": "subtitles.projectseele.eva_at_tear",
     "sounds": [
       {
-        "name": "projectseele:eva_at_tear",
+        "name": "projectseele:eva_at_tear_r65_0",
+        "attenuation_distance": 176,
+        "stream": false
+      },
+      {
+        "name": "projectseele:eva_at_tear_r65_1",
         "attenuation_distance": 176,
         "stream": false
       }
@@ -525,7 +514,7 @@
     "subtitle": "subtitles.projectseele.facility_siren",
     "sounds": [
       {
-        "name": "projectseele:facility_siren",
+        "name": "projectseele:facility_siren_r65",
         "attenuation_distance": 220,
         "stream": false
       }
@@ -692,15 +681,19 @@
     "subtitle": "subtitles.projectseele.eva_joint_load",
     "sounds": [
       {
-        "name": "projectseele:eva_joint_load_r47_0",
+        "name": "projectseele:eva_joint_load_r65_0",
         "attenuation_distance": 192
       },
       {
-        "name": "projectseele:eva_joint_load_r47_1",
+        "name": "projectseele:eva_joint_load_r65_1",
         "attenuation_distance": 192
       },
       {
-        "name": "projectseele:eva_joint_load_r47_2",
+        "name": "projectseele:eva_joint_load_r65_2",
+        "attenuation_distance": 192
+      },
+      {
+        "name": "projectseele:eva_joint_load_r65_3",
         "attenuation_distance": 192
       }
     ]

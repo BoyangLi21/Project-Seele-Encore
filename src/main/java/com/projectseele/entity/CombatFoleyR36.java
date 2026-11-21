@@ -21,7 +21,8 @@ public final class CombatFoleyR36
         long now=actor.level().getGameTime();if(now-STEPS.getOrDefault(actor,-100L)<3)return;STEPS.put(actor,now);
         var ground=actor.level().getBlockState(net.minecraft.core.BlockPos.containing(foot.x,foot.y-.2,foot.z));
         soil|=ground.is(net.minecraft.tags.BlockTags.DIRT)||ground.is(net.minecraft.tags.BlockTags.SAND)||ground.is(net.minecraft.tags.BlockTags.LEAVES);
-        play(actor,foot,actor instanceof SachielEntity?ModSounds.SACHIEL_FOOT.get():soil?ModSounds.EVA_FOOT_SOIL.get():ModSounds.EVA_FOOT_CONCRETE.get(),2.5F*load,1);
+        play(actor,foot,actor instanceof SachielEntity?ModSounds.SACHIEL_FOOT.get():soil?ModSounds.EVA_FOOT_SOIL.get():ModSounds.EVA_FOOT_CONCRETE.get(),2.5F*load,
+                .96F+.08F*actor.getRandom().nextFloat());
     }
     public static void load(EvaUnit01Entity actor)
     {play(actor,actor.position().add(0,actor.getBbHeight()*.57,0),ModSounds.EVA_JOINT_LOAD.get(),.8F,1);}

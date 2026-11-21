@@ -566,3 +566,14 @@ GeoFront 倒挂城市的楼群布局，以及后续的湖面和螺旋路线，�
 - R64 起（V2，perf 的修正，主会话批准）：`shaders/program/gbuffers_entities.glsl`、`shaders/program/gbuffers_spidereyes.glsl` 在片元程序开头加一段远景深度测试（`tools/shader_dh_entity_depth_v2.py`，可单独运行，打印前后 SHA-256），实体比同一像素上的远景地形远 1 格以上就丢掉，远处建筑里的机体、发射井里的门不再隔着远景透出来。没有改别的文件，没有加入外来素材。
 - R64 起（竖井地面舱门，perf）：`shaders/block.properties` 里草方块那一条（`block.10132=grass_block:snowy=false`）末尾加上 `projectseele:nerv_ground_hatch`（`tools/shader_ground_hatch_material.py`，可单独运行）。舱门关着时那一层是这种盖板方块，顶面画的是草；光影包不认识的方块按默认材质渲染，贴地看会比周围草地暗一块。只改这一行。
 - 对 R63r 包的结果：源 sha256 `2d8fe9400ede85903ffe5eaba53caae7911f500b8ff2ff8976a9948c49e811a3`，输出 `c084ade40c989f261ce9e07cda791b290e98fc83d69b36e90d95bc4530188072`；两个着色器文件和 perf 实测用的包逐字节相同。
+
+## R65 原创合成：EVA 脚步、关节负载、AT 力场、警报（2026-11-22）
+
+下列文件全部由 `tools/build_audio_r65.py` 用带种子的数学合成生成：加性和模态音（被敲击的金属、板壳）、按频谱塑形的噪声、颗粒碎响，以及合成的空间混响。不读取任何录音、采样、影视或游戏音频，与 EVA 官方音频无关，也不派生自它们替换掉的 R36/R47 CC0 录音。重新运行脚本得到逐字节相同的波形（ogg 编码器可能有极小差异）。
+
+- `eva_foot_concrete_r65_0..5`、`eva_foot_soil_r65_0..5`：EVA 落脚。低频冲击、脚和地面的低共振、混凝土碎裂或泥土砂石的颗粒声、装甲脚底的短促金属声、腿部作动器的微弱回落声和泄压声，最后加城市回响。替换 `eva_foot_*_r47_*`（混凝土那 6 个文件其实是 3 段，每段用了两次；尾音在 1.07 秒被硬切掉）。
+- `eva_joint_load_r65_0..3`：关节受力。作动器的低沉负载声、金属摩擦的吱嘎声和泄压声。替换 `eva_joint_load_r47_*`（三段 98% 相同）。
+- `eva_at_pressure_r65_0..3`、`eva_at_tear_r65_0..1`：AT 力场受击和破裂。受击是硬冲击加一圈非谐和的玻璃质共鸣，受压时音高略降并带闪烁；破裂是共鸣被向下扯断、碎成碎片，下面压着低沉的塌陷声。替换原来借用的沙袋击打声 `eva_contact_body_r36_*` 和 `eva_at_tear`。
+- `facility_alarm_loop_r65`（循环警报）、`facility_siren_r65`（单次）：双转子防空警报经号角扬声器，加全城多处喇叭的迟到回声。循环版 8 秒两次升降，相位连续、回声按循环卷积，接缝无跳变；单次版是同一音色的一次升降，带自然收尾。替换 `facility_siren`（2.6 秒的号声衰减到 −55 dB 后循环，每 2.6 秒跳回满音量）。
+
+被替换的 23 个旧文件仍留在仓库里，`sounds.json` 已不再引用；回退只需改回 `sounds.json`。改前改后的对照、频谱图和测量见交审说明。
