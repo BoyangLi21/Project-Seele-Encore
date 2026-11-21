@@ -310,10 +310,13 @@ public final class EvaPlantedGaitR64
 
     private static final WeakIdentityMap<EvaUnit01Entity,State> STATES=new WeakIdentityMap<>();
 
+    /** A blow of another kind is in hand beside the punch (none is, as the combat cores stand; asked so that it stays so). */
+    private static boolean otherBlowR65(EvaUnit01Entity e)
+    {return com.projectseele.entity.EvaSwordActionsR45.active(e)||com.projectseele.entity.EvaFieldActionsR45.active(e)||e.getKnifeMotionType(0)>=0;}
     private static boolean wanted(EvaUnit01Entity e,float partial)
     {
-        boolean punch=EvaGameplayMotionR32.activeSupportedPunchR64(e);
-        return EvaMotionModelR64.walks(e)&&EvaBodyPose.hasTerrainStances()
+        boolean punch=EvaGameplayMotionR32.activeSupportedPunchR64(e)&&!otherBlowR65(e);
+        return (punch?EvaMotionModelR64.stands(e):EvaMotionModelR64.walks(e))&&EvaBodyPose.hasTerrainStances()
                 &&(punch||!e.hasLegacyStrikeForRender()&&!e.hasLiveActionForRender(partial)&&e.getOrdinaryAttackStage()<0)
                 &&e.getMotionLabPhysicsPreview()==0&&!e.isVisuallyAirborneForRender()
                 &&!e.hasActiveCarrierMotion()&&e.rifleStanceLevel(partial)<.02F
@@ -880,7 +883,10 @@ public final class EvaPlantedGaitR64
     {
         double step=Math.hypot(f.toX-f.fromX,f.toZ-f.fromZ);
         f.down=true;f.x=f.toX;f.y=f.toY;f.z=f.toZ;f.yaw=f.toYaw;f.slope=f.toSlope;f.stood=0;f.strike=Math.max(0,f.landWith);f.swing=0;f.quick=false;
-        f.restBodyX=s.moving?Double.NaN:s.atX;f.restBodyZ=s.atZ;f.restBodyYaw=s.yaw;
+        // (R65: only a step begun where the body stands is taken as it falls. A stride that the body's stop cut short
+        // ends wherever the wall let it: measured against the review world's wall, the Unit then stood with its right
+        // foot seven blocks ahead of its hips, toes up, for as long as it stood there.)
+        f.restBodyX=s.moving||f.travelling?Double.NaN:s.atX;f.restBodyZ=s.atZ;f.restBodyYaw=s.yaw;
         f.roll=Mth.clamp(.2*s.stanceSeconds,.05,.2);
         // The weight comes down on the foot: the pelvis gives by this much and comes back (a damped spring).
         double give=s.moving?Mth.lerp(Mth.clamp((.62-s.duty)/.32,0,1),DIP_WALK,DIP_RUN)*Mth.clamp(s.speed/20,.3,1):DIP_SPOT;

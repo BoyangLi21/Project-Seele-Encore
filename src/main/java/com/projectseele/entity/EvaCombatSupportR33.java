@@ -465,6 +465,11 @@ public final class EvaCombatSupportR33
     }
     public static void apply(EvaUnit01Entity e,EvaBodyPose.Sample p,float partial)
     {
+        // R65: where the planted model stands the Unit through a punch (EvaPlantedGaitR64.wanted), the feet are that
+        // model's, on every client. The places the server keeps for them are its own standing pose's, which is not
+        // where the model stands them.
+        if(e.level().isClientSide&&EvaMotionModelR64.stands(e)&&EvaGameplayMotionR32.activeSupportedPunchR64(e))
+        {TARGETS.remove(e);CLIENT_RELEASES.remove(e);if(WHY_R64!=null)WHY_R64.put(e,"the planted model's feet");return;}
         if(Unit03SourceRigR53.sharesGroundActions(e)&&e.rifleMoveBlend(partial)>.08F)
         {TARGETS.remove(e);CLIENT_RELEASES.remove(e);if(WHY_R64!=null)WHY_R64.put(e,"walking");return;}
         TARGETS.remove(e);

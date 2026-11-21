@@ -4284,8 +4284,21 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         Vec3 point=EvaGameplayMotionR32.contact(this,rowClipR64(row),1),previous=EvaGameplayMotionR32.previousContact(this,point);
         this.combatR64().sweeps(true);
-        try{return this.strikeZoneR32(pilot,new AABB(previous,point).inflate(radius),damage,row.knock(),point,previous,radius,true);}
+        try{if(this.strikeZoneR32(pilot,new AABB(previous,point).inflate(radius),damage,row.knock(),point,previous,radius,true))return true;}
         finally{this.combatR64().sweeps(false);}
+        // R65: the slam is swung round in an arc 25 to 32 blocks out, and the knee before it lands the Unit 20 from
+        // an Angel's middle: the fists went round behind the Angel and the blow counted as air (measured: the mark
+        // no nearer than 11.8 blocks to a Sachiel's middle through the live ticks, the forearms through its trunk).
+        // What strikes a body inside the arc is the arm, as the leg's length strikes for the kick above.
+        if(row.kind()!=EvaMoveTableR64.SLAM)return false;
+        for(String side:new String[]{"l","r"})
+        {
+            Vec3[] arm=EvaGameplayMotionR32.forearmR65(this,side,1);
+            this.strikeAngelsOnlyR60=true;
+            try{if(this.strikeZoneR32(pilot,new AABB(arm[0],arm[1]).inflate(radius),damage,row.knock(),arm[1],arm[0],radius,true))return true;}
+            finally{this.strikeAngelsOnlyR60=false;}
+        }
+        return false;
     }
     /** The frames core sets the row's place in its clip (the moment of first contact, for the hold). */
     void rowPhaseR64(float phase){this.entityData.set(DATA_LIVE_ACTION_PHASE,Mth.clamp(phase,0,1));}

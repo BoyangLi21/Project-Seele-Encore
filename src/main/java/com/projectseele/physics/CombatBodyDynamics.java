@@ -325,13 +325,13 @@ public final class CombatBodyDynamics
                     Vector3f offset=new Vector3f(moved.x-hip.x,frame.min().y,moved.z-hip.z);s.position=world(s,offset);
                     s.pose=CombatBodyProfiles.render(s.template,frame.deformation(),offset);
                     stitch(s.pose,s.profile);
-                    if(DIAG_R63&&(s.age<=120||s.position.distanceTo(beforeR63)>3))
+                    if(DIAG_R63&&(s.age<=120||s.age%4==0||s.position.distanceTo(beforeR63)>3))
                     {
                         StringBuilder near=new StringBuilder();
                         for(var other:entity.level().getEntitiesOfClass(LivingEntity.class,s.bounds.inflate(45),e->e!=entity&&(e instanceof EvaUnit01Entity||e instanceof SachielEntity)&&e.isAlive()))
                             near.append(String.format(java.util.Locale.ROOT," %s at %.1f moved %.2f%s",other.getType().toShortString(),other.position().distanceTo(s.position),
                                     other.position().distanceTo(new Vec3(other.xo,other.yo,other.zo)),other instanceof SachielEntity a?" strike "+a.isStrikeActive()+" mode "+a.strikeMode()+" age "+a.strikeAge(0):""));
-                        ProjectSeele.LOGGER.info("R63BODY {} age {} at {} moved {} torso speed {} contacts {}; {};{}",entity.getType().toShortString(),s.age,
+                        ProjectSeele.LOGGER.info("R63BODY {} age {} stable {} at {} moved {} torso speed {} contacts {}; {};{}",entity.getType().toShortString(),s.age,s.stable,
                                 String.format(java.util.Locale.ROOT,"%.1f %.1f %.1f",s.position.x,s.position.y,s.position.z),
                                 String.format(java.util.Locale.ROOT,"%.2f",s.position.distanceTo(beforeR63)),String.format(java.util.Locale.ROOT,"%.2f",frame.speed()),
                                 frame.supportContacts(),s.simulation.actorContactsR63(),near);
