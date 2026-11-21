@@ -36,6 +36,33 @@ CITY_LIFT_OK = {'doors': None, 'local': {'original96/57', 'original96/58'}}
 # so here that batch is checked against the city and lift guards and the launch check is left to that writer.
 LAUNCH_BY_WRITER = {'shaft'}
 PLAY_STATE = {'RelocationSnapshotJourney'}
+# Codex fitted the door frames with the city raised: their rows sit at street level (y 81-83), where a raised body's
+# entrance is. The cargo recipes carry them with the building, so with the city lowered they belong at the same place
+# in the lowered body, RetractedBaseY + 1 - 81 lower (in game: raised at 81, lowered at low + 1, both rounds).
+# Written at street level into a lowered city they would stand on the closed hatches until the first raise.
+RAISED_FLOOR = 81
+
+
+def towers_of(world):
+    from map_pipeline.city_protection import unpack
+    data = nbtlib.load(next(Path(world, 'dimensions/projectseele/geofront/data').glob('projectseele_city_rigid_topology_r45_*.dat')))['data']
+    out = []
+    for label, lst in (('towers', data['Towers']), ('original96', data['LowriseAddonR48']['Original96Towers'])):
+        for i, t in enumerate(lst):
+            x, y, z = unpack(int(t['Centre'])); b = t['Footprint']
+            out.append(dict(name=f'{label}/{i}', x0=x + int(b['MinX']), x1=x + int(b['MaxX']), z0=z + int(b['MinZ']), z1=z + int(b['MaxZ']),
+                            low=int(t['RetractedBaseY']), height=int(t['Height'])))
+    return out
+
+
+def city_lowered(w, towers):
+    """True when every tower body is down: solid blocks in the lowered volume, nothing in the raised one."""
+    down = up = 0
+    for t in towers:
+        cx, cz = (t['x0'] + t['x1']) // 2, (t['z0'] + t['z1']) // 2
+        down += any(not (w.get(cx + dx, t['low'] + 5, cz + dz) or 'air').endswith('air') for dx in (-3, 0, 3) for dz in (-3, 0, 3))
+        up += any(not (w.get(cx + dx, RAISED_FLOOR + 5, cz + dz) or 'air').endswith('air') for dx in (-3, 0, 3) for dz in (-3, 0, 3))
+    return down, up
 
 
 def md5(p):
@@ -118,6 +145,25 @@ def main(material, out):
                             raise SystemExit(f'{batch}: {x},{y},{z} inside {volume}')
                         city_hits[volume] += 1
                 rows.append(r)
+        if batch == 'doors':
+            towers = towers_of(WORLD)
+            down, up = city_lowered(w, towers)
+            if up or down < len(towers) * 0.9:
+                raise SystemExit(f'city not cleanly lowered (bodies down {down}, up {up} of {len(towers)}): plan the frames at street level instead')
+            shifted = []
+            for r in rows:
+                x, y, z = r[:3]
+                t = next(t for t in towers if t['x0'] - 1 <= x <= t['x1'] + 1 and t['z0'] - 1 <= z <= t['z1'] + 1)
+                y2 = y + t['low'] + 1 - RAISED_FLOOR
+                cur = w.get(x, y2, z)
+                if cur != r[3]:
+                    raise SystemExit(f'doors: lowered cell {x},{y2},{z} is {cur}, expected {r[3]}')
+                if w.block_entity(x, y2, z):
+                    raise SystemExit(f'doors: lowered cell {x},{y2},{z} carries a block entity')
+                for g in active:
+                    g.assert_positions([(x, y2, z)])
+                shifted.append([x, y2, z, *r[3:]])
+            rows = shifted
         dest = out / batch
         if dest.exists():
             shutil.rmtree(dest)
