@@ -72,7 +72,7 @@
 - 绿色草边资源包由 `tools/gen_green_grass_side.py` 现场生成，放进客户端包，并在 `options.txt` 的资源包列表最后启用（在 PBRJG 地形包上面）。
 - 服务端带 Xaero 内嵌的 `xaerolib`；GeoFront 小地图带 `dimension_config.txt`（`caveModeType:2`）。
 - 光影包 V2（perf）：`SEELE_Local_Cavern_R53_Review_20261026.zip` 在打包时加远景深度测试（`tools/shader_dh_entity_depth_v2.py`，改 `gbuffers_entities.glsl`、`gbuffers_spidereyes.glsl` 两个文件），远处的实体不再隔着远景透出来。包名不变，客户端默认就用它，`oculus.properties` 和同名 `.zip.txt` 不用动。主客户端里的包不用先改，打包工具每次从它现场生成。
-- 说明文件用 `docs/R64_QUICKSTART.zh.md`、`docs/R64_RELEASE.zh.md`（后者是草稿，打包前要定稿）。
+- 说明文件用 `docs/R65_QUICKSTART.zh.md`、`docs/R65_RELEASE.zh.md`（打包工具按 `VERSION` 取这两个文件名；后者是草稿，打包前要定稿）。
 
 ## 2026-11-15 干跑结果
 
