@@ -57,9 +57,11 @@ abstract class AreaMapWorldMixin
         if (same && projectseele$ownsZoom) return;
         if (!projectseele$ownsZoom) projectseele$nativeZoom = destScale;
         projectseele$ownsZoom = true;
-        var window = Minecraft.getInstance().getWindow();
+        var mc = Minecraft.getInstance();
+        var view = layer.hudView(mc.player.getX(), mc.player.getZ());
+        var window = mc.getWindow();
         double margin = 20 * window.getGuiScale();
-        projectseele$fitZoom = layer.fit(Math.max(1, window.getWidth() - margin), Math.max(1, window.getHeight() - 2 * margin))
+        projectseele$fitZoom = view.fit(Math.max(1, window.getWidth() - margin), Math.max(1, window.getHeight() - 2 * margin))
                 / Math.max(1.0, shortSide / 1080.0);
         if (same && projectseele$resumeZoom > 0) userScale = destScale = projectseele$resumeZoom;
         else
@@ -67,8 +69,8 @@ abstract class AreaMapWorldMixin
             userScale = destScale = projectseele$fitZoom;
             if (!attachedCamera)
             {
-                cameraX = layer.bounds().centerX();
-                cameraZ = layer.bounds().centerZ();
+                cameraX = view.centerX();
+                cameraZ = view.centerZ();
             }
         }
         projectseele$resumeZoom = 0;

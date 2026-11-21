@@ -49,10 +49,15 @@ public final class AreaMapDisplay
         var bounds = layer.bounds();
         double px = Mth.lerp(partial, player.xo, player.getX());
         double pz = Mth.lerp(partial, player.zo, player.getZ());
+        var view = layer.hudView(px, pz);
+        var font = Minecraft.getInstance().font;
         int padding = Math.max(1, boxSize / 40);
-        int caption = Math.max(7, Math.min(11, boxSize / 8));
-        double scale = layer.fit(boxSize - 2.0 * padding, boxSize - 2.0 * padding - caption);
-        double mapW = bounds.width() * scale, mapH = bounds.depth() * scale;
+        int textWidth = boxSize - 2 * padding - 2;
+        float textScale = Math.min(Math.min(0.82f, boxSize / 161f),
+                textWidth / (float)(font.width(layer.label()) + font.width("N") + 7));
+        int caption = (int)Math.ceil(font.lineHeight * textScale) + 2;
+        double scale = view.fit(boxSize - 2.0 * padding, boxSize - 2.0 * padding - caption);
+        double mapW = view.width() * scale, mapH = view.depth() * scale;
         double left = x + (boxSize - mapW) * 0.5, top = y + (boxSize - caption - mapH) * 0.5;
 
         graphics.pose().pushPose();
@@ -63,31 +68,28 @@ public final class AreaMapDisplay
         graphics.pose().pushPose();
         graphics.pose().translate(left, top, 1);
         graphics.pose().scale((float)mapW, (float)mapH, 1);
-        graphics.blit(layer.preview(), 0, 0, 0, 0, 1, 1, 1, 1);
+        graphics.blit(layer.preview(), 0, 0, 1, 1, (float)(view.minX() - bounds.minX()),
+                (float)(view.minZ() - bounds.minZ()), view.width(), view.depth(), bounds.width(), bounds.depth());
         graphics.pose().popPose();
 
         for (Marker marker : markers)
         {
-            if (marker.x < bounds.minX() || marker.x >= bounds.maxX() || marker.z < bounds.minZ() || marker.z >= bounds.maxZ()) continue;
-            int mx = (int)Math.round(left + (marker.x - bounds.minX()) * scale);
-            int mz = (int)Math.round(top + (marker.z - bounds.minZ()) * scale);
+            if (marker.x < view.minX() || marker.x >= view.maxX() || marker.z < view.minZ() || marker.z >= view.maxZ()) continue;
+            int mx = (int)Math.round(left + (marker.x - view.minX()) * scale);
+            int mz = (int)Math.round(top + (marker.z - view.minZ()) * scale);
             graphics.fill(mx - 1, mz - 1, mx + 2, mz + 2, 0xff141414);
             graphics.fill(mx, mz, mx + 1, mz + 1, marker.color);
         }
         graphics.flush();
         graphics.pose().pushPose();
-        graphics.pose().translate(left + (px - bounds.minX()) * scale, top + (pz - bounds.minZ()) * scale, 3);
+        graphics.pose().translate(left + (px - view.minX()) * scale, top + (pz - view.minZ()) * scale, 3);
         graphics.pose().mulPose(Axis.ZP.rotationDegrees(180 + player.getViewYRot(partial)));
-        arrow(graphics, Math.max(2.3f, Math.min(4.0f, boxSize / 24f)));
+        arrow(graphics, Math.max(1.2f, Math.min(2.6f, boxSize * .021f)));
         graphics.pose().popPose();
-        var font = Minecraft.getInstance().font;
-        float textScale = Math.min(1f, (caption - 1f) / font.lineHeight);
-        graphics.pose().translate(x + padding + 1, y + boxSize - caption, 3);
+        graphics.pose().translate(x + padding + 1, y + boxSize - caption + 1, 3);
         graphics.pose().scale(textScale, textScale, 1);
-        int textWidth = (int)((boxSize - 2 * padding - 2) / textScale);
-        graphics.drawString(font, font.plainSubstrByWidth(layer.label(), Math.max(0, textWidth - 9)),
-                0, 0, 0xffeff3f5, false);
-        graphics.drawString(font, "N", textWidth - font.width("N"), 0, 0xffa7bdc3, false);
+        graphics.drawString(font, layer.label(), 0, 0, 0xffeff3f5, false);
+        graphics.drawString(font, "N", (int)(textWidth / textScale) - font.width("N"), 0, 0xffa7bdc3, false);
         graphics.pose().popPose();
         graphics.flush();
     }

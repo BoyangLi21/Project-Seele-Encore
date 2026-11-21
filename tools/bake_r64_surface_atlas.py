@@ -82,8 +82,12 @@ def bake(map_root, output, regions=None):
     preview.thumbnail((384, 384), Image.Resampling.LANCZOS)
     save_png(preview, png.with_name("surface_preview.png"))
     save_png(Image.fromarray(encoded), png.with_name("surface_bottom.png"))
+    # HUD framing includes both northern lake groups, the western installation,
+    # Odawara, the offshore base and the southern relief. The whole survey is
+    # retained for world-map panning and trips beyond the authored area.
     layer = dict(id="surface", label="箱根 · 小田原", texture="projectseele:area_maps/surface.png",
                  minX=MIN_X, maxX=MAX_X, minZ=MIN_Z, maxZ=MAX_Z,
+                 hudFrame=dict(minX=-3456, maxX=4736, minZ=-2496, maxZ=3904),
                  minY=-30000000, maxY=30000000, priority=0,
                  bottom="projectseele:area_maps/surface_bottom.png",
                  preview="projectseele:area_maps/surface_preview.png")

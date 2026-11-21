@@ -67,9 +67,19 @@ public final class AreaMapAtlas extends SimplePreparableReloadListener<List<Area
                     Integer floorY = row.has("floorY") ? row.get("floorY").getAsInt() : null;
                     for (var path : new ResourceLocation[]{bottom, ceiling, ground})
                         if (path != null && !heights.containsKey(path)) heights.put(path, AreaMapLayer.Heights.from(image(manager, path)));
-                    layers.add(new AreaMapLayer(row.get("id").getAsString(), row.get("label").getAsString(), bounds(row),
+                    var area = bounds(row);
+                    AreaMapLayer.Bounds hudFrame = null;
+                    if (row.has("hudFrame"))
+                    {
+                        var f = row.getAsJsonObject("hudFrame");
+                        hudFrame = new AreaMapLayer.Bounds(f.get("minX").getAsInt(), area.minY(), f.get("minZ").getAsInt(),
+                                f.get("maxX").getAsInt(), area.maxY(), f.get("maxZ").getAsInt());
+                        if (hudFrame.minX() < area.minX() || hudFrame.maxX() > area.maxX()
+                                || hudFrame.minZ() < area.minZ() || hudFrame.maxZ() > area.maxZ()) hudFrame = null;
+                    }
+                    layers.add(new AreaMapLayer(row.get("id").getAsString(), row.get("label").getAsString(), area,
                             row.get("priority").getAsInt(), texture, preview, masks.get(mask), heights.get(bottom),
-                            heights.get(ceiling), heights.get(ground), floorY, List.copyOf(zones)));
+                            heights.get(ceiling), heights.get(ground), floorY, List.copyOf(zones), hudFrame));
                 }
                 catch (RuntimeException | IOException invalid)
                 {

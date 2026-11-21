@@ -23,7 +23,7 @@ public final class AreaMapAtlasTest
         bottom.setRGB(1, 0, (-471 + 32768) << 8);
         ceiling.setRGB(1, 0, (-431 + 32768) << 8);
         var layer = new AreaMapLayer("pyramid", "", bounds, 1, null, null, AreaMapLayer.Mask.from(mask),
-                AreaMapLayer.Heights.from(bottom), AreaMapLayer.Heights.from(ceiling), null, -469, List.of());
+                AreaMapLayer.Heights.from(bottom), AreaMapLayer.Heights.from(ceiling), null, -469, List.of(), null);
         check(layer.selects(100.1, -471, -149.5), "inclusive floor and negative coordinates");
         check(!layer.selects(100.1, -471.1, -149.5), "below floor");
         check(!layer.selects(100.1, -431, -149.5), "exclusive ceiling");
@@ -33,7 +33,11 @@ public final class AreaMapAtlasTest
         check(layer.fit(100, 100) == 0.1 && layer.fit(300, 100) == 0.25, "aspect ratio");
         check(layer.cursorHeight(100.1, -149.5) == -469 && layer.cursorHeight(99.99, -149.5) == Short.MAX_VALUE, "cursor respects floor and its mask");
         check(layer.overlapsView(610, 0, 20, 20) && !layer.overlapsView(620, 0, 20, 20), "underground backdrop releases after panning away");
-        var surface = new AreaMapLayer("surface", "", bounds, 0, null, null, null, null, null, null, null, List.of());
+        var frame = new AreaMapLayer.Bounds(-280, -1000, -110, 460, 150, 200);
+        var surface = new AreaMapLayer("surface", "", bounds, 0, null, null, null, null, null, null, null, List.of(), frame);
+        check(surface.hudView(100, 40).equals(frame), "fixed overview inside frame");
+        check(surface.hudView(598, 248).maxX() == 600 && surface.hudView(598, 248).maxZ() == 250, "outer navigation stays on real pixels");
+        check(layer.hudView(100, 0).equals(bounds), "full facility footprint");
         check(surface.nearSurfaceEdge(-399, 0) && !surface.nearSurfaceEdge(100, 0), "surface rim returns to navigation");
         check(!layer.nearSurfaceEdge(-399, 0), "rooms retain their plan at the door");
 
@@ -55,6 +59,8 @@ public final class AreaMapAtlasTest
             at(layers, 32.5, 81, 217.5, "surface");
             at(layers, 4160.5, -69, 1567.5, "surface");
             at(layers, 3994.5, -67, 1343.5, "un_hangars");
+            at(layers, 109, 80, 274, "surface");
+            at(layers, -344, -433, -263, "geofront");
             at(layers, 500, -473, 256, "geofront");
             at(layers, 66, -554, 307, "pyramid_b1");
             at(layers, 66, -541, 307, "pyramid_lobby");

@@ -141,20 +141,28 @@ def cavern_projection(volume):
     valid &= (h >= 0)
     z,x = np.indices(h.shape)
     top = volume[np.maximum(h,0),z,x]
-    ground = np.maximum(0, first-1)
+    # The first open span can sit above a tree. Find the surface underneath
+    # its canopy so a player walking below the branches stays in the cavern
+    # and so the floor map follows the land instead of every treetop.
+    land_pick = pick & (volume[:164] != 3)
+    land = np.max(np.where(land_pick, yy[:164], -1),axis=0)
+    land = np.where((land < 0) | (top != 3), h, land)
+    land_id = volume[np.maximum(land,0),z,x]
+    ground = np.minimum(np.maximum(0, first-1), np.maximum(0, land))
     # Levels below the disc have independently baked HQ/hangar/terminal plans.
     return np.stack((np.where(valid,top,0), np.where(valid,h+y0,NO_Y),
-                     np.where(valid,ground+y0-9,NO_Y),np.where(valid,ceiling+y0,NO_Y))).astype(np.int16)
+                     np.where(valid,ground+y0-9,NO_Y),np.where(valid,ceiling+y0,NO_Y),
+                     np.where(valid,land_id,0),np.where(valid,land+y0,NO_Y))).astype(np.int16)
 
 
 def cavern_region(job):
     world, work, rx, rz = job
-    out = work / f"grass.{rx}.{rz}.npz"
+    out = work / f"ground.{rx}.{rz}.npz"
     if out.exists():
         return out
     path = world / "dimensions/projectseele/geofront/region" / f"r.{rx}.{rz}.mca"
-    tile = np.full((4,256,256), NO_Y,np.int16)
-    tile[0] = 0
+    tile = np.full((6,256,256), NO_Y,np.int16)
+    tile[0] = tile[4] = 0
     chunks = 0
     if path.exists():
         bounds = (CAVERN[0]//16, (CAVERN[2]-1)//16, CAVERN[1]//16,(CAVERN[3]-1)//16)
@@ -185,14 +193,32 @@ def layer(id_, label, bounds, y0, y1, priority, **extra):
     return dict(id=id_,label=label,minX=x0,minZ=z0,maxX=x1,maxZ=z1,minY=int(y0),maxY=int(y1),
                 priority=priority,texture=f"projectseele:area_maps/{id_}.png",**extra)
 
+def cavern_floor_map(materials, ground):
+    """Shaded ground, water and facility roofs from the measured cavern survey."""
+    valid = materials != 0
+    nearby = ndimage.distance_transform_edt(~valid, return_distances=False, return_indices=True)
+    h = ground[tuple(nearby)].astype(np.float32)
+    rolling = ndimage.gaussian_filter(h, 5)
+    dz, dx = np.gradient(rolling / 2)
+    # Show broad, shallow floor relief at overview scale. Retain crisp actual
+    # water and building outlines and use the soil beneath surveyed trees.
+    light = np.clip(1 - .90 * dx - .68 * dz, .70, 1.22)
+    natural = (materials == 2) | (materials == 5)
+    tones = COLOURS[materials].astype(np.float32)
+    tones[natural] += np.clip((rolling[natural]+477)*.74, -15, 34)[:,None]
+    rgb = np.clip(tones * np.where(natural, light, 1)[:,:,None], 0, 255).astype(np.uint8)
+    detail = shade(materials,ground,2)
+    rgb[~natural] = detail[~natural]
+    return rgb
+
 
 def bake_cavern(world, out, workers):
     work = out / "parts"
     work.mkdir(exist_ok=True)
     x0,z0,x1,z1 = CAVERN
     jobs = [(world,work,rx,rz) for rx in range(x0//512,(x1-1)//512+1) for rz in range(z0//512,(z1-1)//512+1)]
-    data = np.full((4,(z1-z0)//2,(x1-x0)//2),NO_Y,np.int16)
-    data[0] = 0
+    data = np.full((6,(z1-z0)//2,(x1-x0)//2),NO_Y,np.int16)
+    data[0] = data[4] = 0
     chunks=0
     with Pool(workers) as pool:
         for i,path in enumerate(pool.imap_unordered(cavern_region,jobs),1):
@@ -205,7 +231,7 @@ def bake_cavern(world, out, workers):
                 chunks+=int(a["chunks"])
             if i % 8 == 0:
                 print(f"GeoFront regions {i}/{len(jobs)}",flush=True)
-    ids,heights,bottom,ceil=data
+    ids,heights,bottom,ceil,land_id,land=data
     # The GeoFront is the connected main cavern; unrelated caves outside the
     # real grass rim cannot activate this layer.
     labels,count=ndimage.label(ndimage.binary_closing(ids>0,iterations=2))
@@ -213,14 +239,14 @@ def bake_cavern(world, out, workers):
     if not centre:
         centre = np.bincount(labels.ravel())[1:].argmax()+1
     valid = (labels==centre) & (ids!=0)
-    ids[~valid]=0
-    heights[~valid]=bottom[~valid]=ceil[~valid]=NO_Y
+    ids[~valid]=land_id[~valid]=0
+    heights[~valid]=bottom[~valid]=ceil[~valid]=land[~valid]=NO_Y
     a = out / ASSETS
-    Image.fromarray(shade(ids,heights,2)).save(a/"geofront.png")
+    Image.fromarray(cavern_floor_map(land_id,land)).save(a/"geofront.png")
     put_height(a/"geofront_bottom.png",bottom)
     put_height(a/"geofront_ceiling.png",ceil)
-    put_height(a/"geofront_ground.png",np.where(valid,heights+1,NO_Y))
-    record = layer("geofront","GeoFront · 地下草原",CAVERN,int(bottom[valid].min()),int(ceil[valid].max())+1,10,
+    put_height(a/"geofront_ground.png",np.where(valid,land+1,NO_Y))
+    record = layer("geofront","地下草原",CAVERN,int(bottom[valid].min()),int(ceil[valid].max())+1,10,
                    ground="projectseele:area_maps/geofront_ground.png",bottom="projectseele:area_maps/geofront_bottom.png",ceiling="projectseele:area_maps/geofront_ceiling.png")
     z,x=np.where(valid)
     report = dict(complete_chunks=chunks,valid_texels=int(valid.sum()),resolution=2,

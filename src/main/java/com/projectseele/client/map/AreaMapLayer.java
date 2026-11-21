@@ -7,7 +7,8 @@ import net.minecraft.resources.ResourceLocation;
 
 /** All baked bounds are block edges, half-open; texture columns increase east and rows increase south. */
 public record AreaMapLayer(String id, String label, Bounds bounds, int priority, ResourceLocation texture,
-        ResourceLocation preview, Mask mask, Heights bottom, Heights ceiling, Heights ground, Integer floorY, List<Bounds> zones)
+        ResourceLocation preview, Mask mask, Heights bottom, Heights ceiling, Heights ground, Integer floorY, List<Bounds> zones,
+        Bounds hudFrame)
 {
     public record Bounds(int minX, int minY, int minZ, int maxX, int maxY, int maxZ)
     {
@@ -20,6 +21,7 @@ public record AreaMapLayer(String id, String label, Bounds bounds, int priority,
         public int depth() { return maxZ - minZ; }
         public double centerX() { return minX + width() * 0.5; }
         public double centerZ() { return minZ + depth() * 0.5; }
+        public double fit(double w, double h) { return Math.min(w / width(), h / depth()); }
         public boolean contains(double x, double y, double z)
         {
             return x >= minX && x < maxX && y >= minY && y < maxY && z >= minZ && z < maxZ;
@@ -85,6 +87,23 @@ public record AreaMapLayer(String id, String label, Bounds bounds, int priority,
                 && cz + halfDepth > bounds.minZ && cz - halfDepth < bounds.maxZ;
     }
 
+    /** Stay fixed over the authored area, then follow the player across its surveyed margin. */
+    public Bounds hudView(double x, double z)
+    {
+        if (hudFrame == null) return bounds;
+        int left = follow(x, hudFrame.minX, hudFrame.maxX, bounds.minX, bounds.maxX);
+        int top = follow(z, hudFrame.minZ, hudFrame.maxZ, bounds.minZ, bounds.maxZ);
+        return new Bounds(left, bounds.minY, top, left + hudFrame.width(), bounds.maxY, top + hudFrame.depth());
+    }
+
+    private static int follow(double player, int start, int end, int min, int max)
+    {
+        int size = end - start;
+        double margin = size * 0.06;
+        double move = Math.min(0, player - start - margin) + Math.max(0, player - end + margin);
+        return (int)Math.round(Math.max(min, Math.min(max - size, start + move)));
+    }
+
     /** Xaero uses Short.MAX_VALUE for an unknown cursor Y. Do not place underground waypoints on surface roofs. */
     public int cursorHeight(double x, double z)
     {
@@ -101,5 +120,5 @@ public record AreaMapLayer(String id, String label, Bounds bounds, int priority,
         return x - bounds.minX < edge || bounds.maxX - x <= edge || z - bounds.minZ < edge || bounds.maxZ - z <= edge;
     }
 
-    public double fit(double w, double h) { return Math.min(w / bounds.width(), h / bounds.depth()); }
+    public double fit(double w, double h) { return bounds.fit(w, h); }
 }
