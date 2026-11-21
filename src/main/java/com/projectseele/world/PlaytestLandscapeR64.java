@@ -22,7 +22,8 @@ final class PlaytestLandscapeR64
 {
     private static final String ROOT = "/data/projectseele/worldgen/playtest_landscape_r64/";
     private static final int NONE = Short.MIN_VALUE;
-    private static final Index INDEX = index();
+    private static final Index INDEX = index(ROOT);
+    private static final Index FLOATS = index("/data/projectseele/worldgen/playtest_floats_r64/");
 
     private PlaytestLandscapeR64() {}
 
@@ -46,8 +47,14 @@ final class PlaytestLandscapeR64
     static void decorate(ChunkAccess chunk)
     {
         if (chunk.getStatus().isOrAfter(ChunkStatus.FULL)) return;
+        decorate(chunk, INDEX, true);
+        decorate(chunk, FLOATS, false);
+    }
+
+    private static void decorate(ChunkAccess chunk, Index index, boolean landscape)
+    {
         int cx = chunk.getPos().x, cz = chunk.getPos().z;
-        Region region = INDEX.region(cx >> 5, cz >> 5);
+        Region region = index.region(cx >> 5, cz >> 5);
         if (region == null) return;
         Data data = region.data();
         Patch patch = data.chunks[(cz & 31) * 32 + (cx & 31)];
@@ -74,7 +81,10 @@ final class PlaytestLandscapeR64
                     // facilities and unrelated blocks never qualify as a measured old state.
                     // The base generator gives a freshly surveyed lake a gravel bed.
                     boolean nativeBed = lake != null && lake.water() > lake.ground() && y == lake.ground() && sediment && now.is(Blocks.GRAVEL);
-                    if (nativeBed || now.is(old.getBlock()) || (old.isAir() && now.isAir()))
+                    boolean same = now == old || (now.isAir() && old.isAir());
+                    if (!same && now.is(old.getBlock()))
+                        same = landscape || old.is(net.minecraft.tags.BlockTags.LEAVES);
+                    if (nativeBed || same)
                         chunk.setBlockState(cursor, placed, false);
                 }
             }
@@ -189,9 +199,10 @@ final class PlaytestLandscapeR64
     private static final class Region
     {
         final int x, z;
+        final String root;
         private volatile SoftReference<Data> resident = new SoftReference<>(null);
 
-        Region(int x, int z) { this.x = x; this.z = z; }
+        Region(int x, int z, String root) { this.x = x; this.z = z; this.root = root; }
 
         Data data()
         {
@@ -201,7 +212,7 @@ final class PlaytestLandscapeR64
             {
                 result = resident.get();
                 if (result != null) return result;
-                try (var in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(open(x + "_" + z + ".bin.gz")))))
+                try (var in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(open(root + x + "_" + z + ".bin.gz")))))
                 {
                     int count = in.readUnsignedShort();
                     if (count < 1 || count > 255) throw new IOException("Invalid landscape palette");
@@ -210,7 +221,7 @@ final class PlaytestLandscapeR64
                     for (int i = 0; i < count; i++)
                     {
                         names[i] = in.readUTF();
-                        if (names[i].equals("minecraft:water[level=0]") || names[i].equals("minecraft:water"))
+                        if (ROOT.equals(root) && (names[i].equals("minecraft:water[level=0]") || names[i].equals("minecraft:water")))
                         {
                             if (water == null) water = new boolean[count];
                             water[i] = true;
@@ -242,7 +253,7 @@ final class PlaytestLandscapeR64
                         result.chunks[index] = new Patch(heights, sections, lakeColumns(sections, water));
                     }
                     if (in.read() != -1) throw new IOException("Trailing landscape data");
-                    readShoreProfiles(result, x, z);
+                    if (ROOT.equals(root)) readShoreProfiles(result, x, z);
                 }
                 catch (IOException failure) { throw new IllegalStateException("Missing or invalid landscape region " + x + "," + z, failure); }
                 resident = new SoftReference<>(result);
@@ -262,14 +273,14 @@ final class PlaytestLandscapeR64
 
     private static InputStream open(String file) throws IOException
     {
-        InputStream in = PlaytestLandscapeR64.class.getResourceAsStream(ROOT + file);
+        InputStream in = PlaytestLandscapeR64.class.getResourceAsStream(file);
         if (in == null) throw new IOException("Missing landscape resource " + file);
         return in;
     }
 
-    private static Index index()
+    private static Index index(String root)
     {
-        InputStream index = PlaytestLandscapeR64.class.getResourceAsStream(ROOT + "index.bin");
+        InputStream index = PlaytestLandscapeR64.class.getResourceAsStream(root + "index.bin");
         if (index == null) return new Index(0, 0, 0, 0, new Region[0]);
         try (var in = new DataInputStream(new BufferedInputStream(index)))
         {
@@ -279,7 +290,7 @@ final class PlaytestLandscapeR64
             for (int i = 0; i < regions.length; i++)
             {
                 int x = in.readShort(), z = in.readShort();
-                regions[i] = new Region(x, z);
+                regions[i] = new Region(x, z, root);
                 minX = Math.min(minX,x); maxX = Math.max(maxX,x);
                 minZ = Math.min(minZ,z); maxZ = Math.max(maxZ,z);
             }

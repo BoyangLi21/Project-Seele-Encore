@@ -71,3 +71,4 @@ forge*changelog.txt
 # Surveyed surface changes are generated with tools/package_r64_playtest_terrain.py for local map builds.
 /src/main/resources/data/projectseele/worldgen/playtest_landscape_r64/
 /src/main/resources/data/projectseele/worldgen/playtest_shores_r64/
+/src/main/resources/data/projectseele/worldgen/playtest_floats_r64/
