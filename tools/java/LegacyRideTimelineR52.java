@@ -1,0 +1,15 @@
+package com.projectseele.world;
+import com.google.gson.*;
+import java.nio.file.*;
+import java.util.*;
+/** The exact stored root/ride interpolation, without a world or a game. */
+public final class LegacyRideTimelineR52 {
+ public static void main(String[] args)throws Exception{
+  var d=NervRouteDirectoryR52.parse(JsonParser.parseString(Files.readString(Path.of(args[0]))).getAsJsonObject());var rows=new ArrayList<Object>();
+  for(int v=0;v<3;v++){var b=NervOriginalCarrierR52.nominalBinding(v);var leg=d.leg("unit"+v+"/original_incline");double worst=0,maxPitch=0;int contacts=0,failed=0;var failures=new ArrayList<Object>();
+   for(int age=0;age<240;age++){double from=NervMechanicalTravelR52.fraction(age,240),to=NervMechanicalTravelR52.fraction(age+1,240);var roots=new ArrayList<RigidTransform>();var poses=new ArrayList<NervLegacyCarrierRideR52.RidePose>();for(int k=0;k<=16;k++){var r=d.sample(leg,from+(to-from)*k/16D,b).evaRoot();roots.add(r);poses.add(NervLegacyCarrierRideR52.targetFromActualHeadsR52(r));}
+    for(int k=0;k<16;k++){var a=poses.get(k);var z=poses.get(k+1);if(a==null||z==null){failed++;continue;}for(int i=0;i<4;i++)maxPitch=Math.max(maxPitch,Math.abs(a.joints().get(i).pitch()-z.joints().get(i).pitch()));for(int q=0;q<=4;q++){var root=roots.get(k).interpolate(roots.get(k+1),q/4D);var pose=NervLegacyCarrierRideR52.interpolate(a,z,q/4D);for(var contact:NervLegacyCarrierRideR52.finitePadBearingsR52(root,pose)){contacts++;worst=Math.max(worst,contact.maximumFit());if(!contact.bears()){failed++;if(failures.size()<12)failures.add(Map.of("age",age,"subframe",k,"partial",q/4D,"contact",contact));}}}}
+   }rows.add(Map.of("variant",v,"contacts",contacts,"failed",failed,"maximum_fit_m",worst,"maximum_keyframe_pitch_delta",maxPitch,"first_failures",failures));System.out.println("v="+v+" contacts="+contacts+" failed="+failed+" worst="+worst+" pitch="+maxPitch);
+  }Files.writeString(Path.of(args[1]),new GsonBuilder().setPrettyPrinting().create().toJson(Map.of("world_written",false,"native_admission",false,"root_clock",240,"samples_per_tick",17,"rows",rows)));
+ }
+}

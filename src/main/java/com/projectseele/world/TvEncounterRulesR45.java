@@ -59,7 +59,15 @@ public final class TvEncounterRulesR45
     public static boolean targetFrameReady(ServerLevel l,TvCampaignSavedData d,ServerPlayer player)
     {
         var site=TvEncounterSitesR45.site(l,d.active).orElse(null);
-        if(site==null||player==null||d.angel==null||!visibleToCommander(l,d,player))return false;
+        if(site==null||player==null||player.level()!=l||d.angel==null)return false;
+        // An NPC shooter observes the actual server target. The commander's
+        // camera can remain in headquarters without disabling its cannon.
+        var shooter=d.sorties.get(1);
+        if(d.active.equals("ramiel")&&player.getUUID().equals(d.owner)&&shooter!=null&&shooter.npc
+                &&TvSortiesR32.readyAssigned(l,shooter)
+                &&l.getEntity(d.angel) instanceof com.projectseele.entity.RamielEntity target&&target.isAlive()
+                &&com.projectseele.event.TvEncounterDirectorR45.owned(target,d))return true;
+        if(!visibleToCommander(l,d,player))return false;
         if(site.visibility().equals("native_tracking"))return visibleToCommander(l,d,player);
         var seen=SEEN.getOrDefault(l,Map.of()).get(player.getUUID());
         return seen!=null&&seen.target().equals(d.angel)&&seen.generation()==d.generationR43&&l.getGameTime()-seen.observedAt()<=200;
@@ -152,7 +160,10 @@ public final class TvEncounterRulesR45
         {
             var side=TvYashimaArrivalR50.shieldSide(l);
             if(side==null||site==null){eva.stopAutonomousR30();d.notice="原盾侧待命通路尚未确认。";return true;}
-            boolean counterattack=boss instanceof com.projectseele.entity.RamielEntity ramiel&&ramiel.isCharging();
+            // Return during the beam cooldown, before the next wind-up.
+            // Only the post-shot core window calls for clearing the gun lane.
+            boolean counterattack=boss instanceof com.projectseele.entity.RamielEntity ramiel
+                    &&(ramiel.isCharging()||!ramiel.isExposed());
             Vec3 shieldGoal=counterattack?site.cover():side;
             eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_SHIELD_R45);
             // Clearing the gun line is as urgent as entering cover; ordinary

@@ -1,0 +1,56 @@
+import java.lang.instrument.Instrumentation;
+import java.lang.reflect.*;
+import java.nio.file.*;
+import java.util.*;
+
+/** One server-thread read of the existing preparation; no actuator calls. */
+public final class CurrentPrepareHoldReadOnlyAgentR60
+{
+    private static ClassLoader loader;
+    private static Class<?> type(String n)throws Exception{return Class.forName(n,false,loader);}
+    private static Object field(Object o,String n)throws Exception{Class<?> c=o instanceof Class<?>?(Class<?>)o:o.getClass();Field f=c.getDeclaredField(n);f.setAccessible(true);return f.get(o instanceof Class<?>?null:o);}
+    private static Object invoke(Object o,String[] names,Class<?>[] sig,Object...args)throws Exception
+    {for(String n:names)try{return o.getClass().getMethod(n,sig).invoke(o,args);}catch(NoSuchMethodException absent){}throw new NoSuchMethodException(Arrays.toString(names));}
+    private static Object call(Object o,String n)throws Exception{return invoke(o,new String[]{n},new Class<?>[0]);}
+    private static String text(Object o){return o==null?null:o.toString();}
+    private static Object actor(Object level,Object id)throws Exception{return invoke(level,new String[]{"getEntity","m_8791_"},new Class<?>[]{UUID.class},id);}
+    private static Map<String,Object> record(Object o,String...fields)throws Exception
+    {var r=new LinkedHashMap<String,Object>();for(String n:fields)r.put(n,text(call(o,n)));return r;}
+    private static Map<String,Object> entity(Object level,Object id)throws Exception
+    {
+        var r=new LinkedHashMap<String,Object>();r.put("uuid",text(id));Object e=actor(level,id);r.put("loaded",e!=null);if(e==null)return r;
+        r.put("class",e.getClass().getName());r.put("position",text(invoke(e,new String[]{"position","m_20182_"},new Class<?>[0])));
+        r.put("bounding_box",text(invoke(e,new String[]{"getBoundingBox","m_20191_"},new Class<?>[0])));
+        Object vehicle=invoke(e,new String[]{"getVehicle","m_20202_"},new Class<?>[0]);r.put("vehicle",vehicle==null?null:text(invoke(vehicle,new String[]{"getUUID","m_20148_"},new Class<?>[0])));
+        var passengers=new ArrayList<String>();for(Object p:(List<?>)invoke(e,new String[]{"getPassengers","m_20197_"},new Class<?>[0]))passengers.add(text(invoke(p,new String[]{"getUUID","m_20148_"},new Class<?>[0])));r.put("passengers",passengers);
+        r.put("persistent_data",text(call(e,"getPersistentData")));
+        for(String n:List.of("getCanonicalTransform","getInsertionStage","getInsertionEpoch","getInsertionProgress","isInsertionAbortRequested","getCabinStage","getCabinProgress","isHatchFullySealed","getHatchOpenAmount","getAssignedVariant","getUnitVariant","isPlugCrane","isRestraintGantry","hasDeclaredMachineFrameR52","declaredMachineRotationR52","declaredCollisionSourceR52","actualCraneBottomOffsetR52","hasCraneReference","getCraneReferenceAnchor","getCraneReferenceRotation","getRestraintProgress","lowerFrameDeclaredR52"))
+            try{r.put(n,text(call(e,n)));}catch(NoSuchMethodException absent){}
+        if(e.getClass().getName().endsWith("NervCarrierPlatformEntity")){Object linked=call(e,"getCranePlug");r.put("getCranePlug",linked==null?null:text(invoke(linked,new String[]{"getUUID","m_20148_"},new Class<?>[0])));}
+        return r;
+    }
+    private static Map<String,Object> snapshot(Object server)throws Exception
+    {
+        Object level=null;for(Object l:(Iterable<?>)invoke(server,new String[]{"getAllLevels","m_129785_"},new Class<?>[0]))if(invoke(l,new String[]{"dimension","m_46472_"},new Class<?>[0]).toString().contains("projectseele:geofront"))level=l;
+        if(level==null)throw new IllegalStateException("Current GeoFront missing");
+        var r=new LinkedHashMap<String,Object>();r.put("utc_ms",System.currentTimeMillis());r.put("game_time",invoke(level,new String[]{"getGameTime","m_46467_"},new Class<?>[0]));r.put("world_written",false);r.put("actuator_invoked",false);
+        Object c=((Map<?,?>)field(type("com.projectseele.world.NervRouteRuntimeR52"),"LIVE")).get(level);if(c==null)throw new IllegalStateException("Current controller missing");Object owner=field(c,"owner");
+        var holds=new LinkedHashMap<String,String>();for(var x:((Map<?,?>)field(owner,"holds")).entrySet())holds.put(text(x.getKey()),text(x.getValue()));r.put("owner_holds",holds);
+        Object saved=field(c,"saved");var jobs=new ArrayList<Object>();r.put("jobs",jobs);
+        for(Object job:(Collection<?>)call(saved,"jobs")){var j=record(job,"phase","waiting");Object s=call(job,"snapshot");j.put("snapshot",record(s,"task","route","leg","fraction","stage","waiting","kind","directoryFingerprint"));Object o=call(s,"original");j.put("original",record(o,"eva","plug","pilot","owner","variant","mission"));j.put("owner_data",text(call(job,"ownerData")));jobs.add(j);}
+        var units=new ArrayList<Object>();r.put("units",units);
+        for(var x:((Map<?,?>)field(owner,"units")).entrySet()){
+            Object p=x.getValue();var u=record(p,"variant","bay","dock");for(String n:List.of("eva","plug","npc"))u.put(n,entity(level,call(p,n)));
+            Object gantry=call(p,"gantry"),crane=call(p,"crane"),visual=call(crane,"visual");u.put("gantry_declaration",record(gantry,"id","frame"));u.put("gantry",entity(level,call(gantry,"id")));u.put("crane_declaration",record(crane,"stow","initialBottom","stowBottom","railAxis","railMin","railMax","hoistStep"));u.put("crane_declared_visual",record(visual,"id","frame"));u.put("crane",entity(level,call(visual,"id")));units.add(u);
+        }return r;
+    }
+    public static void agentmain(String argument,Instrumentation instrumentation)throws Exception
+    {
+        Path output=Path.of(argument).toAbsolutePath().normalize();if(Files.exists(output))throw new IllegalArgumentException("Unique fresh output required");
+        for(Path p=output;p!=null;p=p.getParent())if(Files.exists(p.resolve("level.dat"))||Files.exists(p.resolve("session.lock")))throw new IllegalArgumentException("Outside World only");
+        for(Class<?> c:instrumentation.getAllLoadedClasses())if(c.getName().equals("com.projectseele.ProjectSeele")){loader=c.getClassLoader();break;}if(loader==null)throw new IllegalStateException("Existing mod not loaded");
+        Object server=type("net.minecraftforge.server.ServerLifecycleHooks").getMethod("getCurrentServer").invoke(null);if(server==null)throw new IllegalStateException("Existing server missing");Files.createDirectories(output.getParent());
+        Runnable capture=()->{try{Object gson=type("com.google.gson.Gson").getConstructor().newInstance();Map<String,Object> report;try{report=snapshot(server);}catch(Throwable e){while(e instanceof InvocationTargetException&&e.getCause()!=null)e=e.getCause();report=Map.of("error",e.toString());}Files.writeString(output,(String)gson.getClass().getMethod("toJson",Object.class).invoke(gson,report)+"\n",StandardOpenOption.CREATE_NEW);}catch(Throwable e){e.printStackTrace();}};
+        invoke(server,new String[]{"execute","m_18707_"},new Class<?>[]{Runnable.class},capture);
+    }
+}

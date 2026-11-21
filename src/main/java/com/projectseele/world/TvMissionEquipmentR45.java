@@ -130,13 +130,15 @@ public final class TvMissionEquipmentR45
     /** Root calls once after its reversible civil/fixture receipt is committed; never a tick refill. */
     public static boolean commissionNewSupply(NervArmamentStationEntity station,int unit,String committedReceipt)
     {
+        var slot=station.getPersistentData();
+        UUID declaredRack=slot.hasUUID("TvMissionDeclaredRackR53")?slot.getUUID("TvMissionDeclaredRackR53"):unit>=0&&unit<=1?SUPPLY_RACK[unit]:null;
         if(!(station.level() instanceof ServerLevel l)||!l.dimension().location().toString().equals("projectseele:geofront")
-                ||unit<0||unit>1||!station.getUUID().equals(SUPPLY_RACK[unit])
+                ||unit<0||unit>1||!station.getUUID().equals(declaredRack)
                 ||committedReceipt==null||!committedReceipt.matches("[0-9a-f]{64}")
                 ||!committedReceipt.equals(station.getPersistentData().getString(SUPPLY_RECEIPT)))return false;
         var registry=BuiltInRegistries.ITEM;var id=unit==0?SHIELD:CANNON;
         if(!registry.containsKey(id))return false;
-        var state=state(l);var cargo=SUPPLY_CARGO[unit];var slot=station.getPersistentData();
+        var state=state(l);var cargo=slot.hasUUID("TvMissionDeclaredCargoR53")?slot.getUUID("TvMissionDeclaredCargoR53"):SUPPLY_CARGO[unit];
         if(state.commissioned.containsKey(cargo)||state.physical.containsKey(cargo)||state.loans.containsKey(cargo)
                 ||slot.contains(CARGO)||slot.hasUUID(CARGO_ID)||slot.contains(RACK_UNIT,Tag.TAG_INT)&&slot.getInt(RACK_UNIT)!=unit)return false;
         var item=new ItemStack(registry.get(id),1);if(cargoUnit(item)!=unit)return false;
@@ -160,7 +162,7 @@ public final class TvMissionEquipmentR45
         var tag=station.getPersistentData();
         if(!tag.contains(RACK_UNIT,Tag.TAG_INT)||!tag.getString(SUPPLY_RECEIPT).matches("[0-9a-f]{64}"))return false;
         int unit=tag.getInt(RACK_UNIT);
-        return unit>=0&&unit<=1&&station.getUUID().equals(SUPPLY_RACK[unit]);
+        return unit>=0&&unit<=1&&station.getUUID().equals(tag.hasUUID("TvMissionDeclaredRackR53")?tag.getUUID("TvMissionDeclaredRackR53"):SUPPLY_RACK[unit]);
     }
     private static boolean context(ServerLevel l,EvaUnit01Entity eva)
     {

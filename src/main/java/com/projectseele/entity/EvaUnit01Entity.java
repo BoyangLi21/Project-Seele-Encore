@@ -598,6 +598,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private final AnimatableInstanceCache geoCache = GeckoLibUtil.createInstanceCache(this);
 
     private boolean chargingHeld;
+    private long pendingCannonReleaseR53;
+    private java.util.UUID pendingCannonPilotR53;
     private int meleeCooldown;
     private int meleeInputBufferTicks;
     private int ordinaryAttackVisualTicks;
@@ -4149,6 +4151,15 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(pilot==null||this.getPilotEntity()!=pilot||this.level().isClientSide)return;
         if(this.fixedCannonOperatingR52()&&!com.projectseele.world.TvYashimaStationR52.aim(this,this.fixedCannonAimTargetR52(pilot)))
         {this.suspendFixedCannonR52();return;}
+        if(this.getWeapon()==WEAPON_CANNON&&this.getCannonCharge()>=SeeleConfig.CANNON_CHARGE_TICKS.get()
+                &&!this.cannonTerrainReadyR53(pilot))
+        {
+            if(this.pendingCannonReleaseR53==0&&pilot instanceof ServerPlayer player)
+                player.displayClientMessage(Component.literal("远距火线正在载入，保持蓄能。"),true);
+            if(this.pendingCannonReleaseR53==0)this.pendingCannonReleaseR53=this.level().getGameTime()+600;
+            this.pendingCannonPilotR53=pilot.getUUID();return;
+        }
+        this.pendingCannonReleaseR53=0;this.pendingCannonPilotR53=null;
         this.chargingHeld = false;
         if (this.getWeapon() == WEAPON_N2)
         {
@@ -5131,6 +5142,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         SeeleNetwork.CHANNEL.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(
                         impact.x, impact.y, impact.z, 320.0D, level.dimension())),
                 new ClientboundNukeFxPacket(impact.x, impact.y, impact.z, 3.6F, false));
+        if(this.hasFixedCannonR52())for(var observer:level.players())
+            if(observer.distanceToSqr(this)<512D*512&&observer.position().distanceToSqr(impact)>320D*320)
+            {
+                SeeleNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(()->observer),
+                        new ClientboundNukeFxPacket(impact.x,impact.y,impact.z,3.6F,false));
+                com.projectseele.world.PositronAudioR45.distantImpact(level,observer,impact);
+            }
         level.sendParticles(ParticleTypes.END_ROD, impact.x, impact.y, impact.z, 54, 1.4D, 1.4D, 1.4D, 0.24D);
         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER,
                 impact.x, impact.y + 1.5D, impact.z, 6, 3.5D, 1.8D, 3.5D, 0.0D);
@@ -5146,6 +5164,15 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     @Override public double effectiveCannonRangeR45()
     {return this.hasFixedCannonR52()?this.entityData.get(DATA_FIXED_CANNON_RANGE_R52):SeeleConfig.CANNON_RANGE.get();}
+    private boolean cannonTerrainReadyR53(LivingEntity pilot)
+    {
+        if(!(this.level() instanceof ServerLevel level)||this.effectiveCannonRangeR45()<=1024)return true;
+        Vec3 direction=this.pilotAimDirection(pilot);var fixed=this.fixedCannonBodyR52();
+        if(fixed!=null&&fixed.boreR52()!=null)direction=fixed.boreR52();
+        Vec3 from=this.cannonMuzzlePosition(direction);
+        return com.projectseele.world.LongRangeTerrainR53.ready(level,"cannon-"+this.getUUID(),from,
+                from.add(direction.scale(this.effectiveCannonRangeR45())));
+    }
     private long lastFriendlyCannonTraceR50=Long.MIN_VALUE;
     private void friendlyCannonTraceR50(String kind,EvaUnit01Entity blocker,Vec3 contact,Vec3 from,Vec3 to)
     {
@@ -5160,6 +5187,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         if(!(this.level() instanceof ServerLevel level)||pilot==null||this.getPilotEntity()!=pilot)return false;
         if(!this.getPersistentData().getBoolean("TvMissionCannonAppliedR45")&&!com.projectseele.world.TvMissionEquipmentR45.cannonAuthorized(this))return true;
+        if(!this.cannonTerrainReadyR53(pilot))return false;
         Vec3 direction=this.pilotAimDirection(pilot);var fixed=this.fixedCannonBodyR52();if(fixed!=null&&fixed.boreR52()!=null)direction=fixed.boreR52();
         Vec3 from=this.cannonMuzzlePosition(direction);
         Vec3 to=level.clip(new ClipContext(from,from.add(direction.scale(this.effectiveCannonRangeR45())),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this)).getLocation();
@@ -5229,6 +5257,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void aiStep()
     {
         if(!this.level().isClientSide)this.expireLegacyRecoveryR51();
+        if(!this.level().isClientSide&&this.pendingCannonReleaseR53>0)
+        {
+            var pilot=this.getPilotEntity();
+            if(pilot==null||!pilot.getUUID().equals(this.pendingCannonPilotR53)||this.getWeapon()!=WEAPON_CANNON
+                    ||this.isPilotControlLocked()||this.level().getGameTime()>this.pendingCannonReleaseR53)
+            {this.pendingCannonReleaseR53=0;this.pendingCannonPilotR53=null;this.chargingHeld=false;}
+            else if(this.cannonTerrainReadyR53(pilot))this.releaseCannon(pilot);
+        }
         this.refreshTvPersonnelClockHoldR44();
         com.projectseele.visual.RuntimeR44ServerProbe.firstActorTick(this,"first_before_ai_step");
         EvaBayRepairR33.tick(this);

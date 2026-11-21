@@ -29,7 +29,10 @@ public final class RamielDistantViewR52
         private ReloadRegistration(){}
     }
     private static final ResourceLocation TEXTURE=new ResourceLocation("projectseele","textures/entity/ramiel.png");
-    private static final MultiBufferSource.BufferSource BUFFERS=MultiBufferSource.immediate(new BufferBuilder(8192));
+    // The crystal and its glow are emitted interleaved. A single fallback
+    // builder switches format when the glow is requested, invalidating body.
+    private static final MultiBufferSource.BufferSource BUFFERS=MultiBufferSource.immediateWithBuffers(
+            java.util.Map.of(net.minecraft.client.renderer.RenderType.lightning(),new BufferBuilder(8192)),new BufferBuilder(8192));
     private static boolean installed;private static Object resources;private static String hash="";private static UUID reported;
     private static String resourceHash()
     {

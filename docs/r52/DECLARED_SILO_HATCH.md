@@ -1,0 +1,27 @@
+# R52 显式水平大门
+
+Root 最终未 commission 参数已校准为水平门 `frameY=floor+.02`、`beam_bottom=-2.02`。164门 frameY68.02，三型服务底闸 frameY−678.98；原R16叶片顶 .980000019、原承座及全部土建不变。164八梁脚仍 worldY66，闭叶 top69.000000019；服务八梁脚仍 worldY−681，闭叶 top−677.999999981。原 gantry 相对服务 hatch 的 Y 为+.02，实际完整原柱 mesh 继续连续检查。下文68.01/−678.99及−2.01是保留的旧未commission测量方案，不作为最终安装参数；新测量分别为 `.Codex/r52_airlift_draft/ACTUAL_FINAL_LARGE_HATCH_FRAME68_02_BEAM_MINUS2_02.json` 与 `ACTUAL_FINAL_SERVICE_HATCH_FRAME_MINUS678_98_BEAM_MINUS2_02.json`，旧施工receipt没有覆盖。没有增加薄皮或放宽2mm真实接触要求。
+
+所有显式 R52 Spec 都增加四根实际承托梁及八个承座点，包含净31出口。legacy 未声明门仍使用原renderer/机制，原R16和31叶片/净孔/位移不变。Root 的31出口仅使用 `separation_sign=+1`；down31会因保留的原collar下唇与侧移叶片相交，生产Spec明确拒绝这个组合。31up全包络 local X±20.700000763、Z[-17.395000458,17.299999237]、Y[-2.02,5.695000172]；八foot为 X±16.1/±20.4、Z±16.1、Y−2.02，frame=floor+.02时footY=floor−2，承座块Y=floor−3。七固定件与叶片实际侧移pair均通过，回执 `ACTUAL_DECLARED31_EIGHT_BEARING_MEASUREMENT.json` 也保留了未采用down31的真实碰撞证据。
+
+最终服务模型的全静/动包络仍为 X±20.875000254、Z±19.4、Y[-5.695000172,1]，在 frameY−678.98 时最低 worldY−684.675000172。全部4904原固定柱、96格真实柱格、八整格基础与七固定内部件的整段实际三角检查通过。按当前 full-assembly source receipt 选取的三型完整64m收架，每型176235三角，bodyRootY−678 时顶−691.640625、底−744.200000048；实际全程 pair 无碰，竖向净距6.965624828m。Root pit floor−747满足这一停稳状态。此 source 证据仍不代替排液、下降全程、原生接收或正常操作验收。
+
+SILO Gate 必须由 Root 给 `silo_hatch:{opening_x,opening_z,open_ticks,close_ticks,separation_sign,beam_bottom}`；X/Z 是净孔米数，时长是完整行程 ticks。`separation_sign` 为 +1 向上分层或 -1 向下分层；`beam_bottom` 是真实承托梁底相对 frame 的米数。frame 是实际水平 yaw-only 刚体帧，支持块与闭/开 cells 全由 Root 填写。未声明的原 31 门继续走原 renderer/时钟，不自动变成大型门。本批同步协议为 65，不能与 build3/protocol63 或 build4/protocol64 客户端混用。
+
+`SiloHatchMechanism` 计算四层先竖向分离再侧叠；`NervSiloHatchGeometryR52` 从同 SHA 的原 R16 `hatch_frame/hatch_cassette/hatch_panel` 生成实际几何，供 renderer、门状态读回、承托和完整曲线 sweep 共用。向下机构同步翻转实际 cassette 分层槽；装甲叶片不翻面。新尺寸改变板面跨度，原装甲纵向厚度与层高保持。刚性板移动采用实际连续 lift/translation 曲线及其误差证书，不拿停稳端点连线代替轨迹。
+
+门保持整孔 blocked，直到原板实际 fully open 才允许所有声明碰撞 cells 进入 open 状态。关闭首步先请求整孔 closed；任何 actor/整组占用、cells 不符、基础/梁槽未加载或刚性门板 sweep 阻挡都会保持当前真实样本与时钟。有限闭/开 cells 就够，不需要把 27k 格乘几十动画阶段写成 JSON。碰撞 cells 是 Root 指定的闭孔物理阻挡；其自身不是门板运动过程的外部障碍，其他实物保持碰撞。
+
+164×164 净孔时，单板宽 20.625m，侧叠起点 X=82.9m，四层高度 1.1/2.2/3.3/4.4m，源装甲顶 .98m。全静/动件相对 frame 的实测范围：X[-103.825000763,103.825000763]，Z[-83.895000458,83.799999237]，Y[-2.01,5.695000172]。Z 轻微不对称来自原 source。整孔清空后的动板范围 X±103.525、Z±83、最高 5.38；不能把 full outer box 当成仍封住中央孔的实体。
+
+仅大型门增加两侧四根实物承托梁，local 底=-2.01、顶=-.35；原 31 门、板和 cassette source 不改。八个承托点是 local X=±82.6 或 ±103.525、Z=±82.6、Y=-2.01。Root 指定 frameY=68.01 时，底恰为 worldY66；Root 的支承块 Y65(top66)，Y66/67 是实物梁槽。运行时逐点核对声明 support cell 的真实碰撞面顶，不用 floating/OnGround Boolean 代替基础。
+
+实体保存原 raw open、target、整数行程时钟、spec、variant/stage 及 unknown NBT。未知版本、不同规格或实际 frame 不符时保留原保存并 HOLD；重载不默认收起或重造。只有同一真实样本通过后才逐 tick 提交门动作。
+
+source geometry/承托点/净孔/中途障碍定向测试不等于原生施工或机械验收。Root 仍需实际整孔封闭/全开/首步关闭占用、飞机与载荷通过、冷载及正常操作画面检查。
+
+33×33 机库服务坑底闸使用显式向下分层，避免叶片抬升穿过原足底。尺寸在 31..64m 范围内使用随尺寸计算的有限 trim/pocket 间隙；33m 全外宽实测 41.750000509m，小于 42m bay pitch。`Spec(33,33,120,180,-1,-2.01)` 的最终全静/动包络是 local X±20.875000254、Y[-5.695000172,1]、Z±19.4。向下新增梁在 |Z|17.55..19.4，八支点移到 Z±19.1，避免原 Z±17.1 整格座柱撞槽/叶；Root 三门座柱 Z311→309、345→347，X、Y保持。下叠新 collar 下唇 -.10，给最高层叶 top-.12 留 .02m真实间隙；原31/向上门/原叶片/cassette不改。Root frameY=-678.99 时，叶片 top≈-678.01、梁底 -681、座块 -682(top -681)。Root 实际选择完整行程120/180 ticks。三个实际 frame 与八支承点、整格座/四格柱与内部侧移曲线检测见 `.Codex/r52_airlift_draft/ACTUAL_SERVICE_DOWNWARD_HATCH_MEASUREMENT_ROOT_FRAME_MINUS678_99.json`；旧8/8碰撞证据另存 `ACTUAL_SERVICE_DOWNWARD_HATCH_OLD_SUPPORT_COLLISION_EVIDENCE.json`。这不是世界安装或原足底/承托架全运动验收。Root manifest 片段见 [service-pit.root-parameters.template.json](service-pit.root-parameters.template.json)，待修正土建回读后才能填入正式 owner。
+
+竖向 HANGAR 使用同源叶片的每侧四片水平侧叠（全八片），Root 字段为原 `width/height` 加 `hangar_stack:{open_ticks,close_ticks}`。实际 grounded cassette、顶梁、八承托点、四深度槽、板面 renderer 与 sweep 共用 `NervHangarGateGeometryR52`。164×181 门全包络 local X±103.545454545、Y[0,181.35]、Z[-.35,5.73]，总外宽207.090909091m、总深6.08m；33×75 为 X±20.875、Y[0,75.35]、同深6.08m，总外宽41.75m。默认旧 R50 实体不变。完整零件和支承测量见 `.Codex/r52_airlift_draft/ACTUAL_VERTICAL_SIDE_STACK_MEASUREMENT.json`。
+
+Root 三型服务闸必须显式增加 `service_column_ports:true`（实体 NBT `Spec.ServiceColumnPorts=true`），仅净33×33且向下机制可用。六字段旧构造保持 false。此模式从同选源原立柱完整 mesh 的实际脚部计算四端口，以原外侧叶片派生裁切；原R16资产/原柱不改。四层先完整下降1.60/2.70/3.80/4.90m再侧移，原下叠 cassette 仍不平移，实际 pair 已证明 frame/cassette/梁和全部4904原柱三角均清空完整曲线。生产每一步必须读到同variant实际gantry、同selected cage source、实际gantryframe相对hatchframe [0,.03,0]，并重新用原柱mesh核查；缺任何一项HOLD。固定接合的门框与gantry作为结构连接，移动叶片仍全检原柱，不能把tiny native entity box当柱子几何。完整1089闭floor cells与90947真实排液顺序保持Root Owner契约。

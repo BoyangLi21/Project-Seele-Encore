@@ -1,0 +1,23 @@
+# R52 claimed 世界的旧 EVA 生成入口
+
+> 2026-10-11：本页保留 Air 初批审计记录。总部、MAGI、Dogma、所有旧 V2 zone/ports 已由后续完整迁移保护覆盖，不再保留旧生成。最终范围见 [MOVED_FACILITY_LEGACY_GUARDS.md](MOVED_FACILITY_LEGACY_GUARDS.md)。
+
+本批使用 `NervLegacyGenerationGuardR52.retired(level)`，只依据 `NervRouteRuntimeR52.claimed(level)`。claimed 尚未 ready 与已经 ready 都禁止旧 EVA 坐标写入；未 claimed 的原地图仍执行原生成器。没有从 ready 状态倒推建造许可。
+
+已沿实际调用链核对的入口：
+
+| 调用链 | 实际写入点与处理 |
+| --- | --- |
+| `RegionalFacilityLayout.maintainRemoteControls`（40 ticks）→ `EvaLogisticsDirector.loadControlTarget` | 原 callee 已在 claimed 状态提前返回，因此本批没有重复改事件。`keepCommandStationLoaded` 只保区块加载，不生成旧设施。 |
+| `GameEvents` clean-rebuild tick → `FacilityV2ArchitectureDirector.tick` → `applyEvaTransportClearance` → `setBlock` | 只在 EVA transport clearance 分支加 claimed 保护；总部 command/MAGI/Dogma 分支保留。 |
+| `FacilityV2BuildDirector.tick` → `advance` → 旧 `UNIT00..02` zone 的 `plan.blockAt` / `setBlock` | 在 `start` 与持久进度 `advance` 同时禁止旧 CAGE/CARRIER/SWITCHYARD/SILO/SURFACE_HEAD zone；其他 zone 保留。 |
+| `FacilityV2ProgrammeDirector` / `FacilityV2StagedBuildDirector` → EVA backbone requeue | claimed 后停止旧 EVA programme；已经保存的旧 active zone 还会被 BuildDirector 的执行入口拦截。 |
+| `FacilityV2RouteGateDirector.refresh` → `setAperture` | 只跳过 EVA2X profile、上述 EVA zone 及其 peer port；其他人员端口保留。 |
+| `IntegratedNervMapBuilder.ensure` / surface repair → `Tokyo3RecoveryConsole.ensure` → `build` → corridor/platform/label 写入 | 两个 public 入口都在 claimed 后仅调用只读 inspect，不修建旧回收台。 |
+| `EvaHangarBuilder.ensure` / direct build / direct mechanical build | ensure 原有保护继续保留；build 与 mechanical build 同样禁止旧机库生成。 |
+| `S20EvaPlantDirector.tick` → Cage/Gallery/Transport/Boarding/LaunchSpine/Foundation / `restoreS20LowerLaunchShells` | EVA 专用 tick 与各独立入口保护，包含直接调用 shell repair 的分支。 |
+| `EntryPlugDirector` / `EvaLogisticsDirector` / `NervOperationsCentreBuilder` → `EvaHangarBuilder` 旧载架、轨道、梯道、夹具、桥、LCL、后门写入 | 15 个公开写入入口提前返回；该旧 EVA builder 的 `set` 与直接 `clearLcl` 落点另行拦截，防止内部 repair 绕过入口。 |
+| `NervFacilityTopologyBuilder.build` → old CAGE connection / lift / landing / controls / gallery threshold | 只停旧 CAGE 设施。其他总部人员电梯继续构建。旧 CAGE 按键不生成 cabin，`spawnCabin` 还有独立保护。 |
+| `NervSiloDoorEntity.reconcile` → `reconcilePlane` → `addFreshEntity` / `synchronizePhysicalHatch` → 31×31 hatch `setBlock` | 三个旧入口全都在 claimed 后提前返回。R52 显式 `configureDeclaredR52` / `advanceDeclaredR52` 与 Owner 的实际门模型、样本、两态物理碰撞继续工作。 |
+
+地图没有由本代理写入。编译验证与上述源调用链审计证明保护落在真实 callee；它们不是世界原生运行或整个迁移世界的验收记录。本轮单独回执保存在 `.Codex/r52_airlift_draft/LEGACY_GENERATION_GUARD_RECEIPT.json`。

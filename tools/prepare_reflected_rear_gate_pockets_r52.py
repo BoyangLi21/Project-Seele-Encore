@@ -1,0 +1,99 @@
+"""Root finite civil fit for the actual opposite-side rear door factory."""
+import argparse,hashlib,json,gzip,msvcrt
+from collections import defaultdict,Counter
+from pathlib import Path
+import numpy as np
+import regional_voxels as vox
+from query_blocks import iter_selected_sections,iter_block_entities
+from r52_spatial_plan import BASE
+from extend_world_depth_r52 import acquire_world_lock
+from project_upright_gate_collisions_r52 import rigid
+
+
+def main():
+    ap=argparse.ArgumentParser();ap.add_argument('--apply',action='store_true');args=ap.parse_args()
+    root=Path(__file__).resolve().parents[1];source=root/'.Codex/r52_continuous_route_migration_20261012/D31_61C9_REAR_REFLECTED_ACTUAL_PRIMITIVES_81PHASES.json'
+    doc=json.loads(source.read_text());volumes={};supports=[];bounds=[]
+    for gate in doc['gates']:
+        spans=[]
+        for part in gate['fixed']:
+            vertices=np.array(gate['templates_rgb'][part['part']]).reshape(-1,6)[:,:3];origin,R=rigid(part['frame'])
+            xyz=vertices@R.T+origin;spans.append((xyz.min(0),xyz.max(0)))
+        for index in range(8):
+            xyz=[];origins=[]
+            for phase in gate['phases']:
+                part=next(r for r in phase['moving']if r['index']==index)
+                vertices=np.array(gate['templates_rgb'][part['part']]).reshape(-1,6)[:,:3];origin,R=rigid(part['frame'])
+                xyz.append(vertices@R.T+origin);origins.append(origin)
+            differences=np.diff(origins,axis=0)
+            assert all(np.all(differences[:,axis]>=-1e-8) or np.all(differences[:,axis]<=1e-8)for axis in range(3)), 'Nonmonotonic path needs a separate continuous envelope'
+            xyz=np.concatenate(xyz);spans.append((xyz.min(0),xyz.max(0)))
+        for lo,hi in spans:
+            # Contact with the founding floor is not an excavation request.
+            a=np.floor(lo+1e-6).astype(int);b=np.ceil(hi-1e-6).astype(int)-1
+            for x in range(a[0],b[0]+1):
+                for y in range(a[1],b[1]+1):
+                    for z in range(a[2],b[2]+1):volumes[x,y,z]=gate['resource']
+        for s in gate['native_bearing_requests']:
+            supports.append(dict(resource=gate['resource'],position=s['candidate_native_at'],source_contact=s['bearing'],normal=s['normal']))
+        bounds.append(dict(resource=gate['resource'],low=np.min([a for a,b in spans],axis=0).tolist(),high=np.max([b for a,b in spans],axis=0).tolist()))
+    gates=json.loads((BASE/'runtime_directory/gates/ROOT_GATES.json').read_text())['gates'];proxies=set()
+    for gate in gates:
+        for phase in json.loads(gzip.decompress((BASE/'runtime_directory/gates'/gate['collision_steps']['cells_file']).read_bytes())):
+            proxies.update(tuple(r['position'])for r in phase)
+    wanted=set(volumes)
+    for s in supports:
+        x,y,z=s['position'];wanted.update((x,y-dy,z)for dy in range(5))
+    selected=defaultdict(set);members=defaultdict(set)
+    for x,y,z in wanted:selected[x//16,z//16].add(y//16);members[x//16,z//16,y//16].add((x,y,z))
+    states={}
+    for cx,cz,sy,pal,data in iter_selected_sections(BASE/'WORLD_R52','projectseele:geofront',selected):
+        for x,y,z in members[cx,cz,sy]:states[x,y,z]=pal[int(data[(y%16)*256+(z%16)*16+x%16])]
+    assert len(states)==len(wanted)
+    free={'minecraft:air','minecraft:cave_air','minecraft:void_air'}
+    bearing={'projectseele:nerv_shaft_panel','projectseele:nerv_structural_panel','projectseele:nerv_machine_edge',
+        'projectseele:nerv_wall_panel','projectseele:nerv_machine_panel','projectseele:nerv_floor_panel','minecraft:stone','minecraft:deepslate_bricks','minecraft:black_concrete'}
+    clear={p:s for p,s in states.items()if p in volumes and p not in proxies and s not in free}
+    unknown={p:s for p,s in clear.items()if s not in bearing}
+    out=BASE/'continuous_upright/rear_gate_pockets';out.mkdir(exist_ok=True)
+    (out/'MEASURED.json').write_text(json.dumps(dict(source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+        bounds=bounds,clear_materials=dict(Counter(clear.values())),unclassified=[dict(position=p,state=s)for p,s in unknown.items()],supports=supports),indent=2),'utf8')
+    assert not unknown, ('Native unrelated structures intersect rear gate',list(unknown.items())[:15],len(unknown))
+    changes={p:'minecraft:air'for p in clear};new_support_cells=[]
+    for s in supports:
+        p=tuple(s['position']);actual=states[p]
+        if actual not in bearing:
+            assert actual in free,(p,actual)
+            x,y,z=p;depth=next((d for d in range(1,5)if states[x,y-d,z]in bearing),None)
+            assert depth is not None,('No finite backing below gate foot',p)
+            for d in range(depth):
+                q=(x,y-d,z);assert states[q]in free and q not in volumes
+                changes[q]='projectseele:nerv_structural_panel';new_support_cells.append(q)
+            actual='projectseele:nerv_structural_panel'
+        assert p not in clear,('Gate would excavate its own founding block',p)
+        s['state']=actual
+    seat_path=BASE/'continuous_upright/civil_replacement/NATIVE_SEATS_RESELECTED.json'
+    for seat in json.loads(seat_path.read_text())['seats']:
+        p=tuple(seat['at'])
+        assert changes.get(p,seat['state'])==seat['state'],('Pocket would remove a selected actual rail bearing',seat['socket_id'],p)
+    lower=tuple(min(p[i]for p in wanted)for i in range(3));upper=tuple(max(p[i]for p in wanted)for i in range(3))
+    devices=dict(iter_block_entities(BASE/'WORLD_R52','projectseele:geofront',lower,upper,selected_chunks=selected))
+    assert not set(changes)&set(devices),('Original device in pocket',set(changes)&set(devices))
+    graph=np.load(BASE/'navigation_rebuild/combined/CURRENT_GRAPH.npz');nodes=graph['coords'][graph['kept']]
+    for x,y,z in nodes:
+        for dy in (-1,0,1):assert (int(x),int(y)+dy,int(z))not in changes,('Retained walking volume',x,y,z)
+    stage='six_opposite_side_cassette_pockets';assert not list((out/stage).glob('applied_*'))
+    vox.WORLD=BASE/'WORLD_R52';vox.OUT=out;vox.DIM='projectseele:geofront';paint=vox.Painter(vertical_bounds=(-960,320))
+    for p,value in changes.items():paint.exact((*p,*p),states[p],value,'R52_rear_gate_opposite_side_finite_pocket')
+    paint.meta.update(root_author=True,original_closed_proxy_cells_preserved=True,actual_source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),bounds=bounds)
+    folder=paint.save_plan(stage);report=dict(world_written=False,changed_cells=len(changes),original_device_cells_preserved=len(devices),
+        actual_mesh_envelopes=bounds,finite_new_support_cells=new_support_cells,native_bearing_requests=supports,
+        closed_gate_planes_preserved=True,original_walking_volumes_preserved=True,native_operation_passed=False)
+    if args.apply:
+        lock=acquire_world_lock()
+        try:report.update(world_written=True,receipt=paint.apply(stage,session_lock=lock))
+        finally:msvcrt.locking(lock.fileno(),msvcrt.LK_UNLCK,1);lock.close()
+    (folder/'PLAN.json').write_text(json.dumps(report,indent=2),'utf8');print(json.dumps({k:v for k,v in report.items()if k not in('native_bearing_requests','actual_mesh_envelopes','finite_new_support_cells')}),flush=True)
+
+
+if __name__=='__main__':main()

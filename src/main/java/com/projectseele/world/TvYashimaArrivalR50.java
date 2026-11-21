@@ -54,7 +54,8 @@ public final class TvYashimaArrivalR50
     private static Next follow(EvaUnit01Entity eva,List<Vec3> points,String key,double radius)
     {var tag=eva.getPersistentData();int cursor=Math.max(0,Math.min(tag.getInt(key),points.size()-1));while(cursor<points.size()-1&&at(eva,points.get(cursor),radius))cursor++;tag.putInt(key,cursor);return new Next(points.get(cursor),false);}
     public static void recovered(EvaUnit01Entity eva)
-    {for(String key:List.of("R50YashimaRouteGeneration","R50YashimaRouteLayout","R50YashimaRouteCursor","R50YashimaCoverCursor","R50YashimaRampDone","R50YashimaCoverDone","R50YashimaCoverReadyGeneration"))eva.getPersistentData().remove(key);}
+    {for(String key:List.of("R50YashimaRouteGeneration","R50YashimaRouteLayout","R50YashimaRouteCursor","R50YashimaCoverCursor","R50YashimaRampDone","R50YashimaCoverDone","R50YashimaCoverReadyGeneration",
+            "YashimaLandingGenerationR52","YashimaLandingLayoutR52","YashimaLandingReceiverR52"))eva.getPersistentData().remove(key);}
     public static void clear(ServerLevel level){CACHE.remove(level);}
     private TvYashimaArrivalR50(){}
 }

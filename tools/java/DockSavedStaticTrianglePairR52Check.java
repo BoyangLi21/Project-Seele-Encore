@@ -1,0 +1,51 @@
+import com.google.gson.*;
+import com.projectseele.world.TriangleSweepMeshR52;
+import net.minecraft.world.phys.Vec3;
+import java.nio.file.*;
+
+/** Direct production-kernel observation of the saved actual world vertices only. */
+public final class DockSavedStaticTrianglePairR52Check {
+    static Vec3[] vertices(JsonArray rows) {
+        var result=new Vec3[rows.size()];
+        for(int i=0;i<result.length;i++) {
+            var row=rows.get(i).getAsJsonObject();
+            result[i]=new Vec3(row.get("x").getAsDouble(),row.get("y").getAsDouble(),row.get("z").getAsDouble());
+        }
+        if(result.length%3!=0)throw new IllegalArgumentException("Complete saved triangles required");
+        return result;
+    }
+    static Vec3[] chord(Vec3[] points,int triangle) {
+        var result=new Vec3[6];
+        for(int i=0;i<3;i++)result[i]=result[i+3]=points[triangle*3+i];
+        return result;
+    }
+    public static void main(String[] args)throws Exception {
+        var data=JsonParser.parseString(Files.readString(Path.of(args[0]))).getAsJsonObject();
+        var tube=vertices(data.getAsJsonArray("tube_vertices"));
+        var foundation=vertices(data.getAsJsonArray("foundation_vertices"));
+        int hits=0;var examples=new JsonArray();
+        for(int i=0;i<tube.length/3;i++)for(int j=0;j<foundation.length/3;j++) {
+            if(TriangleSweepMeshR52.convexSweepPair(chord(tube,i),chord(foundation,j),Vec3.ZERO)) {
+                hits++;if(examples.size()<8){var hit=new JsonObject();hit.addProperty("tube_triangle",i);hit.addProperty("foundation_triangle",j);examples.add(hit);}
+            }
+        }
+        var result=new JsonObject();result.addProperty("source_metadata",data.get("source").getAsString());
+        result.addProperty("source_metadata_not_a_kernel_hit_receipt",true);
+        result.addProperty("pose",data.get("pose").getAsString());
+        result.addProperty("piece",data.get("piece").getAsString());
+        result.addProperty("foundation",data.get("foundation").getAsString());
+        result.addProperty("tube_triangles",tube.length/3);result.addProperty("foundation_triangles",foundation.length/3);
+        result.addProperty("direct_actual_triangle_pairs",tube.length/3*foundation.length/3);
+        result.addProperty("static_chord_repeats_the_same_three_points",true);
+        result.addProperty("certified_error_for_static_world_vertex_probe",0);
+        result.addProperty("current_production_kernel_pair_hits",hits);result.add("first_hit_indices",examples);
+        result.add("tube_signed_radial_range_m",data.get("tube_signed_radial_range_m"));
+        result.add("foundation_signed_radial_range_m",data.get("foundation_signed_radial_range_m"));
+        result.addProperty("counterexample_reproduced",hits>0);
+        result.addProperty("production_changed",false);result.addProperty("world_written",false);
+        result.addProperty("game_started",false);
+        result.addProperty("scope","Only the saved later-minus-lug-.48 world coordinates, not earlier +in/.10 red records or a complete Dock acceptance");
+        var json=new GsonBuilder().setPrettyPrinting().create().toJson(result)+"\n";
+        Files.writeString(Path.of(args[1]),json,StandardOpenOption.CREATE_NEW);System.out.print(json);
+    }
+}

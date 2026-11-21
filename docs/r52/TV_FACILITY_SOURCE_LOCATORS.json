@@ -1,0 +1,170 @@
+{
+  "status": "SOURCE_LOCATORS_PENDING_ROOT_PIXEL_REVIEW_NOT_ART_ACCEPTANCE",
+  "updated_at": "2026-10-12T02:51:15.303804",
+  "scope": "HQ exterior/inverse water basin/interior corridors/floor signs; no World or production source changes",
+  "official_tv_episode_images": {
+    "page": "https://www.tv-asahi.co.jp/evangelion/",
+    "attribution": "Official broadcaster TV-series page, story image filenames derive from its actual public script id mapping; all selected URLs HEAD200 image/jpeg. Pixel content not observed by this subagent.",
+    "image_path_source": "https://www.tv-asahi.co.jp/evangelion/js/script.js?v=2020092519",
+    "candidates": [
+      {
+        "episode": 1,
+        "url": "https://www.tv-asahi.co.jp/evangelion/img/story/thumb/1.jpg?v=1",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "pixels_viewed": false
+      },
+      {
+        "episode": 9,
+        "url": "https://www.tv-asahi.co.jp/evangelion/img/story/thumb/9.jpg?v=1",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "pixels_viewed": false
+      },
+      {
+        "episode": 11,
+        "url": "https://www.tv-asahi.co.jp/evangelion/img/story/thumb/11.jpg?v=1",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "pixels_viewed": false
+      },
+      {
+        "episode": 19,
+        "url": "https://www.tv-asahi.co.jp/evangelion/img/story/thumb/19.jpg?v=1",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "pixels_viewed": false
+      },
+      {
+        "episode": 21,
+        "url": "https://www.tv-asahi.co.jp/evangelion/img/story/thumb/21.jpg?v=1",
+        "status": 200,
+        "content_type": "image/jpeg",
+        "pixels_viewed": false
+      }
+    ]
+  },
+  "original_tv_frame_locators": [
+    {
+      "id": "tv01_c167_hq",
+      "episode": 1,
+      "cut": "167",
+      "page": "https://wiki.evageeks.org/FGC:Episode_01_Cut_167",
+      "locator_basis": "The cut-index page identifies Misato introducing NERV headquarters. Page text read, frame pixels not supplied to subagent.",
+      "root_check": "Pyramid exterior and adjacency to the lowered/artificial water basin; inspect original pixels before accepting outline, materials or relative placement.",
+      "pixels_viewed_by_subagent": false,
+      "world_match_accepted": false,
+      "source_class": "TV frame locator hosted by secondary index; inspect original frame"
+    },
+    {
+      "id": "tv01_c168_geofront",
+      "episode": 1,
+      "cut": "168",
+      "page": "https://wiki.evageeks.org/FGC:Episode_01_Cut_168",
+      "file_page": "https://evangelion.fandom.com/ru/wiki/%D0%A4%D0%B0%D0%B9%D0%BB:FGC_01_C168.jpg",
+      "locator_basis": "Cut-index description identifies the sunset GeoFront overview; matching file listed in episode01 screenshot category.",
+      "root_check": "Overall pyramid, inverse basin, surrounding green floor and suspended city relation; avoid deriving metre dimensions from this perspective.",
+      "pixels_viewed_by_subagent": false,
+      "world_match_accepted": false,
+      "source_class": "TV frame locator hosted by secondary index; inspect original frame"
+    },
+    {
+      "id": "tv01_c169b_map_door",
+      "episode": 1,
+      "cut": "169B",
+      "page": "https://wiki.evageeks.org/FGC:Episode_01_Cut_169B",
+      "file_page": "https://evangelion.fandom.com/ru/wiki/%D0%A4%D0%B0%D0%B9%D0%BB:FGC_01_C169B2.jpg",
+      "locator_basis": "Cut-index page identifies Misato map and opening door; it reports Central Dogma B20 text. This is a locator, not an independently pixel-read observation.",
+      "root_check": "Actual map lettering, corridor cross-section, angular door outline and seams; compare to current HQ navigation/interior at matching viewpoint.",
+      "pixels_viewed_by_subagent": false,
+      "world_match_accepted": false,
+      "source_class": "TV frame locator hosted by secondary index; inspect original frame"
+    },
+    {
+      "id": "tv01_b20_sign",
+      "episode": 1,
+      "file_page": "https://evangelion.fandom.com/ru/wiki/%D0%A4%D0%B0%D0%B9%D0%BB:Level_B-20.jpg",
+      "locator_basis": "Exact file title listed under episode01 screenshot category; file pixel fetch unavailable in subagent.",
+      "root_check": "Read actual B-20/Level20 sign shape, typeface, placement and wall material rather than a guessed wooden label.",
+      "pixels_viewed_by_subagent": false,
+      "world_match_accepted": false,
+      "source_class": "TV frame locator hosted by secondary index; inspect original frame"
+    },
+    {
+      "id": "tv01_door",
+      "episode": 1,
+      "file_page": "https://evangelion.fandom.com/ru/wiki/%D0%A4%D0%B0%D0%B9%D0%BB:Ep1_Door.png",
+      "locator_basis": "Exact filename belongs to episode01 screenshot category.",
+      "root_check": "Actual geometric hatch and corridor finish; scene pixels required.",
+      "pixels_viewed_by_subagent": false,
+      "world_match_accepted": false,
+      "source_class": "TV frame locator hosted by secondary index; inspect original frame"
+    },
+    {
+      "id": "tv01_hq_alt",
+      "episode": 1,
+      "file_page": "https://evangelion.fandom.com/ru/wiki/%D0%A4%D0%B0%D0%B9%D0%BB:Ep1_Nerv.png",
+      "locator_basis": "Exact filename belongs to episode01 screenshot category.",
+      "root_check": "Alternative exterior/approach viewpoint; validate it is the TV headquarters frame before use.",
+      "pixels_viewed_by_subagent": false,
+      "world_match_accepted": false,
+      "source_class": "TV frame locator hosted by secondary index; inspect original frame"
+    },
+    {
+      "id": "tv01_wet_geofront_candidate",
+      "episode": 1,
+      "page": "https://wrongeverytime.com/2018/09/07/neon-genesis-evangelion-episode-1/",
+      "image_url": "https://i.imgur.com/mdRX5UM.jpg",
+      "locator_basis": "Image-search result links this image to the episode01 article. Automatic image caption deliberately not adopted as fact. Direct imgur fetch may fail.",
+      "root_check": "Potential Geofront exterior frame; actual image and film placement must be confirmed.",
+      "pixels_viewed_by_subagent": false,
+      "world_match_accepted": false,
+      "source_class": "TV frame locator hosted by secondary index; inspect original frame"
+    },
+    {
+      "id": "tv11_corridor_access",
+      "episode": 11,
+      "page": "https://wrongeverytime.com/2019/06/24/neon-genesis-evangelion-episode-11/?share=print",
+      "locator_basis": "Episode11 article read. Its linked stills under card-reader/forced-door and pilot-access paragraphs are scene locators only.",
+      "root_check": "Normal facility access/corridor materials and scanner/door scale; keep blackout lighting separate from ordinary lit appearance.",
+      "pixels_viewed_by_subagent": false,
+      "world_match_accepted": false,
+      "source_class": "TV frame locator hosted by secondary index; inspect original frame"
+    }
+  ],
+  "book_locators": [
+    {
+      "title": "Evangelion Chronicle (Sony Magazines original issue index)",
+      "issues": [
+        {
+          "number": 3,
+          "section": "Installation 05 GeoFront",
+          "page_locator": "19-20 according to NERV_Headquarters secondary index; actual edition/pages not inspected"
+        },
+        {
+          "number": 2,
+          "section": "Installation 03A NERV"
+        },
+        {
+          "number": 5,
+          "section": "Installation 03B NERV Command Center"
+        },
+        {
+          "number": 24,
+          "section": "Installation 03D NERV HQ Services"
+        }
+      ],
+      "index_page": "https://evangelion.fandom.com/wiki/Evangelion_Chronicle",
+      "page_locator_source": "https://evangelion.fandom.com/wiki/NERV_Headquarters",
+      "book_pages_viewed": false,
+      "edition_note": "Do not transfer original issue numbers/page references to2010 revised edition without checking actual contents."
+    }
+  ],
+  "verification_limits": [
+    "Official/source HTML and index text read only; no new source image pixels available from subagent browser (inventory empty).",
+    "Root has working IAB and will inspect selected frames. No1:1 completeness or World visual PASS is claimed here.",
+    "No login/download of the private2020kharaYouTube video attempted.",
+    "No remote image downloaded to bypass display limits; HTML/JS and HEAD metadata only.",
+    "Autogenerated image-search prose, fan fiction, Rebuild/movie frames and unrelated game art are excluded as setting evidence."
+  ]
+}

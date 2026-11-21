@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.projectseele.ProjectSeele;
 import com.projectseele.client.render.RibbonRenderer;
@@ -253,6 +254,15 @@ public final class ClientFxManager
 
         for (WorldFx fx : ACTIVE)
         {
+            boolean distantImpact = fx instanceof NukeExplosion && fx.pos.distanceToSqr(cam) > 320 * 320;
+            float fogStart = RenderSystem.getShaderFogStart(), fogEnd = RenderSystem.getShaderFogEnd();
+            if (distantImpact)
+            {
+                buffer.endBatch();
+                float distance = (float)fx.pos.distanceTo(cam);
+                RenderSystem.setShaderFogStart(distance + 64);
+                RenderSystem.setShaderFogEnd(distance + 512);
+            }
             poseStack.pushPose();
             poseStack.translate(fx.pos.x - cam.x, fx.pos.y - cam.y, fx.pos.z - cam.z);
             VertexConsumer target = fx instanceof KabbalahTree
@@ -263,6 +273,12 @@ public final class ClientFxManager
                     ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.CROSS) : buffer.getBuffer(RenderType.lightning());
             fx.render(poseStack, target, event.getPartialTick());
             poseStack.popPose();
+            if (distantImpact)
+            {
+                buffer.endBatch(com.projectseele.client.render.EnergyGlowR24.CROSS);
+                RenderSystem.setShaderFogStart(fogStart);
+                RenderSystem.setShaderFogEnd(fogEnd);
+            }
         }
         buffer.endBatch(RenderType.lightning());
         buffer.endBatch(com.projectseele.client.render.EnergyGlowR24.CROSS);

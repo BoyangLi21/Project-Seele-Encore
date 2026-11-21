@@ -26,7 +26,9 @@ public final class EncounterObserverR45
 {
     private static final int CAPABILITY_LEASE = 120;
     private static final int MAX_OBSERVERS = 16;
-    private static String expectedRamielResource = "";
+    // Existing missions resume without begin(), so the render contract must
+    // also exist when the server loads a saved, already active encounter.
+    private static String expectedRamielResource = RamielRemoteResourcesR52.classpathHash().orElse("");
     private record Sent(UUID target, long tick) {}
     private static final class Session
     {

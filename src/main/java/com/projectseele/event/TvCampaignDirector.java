@@ -201,7 +201,7 @@ public final class TvCampaignDirector
         String preparation=TvCampaignCatalog.preparationBlockerR52(d.active);
         if(!preparation.isEmpty())return message(player,preparation,false);
         if(!player.getUUID().equals(d.owner)&&!player.hasPermissions(2))return message(player,"只能重试自己受托的作战。",false);
-        if(!TvEncounterRulesR45.handles(d.active)||!d.phase.equals("failure"))return message(player,"当前没有等待恢复的遭遇战。",false);
+        if(!TvEncounterRulesR45.handles(d.active)||!Set.of("failure","approach").contains(d.phase))return message(player,"当前没有等待恢复的遭遇战。",false);
         if(d.targetDeathConfirmedR45)return message(player,"目标已经不在了，不能重试这场战斗。先回收机体，再取消这次行动。",false);
         if(!NervStaffDialogue.authorized(player)||player.level()!=l)return message(player,"请由指挥员回到战区，再下达出击指令。",false);
         if(d.owner==null||d.generationR43<=0||d.sorties.isEmpty())return message(player,"这次出击的联络信息对不上，暂时无法开始。请联系整备部。",false);
@@ -218,7 +218,11 @@ public final class TvCampaignDirector
             // Never clear IDs or commandeer a still-deployed/riding unit.
             if(sortie.npc&&eva!=null&&sortie.eva!=null&&sortie.eva.equals(eva.getUUID())
                     &&EvaLogisticsDirector.status(l,sortie.unit).phase().equals("PARKED"))
+            {
+                AutoSortieR32.clearAutomatic(l,sortie.unit);
+                eva.getPersistentData().remove("R32AutoCancelled");
                 sortie.dispatchRequested=false;
+            }
         }
         d.phase="approach";d.missingTicksR45=0;d.rayPreloadCursorR45=0;d.notice="重新确认目标与机体状态，请保持通信。";d.setDirty();
         if(d.active.equals("ramiel")&&!TvYashimaDirectorR50.begin(l,d))

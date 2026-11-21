@@ -1,0 +1,19 @@
+package com.projectseele.world;
+import com.google.gson.*;
+import java.nio.file.*;
+import java.util.*;
+import net.minecraft.world.phys.*;
+/** Final measured station feet/bounds at unchanged Root nodes. */
+public final class FootGuideFinalExportR52 {
+ private static Vec3 point(JsonArray a){return new Vec3(a.get(0).getAsDouble(),a.get(1).getAsDouble(),a.get(2).getAsDouble());}
+ private static double[] box(AABB b){return new double[]{b.minX,b.minY,b.minZ,b.maxX,b.maxY,b.maxZ};}
+ public static void main(String[] args)throws Exception{var d=NervRouteDirectoryR52.parse(JsonParser.parseString(Files.readString(Path.of(args[0]))).getAsJsonObject());var old=JsonParser.parseString(Files.readString(Path.of(args[1]))).getAsJsonObject().getAsJsonArray("candidate_stations");var rows=new ArrayList<Object>();
+  for(var raw:old){var r=raw.getAsJsonObject();int v=r.get("variant").getAsInt();var spec=new NervFootGuideDockR52.Spec(d,d.leg(r.get("leg").getAsString()),NervOriginalCarrierR52.nominalBinding(v),point(r.getAsJsonArray("from_up")),point(r.getAsJsonArray("to_up")),r.get("foundation_top").getAsDouble());var view=NervFootGuideDockR52.view(spec);AABB bounds=null;int samples=0;var feet=new ArrayList<Object>();var posts=new LinkedHashMap<String,AABB>();
+   for(var stage:NervFootGuideDockR52.Stage.values())for(int k=0;k<=32;k++){var pieces=NervFootGuideDockR52.pieces(spec,new NervFootGuideDockR52.Sample(stage,k/32D));samples++;for(var p:pieces){var b=p.mesh().envelope(p.frame(),p.frame());bounds=bounds==null?b:bounds.minmax(b);if(p.name().startsWith("dock_column/"))posts.merge(p.name(),b,AABB::minmax);}}
+   for(int k=0;k<=32;k++)for(var pose:List.of(new NervFootGuideDockR52.StationPose(k/32D,1,1,0,0),new NervFootGuideDockR52.StationPose(0,1,1,0,k/32D),new NervFootGuideDockR52.StationPose(1,1,1,0,k/32D))){samples++;for(var p:NervFootGuideDockR52.pieces(view,pose)){var b=p.mesh().envelope(p.frame(),p.frame());bounds=bounds.minmax(b);}}
+   for(var f:NervFootGuideDockR52.feet(spec)){var p=f.centre();var nativeCells=new ArrayList<int[]>();for(int x=(int)Math.floor(p.x-f.halfX()+1e-7);x<=Math.floor(p.x+f.halfX()-1e-7);x++)for(int z=(int)Math.floor(p.z-f.halfZ()+1e-7);z<=Math.floor(p.z+f.halfZ()-1e-7);z++)nativeCells.add(new int[]{x,(int)Math.floor(p.y-.001),z});feet.add(Map.of("bearing_cells",nativeCells,"name",f.name(),"centre",new double[]{p.x,p.y,p.z},"half_xz",new double[]{f.halfX(),f.halfZ()},"finite_contact_area_m2",4*f.halfX()*f.halfZ(),"bearing_cell",new int[]{(int)Math.floor(p.x),(int)Math.floor(p.y-.001),(int)Math.floor(p.z)}));}
+   var postRows=new ArrayList<Object>();for(var entry:posts.entrySet())postRows.add(Map.of("part",entry.getKey(),"net_curve_bounds",box(entry.getValue())));rows.add(Map.of("leg",spec.leg().id(),"reverse_leg",spec.leg().id()+"/reverse","variant",v,"foundation_top",spec.foundationTop(),"full_hardware_curve_bounds",box(bounds),"source_pose_samples",samples,"feet",feet,"actual_column_curve_bounds",postRows,"reservation_boxes",List.of(box(bounds)),"native_foundation_cells",NervMechanicalRailBindingR52.stationCells(spec).stream().sorted(java.util.Comparator.comparingInt((net.minecraft.core.BlockPos cell)->cell.getX()).thenComparingInt(cell->cell.getY()).thenComparingInt(cell->cell.getZ())).map(p->new int[]{p.getX(),p.getY(),p.getZ()}).toList()));System.out.println(spec.leg().id()+" feet="+feet.size()+" poses="+samples);
+  }
+  Files.writeString(Path.of(args[2]),new GsonBuilder().setPrettyPrinting().create().toJson(Map.of("world_written",false,"native_admission",false,"dock_source_sha256",NervFootGuideDockR52.class.getField("SOURCE_SHA").get(null),"rig_source_sha256",NervFootGuideRigR52.SOURCE_SHA,"stations",rows)));
+ }
+}

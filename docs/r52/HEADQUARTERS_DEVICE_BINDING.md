@@ -1,0 +1,55 @@
+# R52 总部设备的新址绑定
+
+`NervHeadquartersFrameR52` 仅绑定完整总部原始设备；Root 已授权其整体平移 `[0,-93,0]`。Terminal 的 `[0,-280,-7]` 和机库的 half-turn/独立平移不经过该类。总部文件必须显式存在且与当前 claimed SavedData 的 epoch/fingerprint 匹配，没有从 ready 状态或旧 marker 回推默认许可。
+
+Root 需要落地两个世界相对文件：
+
+```json
+{
+  "schema": "projectseele.r52.headquarters-frame.v1",
+  "dimension": "projectseele:geofront",
+  "component": "headquarters",
+  "installed": true,
+  "epoch": 52,
+  "directory_fingerprint": "<当前 claimed SavedData 的 64 位 hex fingerprint>",
+  "translation": [0, -93, 0],
+  "command_door_manifest": "r52/headquarters_command_doors.json",
+  "command_door_sha256": "<该完整 JSON 文件实际 UTF-8 字节 SHA-256>"
+}
+```
+
+第一份保存为 `W/r52/headquarters.json`。第二份 `W/r52/headquarters_command_doors.json` 保留旧 r01 的完整 17 门、39 个 fixed-input 合同、native states、原 ID、excluded 门 5/14。它的顶层字段为 `schema="projectseele.r52.headquarters-command-doors.v1"`、同一 `dimension/component/epoch/directory_fingerprint` 以及 `headquarters_translation=[0,-93,0]`；门的 lower/aperture/buttons、固定输入 pos/operator/input_before.pos/fixed_support.pos 和 excluded 门 lower 均只平移一次。
+
+不要直接改旧 `.projectseele_command_sliding_doors_r01.json` 来重新启用旧维护路径。Root 新文件是新的实际所有权；旧文件在 claimed 世界不再被该 callee 消费。生成器只读原世界并输出外部草案：
+
+```powershell
+python tools/prepare_headquarters_metadata_r52.py --world <W> --out <世界以外的草案目录> --epoch 52 --directory-fingerprint <当前claim-fingerprint> --translation 0 -93 0
+```
+
+本批 pending 草案已经生成在 `.Codex/r52_headquarters_binding/pending_root_metadata/r52/`，epoch 52、fingerprint 全零，对应 Root 当前 pending claim。正式 ground directory install 改变 claimed fingerprint 后，需要用实际新 fingerprint 重新生成两份文件；旧声明会自动停止新设备维护，绝不会恢复旧址。文件轮询有 20 tick 正/负缓存，更换文件后可调用 `NervHeadquartersFrameR52.invalidate(level)` 提前刷新。
+
+21 个指挥按钮、3 个操作员座位、5 个屏幕的完整 original/actual rows 在 `.Codex/r52_headquarters_binding/HEADQUARTERS_DEVICE_ROWS.json`。这些 rows 用于 Root 回读实物，不需要另一个运行清单；生产代码按既有设备 ID 从总部 frame 派生一次。例如初号机 launch 键 `[32,-407,286]` → `[32,-500,286]`，三屏幕中的初号机平面 `[28,-415.795,322.793]` → `[28,-508.795,322.793]`。
+
+实际接入：
+
+| 功能 | 最终运行路径 |
+| --- | --- |
+| command 滑门 | `GameEvents` → `CommandRoomSlidingDoorDirector.tick` → Root artifact 完整解析 → 新 lower/aperture/input/support → `NervSlidingDoorEntity.reconcile`。旧位置实体在 claimed tick 被拒绝，不能按旧 ID 写新平面；新碰撞维护只作用于声明的新六格平面。 |
+| 操作员按钮/员工按键目标 | `NervOperationsConsole.handleUse/staffControl` 只映射原始 `S20_AUTHORED_CONTROLS` 和原 cancel/city/armament 行。claimed 缺文件不回退旧兼容 aliases。只有新址实际可生存按钮可触发操作；EVA prepare/launch/recovery 的原 readiness/passenger/interlock 逻辑继续运行。 |
+| 操作员座位 | `S20CommandPresentationDirector.seatSpecs` 映射三套既有 block/anchor，复用原 tag/UUID；手动及 200 tick 缺失维护只在新址实际椅子格存在时生成。旧 presentation/NBT architecture 安装仍退休。真实 office chair/stool 的点击逻辑继续按其实际位置运行。 |
+| 五屏幕和实时视频 | `FacilityFrameSyncR52` 同步明确 HQ bound/translation → `FacilityFrameClientR52` → `EvaCommandFeedClient` 上三屏/战术屏/城市屏和 pilot status text 都使用同一新平面。`ServerboundEvaVideoFramePacket.isCommandViewer` 同步使用新总部 viewer bounds；没有文件时不启动旧房间的采集需求。 |
+| 运行 presentation | claimed 时只维护新设备座位、实际 telemetry 与新址退休 city 文本层；不运行旧 guessed furniture block cleanup 或总部建筑重画。 |
+
+网络协议由 66 升至 67，因为 `ClientboundFacilityFrameR52` 新增 HQ bound/translation；最终客户端和服务端应使用同一包。未 claimed 世界继续原事件、坐标、门清单和显示行为。
+
+验证：12 个本批源码及 1 个新测试 targeted javac 通过；真实生产 frame/command-door parser/原生 FriendlyByteBuf 回读 19 项通过，覆盖错误 epoch/fingerprint、Terminal frame、零平移、路径逃逸、部分门、缺输入合同、旧 door plane 拒绝；实际完整旧 r01 元数据转换 230 项检查通过，身份/状态/full NBT 保留且源世界字节未变。回执在 `.Codex/r52_headquarters_binding/`。这是代码/元数据验证；实际新址 39 个按钮的 native canSurvive/outline、滑门碰撞和座椅/屏幕画面仍应由 Root 原生验收。
+
+## Root 仍需集中核对的短清单
+
+- `facility_lighting_r30.json`：`command_lever` 和 58 个 `command_lamps` 仍为旧总部点，需跟实际移动的总部灯具对齐；不要统一移动其他区域 `constant_lamps`。
+- `r44_public_station_gates.json`：仅原 HQ `station_id=9166787716217601435` 的 6 gate positions/station_bounds 随原总部站下沉；其他站保持。
+- `regional_plan.json`：仅 `stations[id=hq].pos`；其他站/线路不变。该字段不是 claimed 新设施所有权本身。
+- `regional_wayfinding.json`：16 个 `hq/*` labels 的旧位置仍在历史源 JSON；原实体由 Root 随金字塔完整迁移，旧 author 已退休。
+- `r47_seele_conference.json`、`r48_seele_lighting.json`、`nerv_staff_r15.json` 已下沉，不能再套第二遍偏移。
+- `r49_facility_controls.json` 的旧 gate/readers 在 claimed 已由 Root office 清单替代；旧 `facility_lifts_r25/r26` 已被 claimed 路径退休；`facility_chairs_r26` 和旧 `regional_r04_specimen_receipt` 是历史记录。完整状态见 `MOVED_FACILITY_RUNTIME_METADATA_READONLY.md`。
+- 真实 office/stool ride entity 的 `PersistentData.OfficeChair` 是 packed BlockPos；若 Root 保留正在乘坐的 seat entity，需随该总部组件核对这个内部引用，不能只改 entity Pos。新手动坐下会按真实椅子位置建立正确引用。

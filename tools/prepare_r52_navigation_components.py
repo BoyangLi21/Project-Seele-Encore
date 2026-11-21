@@ -1,0 +1,39 @@
+"""Bounded current-floor graphs for the explicit R52 facilities, without world edits."""
+import os
+os.environ.setdefault('OPENBLAS_NUM_THREADS','1')
+import argparse,json,shutil,datetime
+from pathlib import Path
+import plan_pyramid_navigation_r22 as nav
+from r52_spatial_plan import BASE,PYRAMID
+
+SCOPES={
+    'headquarters':((-95,-577,205),(152,-425,545)),
+    'commander_office':((5,-435,302),(55,-404,352)),
+    'hangar':((-56,-708,100),(115,-574,415)),
+    'terminal':((-56,-930,225),(116,-795,413)),
+    'old_laboratory_station':((-48,-476,-194),(185,-429,43)),
+    'public_surface_lift':((110,70,264),(235,87,313)),
+    'retained_research_bridge':((138,-478,388),(210,-452,470)),
+}
+
+
+def main():
+    parser=argparse.ArgumentParser();parser.add_argument('--part',choices=SCOPES,required=True);parser.add_argument('--remeasure',action='store_true');args=parser.parse_args()
+    world=BASE/'WORLD_R52';out=BASE/'navigation_rebuild/components'/args.part
+    if (out/'walkable_graph.npz').exists():
+        assert args.remeasure,'Keep the existing measured graph; choose a deliberate remeasure after changes'
+        before=out.parent/(out.name+'_before_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        shutil.copytree(out,before)
+    nav.WORLD=world;nav.LO,nav.HI=SCOPES[args.part];nav.LIFT_GROUPS=[];nav.GRAPH_ONLY=True
+    nav.COMMAND_DOOR_FILE='r52/headquarters_command_doors.json'
+    nav.FREE_LATCH_DOORS=[PYRAMID.block(p)for p in((24,-423,254),(28,-448,282),(48,-448,282))]
+    units=json.loads((BASE/'runtime_directory/units/ROOT_UNITS.json').read_text('utf8'))['units']
+    nav.EXTRA_OPERABLE_DOORS=[pair for unit in units for pair in unit['personnel_doors']]
+    nav.MEASURE_ACCESS_READERS=True
+    nav.PUBLIC_DOMAINS=None;nav.PUBLIC_PATHS=None;nav.RETIRED_WALK_DOMAINS=[]
+    nav.RAIL_CURVES=json.loads((world/'native_transit_r28.json').read_text('utf8'))['curves']
+    nav.LIFT_DIRECT=True;nav.STAIR_COST=4.
+    nav.main(False,out,None)
+
+
+if __name__=='__main__':main()

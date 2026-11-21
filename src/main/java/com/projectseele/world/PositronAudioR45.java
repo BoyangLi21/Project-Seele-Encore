@@ -70,6 +70,15 @@ public final class PositronAudioR45
     }
 
     /** Optional hook for actual rearm completion; never schedules the SBW 80-tick reload onto EVA. */
+    public static void distantImpact(ServerLevel level,ServerPlayer player,Vec3 impact)
+    {
+        double distance=player.position().distanceTo(impact);long now=level.getGameTime();
+        Vec3 direction=impact.subtract(player.position()).normalize();
+        PENDING.computeIfAbsent(level,ignored->new ArrayList<>()).add(new Pending(player.getUUID(),
+                player.position().add(direction.scale(3)),ModSounds.EVA_IMPACT_HEAVY.get(),
+                (float)Math.max(.22,1/(1+distance/1000)),now,now+(long)(distance/17)));
+    }
+
     public static void rearmed(ServerLevel level, Vec3 muzzle)
     {
         if (ModList.get().isLoaded("superbwarfare"))

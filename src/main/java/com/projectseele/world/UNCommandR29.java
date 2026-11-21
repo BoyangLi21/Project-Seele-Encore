@@ -8,7 +8,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.*;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -32,10 +31,10 @@ public final class UNCommandR29
     {
         UUID id=UNRecoveryR22.identity(l,serial);if(id==null)return null;
         BlockPos pos=UNRecoveryR22.lastKnownPosition(l,id);if(pos==null)pos=BlockPos.containing(UNRecoveryR22.home(serial));
-        var chunk=new ChunkPos(pos);l.getChunkSource().addRegionTicket(RADIO,chunk,3,chunk);l.getChunkSource().getChunkFuture(chunk.x,chunk.z,ChunkStatus.FULL,true);
+        var chunk=new ChunkPos(pos);l.getChunkSource().addRegionTicket(RADIO,chunk,3,chunk);
         if(l.getEntity(id) instanceof EvaPrototypeEntity eva)
         {
-            var t=eva.getPersistentData();if(t.hasUUID("UNPlug")){var pp=UNRecoveryR22.lastKnownPosition(l,t.getUUID("UNPlug"));if(pp!=null){var c=new ChunkPos(pp);l.getChunkSource().addRegionTicket(RADIO,c,3,c);l.getChunkSource().getChunkFuture(c.x,c.z,ChunkStatus.FULL,true);}}
+            var t=eva.getPersistentData();if(t.hasUUID("UNPlug")){var pp=UNRecoveryR22.lastKnownPosition(l,t.getUUID("UNPlug"));if(pp!=null){var c=new ChunkPos(pp);l.getChunkSource().addRegionTicket(RADIO,c,3,c);}}
             return eva;
         }
         return null;

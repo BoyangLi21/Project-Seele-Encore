@@ -259,8 +259,9 @@ public final class TvYashimaDirectorR50
         // Retry the same one-time receipt after loading; the cargo ledger refuses
         // a second commission even after the original stock has been issued.
         if(TvYashimaSavedDataR50.get(level).onlineTicks%20==0)supply(level,plan);
-        int segments=Math.max(1,(int)Math.ceil(site.separation()/16));
-        for(int n=0;n<=segments;n++)retain(level,BlockPos.containing(site.hero().lerp(site.angel(),n/(double)segments)));
+        var rayStart=site.hero().add(0,8,0);
+        LongRangeTerrainR53.ready(level,"yashima-prewarm",rayStart,
+                rayStart.add(site.angel().subtract(rayStart).normalize().scale(site.attackRange())));
         services(level,data,plan);
         var service=TvYashimaSavedDataR50.get(level);service.onlineTicks+=10;service.setDirty();
         NervArmorColumnR50.tickRamiel(level,data,boss,plan.drillStepTicks());

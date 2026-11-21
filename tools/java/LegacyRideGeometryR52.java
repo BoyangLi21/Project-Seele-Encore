@@ -1,0 +1,20 @@
+package com.projectseele.world;
+import com.google.gson.*;
+import java.nio.file.*;
+import java.util.*;
+import net.minecraft.world.phys.*;
+/** Exact selected source clock replay; no world writes or native admission. */
+public final class LegacyRideGeometryR52 {
+ public static void main(String[] args)throws Exception{
+  var d=NervRouteDirectoryR52.parse(JsonParser.parseString(Files.readString(Path.of(args[0]))).getAsJsonObject());var fixed=NervLegacyCarrierRideR52.fixedPartsR52();var deck=NervLegacyCarrierRideR52.actualHousingDeckR52();var rows=new ArrayList<Object>();
+  for(int v=0;v<3;v++){var b=NervOriginalCarrierR52.nominalBinding(v);var l=d.leg("unit"+v+"/original_incline");double maximumFit=0,minDrop=1e9,maxDrop=0,maxPitchStep=0,maxDropStep=0;int missing=0,finite=0;var hits=new LinkedHashSet<String>();var failures=new ArrayList<Object>();NervLegacyCarrierRideR52.RidePose previous=null;
+   for(int k=0;k<=960;k++){double t=k/(4D*l.ticks());double f=t*t*t*(t*(t*6-15)+10);var root=d.sample(l,f,b).evaRoot();var pose=NervLegacyCarrierRideR52.targetFromActualHeadsR52(root);if(pose==null){missing++;if(failures.size()<10)failures.add(Map.of("tick",k/4D,"fraction",f,"root",root.translation().toString()));continue;}
+    for(var joint:pose.joints()){minDrop=Math.min(minDrop,joint.drop());maxDrop=Math.max(maxDrop,joint.drop());}if(previous!=null)for(int i=0;i<4;i++){maxPitchStep=Math.max(maxPitchStep,Math.abs(pose.joints().get(i).pitch()-previous.joints().get(i).pitch()));maxDropStep=Math.max(maxDropStep,Math.abs(pose.joints().get(i).drop()-previous.joints().get(i).drop()));}previous=pose;
+    var bearing=NervLegacyCarrierRideR52.finitePadBearingsR52(root,pose);for(var r:bearing){maximumFit=Math.max(maximumFit,r.maximumFit());if(r.bears())finite++;else if(failures.size()<10)failures.add(Map.of("tick",k/4D,"pad",r));}
+    if(Boolean.getBoolean("projectseele.legacy.contactOnly")||k%64!=0)continue;var parts=NervLegacyCarrierRideR52.partsAtR52(v,root,1,pose);for(var part:parts){if(!(part.role().equals("ride_roof_connector")&&NervLegacyCarrierRideR52.finiteHousingRoofContactR52())&&part.mesh().intersects(part.frame(),part.frame(),deck,root,root,.003,Vec3.ZERO))hits.add(part.name()+" vs actual housing deck");for(var rail:fixed){if(!part.mesh().envelope(part.frame(),part.frame()).intersects(rail.mesh().envelope(rail.frame(),rail.frame())))continue;if(NervLegacyCarrierRideR52.namedHeadContactR52(new NervOriginalCarrierR52.Part(part.name(),NervOriginalCarrierR52.Role.RUNNING_BOGIE,part.mesh(),part.frame()),new NervOriginalCarrierR52.Part(part.name(),NervOriginalCarrierR52.Role.RUNNING_BOGIE,part.mesh(),part.frame()),rail))continue;if(part.mesh().intersects(part.frame(),part.frame(),rail.mesh(),rail.frame(),rail.frame(),.003,Vec3.ZERO))hits.add(part.name()+" vs "+rail.name());}}
+    var actualDeck=new NervOriginalCarrierR52.Part("deck",NervOriginalCarrierR52.Role.STRUCTURE,deck,root);for(var rail:fixed)if(!NervLegacyCarrierRideR52.namedDeckHeadContactR52(actualDeck,actualDeck,rail)&&deck.envelope(root,root).intersects(rail.mesh().envelope(rail.frame(),rail.frame()))&&deck.intersects(root,root,rail.mesh(),rail.frame(),rail.frame(),.003,Vec3.ZERO))hits.add("actual housing deck vs "+rail.name()+" @ "+k/4D);
+   }
+   rows.add(Map.of("variant",v,"samples",961,"target_missing",missing,"finite_pad_receipts",finite,"expected_finite_receipts",3844,"maximum_fit_m",maximumFit,"drop_range",new double[]{minDrop,maxDrop},"maximum_quarter_tick_change",new double[]{maxDropStep,maxPitchStep},"source_hits",hits,"first_failures",failures));System.out.println("v="+v+" missing="+missing+" finite="+finite+" fit="+maximumFit+" drops="+minDrop+".."+maxDrop+" hits="+hits.size());
+  }Files.writeString(Path.of(args[1]),new GsonBuilder().setPrettyPrinting().create().toJson(Map.of("world_written",false,"native_admission",false,"head_source",NervLegacyCarrierRideR52.SOURCE_SHA,"deck_source",NervLegacyCarrierRideR52.DECK_SHA,"finite_housing_roof_source",NervLegacyCarrierRideR52.finiteHousingRoofContactR52(),"rows",rows)));
+ }
+}

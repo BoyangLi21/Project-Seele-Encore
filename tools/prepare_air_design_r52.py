@@ -1,0 +1,99 @@
+"""Root-authorized JSON plan only. No world/source/Root-file writes."""
+import argparse,json,math,copy,hashlib
+from pathlib import Path
+from r52_spatial_plan import BASE
+B=BASE;C=Path(__file__).resolve().parents[1]
+parser=argparse.ArgumentParser();parser.add_argument('--ground',type=Path,default=B/'runtime_directory/candidate/GROUND_SOURCE_SPACES.json');parser.add_argument('--out',type=Path,default=B/'runtime_directory/candidate/air');args=parser.parse_args()
+OUT=args.out;OUT.mkdir(parents=True,exist_ok=True)
+SURFACE_CRUISE=512
+load=lambda p:json.loads(Path(p).read_text(encoding='utf-8-sig'))
+points=load(B/'runtime_directory/ROOT_AIR_POINTS.json');ground=load(args.ground)
+template=load(C/'docs/r52/air-transport.root-parameters.template.json')
+gears=load(B/'underground_airport_expansion/AIRCRAFT_ACTUAL_FULL_GEAR_SUPPORTS.json')
+nodes={};corridors={};spaces=set();node_regions={};special_doors={}
+def rigid(p,q=(0,0,0,1)):return {'translation':list(p),'quaternion_xyzw':list(q)}
+def grid_box(lo,hi):
+ return {f'space/c{x}_{y}_{z}' for x in range(math.floor(lo[0]/32),math.floor((hi[0]-1e-8)/32)+1) for y in range(math.floor(lo[1]/32),math.floor((hi[1]-1e-8)/32)+1) for z in range(math.floor(lo[2]/32),math.floor((hi[2]-1e-8)/32)+1)}
+def footprint(p,empty=False):
+ # Actual measured R16 and explicit prone-reference source union, plus 2m
+ # for the certified cradle envelope. Native uses real captured source and
+ # may reject unregistered field-pose extent; this is a design, not proof.
+ return [p[0]-71,p[1]-(13 if empty else 128.573),p[2]-62],[p[0]+71,p[1]+21,p[2]+60]
+def add_node(id,region,p,cargo=None,stand=False):
+ if id in nodes:return id
+ occupied=grid_box(*footprint(p,stand));spaces.update(occupied)
+ f={'plane':rigid(p),'rig':{'hoist':112,'deployment':0 if stand else 1,'jaws':1 if stand else 0}}
+ if not stand:f['cargo']=rigid(cargo if cargo is not None else [p[0],p[1]-112,p[2]],(0,1,0,0))
+ nodes[id]={'id':id,'region':region,'frame':f,'occupancy':sorted(occupied),'actual_cells':[]};node_regions[id]=region;return id
+for n in points['nodes']:add_node(n['id'],n['region'],n['plane_root'])
+aircraft=copy.deepcopy(template['aircraft'])
+for a in aircraft:
+ g=next(x for x in gears['aircraft'] if x['stand']['serial']==a['serial']);p=g['stand']['root_stand_yaw0'];a['support_cells']=g['support_cells']
+ add_node(a['stand_node'],'SURFACE' if a['serial']==0 else 'GEOFRONT',p,stand=True)
+ a['airport']='root_surface_region' if a['serial']==0 else 'root_geofront_region'
+ a['climb']= 'surface_stand_climb' if a['serial']==0 else add_node(a['id']+'/climb','GEOFRONT',[p[0],-330,p[2]])
+pickups=[]
+for region,p in points['pickup_reference'].items():
+ id='pickup/'+region.lower()+'/reference';add_node(id,region,[p[0],p[1]+112,p[2]],p)
+ cruise=add_node(id+'/cruise',region,[p[0],SURFACE_CRUISE if region=='SURFACE' else -330,p[2]])
+ pickups.append({'id':id,'region':region,'variants':[0,1,2],'domain':points['domains'][region],'cruise':cruise})
+receivers=[];ground_nodes={n['id']:n for n in ground['nodes']}
+sole={v:328.5-ground_nodes[f'unit{v}/bay']['foot_frame']['translation'][2] for v in range(3)}
+for port in ground['ports']:
+ variant=int(next(iter(port['reverse_routes'])));p=list(ground_nodes[port['node']]['foot_frame']['translation']);p[2]+=sole[variant]
+ id='receiver/'+port['id'];add_node(id,port['region'],[p[0],p[1]+112,p[2]],p)
+ clear=add_node(id+'/clear',port['region'],[p[0],SURFACE_CRUISE if port['region']=='SURFACE' else -330,p[2]])
+ receivers.append({'port':port['id'],'region':port['region'],'flight_node':id,'stopped_cargo_frame':rigid(p,(0,1,0,0)),'reverse_routes':port['reverse_routes'],'variant':variant,'clear':clear})
+for d in points['far_deliveries']:
+ id='delivery/'+d['id'];p=d['cargo_body_root'];add_node(id,d['region'],d['plane_root'],p)
+ clear=add_node(id+'/clear','SURFACE',[p[0],SURFACE_CRUISE,p[2]])
+ supports=[{'position':list(map(int,c['position'].split())) if isinstance(c['position'],str) else c['position'],'state':c['state']} for c in d['support_cells']]
+ receivers.append({'port':d['id'],'region':'SURFACE','flight_node':id,'stopped_cargo_frame':rigid(p,d['cargo_quaternion_xyzw']),'reverse_routes':{},'delivery':True,'actual_support_cells':supports,'gates':[],'variant':d['variant'],'clear':clear})
+ pickup='pickup/far/'+d['id'];add_node(pickup,'SURFACE',d['plane_root'],p);cruise=add_node(pickup+'/cruise','SURFACE',[p[0],SURFACE_CRUISE,p[2]])
+ pickups.append({'id':pickup,'region':'SURFACE','variants':[d['variant']],'domain':[p[0]-16.5,p[1]-1,p[2]-16.5,p[0]+16.5,p[1]+90,p[2]+16.5],'cruise':cruise})
+def connect(a,b):
+ if a==b:return None
+ id=f'air/{a}__{b}'
+ if id in corridors:return id
+ pa=nodes[a]['frame']['plane']['translation'];pb=nodes[b]['frame']['plane']['translation'];distance=math.dist(pa,pb);occupied=set();steps=max(1,math.ceil(distance/24))
+ for i in range(steps):
+  aa=[pa[k]+(pb[k]-pa[k])*i/steps for k in range(3)];bb=[pa[k]+(pb[k]-pa[k])*(i+1)/steps for k in range(3)]
+  la,ha=footprint(aa);lb,hb=footprint(bb);occupied.update(grid_box([min(la[k],lb[k]) for k in range(3)],[max(ha[k],hb[k]) for k in range(3)]))
+ spaces.update(occupied);gates=[]
+ if {a,b}=={'ug_shaft_approach','ug_shaft_bottom'}:gates=['remote_airshaft_south']
+ if {a,b}=={'ug_shaft_bottom','surface_shaft_lip'}:gates=['remote_airshaft_surface']
+ corridors[id]={'id':id,'from':a,'to':b,'ticks':max(60,math.ceil(distance/3.5)),'occupancy':sorted(occupied),'gates':gates};return id
+def chain(ids):return [x for a,b in zip(ids,ids[1:]) if (x:=connect(a,b))]
+def bridge(from_region,to_region):
+ if from_region==to_region:return []
+ return ['ug_merge','ug_shaft_approach','ug_shaft_bottom','surface_shaft_lip','surface_shaft_depart'] if from_region=='GEOFRONT' else ['surface_shaft_depart','surface_shaft_lip','ug_shaft_bottom','ug_shaft_approach','ug_merge']
+missions=[]
+for a in aircraft:
+ ar=node_regions[a['stand_node']]
+ for pickup in pickups:
+  outbound=chain([a['stand_node'],a['climb']]+bridge(ar,pickup['region'])+[pickup['cruise'],pickup['id']])
+  for id in outbound:
+   c=corridors[id];rid=connect(c['to'],c['from']);corridors[rid]['reverse_of']=id
+  for r in receivers:
+   if r['variant'] not in pickup['variants']:continue
+   if r.get('delivery') and not pickup['id'].endswith('/reference'):continue
+   loaded=chain([pickup['id'],pickup['cruise']]+bridge(pickup['region'],r['region'])+(['ridge_approach'] if r.get('delivery') else [])+[r['clear'],r['flight_node']])
+   retreat=chain([r['flight_node'],r['clear']]+bridge(r['region'],ar)+[a['climb'],a['stand_node']])
+   missions.append({'id':f'{a["id"]}/{pickup["id"]}/{r["port"]}','intent':'FAR_MOUNTAIN' if r.get('delivery') else 'RECOVER','aircraft':a['id'],'variants':[r['variant']],'pickup_region':pickup['region'],'pickup_domain':pickup['domain'],'pickup_node':pickup['id'],'receiver':r['port'],'outbound':outbound,'loaded':loaded,'retreat':retreat})
+for c in list(corridors.values()):
+ if c.get('reverse_of'):c['occupancy']=corridors[c['reverse_of']]['occupancy'];c['gates']=corridors[c['reverse_of']]['gates'];c['ticks']=corridors[c['reverse_of']]['ticks']
+shaft_spaces=set()
+for c in corridors.values():
+ if {c['from'],c['to']}=={'ug_shaft_bottom','surface_shaft_lip'}:shaft_spaces.update(c['occupancy'])
+original={r['id'] for r in ground['resources']};addition=[{'id':id,'kind':'SPACE','component':id} for id in sorted(spaces-original)]
+for id in points['actual_shaft']['gates']:
+ if id not in original:addition.append({'id':id,'kind':'DOOR','component':id})
+draft=copy.deepcopy(ground);draft['resources']+=addition
+# Root's sole global grid is extended only in this C draft. Root owns merge.
+air={'schema':'projectseele.r52.air-transport.v1','map_author':'root','status':'design','epoch':52,'directory_fingerprint':'0'*64,'dimension':points['dimensions'],'mesh_sources':template['mesh_sources'],'aircraft':[{k:v for k,v in a.items() if k!='climb'} for a in aircraft],'airports':[{'id':'root_'+r.lower()+'_region','region':r,'domain':points['domains'][r],'takeoff_node':'surface_stand_climb' if r=='SURFACE' else 'ug_merge','occupancy':nodes['surface_stand_climb' if r=='SURFACE' else 'ug_merge']['occupancy']} for r in ('SURFACE','GEOFRONT')],'nodes':list(nodes.values()),'corridors':list(corridors.values()),'receivers':[{k:v for k,v in r.items() if k not in ('variant','clear')} for r in receivers],'missions':missions,'shafts':[{'id':'remote_airshaft','underground_node':'ug_shaft_bottom','surface_node':'surface_shaft_lip','motion':'AIRCRAFT','occupancy':sorted(shaft_spaces)}],'root_pending':['Root actual native bindings/obstruction checks. This C design never installs.','Original0/50 native stand hoist readback remains required; design follows Root supplied flight hoist112.','The captured field pose and translated pickup need actual grid coverage; only declared reference and actual far pickups listed.','Directory fingerprint must be filled by actual Java parser after this Root-authorized draft grid merge.']}
+air['pickup_vertical_clearance']=32
+for name,obj in [('GROUND_WITH_AIR_GRID_DESIGN.json',draft),('AIR_DESIGN.json',air),('ROOT_PENDING_SHARED_GRID_ADDITIONS.json',{'grid_metres':32,'status':'design','resources':addition,'space_boxes':{r['id']:[32*int(n) for n in r['id'][7:].split('_')]+[32*int(n)+32 for n in r['id'][7:].split('_')] for r in addition if r['kind']=='SPACE'},'root_source_unchanged':True})]:
+ (OUT/name).write_text(json.dumps(obj,ensure_ascii=False,indent=2),encoding='utf-8')
+receipt={'world_written':False,'native_admission':False,'surface_cruise':SURFACE_CRUISE,'pickup_vertical_clearance':32,'source_inputs':{str(p.resolve()):hashlib.sha256(p.read_bytes()).hexdigest() for p in [args.ground,B/'runtime_directory/ROOT_AIR_POINTS.json',C/'docs/r52/air-transport.root-parameters.template.json']},'outputs':{name:hashlib.sha256((OUT/name).read_bytes()).hexdigest() for name in ['GROUND_WITH_AIR_GRID_DESIGN.json','AIR_DESIGN.json','ROOT_PENDING_SHARED_GRID_ADDITIONS.json']}}
+(OUT/'AIR_GENERATION_RECEIPT.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
+print(json.dumps({'aircraft':len(aircraft),'nodes':len(nodes),'corridors':len(corridors),'receivers':len(receivers),'missions':len(missions),'new_same_grid_resources':len(addition),'out':str(OUT)}))

@@ -1,0 +1,168 @@
+"""Prepare Root-authorized independent one-way HQ rail records and fleet progress. Never writes WORLD."""
+import argparse
+import copy
+import hashlib
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+
+def point(p):
+    return tuple(p[k] for k in ("x", "y", "z")) if isinstance(p, dict) else tuple(p)
+
+
+def as_pos(p):
+    return dict(zip(("x", "y", "z"), p))
+
+
+def edge(a, b):
+    return tuple(sorted((point(a), point(b))))
+
+
+def main():
+    parser = argparse.ArgumentParser(__doc__)
+    parser.add_argument('--candidate-directory',type=Path,required=True)
+    parser.add_argument('--world',type=Path,required=True)
+    args=parser.parse_args();out=args.candidate_directory.resolve()
+    if (out/'PROPOSAL.json').exists():raise ValueError('Preserve previous proposal')
+    read=lambda p:json.loads(p.read_text('utf-8'))
+    from prepare_mtr_member_patch_r52 import Parser
+    baseline=read(args.world.parent/'BASELINE.json')
+    ledger={r['path'].replace('\\','/'):r['sha256']for r in baseline['files']}
+    records={}
+    for f in sorted((args.world/'mtr/projectseele/geofront').rglob('*')):
+        if not f.is_file():continue
+        name=f.relative_to(args.world).as_posix();raw=f.read_bytes()
+        assert hashlib.sha256(raw).hexdigest()==ledger[name],name
+        kind=name.split('/')[3]
+        records.setdefault(kind,[]).append(dict(member=name,data=Parser(raw).node().value))
+    ten_rows=read(out/'CURRENT_ORDERED_BOUNDARY.json');ten=[r['data']for r in ten_rows]
+    probe=read(out/'CURRENT_NATIVE_PROBE.json');candidate_path=out/'CANDIDATE.json';candidate=read(candidate_path)
+    segments={s['id']:s for s in probe['candidate_native_segments']}
+    chains={int(k.split('_')[1]):v for k,v in candidate['routes'].items()}
+    original_edges={edge(d['position1'],d['position2']):i for i,d in enumerate(ten)}
+    existing_colors={c for r in records['rails']for c in r['data'].get('signalColors',[])}
+    blocks=[];new_rails=[]
+    for s in segments.values():
+        sources=s['source_original_indices'];assert len(sources)==1,'No shared track merging authorized'
+        rail=copy.deepcopy(ten[sources[0]])
+        rail.update(position1=as_pos(s['from']),position2=as_pos(s['to']),angle1=s['from_angle'],angle2=s['to_angle'],shape=s['shape'],verticalRadius=s['vertical_radius'])
+        assert rail['speedLimit1']==ten[sources[0]]['speedLimit1'] and rail['speedLimit2']==ten[sources[0]]['speedLimit2']
+        new_rails.append({'member':'UNINSTALLED_CANDIDATE/rails/'+s['id'],'data':rail})
+    for i,chain in chains.items():
+        assert all(segments[a]['to']==segments[b]['from']for a,b in zip(chain,chain[1:])),(i,'discontinuous')
+    original_vehicle_state={str(v['id']):v for row in records['sidings']for v in row['data']['vehicles']}
+    def replacement(p):
+        index = original_edges.get(edge(p["startPosition"], p["endPosition"]))
+        if index is None:
+            return [copy.deepcopy(p)]
+        reverse = point(p["startPosition"]) != point(ten[index]["position1"])
+        names = list(reversed(chains[index])) if reverse else chains[index]
+        result = []
+        for j, name in enumerate(names):
+            s = segments[name]
+            q = copy.deepcopy(p)
+            q.update(startPosition=as_pos(s["to"] if reverse else s["from"]),
+                     endPosition=as_pos(s["from"] if reverse else s["to"]),
+                     startAngle=s["to_angle"] if reverse else s["from_angle"],
+                     endAngle=s["from_angle"] if reverse else s["to_angle"],
+                     shape=s["shape"], verticalRadius=s["vertical_radius"])
+            if j < len(names) - 1:
+                q.update(savedRailBaseId=0, dwellTime=0)
+            result.append(q)
+        return result
+
+    plans, affected_depots = [], []
+    for depot in probe["depots"]:
+        hits = [p["changed_original_rail_index"] for p in depot["path"] if "changed_original_rail_index" in p]
+        if hits:
+            affected_depots.append(dict(id=depot["id"], hex_id=depot["hex_id"], original_rail_occurrences=hits))
+    for siding in probe["sidings"]:
+        for v in siding["vehicles"]:
+            path, mapping, prefix = [], {}, 0.
+            for old_index, old in enumerate(v["path"]):
+                pieces = replacement(old)
+                indices = []
+                for piece in pieces:
+                    q = copy.deepcopy(piece)
+                    if old.get("endDistance", 0) > 1e300:
+                        length = float("inf")
+                    elif "changed_original_rail_index" in old:
+                        name = next(n for n, s in segments.items() if edge(s["from"], s["to"]) == edge(q["startPosition"], q["endPosition"]))
+                        length = segments[name]["native_rail_length"]
+                        q["candidate_segment_id"] = name
+                    else:
+                        length = old["native_rail_length"]
+                    q.update(startDistance=prefix, endDistance=1.7976931348623157e308 if length == float("inf") else prefix + length,
+                             source_old_path_index=old_index)
+                    if length != float("inf"):
+                        q["native_rail_length"] = length
+                    indices.append(len(path)); path.append(q)
+                    if length != float("inf"):
+                        prefix += length
+                mapping[old_index] = indices
+            old_index = v["native_current_path_index"]
+            old = v["path"][old_index]
+            target = mapping[old_index]
+            new_start, new_end = path[target[0]]["startDistance"], path[target[-1]]["endDistance"]
+            if "changed_original_rail_index" in old:
+                local = v["native_local_fraction"] * (new_end - new_start)
+                policy = "changed edge: same traversal fraction along its complete replacement chain"
+            else:
+                local = v["native_local_distance"]
+                policy = "unchanged edge: identical local distance and native world position"
+            mapped = new_start + local
+            ato, manual = (mapping[int(v[k])][-1] for k in ("nextStoppingIndexAto", "nextStoppingIndexManual"))
+            changed = mapped != v["railProgress"] or ato != v["nextStoppingIndexAto"] or manual != v["nextStoppingIndexManual"]
+            plans.append(dict(vehicle_id=str(v["id"]), siding_id=siding["id"], affected=changed, policy=policy,
+                              old_progress=v["railProgress"], railProgress=mapped,
+                              old_next_ato=v["nextStoppingIndexAto"], old_next_manual=v["nextStoppingIndexManual"],
+                              nextStoppingIndexAto=ato, nextStoppingIndexManual=manual,
+                              old_current_path_index=old_index, changed_original_rail_index=old.get("changed_original_rail_index"),
+                              old_native_progress_position=v.get("native_progress_position"),
+                              old_native_head_position=v.get("native_head_position"), new_expected_path=path,
+                              preserved_state={k:value for k,value in original_vehicle_state[str(v["id"])].items() if k not in ("railProgress","nextStoppingIndexAto","nextStoppingIndexManual")},
+                              logical_next_stop_manual={k:v["path"][int(v["nextStoppingIndexManual"])][k] for k in ("savedRailBaseId","stopIndex","dwellTime")},
+                              logical_next_stop={k:v["path"][int(v["nextStoppingIndexAto"])] [k] for k in ("savedRailBaseId", "stopIndex", "dwellTime")}))
+    plan_by_id = {p["vehicle_id"]: p for p in plans}
+    proposed_records = copy.deepcopy(records)
+    proposed_records["rails"] = [r for r in proposed_records["rails"] if edge(r["data"]["position1"], r["data"]["position2"]) not in original_edges] + new_rails
+    for row in proposed_records["depots"]:
+        d = row["data"]; d["path"] = [piece for p in d["path"] for piece in replacement(p)]
+        if d['id'] == 4097966716154959775:
+            for key in ('position1','position2'): d[key]['y'] -= 93
+    for row in proposed_records["sidings"]:
+        d = row["data"]
+        for key in ("pathSidingToMainRoute", "pathMainRouteToSiding"):
+            d[key] = [piece for p in d[key] for piece in replacement(p)]
+        if d["id"] == -2350900284255344150:
+            for key in ("position1","position2"): d[key]["y"] -= 93
+        for v in d["vehicles"]:
+            plan = plan_by_id[str(v["id"])]
+            for key in ("railProgress", "nextStoppingIndexAto", "nextStoppingIndexManual"):
+                v[key] = plan[key]
+    for row in proposed_records["platforms"]:
+        d = row["data"]
+        if edge(d["position1"], d["position2"]) in original_edges:
+            for key in ("position1", "position2"):
+                d[key]["y"] -= 93
+    for row in proposed_records["stations"]:
+        if row["data"]["id"] == 9166787716217601435:
+            for key in ("position1", "position2"):
+                row["data"][key]["y"] -= 93
+    report = dict(schema="projectseele.complete-map.independent-native-mtr-migration-proposal.v1", installed=False,
+                  candidate_sha256=hashlib.sha256(candidate_path.read_bytes()).hexdigest(),
+                  original_signal_colors=sorted(existing_colors), blocks=blocks, affected_depots=affected_depots,
+                  all_vehicles=plans, operating_diff="Original per-direction speed limits and signal colors unchanged; independent double tracks. Original U2 siding128m and direct HQ throat32m translated -93 as one component.",
+                  requires_native_reassembly_verification=True)
+    (out / "ORIGINAL_NATIVE_RECORDS.json").write_text(json.dumps(records,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    (out / "PROPOSAL.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / "IN_MEMORY_NATIVE_RECORDS.json").write_text(json.dumps(proposed_records, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps({"output": str(out), "affected_vehicle_ids": [p["vehicle_id"] for p in plans if p["affected"]],
+                      "block_members": [(b["hex_color"], len(b["members"])) for b in blocks]}))
+
+
+if __name__ == "__main__":
+    main()

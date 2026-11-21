@@ -145,7 +145,7 @@ public final class NervRouteRuntimeR52
     {
         var c=LIVE.get(level);if(c==null||!ready(level))return unavailable();
         var order=StaffCommandBookR24.unitOrder(level,variant);String intent=order!=null?NervOutletControlsR53.intent(order.requested)
-                :TvCampaignSavedData.get(level).active.equals("ramiel")?"geofront":"surface";
+                :TvCampaignSavedData.get(level).active.equals("ramiel")?TvYashimaTransitR52.departure(level):"surface";
         var result=c.prepare(variant,intent);if(result.accepted()&&order!=null&&order.requested.equals(StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY))c.launch(variant,null);return result;
     }
     public static EvaLogisticsDirector.ActionResult prepare(ServerLevel level,int variant,String rootIntent)
@@ -188,8 +188,8 @@ public final class NervRouteRuntimeR52
     {var c=LIVE.get(level);if(c!=null)for(var job:c.saved.jobs())if(!job.snapshot().original().mission().isEmpty()&&!Set.of(Phase.PARKED,Phase.DEPLOYED,Phase.CANCELLED,Phase.RETURNING,Phase.FINISHING).contains(job.phase()))c.cancel(job.snapshot().original().variant(),job.snapshot().original().owner());}
     public static void automatic(ServerLevel level,int variant)
     {
-        if(!ready(level))return;var c=LIVE.get(level);var mission=AutoSortieR32.missionToken(level);if(mission.isEmpty())return;
-        var job=c.saved.job(variant);if(job==null||job.phase()==Phase.PARKED){var result=c.prepare(variant,TvCampaignSavedData.get(level).active.equals("ramiel")?"geofront":"surface");var created=c.saved.job(variant);if(created!=null&&c.directory.route(created.snapshot().route()).continuousUpright())c.launch(variant,null);}
+        if(!ready(level))return;var c=LIVE.get(level);var mission=AutoSortieR32.missionToken(level,variant);if(mission.isEmpty())return;
+        var job=c.saved.job(variant);if(job==null||job.phase()==Phase.PARKED){var result=c.prepare(variant,TvCampaignSavedData.get(level).active.equals("ramiel")?TvYashimaTransitR52.departure(level):"surface");var created=c.saved.job(variant);if(created!=null&&c.directory.route(created.snapshot().route()).continuousUpright())c.launch(variant,null);}
         else if(job.phase()==Phase.READY)c.launch(variant,null);
     }
     /** A moved original's declared dimensions replace the old absolute -370

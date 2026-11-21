@@ -173,8 +173,11 @@ public final class TvYashimaStationR52
         var data=TvCampaignSavedData.get(level);var boss=data.angel!=null&&level.getEntity(data.angel) instanceof RamielEntity ramiel?ramiel:null;
         if(pilot instanceof TrainingPilotEntity&&boss!=null&&com.projectseele.event.TvEncounterDirectorR45.owned(boss,data))return boss.getBoundingBox().getCenter();
         Vec3 eye=EvaBodyPose.opticalEye(eva,1),end=eye.add(direction.scale(range));
-        var block=level.clip(new net.minecraft.world.level.ClipContext(eye,end,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,eva));
-        if(block.getType()!=net.minecraft.world.phys.HitResult.Type.MISS)end=block.getLocation();
+        if(LongRangeTerrainR53.ready(level,"cannon-optics-"+eva.getUUID(),eye,end))
+        {
+            var block=level.clip(new net.minecraft.world.level.ClipContext(eye,end,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,eva));
+            if(block.getType()!=net.minecraft.world.phys.HitResult.Type.MISS)end=block.getLocation();
+        }
         if(boss!=null){var hit=boss.getBoundingBox().clip(eye,end);if(hit.isPresent())return hit.get();}return end;
     }
     public static TvYashimaArrivalR50.Next npcArrival(ServerLevel level,TvCampaignSavedData data,EvaUnit01Entity eva,ServerPlayer owner)
@@ -199,12 +202,35 @@ public final class TvYashimaStationR52
         {var eva=boundEva(level,gun);if(eva!=null)release(eva,gun);gun.readyR52(false);tag.putString("LiftPhaseR52",phase="lowering");}
         switch(phase)
         {
-            case "opening"->{hatch.setTargetOpen(1);if(hatch.actualOpenProgressR52()>=.995)tag.putString("LiftPhaseR52","raising");}
-            case "raising"->{hatch.setTargetOpen(1);if(hatch.actualOpenProgressR52()<.995)return;if(gun.liftStepR52(p.raised(),p.closed().distanceTo(p.raised())/p.riseTicks())){tag.putString("LiftPhaseR52","ready");gun.readyR52(true);}}
-            case "lowering"->{hatch.setTargetOpen(1);if(hatch.actualOpenProgressR52()<.995)return;if(!gun.resetAimR52())return;if(gun.liftStepR52(p.closed(),p.closed().distanceTo(p.raised())/p.returnTicks()))tag.putString("LiftPhaseR52","closing");}
-            case "closing"->{hatch.setTargetOpen(0);if(hatch.actualOpenProgressR52()<=.005)tag.putString("LiftPhaseR52","idle");}
+            case "opening"->{advanceHatch(level,hatch,true);if(hatch.actualOpenProgressR52()>=.995)tag.putString("LiftPhaseR52","raising");}
+            case "raising"->{advanceHatch(level,hatch,true);if(hatch.actualOpenProgressR52()<.995)return;if(gun.liftStepR52(p.raised(),p.closed().distanceTo(p.raised())/p.riseTicks())){tag.putString("LiftPhaseR52","ready");gun.readyR52(true);}}
+            case "lowering"->{advanceHatch(level,hatch,true);if(hatch.actualOpenProgressR52()<.995)return;if(!gun.resetAimR52())return;if(gun.liftStepR52(p.closed(),p.closed().distanceTo(p.raised())/p.returnTicks()))tag.putString("LiftPhaseR52","closing");}
+            case "closing"->{if(advanceHatch(level,hatch,false))tag.putString("LiftPhaseR52","idle");}
             default->{}
         }
+    }
+    private static boolean advanceHatch(ServerLevel level,NervSiloDoorEntity hatch,boolean open)
+    {
+        var tag=hatch.getPersistentData();int[] box=tag.getIntArray("CannonProxyBoxR53");
+        if(box.length!=6){hatch.setTargetOpen(open?1:0);return hatch.actualOpenProgressR52()==(open?1:0);}
+        var barrier=net.minecraft.world.level.block.Blocks.BARRIER.defaultBlockState();
+        var air=net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        if(open||hatch.actualOpenProgressR52()<=.005)
+        {
+            int changed=0;
+            for(var pos:BlockPos.betweenClosed(box[0],box[1],box[2],box[3],box[4],box[5]))
+            {
+                var state=level.getBlockState(pos);
+                if(open?state.equals(barrier):state.isAir())
+                {level.setBlock(pos,open?air:barrier,2);if(++changed>=256)return false;}
+            }
+        }
+        float old=hatch.actualOpenProgressR52();hatch.advanceDeclaredR52(open);
+        if(old!=(open?1:0)&&(old==0||old==1))
+            hatch.playSound(com.projectseele.registry.ModSounds.SURFACE_BULKHEAD_MOTION_R48.get(),1.3F,1);
+        if(old!=hatch.actualOpenProgressR52()&&hatch.actualOpenProgressR52()==(open?1:0))
+            hatch.playSound(com.projectseele.registry.ModSounds.SURFACE_BULKHEAD_STOP_R48.get(),1.1F,1);
+        return open?hatch.actualOpenProgressR52()==1:old==0;
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {

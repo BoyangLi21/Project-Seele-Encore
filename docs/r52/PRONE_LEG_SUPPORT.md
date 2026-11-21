@@ -1,0 +1,42 @@
+# R52 普通 prone 下肢支撑修正
+
+本修正使用现有恢复到 R48 来源的 body/stance profile，不重选后来被撤回的行走、跑步 FBX，不改任何动画资源或模型顶点。地图、大处决 body2、服务机械姿态和处决演出均不在此修改范围。
+
+## 原因与生产修改
+
+已有真实 powered 01 prone 采样的 `EvaBodyPose.Bone.matrix` 与 `EvaPoseGraph.finish` 最终矩阵差异不超过 1.5e-6；脚最低接近 0，而原完整 shin_r 网格最低为 -4.6561546 m。大腿是刚性网格，胫/鞋没有显式 jointSkin，但生产模型保留 automatic ankle DQ seam；完整 provider 评估已包括该自动踝缝皮肤。主要错误在原 prone 腿弯曲平面，不能通过替换 renderer 或整体抬升根骨解决。
+
+`EvaProneLegSupportR52` 缓存三型各自的原腿/胫 rest 凸包支撑点（150/154/158 点；方向高度极值与全部原 rest 顶点完全相同），在最后的普通生产姿态上约束完整表面到同一支撑平面以上 0.03 m。它围绕固定髋—踝轴旋转整条原链，保持原 shin 局部膝铰链、膝中心补偿和两段实长，然后对鞋的局部姿态作反向补偿，保持整套原鞋世界矩阵及原最低鞋点接触锚。原自动踝缝皮肤会随新胫角作局部变形以保持表面连接，鞋趾和最低鞋点不动。没有增加 root、leg、shin 或 foot 平移，没有骨骼缩放。
+
+生产接点位于 `EvaBodyPose.sample` 的 `EvaTripoHandsR48` 后、`FixedCannonPoseR52` 前，因此固定炮的上肢拟合使用同一个 torso 与手姿态，最终脚缓存记录修正后的下肢。机械服务源先行返回；helper 又明确排除机械 lock、serviceHeld、空运、停机、狂暴、十字架、演出、空中和正在进行的 live action/reaction。
+
+真实 stance 目标值是 0 站立、1 蹲、3 prone。helper 在值不大于 1 时完全不写骨骼；1 以上属于 prone 进入/退出。单纯逐帧选择最小清地角会在首次接触时跳约 18°，因此同一个 stance 值驱动连续提前转腿，提前量在最终 prone 之前消失，最终仍取完整源表面的最小清地角。修正不推进独立时钟、不创建姿态缓存、不改走跑状态。
+
+`ordinaryReleaseTargetR52` 还调用显式 variant/捕获 stance/捕获 terrain 的纯入口。它构建正常释放目标，不读取机械 held 期间的现场 stance flags，不改变持有的机械源。
+
+## 源几何与连续姿态验证
+
+验证输入为 `D:/eva/artifacts/r51_nonmap_release/native_r51/game` 中当前实际选源 JAR 和 `eva_body_r44.json`，该 profile 的 `walk_run_selection_r52` 明确记录恢复的 R48 六 clip，当前 body SHA-256 为 `cd9ba815c44a6ca60824417ae76b25de9db1936b655ec035b62775fa41d380f9`。
+
+原 native 同帧 FK 使用 `.Codex/r52_operations/calibration_powered/native_prone_cannon.json` 逆父重建；`extra.json` 只提供原 parent/pivot，未混入后采 local rotation。选源 provider 读取实际 JAR receipt 并校验全部源资源 SHA-256，评估完整原三角面，不抽样缩减皮肤。
+
+`tools/java/AuditProneLegSupportR52.java` 定向编译与运行通过，当前报告为 `.Codex/r52_prone_support/PRONE_LEG_SOURCE_AUDIT.json`，包含 169 个静态源场景（含三型原 prone_crawl 的周期与 0.5 权重混合、支撑坡面极限）、6 条各 201 个 stance 值的完整过渡、6 条各 201 个 phase 值的原趴行周期，共 12197 项检查：
+
+- 三型普通 unarmed/rifle prone 与同帧真实 powered 01 基础姿态的原完整腿/胫表面均不低于 0.03 m。
+- 原完整鞋世界矩阵、髋/踝中心、膝局部铰链与 joint-centre offset 保持不变；root/torso/head/arm/hand 矩阵保持不变。
+- 站立和蹲姿所有骨矩阵完全不变。三型连续进入/退出的完整腿/胫表面清地，最大腿世界角变化每 0.01 stance 为 2.2206°（unarmed）/3.1495°（rifle）。没有首次接触时的 18° 突变。
+- 7 个完整 prone 源使用生产 paired triangle BVH，左右完整腿/胫/鞋无相互穿透；各自 shin 与 foot 仍有真实表面接触，踝中心没有断开。
+
+三视对比 `NATIVE_PRONE_SOURCE_SWIVEL_COMPARISON.png` 已由 Root 看图认可为可集成候选。`NATIVE_PRONE_ANKLE_SOURCE_DETAIL.png` 使用 Java 生产 helper 输出的完整源云放大踝部，显示原鞋、原踝中心及实际胫/鞋表面连接。01 最终链外旋约左 54.774°、右 59.646°，膝只向外移动约 1.6–1.8 m；原脚位不变。
+
+生产资源 `prone_leg_support_hulls_r52.json` 仅 28243 B，首次读取并核原 mesh SHA-256 后缓存。每次 sample 不读取资产、不重建完整 mesh，也不扫描 102966 个顶点；使用一次轻量骨 FK、最多 158 个支撑点的标量平面系数及解析角区间投影，已移除逐角度枚举。`tools/build_prone_support_hulls_r52.py` 可从实际选源 JAR 重建同一数据，未替换任何渲染网格。
+
+该机器上每型预热 3000 次并计时 25000 次生产 helper（包括下肢通道复位/FK 缓存失效），中位开销分别为 00 的 0.008456 ms、01 的 0.007492 ms、02 的 0.006288 ms；最慢批次为 0.013710 ms。这是 CPU 微基准，不能冒充游戏帧率验收。真实最低鞋 source 顶点误差左 1.75e-6 m、右 4.87e-6 m；鞋踝自动 skin 的局部变形不移动最低接触锚。
+
+复用的原生输入与验证场景汇集为 `.Codex/r52_prone_support/NATIVE_VALIDATION_INPUT.json`，明确区分真实 powered 旧版基线和需要重采的新版本 native 最终矩阵/运动。
+
+复现入口为 `.Codex/r52_prone_support/compile.args`、`audit-run.args` 与 `python tools/audit_prone_leg_geometry_r52.py`。Java 输出 `powered_native_01.bin.gz` 为完整 19 parts/102966 顶点，单位已是 scale 5 的米，不得再次乘 5。
+
+## 验收边界
+
+这是已经接入并定向编译的生产修改，以及同源完整几何/连续姿态验证；它不是修改后重新打开游戏的 native 验收。本轮未重新开游戏或写世界。最后的原生阶段仍须看贴图、进出 prone 运动与踝部反向补偿的观感，并核实际 `PoseGraph.finish` 最终骨矩阵。已有 powered 原生证据证明旧缺陷的生产来源，不能替代新版本原生画面与运动验收。
