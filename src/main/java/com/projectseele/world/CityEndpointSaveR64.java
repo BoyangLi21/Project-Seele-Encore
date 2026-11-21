@@ -17,12 +17,14 @@ final class CityEndpointSaveR64
             ChunkMap.class, "m_140258_", ChunkAccess.class);
     private final ServerLevel level;
     private final List<ChunkPos> chunks;
+    private final CityEntitySaveFence fence;
     private int cursor;
     private CompletableFuture<Void> writes;
 
     CityEndpointSaveR64(ServerLevel level, List<ChunkPos> chunks)
     {
         this.level = level;
+        this.fence = new CityEntitySaveFence(level);
         this.chunks = chunks;
     }
 
@@ -53,6 +55,6 @@ final class CityEndpointSaveR64
             if (!writes.isDone()) return false;
             writes.join();
         }
-        return true;
+        return fence.advance();
     }
 }

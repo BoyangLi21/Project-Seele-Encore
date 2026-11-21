@@ -622,10 +622,11 @@ public final class CityCreateDistrictR45
                         syncEndpointMetadata();
                         endpointSave = new CityEndpointSaveR64(level, chunks);
                     }
-                    if (endpointSave.drain(start + WORK_NANOS))
+                    long before = System.nanoTime();
+                    boolean durable = endpointSave.drain(start + WORK_NANOS);
+                    endpointFlushNanos += System.nanoTime() - before;
+                    if (durable)
                     {
-                        long before = System.nanoTime(); level.save(null, true, false);
-                        endpointFlushNanos += System.nanoTime() - before;
                         state.phase = "COMMIT"; persist();
                         endpointSave = null;
                     }
