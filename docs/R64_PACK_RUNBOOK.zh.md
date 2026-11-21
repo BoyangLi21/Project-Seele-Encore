@@ -1,5 +1,7 @@
 # R64 打包流程（2026-11-15 干跑后写）
 
+> 2026-11-22：R64 没有单独发布，本流程适用于 R65（打包工具里的版本名已改成 R65）。
+
 工具在分支 `claude/r64-pack-prep`（385c7ea3）：`tools/package_r60.py`（R64）、`tools/rebake_r63.py`、`tools/dh_v6_prepare.py`、`tools/gen_green_grass_side.py`。所有 Python 用 `F:/eva/.claude/fable-review/pyfr/Scripts/frpy.exe -I` 跑；设 `JAVA_HOME=E:\Users\liboy\jdks\jdk-17.0.19+10`。工作目录 `WORK = E:/eva-r64-rebake`（每条命令加 `--work E:/eva-r64-rebake`）。开客户端的步骤先看 `slot.py status`，按规矩拿槽位。
 
 ## 前提
