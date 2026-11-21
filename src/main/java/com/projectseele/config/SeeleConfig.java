@@ -319,7 +319,7 @@ public final class SeeleConfig
                         "slam; out of a run it is a charge with the shoulder; a held Angel is beaten on with the light press",
                         "and thrown with the heavy one; with stand, curve, clock and step).",
                         "In game: /seele combat flow.")
-                .define("flow", "off", value -> value instanceof String);
+                .define("flow", "on", value -> value instanceof String);
         common.pop();
 
         common.push("eva_pallet_smg");
