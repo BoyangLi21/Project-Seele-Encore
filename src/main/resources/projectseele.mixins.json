@@ -51,6 +51,11 @@
     "CitySavedOwnerUnionMixinR45"
   ],
   "client": [
+    "client.AreaMapMinimapMixin",
+    "client.AreaMapWaypointAccess",
+    "client.AreaMapWaypointMixin",
+    "client.AreaMapWorldMixin",
+    "client.AreaMapRegionAccess",
     "client.BufferBuilderDirectMixin",
     "client.LclBubbleR54Mixin",
     "client.HangarLclTerrainMixin",
