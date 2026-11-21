@@ -36,6 +36,32 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.DoubleValue SHAMSHEL_CORE_FINISH_FRACTION;
     public static final ForgeConfigSpec.IntValue SHAMSHEL_CORE_HOLD_TICKS;
     public static final ForgeConfigSpec.DoubleValue SHAMSHEL_CORE_STAB_DAMAGE;
+    public static final ForgeConfigSpec.DoubleValue GAGHIEL_CLAMP_DAMAGE;
+    public static final ForgeConfigSpec.IntValue GAGHIEL_CLAMP_MAX_TICKS;
+    public static final ForgeConfigSpec.IntValue GAGHIEL_CLAMP_COOLDOWN_TICKS;
+    public static final ForgeConfigSpec.BooleanValue GAGHIEL_CREW_AUTO_FIRE;
+    public static final ForgeConfigSpec.DoubleValue ISRAFEL_MAX_HEALTH;
+    public static final ForgeConfigSpec.DoubleValue ISRAFEL_AT_FIELD;
+    public static final ForgeConfigSpec.IntValue ISRAFEL_SYNC_WINDOW_TICKS;
+    public static final ForgeConfigSpec.DoubleValue ISRAFEL_REVIVE_FRACTION;
+    public static final ForgeConfigSpec.DoubleValue ISRAFEL_REVIVE_FIELD;
+    public static final ForgeConfigSpec.DoubleValue MATARAEL_MAX_HEALTH;
+    public static final ForgeConfigSpec.DoubleValue MATARAEL_AT_FIELD;
+    public static final ForgeConfigSpec.DoubleValue MATARAEL_ACID_DAMAGE;
+    public static final ForgeConfigSpec.DoubleValue MATARAEL_ACID_POOL_DAMAGE;
+    public static final ForgeConfigSpec.IntValue MATARAEL_ACID_PERIOD_TICKS;
+    public static final ForgeConfigSpec.BooleanValue MATARAEL_BLACKOUT;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_MAX_HEALTH;
+    public static final ForgeConfigSpec.IntValue SAHAQUIEL_FALL_TICKS;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_FALL_HEIGHT;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_CATCH_RADIUS;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_SUPPORT_LOSS_ONE;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_SUPPORT_LOSS_TWO;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_SUPPORT_LOSS_NONE;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_SUPPORT_GAIN_THREE;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_PIECE_DAMAGE;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_IMPACT_DAMAGE;
+    public static final ForgeConfigSpec.DoubleValue SAHAQUIEL_IMPACT_RADIUS;
 
     // ----- common: Ramiel -----
     public static final ForgeConfigSpec.DoubleValue RAMIEL_MAX_HEALTH;
@@ -274,6 +300,98 @@ public final class SeeleConfig
         SHAMSHEL_CORE_STAB_DAMAGE = common
                 .comment("Damage the whips deal to the unit holding the knife, once a second.")
                 .defineInRange("coreStabDamage", 8.0D, 0.0D, 200.0D);
+        common.pop();
+
+        common.push("gaghiel");
+        GAGHIEL_CLAMP_DAMAGE = common
+                .comment("Damage per second to a unit held in Gaghiel's jaws (episode 8: Unit-02 swallowed).")
+                .defineInRange("clampDamage", 6.0D, 0.0D, 200.0D);
+        GAGHIEL_CLAMP_MAX_TICKS = common
+                .comment("Ticks Gaghiel keeps a unit in its jaws before it spits it out, unless the jaws are pried open first.")
+                .defineInRange("clampMaxTicks", 300, 20, 6000);
+        GAGHIEL_CLAMP_COOLDOWN_TICKS = common
+                .comment("Ticks after a clamp ends before Gaghiel can take a unit into its jaws again.")
+                .defineInRange("clampCooldownTicks", 400, 20, 12000);
+        GAGHIEL_CREW_AUTO_FIRE = common
+                .comment("The fleet's own crews switch the gun power on and fire both guns into the held-open mouth",
+                        "when no player stands at the bridge or a gun post.")
+                .define("crewAutoFire", true);
+        common.pop();
+
+        common.push("israfel");
+        ISRAFEL_MAX_HEALTH = common
+                .comment("Israfel max health (episode 9). Each half keeps half of it after the split.")
+                .defineInRange("maxHealth", 720.0D, 1.0D, 10000.0D);
+        ISRAFEL_AT_FIELD = common
+                .comment("Israfel A.T. Field pool, worn down only by EVA melee; the halves share what is left at the split.")
+                .defineInRange("atField", 850.0D, 0.0D, 10000.0D);
+        ISRAFEL_SYNC_WINDOW_TICKS = common
+                .comment("A downed half waits this many ticks for the other half to fall; both falling inside it kills Israfel.",
+                        "Episode 9 asks for a simultaneous strike: 20 ticks is about one second; 100 is the old lenient window.")
+                .defineInRange("syncWindowTicks", 20, 1, 400);
+        ISRAFEL_REVIVE_FRACTION = common
+                .comment("Share of max health a half gets back when the window passes alone (the halves make each other whole).")
+                .defineInRange("reviveHealthFraction", 0.45D, 0.01D, 1.0D);
+        ISRAFEL_REVIVE_FIELD = common
+                .comment("A.T. Field a half gets back when it revives.")
+                .defineInRange("reviveField", 240.0D, 0.0D, 10000.0D);
+        common.pop();
+
+        common.push("matarael");
+        MATARAEL_MAX_HEALTH = common
+                .comment("Matarael max health (episode 11).")
+                .defineInRange("maxHealth", 450.0D, 1.0D, 10000.0D);
+        MATARAEL_AT_FIELD = common
+                .comment("Matarael's weak A.T. Field; any blow or shot from underneath wears it down, nothing else reaches it.")
+                .defineInRange("atField", 300.0D, 0.0D, 10000.0D);
+        MATARAEL_ACID_DAMAGE = common
+                .comment("Damage of an acid drop that falls on a unit.")
+                .defineInRange("acidDamage", 10.0D, 0.0D, 500.0D);
+        MATARAEL_ACID_POOL_DAMAGE = common
+                .comment("Damage per second to a unit standing in an acid pool.")
+                .defineInRange("acidPoolDamage", 4.0D, 0.0D, 500.0D);
+        MATARAEL_ACID_PERIOD_TICKS = common
+                .comment("Ticks between two acid drops.")
+                .defineInRange("acidPeriodTicks", 25, 2, 1200);
+        MATARAEL_BLACKOUT = common
+                .comment("While the operation runs the city has no power: no cable reaches a unit and it fights on its battery.")
+                .define("blackout", true);
+        common.pop();
+
+        common.push("sahaquiel");
+        SAHAQUIEL_MAX_HEALTH = common
+                .comment("Sahaquiel max health (episode 12). It can be hurt only while caught, from underneath.")
+                .defineInRange("maxHealth", 600.0D, 1.0D, 10000.0D);
+        SAHAQUIEL_FALL_TICKS = common
+                .comment("Ticks from the start of the fall (the first unit up on the surface) to the catch height.")
+                .defineInRange("fallTicks", 2400, 200, 24000);
+        SAHAQUIEL_FALL_HEIGHT = common
+                .comment("Height above the ground it falls from.")
+                .defineInRange("fallHeight", 360.0D, 60.0D, 1200.0D);
+        SAHAQUIEL_CATCH_RADIUS = common
+                .comment("A unit catches it when standing this close (horizontally) to the landing point as it comes down.")
+                .defineInRange("catchRadius", 16.0D, 2.0D, 80.0D);
+        SAHAQUIEL_SUPPORT_LOSS_ONE = common
+                .comment("Support lost per second while only one unit holds it (support starts at 100; at 0 it crushes them).")
+                .defineInRange("supportLossOne", 6.0D, 0.0D, 100.0D);
+        SAHAQUIEL_SUPPORT_LOSS_TWO = common
+                .comment("Support lost per second while two units hold it.")
+                .defineInRange("supportLossTwo", 1.5D, 0.0D, 100.0D);
+        SAHAQUIEL_SUPPORT_LOSS_NONE = common
+                .comment("Support lost per second while nobody is under it.")
+                .defineInRange("supportLossNone", 25.0D, 0.0D, 100.0D);
+        SAHAQUIEL_SUPPORT_GAIN_THREE = common
+                .comment("Support regained per second while three or more units hold it.")
+                .defineInRange("supportGainThree", 4.0D, 0.0D, 100.0D);
+        SAHAQUIEL_PIECE_DAMAGE = common
+                .comment("Damage of a test piece's blast at its centre (it falls well away from the landing point).")
+                .defineInRange("pieceDamage", 40.0D, 0.0D, 1000.0D);
+        SAHAQUIEL_IMPACT_DAMAGE = common
+                .comment("Damage of the impact blast at its centre when it is not held.")
+                .defineInRange("impactDamage", 150.0D, 0.0D, 2000.0D);
+        SAHAQUIEL_IMPACT_RADIUS = common
+                .comment("Radius of the impact blast.")
+                .defineInRange("impactRadius", 70.0D, 1.0D, 400.0D);
         common.pop();
 
         common.push("positron_rifle");

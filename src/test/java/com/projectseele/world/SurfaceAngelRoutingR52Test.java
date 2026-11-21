@@ -29,8 +29,8 @@ public final class SurfaceAngelRoutingR52Test
         var target=java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
         var foreign=java.util.UUID.fromString("00000000-0000-0000-0000-000000000003");
         // R66: Shamshel has its own original model and opens like Sachiel; a closed chapter still never finishes.
-        {var closed=new TvCampaignSavedData();closed.active="israfel";closed.owner=owner;closed.angel=target;closed.phase="combat";
-         check(!closed.canFinish("israfel",owner,target),"A closed chapter cannot be finished");}
+        {var closed=new TvCampaignSavedData();closed.active="ireul";closed.owner=owner;closed.angel=target;closed.phase="combat";
+         check(!closed.canFinish("ireul",owner,target),"A closed chapter cannot be finished");}
         for(String chapter:new String[]{"sachiel","shamshel"})for(double distance:new double[]{48,80,160})
         {
             var data=new TvCampaignSavedData();data.active=chapter;data.owner=owner;data.angel=target;data.phase="approach";data.generationR43=6;

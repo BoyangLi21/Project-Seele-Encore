@@ -38,6 +38,8 @@ public class CommonEvents
         event.put(ModEntities.SHAMSHEL.get(), com.projectseele.entity.ShamshelEntity.createAttributes().build());
         event.put(ModEntities.ZERUEL.get(), com.projectseele.entity.ZeruelEntity.createAttributes().build());
         event.put(ModEntities.ISRAFEL.get(), com.projectseele.entity.IsrafelEntity.createAttributes().build());
+        event.put(ModEntities.MATARAEL.get(), com.projectseele.entity.MataraelEntity.createAttributes().build());
+        event.put(ModEntities.SAHAQUIEL.get(), com.projectseele.entity.SahaquielEntity.createAttributes().build());
         event.put(ModEntities.MASS_PRODUCTION_EVA.get(),
                 com.projectseele.entity.MassProductionEvaEntity.createAttributes().build());
         event.put(ModEntities.LILITH.get(),

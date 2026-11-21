@@ -68,6 +68,8 @@ public class ModCreativeTabs
                         output.accept(ModItems.SHAMSHEL_SPAWN_EGG.get());
                         output.accept(ModItems.ZERUEL_SPAWN_EGG.get());
                         output.accept(ModItems.ISRAFEL_SPAWN_EGG.get());
+                        output.accept(ModItems.MATARAEL_SPAWN_EGG.get());
+                        output.accept(ModItems.SAHAQUIEL_SPAWN_EGG.get());
                         output.accept(ModItems.MASS_PRODUCTION_EVA_SPAWN_EGG.get());
                         output.accept(ModItems.NERV_CONSTRUCTION_KIT.get());
                         output.accept(ModItems.NERV_BEACON.get());

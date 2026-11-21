@@ -170,6 +170,8 @@ public final class NervPilotCombatR30
                 ?ArmedSortieSavedDataR48.get(l).selection(sortie.unit).payload():-1;
         if(selectedPayloadR48>=0)eva.autonomousWeaponR30(pilot,selectedPayloadR48);
         LivingEntity angel=d.angel!=null&&l.getEntity(d.angel) instanceof LivingEntity target?target:null;
+        // R66: after Israfel divides, each unit takes its own half (by its rank in the sortie).
+        if(angel instanceof IsrafelEntity israfel)angel=israfel.pairTargetR66(d.sorties.keySet().stream().sorted().toList().indexOf(sortie.unit));
         Vec3 goal=TvEncounterRulesR45.handles(d.active)?TvEncounterRulesR45.unitApproach(l,d,sortie.unit):TvCampaignDirector.approachPointR30(l);
         if(goal==null){eva.stopAutonomousR30();return;}
         if(d.active.equals("ramiel")&&(sortie.unit==0||sortie.unit==1))
@@ -265,6 +267,43 @@ public final class NervPilotCombatR30
             if(spacing.lengthSqr()<.001&&eva.position().subtract(goal).horizontalDistance()>14)spacing=goal.subtract(eva.position()).multiply(1,0,1).normalize().scale(.5);
             eva.autonomousDriveR30(pilot,steer(l,eva,b,spacing),aim,false);say(owner,pilot,b,"finale_spacing");return;
         }
+        // R66: Sahaquiel (episode 12): every unit runs for the landing point, each to its own side of it, and stays under
+        // the body; once it is caught they strike up at the core.
+        if(angel instanceof SahaquielEntity sky&&sky.landingR66()!=null)
+        {
+            int rank=d.sorties.keySet().stream().sorted().toList().indexOf(sortie.unit);
+            Vec3 spot=sky.landingR66().add(new Vec3(5,0,0).yRot(rank*2.0944F)),to=spot.subtract(eva.position()).multiply(1,0,1);
+            boolean there=to.length()<4;
+            eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_KNIFE);b.retreat=0;
+            eva.autonomousDriveR30(pilot,steer(l,eva,b,there?Vec3.ZERO:to.normalize()),sky.caughtR66()?sky.coreWorldR66():spot.add(0,60,0),!there&&to.length()>20);
+            if(sky.caughtR66()&&to.length()<14&&b.age%12==0)eva.autonomousAttackR30(pilot,0);
+            say(owner,pilot,b,there?"melee":"close_in");return;
+        }
+        // R66: Matarael is reached only from underneath (episode 11): the pilot goes right under the body and fires up.
+        if(angel instanceof MataraelEntity spider)
+        {
+            Vec3 core=spider.coreWorldR66(),under=core.subtract(eva.position()).multiply(1,0,1);
+            boolean gun=(eva.getArmamentMask()&(1<<EvaUnit01Entity.WEAPON_RIFLE))!=0,beneath=under.length()<6;
+            eva.autonomousWeaponR30(pilot,gun?EvaUnit01Entity.WEAPON_RIFLE:EvaUnit01Entity.WEAPON_KNIFE);b.retreat=0;
+            eva.autonomousDriveR30(pilot,steer(l,eva,b,beneath?Vec3.ZERO:under.normalize()),core,!beneath&&under.length()>40);
+            if(beneath&&b.age%(gun?8:12)==0)eva.autonomousAttackR30(pilot,gun?3:0);
+            say(owner,pilot,b,gun?"ranged":"melee");return;
+        }
+        // R66: Israfel's halves must fall together (episode 9). Once a half is split and bare, the pilot counts the knife
+        // blows still needed on each half: ahead, it waits; behind, it catches up; level, it strikes on the beat both
+        // pilots share (the game clock), so the last blows land within the window.
+        if(angel instanceof IsrafelEntity half&&half.splitR66()&&half.getAtField()<=0&&half.twinR66()!=null&&half.twinR66().isAlive())
+        {
+            var other=half.twinR66();
+            int mine=israfelBlowsLeft(half),theirs=other.downedR66()?0:other.getAtField()>0?99:israfelBlowsLeft(other);
+            eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_KNIFE);b.retreat=0;
+            Vec3 to=half.position().subtract(eva.position()).multiply(1,0,1);
+            boolean reach=range<22;
+            eva.autonomousDriveR30(pilot,steer(l,eva,b,reach?Vec3.ZERO:to.normalize()),aim,!reach&&range>40);
+            boolean strike=half.downedR66()?false:theirs==0||mine>theirs?b.age%12==0:mine==theirs&&l.getGameTime()%40==0;
+            if(reach&&strike)eva.autonomousAttackR30(pilot,0);
+            say(owner,pilot,b,"melee");return;
+        }
         // R66: Shamshel brought low falls only to a knife held on its core; the pilot closes in and stays, as in episode 3.
         if(angel instanceof ShamshelEntity shamshel&&shamshel.coreFinishReadyR66())
         {
@@ -333,6 +372,8 @@ public final class NervPilotCombatR30
         if(!support)steer=Vec3.ZERO;
         eva.autonomousDriveR30(pilot,steer.scale(run?1:Math.min(1,delta.length()/2)),aim==null?point.add(0,45,0):aim,run);
     }
+    /** Knife blows a bare Israfel half still needs: about 55 a blow after its armour of 9 (knife 60). */
+    private static int israfelBlowsLeft(IsrafelEntity half){return Math.max(1,(int)Math.ceil(half.getHealth()/55F));}
     private static Vec3 steer(ServerLevel l,EvaUnit01Entity eva,Brain b,Vec3 desired)
     {
         if(desired.lengthSqr()<.001)return Vec3.ZERO;

@@ -158,6 +158,10 @@ public class ModItems
             () -> new ForgeSpawnEggItem(ModEntities.ZERUEL, 0xE4E2D8, 0x181414, new Item.Properties()));
     public static final RegistryObject<Item> ISRAFEL_SPAWN_EGG = ITEMS.register("israfel_spawn_egg",
             () -> new ForgeSpawnEggItem(ModEntities.ISRAFEL, 0x173B25, 0xD8D8D0, new Item.Properties()));
+    public static final RegistryObject<Item> MATARAEL_SPAWN_EGG = ITEMS.register("matarael_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.MATARAEL, 0x2A2420, 0xC9D24A, new Item.Properties()));
+    public static final RegistryObject<Item> SAHAQUIEL_SPAWN_EGG = ITEMS.register("sahaquiel_spawn_egg",
+            () -> new ForgeSpawnEggItem(ModEntities.SAHAQUIEL, 0xE0602A, 0x101010, new Item.Properties()));
     public static final RegistryObject<Item> MASS_PRODUCTION_EVA_SPAWN_EGG = ITEMS.register("mass_production_eva_spawn_egg",
             () -> new ForgeSpawnEggItem(ModEntities.MASS_PRODUCTION_EVA, 0xE2DED2, 0xA51620, new Item.Properties()));
     public static final RegistryObject<Item> SEELE_SCENARIO = ITEMS.register("seele_scenario",

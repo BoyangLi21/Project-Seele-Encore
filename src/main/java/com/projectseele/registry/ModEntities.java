@@ -256,6 +256,14 @@ public class ModEntities
     public static final RegistryObject<EntityType<IsrafelEntity>> ISRAFEL = ENTITY_TYPES.register("israfel",
             () -> EntityType.Builder.of(IsrafelEntity::new, MobCategory.MONSTER)
                     .sized(18.0F, 60.0F).fireImmune().clientTrackingRange(24).build("israfel"));
+    // R66: the body rides high on long legs; the box is the body and the space under it, so a unit can stand beneath.
+    public static final RegistryObject<EntityType<com.projectseele.entity.MataraelEntity>> MATARAEL = ENTITY_TYPES.register("matarael",
+            () -> EntityType.Builder.of(com.projectseele.entity.MataraelEntity::new, MobCategory.MONSTER)
+                    .sized(16.0F, 38.0F).fireImmune().clientTrackingRange(24).build("matarael"));
+    // R66: a broad flat body that falls from high above; tracked from far so the fall is seen across the city.
+    public static final RegistryObject<EntityType<com.projectseele.entity.SahaquielEntity>> SAHAQUIEL = ENTITY_TYPES.register("sahaquiel",
+            () -> EntityType.Builder.of(com.projectseele.entity.SahaquielEntity::new, MobCategory.MONSTER)
+                    .sized(40.0F, 10.0F).fireImmune().clientTrackingRange(64).build("sahaquiel"));
     public static final RegistryObject<EntityType<LilithEntity>> LILITH =
             ENTITY_TYPES.register("lilith",
                     () -> EntityType.Builder.of(LilithEntity::new, MobCategory.MISC)

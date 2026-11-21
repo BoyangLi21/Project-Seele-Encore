@@ -23,7 +23,7 @@ public final class BattleParametersR52Test
     public static void main(String[] args)
     {
         var root=fixture();var plan=SurfaceAngelPlanR52.parse(root,"synthetic:surface");
-        check(plan.sites().size()==2,"both surface encounters present");check(plan.fingerprint().length()==64,"configuration continuity fingerprint");
+        check(plan.sites().containsKey("sachiel")&&plan.sites().containsKey("shamshel"),"both surface encounters present");for(String walker:new String[]{"israfel","matarael","sahaquiel"})check(plan.sites().get(walker).route().equals(plan.sites().get("sachiel").route()),"R66 chapters borrow Sachiel's route");check(plan.fingerprint().length()==64,"configuration continuity fingerprint");
         rejects(()->SurfaceAngelPlanR52.parse(fixture(),"synthetic:other"),"foreign dimension");
         var absent=fixture();absent.remove("sites");rejects(()->SurfaceAngelPlanR52.parse(absent,"synthetic:surface"),"no old-site fallback");
         var draft=fixture();draft.addProperty("installed",false);rejects(()->SurfaceAngelPlanR52.parse(draft,"synthetic:surface"),"unbuilt design cannot start");

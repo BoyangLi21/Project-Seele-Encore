@@ -17,7 +17,7 @@
 | `/seele call [联络人]` | 接通指挥通信，默认美里；可写美里、律子、冬月、摩耶或 misato、ritsuko、fuyutsuki、maya。条件与 O 键相同 |
 | `/seele route <目的地>` | 在总部公共通道里步行引导；`/seele route stop` 停止 |
 | `/seele sortie status` | 当前作战简报 |
-| `/seele sortie select <sachiel\|shamshel\|ramiel\|gaghiel>` | 选择作战 |
+| `/seele sortie select <sachiel\|shamshel\|ramiel\|gaghiel\|israfel\|matarael\|sahaquiel>` | 选择作战 |
 | `/seele sortie begin` | 开始已选的作战 |
 | `/seele sortie retry` | 作战失败、机体和装备回收后，用同一批机体重试 |
 | `/seele sortie cancel` | 结束作战并回收机体 |

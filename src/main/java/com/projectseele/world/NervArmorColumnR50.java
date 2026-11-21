@@ -142,7 +142,7 @@ public final class NervArmorColumnR50
     /** The visible sole/lance/whip must intersect the actual top plate before its ledger changes. */
     public static boolean surfaceImpactR52(ServerLevel level,LivingEntity attacker,Vec3 from,Vec3 to,float damage)
     {
-        if(!(attacker instanceof com.projectseele.entity.SachielEntity||attacker instanceof com.projectseele.entity.ShamshelEntity)
+        if(!(attacker instanceof com.projectseele.entity.SachielEntity||attacker instanceof com.projectseele.entity.ShamshelEntity||attacker instanceof com.projectseele.entity.MataraelEntity)
                 ||from==null||to==null||!Double.isFinite(from.lengthSqr())||!Double.isFinite(to.lengthSqr())||!Float.isFinite(damage)||damage<=0)return false;
         var p=plan(level).orElse(null);if(p==null||!p.installed())return false;
         var s=initialized(level,p);if(!s.column.equals(p.id()))return false;var layer=p.layers().get(0);

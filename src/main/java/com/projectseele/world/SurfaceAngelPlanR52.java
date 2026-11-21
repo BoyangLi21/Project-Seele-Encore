@@ -22,7 +22,7 @@ public final class SurfaceAngelPlanR52
     private static final Map<ServerLevel,DeclarationR52> CACHE=new WeakHashMap<>();
     static RoutingR52 routingR52(String chapter,boolean declared,boolean claimed,boolean ready)
     {
-        if(!"sachiel".equals(chapter)&&!"shamshel".equals(chapter)||!declared&&!claimed)return RoutingR52.LEGACY;
+        if(!"sachiel".equals(chapter)&&!"shamshel".equals(chapter)&&!"israfel".equals(chapter)&&!"matarael".equals(chapter)&&!"sahaquiel".equals(chapter)||!declared&&!claimed)return RoutingR52.LEGACY;
         return claimed&&ready?RoutingR52.SURFACE:RoutingR52.HOLD;
     }
     static boolean declarationMatchesR52(String declaredDimension,String actualDimension,boolean geofrontGenerator)
@@ -77,6 +77,12 @@ public final class SurfaceAngelPlanR52
                 throw new IllegalArgumentException("Surface route is not continuous");
             sites.put(chapter,new Site(chapter,spawn,List.copyOf(route),intercept,yaw,speed,radius,range,period,damage));
         }
+        // R66: Israfel and Matarael walk in on the ground like Sachiel and take Sachiel's route (the map has none of theirs);
+        // Sahaquiel only borrows the entry so the operation can run; it falls on NERV and never walks it.
+        var sachiel=sites.get("sachiel");
+        for(String walker:List.of("israfel","matarael","sahaquiel"))
+            sites.put(walker,new Site(walker,sachiel.spawn(),sachiel.route(),sachiel.intercept(),sachiel.yaw(),sachiel.speed(),
+                    sachiel.arrivalRadius(),sachiel.engagementRange(),sachiel.attackPeriod(),sachiel.armorDamage()));
         try
         {
             String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(root.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));

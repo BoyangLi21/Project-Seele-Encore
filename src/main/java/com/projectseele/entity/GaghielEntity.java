@@ -52,6 +52,8 @@ public final class GaghielEntity extends Mob implements Enemy, Angel, software.b
     private final Set<UUID> hit=new HashSet<>();
     private Vec3 damagePoint;
     private boolean navalCoreHit;
+    private UUID clampVictim;
+    private int clampTicks,clampCooldown=200;
     private boolean nativeProjectileProcessing;
 
     private record Body(Vec3 center,Vec3 radii) {}
@@ -101,6 +103,49 @@ public final class GaghielEntity extends Mob implements Enemy, Angel, software.b
     public void holdMouthR50(UUID eva)
     {
         heldBy=eva;if(eva!=null){entityData.set(MOUTH,1F);setDeltaMovement(getDeltaMovement().scale(.1));}
+        if(eva!=null&&clampVictim!=null)
+        {
+            com.projectseele.ProjectSeele.LOGGER.info("R66 GAGHIEL jaws pried open by eva={} after {} ticks",eva,clampTicks);
+            clampVictim=null;clampCooldown=com.projectseele.config.SeeleConfig.GAGHIEL_CLAMP_COOLDOWN_TICKS.get();
+        }
+    }
+    /** R66: true while this unit hangs in the jaws (episode 8: Unit-02 swallowed, then prying the jaws apart). */
+    public boolean clampingR66(EvaUnit01Entity eva){return eva!=null&&eva.getUUID().equals(clampVictim);}
+    private void beginClampR66(EvaUnit01Entity eva)
+    {
+        clampVictim=eva.getUUID();clampTicks=0;
+        entityData.set(ATTACK,SWIM);entityData.set(AGE,0);entityData.set(MOUTH,.42F);hit.clear();cooldown=54;
+        CombatFeelR31.send(eva,CombatFeelR31.STAGGER,getForward(),.4F,30,20);
+        com.projectseele.ProjectSeele.LOGGER.info("R66 GAGHIEL clamp eva={}",eva.getUUID());
+    }
+    /** Holds the clamped unit in front of the jaws while Gaghiel sinks; returns false when there is no clamp. */
+    private boolean tickClampR66()
+    {
+        if(clampVictim==null)return false;
+        net.minecraft.world.entity.Entity found=((ServerLevel)level()).getEntity(clampVictim);
+        if(!(found instanceof EvaUnit01Entity eva)||!eva.isAlive())
+        {clampVictim=null;clampCooldown=com.projectseele.config.SeeleConfig.GAGHIEL_CLAMP_COOLDOWN_TICKS.get();return false;}
+        clampTicks++;
+        entityData.set(MOUTH,.42F);
+        // it keeps its heading (toward the guns, where it struck) and drags the unit down toward the bed
+        double low=seabed+(13+11*.42)*modelScaleR50()+2;
+        Vec3 sink=new Vec3(0,Mth.clamp((low-getY())*.04,-.15,.15),0);
+        setDeltaMovement(sink);move(MoverType.SELF,sink);setBoundingBox(makeBoundingBox());
+        Vec3 front=getForward().multiply(1,0,1).normalize(),mouth=mouthWorldPos(1).add(front.scale(4*modelScaleR50()));
+        eva.teleportTo(mouth.x,mouth.y-eva.getBbHeight()*.62,mouth.z);
+        eva.setYRot(getYRot()+180);eva.setYBodyRot(getYRot()+180);eva.setYHeadRot(getYRot()+180);eva.setDeltaMovement(Vec3.ZERO);
+        if(clampTicks%20==0)
+            EvaHitFeedback.hurt(eva,damageSources().mobAttack(this),com.projectseele.config.SeeleConfig.GAGHIEL_CLAMP_DAMAGE.get().floatValue(),mouthWorldPos(1),front);
+        if(clampTicks>=com.projectseele.config.SeeleConfig.GAGHIEL_CLAMP_MAX_TICKS.get())
+        {
+            // not pried open in time: spat out, hard
+            Vec3 velocity=front.scale(1.6).add(0,.8,0);
+            CombatFeelR31.send(eva,CombatFeelR31.THROWN,velocity,1F,60,0);
+            eva.setDeltaMovement(velocity);eva.hurtMarked=true;
+            com.projectseele.ProjectSeele.LOGGER.info("R66 GAGHIEL spat out eva={} after {} ticks",eva.getUUID(),clampTicks);
+            clampVictim=null;clampCooldown=com.projectseele.config.SeeleConfig.GAGHIEL_CLAMP_COOLDOWN_TICKS.get();
+        }
+        return true;
     }
     public Vec3 modelPointR50(Vec3 local,float partial)
     {
@@ -265,6 +310,8 @@ public final class GaghielEntity extends Mob implements Enemy, Angel, software.b
         entityData.set(SWIM_AGE,(entityData.get(SWIM_AGE)+1)%62800);
         if(heldBy!=null)
         {entityData.set(MOUTH,1F);setDeltaMovement(Vec3.ZERO);return;}
+        if(clampCooldown>0)clampCooldown--;
+        if(tickClampR66())return;
         var target=getTarget();boolean live=target!=null&&target.isAlive();
         Vec3 goal;
         if(live)
@@ -353,6 +400,9 @@ public final class GaghielEntity extends Mob implements Enemy, Angel, software.b
             Optional<Vec3> contact=com.projectseele.physics.CombatBodyContacts.clip(victim,from,to,radius*modelScaleR50());
             if(contact.isEmpty())continue;
             hit.add(victim.getUUID());Vec3 direction=to.subtract(from).lengthSqr()>1e-6?to.subtract(from).normalize():getForward();
+            // R66: a bite that closes on a unit takes it into the jaws
+            if(attackKind()==BITE&&victim instanceof EvaUnit01Entity eva&&clampVictim==null&&heldBy==null&&clampCooldown<=0)
+                beginClampR66(eva);
             if(EvaHitFeedback.hurt(victim,damageSources().mobAttack(this),attackKind()==BREACH?42:attackKind()==FIN_SWEEP?28:36,contact.get(),direction))
                 CombatFoleyR36.impact(this,victim,contact.get(),false,attackKind()==BREACH);
         }

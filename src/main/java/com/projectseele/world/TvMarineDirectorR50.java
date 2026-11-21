@@ -158,7 +158,8 @@ public final class TvMarineDirectorR50
             double mouthRadius=10*boss.modelScaleR50()+2;
             boolean contact=left.distanceTo(boss.mouthWorldPos(1))<=mouthRadius&&right.distanceTo(boss.mouthWorldPos(1))<=mouthRadius
                     &&lead.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&lead.isPilotCrouching()&&lead.getDeltaMovement().horizontalDistance()<.55
-                    &&lead.isUmbilicalConnected()&&(boss.getAtField()<=0||lead.isAtFieldOn()&&lead.getAtFieldEnergy()>0)&&boss.mouthOpen(1)>.6;
+                    &&lead.isUmbilicalConnected()&&(boss.getAtField()<=0||lead.isAtFieldOn()&&lead.getAtFieldEnergy()>0)
+                    &&(boss.mouthOpen(1)>.6||boss.clampingR66(lead));
             state.holdTicks=contact?Math.min(200,state.holdTicks+10):0;
             boss.holdMouthR50(state.holdTicks>=20?lead.getUUID():null);
         }
@@ -168,6 +169,8 @@ public final class TvMarineDirectorR50
                     .min(Comparator.comparingDouble(p->p.distanceToSqr(boss))).orElse(null);
             boss.setTarget(crew);boss.holdMouthR50(null);state.holdTicks=0;
         }
+        if(com.projectseele.config.SeeleConfig.GAGHIEL_CREW_AUTO_FIRE.get()&&campaign.phase.equals("combat")&&commander!=null)
+            crewR66(level,site,state,boss,commander);
         if(state.elapsed>=site.deadline()){fail(level,campaign,state,"海战拦截时限已过，未及时完成二号机水中牵制与击破；本场可回收后重试。");return;}
         if(lead!=null&&campaign.phase.equals("combat")&&(!lead.isAlive()||com.projectseele.entity.EvaShutdownR30.wreck(lead)))
         {fail(level,campaign,state,"原二号机失去战斗能力，请先回收整备。");return;}
@@ -177,6 +180,38 @@ public final class TvMarineDirectorR50
         if(boss.mouthHeldR50())briefing.append(Component.translatable("ops.projectseele.marine.mouth_held"));
         state.notice=OperationText.encode(briefing);
         campaign.notice=state.notice;bar.setName(briefing);bar.setProgress(Math.max(0,Math.min(1,boss.getHealth()/boss.getMaxHealth())));state.setDirty();
+    }
+    /**
+     * R66: the fleet's own crews man the bridge and both guns whenever no person stands at those posts, as the UN
+     * fleet did in episode 8. They switch the gun power on once the fight starts and, while Unit-02 holds the jaws
+     * open, fire the two guns one after the other (one gun per director pass, well inside the pair window).
+     */
+    private static void crewR66(ServerLevel level,TvMarineSiteR50.Site site,TvMarineSavedDataR50 state,GaghielEntity boss,ServerPlayer commander)
+    {
+        var powered=net.minecraft.world.level.block.state.properties.BlockStateProperties.POWERED;
+        if(!state.powerEnabled&&!mannedR66(level,site.powerControl())&&level.hasChunkAt(site.powerControl()))
+        {
+            var control=level.getBlockState(site.powerControl());
+            if(control.getBlock() instanceof net.minecraft.world.level.block.LeverBlock&&control.hasProperty(powered))
+            {
+                state.powerEnabled=true;level.setBlock(site.powerControl(),control.setValue(powered,true),3);state.setDirty();
+                ProjectSeele.LOGGER.info("R66 GAGHIEL crew switched the gun power on");
+            }
+        }
+        if(!boss.mouthHeldR50())return;
+        for(int i=0;i<2;i++)
+        {
+            if(state.cannonCharge[i]<CHARGE_TICKS||state.cannonCooldown[i]>0||mannedR66(level,site.cannonControls()[i]))continue;
+            String result=fireCannonR66(level,commander,i,false);
+            boolean fired=state.cannonFired[i]==level.getGameTime();
+            if(fired||level.getGameTime()%100<10)ProjectSeele.LOGGER.info("R66 GAGHIEL crew gun {}: {}",i+1,result);
+            if(fired)break;
+        }
+    }
+    private static boolean mannedR66(ServerLevel level,BlockPos post)
+    {
+        Vec3 at=Vec3.atCenterOf(post);
+        return level.players().stream().anyMatch(p->!p.isSpectator()&&p.position().distanceTo(at)<=6);
     }
     private static void freeze(ServerLevel level,TvCampaignSavedData campaign)
     {if(campaign.angel!=null&&level.getEntity(campaign.angel) instanceof GaghielEntity boss&&TvEncounterDirectorR45.owned(boss,campaign)){boss.setNoAi(true);boss.holdMouthR50(null);}}
@@ -266,6 +301,13 @@ public final class TvMarineDirectorR50
                 ||!(level.getEntity(campaign.angel) instanceof GaghielEntity boss)||!damageAllowed(level,boss))return false;
         var site=TvMarineSiteR50.site(level).orElse(null);if(site==null||eva.position().distanceTo(site.center())>180)return false;
         var sortie=campaign.sorties.get(2);if(sortie==null||!eva.getUUID().equals(sortie.eva)||!pilot.getUUID().equals(sortie.pilotR45))return false;
+        if(boss.clampingR66(eva))
+        {
+            // R66: taken into the jaws, the pilot drops the fight and braces both hands against them at once.
+            eva.settleAutonomousAttackR30(pilot);eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_FISTS);
+            eva.autonomousDriveR30(pilot,Vec3.ZERO,boss.mouthWorldPos(1),false);eva.autonomousMarineBraceR50(pilot,true);
+            campaign.notice="二号机被衔进嘴里，正在撑开上下颚。";return true;
+        }
         Vec3 mouth=boss.mouthWorldPos(1),gunAxis=site.cannons().get(0).position().add(site.cannons().get(1).position()).scale(.5).subtract(boss.position()).multiply(1,0,1).normalize();
         Vec3 intercept=boss.position().add(gunAxis.scale(49));
         Vec3 destination=TvMarineWalkR50.approachGoal(level,campaign,eva,intercept);
@@ -382,10 +424,13 @@ public final class TvMarineDirectorR50
         state.setDirty();return state.powerEnabled?"ops.projectseele.marine.power_on":"ops.projectseele.marine.power_off";
     }
     public static String fireOriginalCannonR50(ServerPlayer operator,int index)
+    {return fireCannonR66(operator.serverLevel(),operator,index,true);}
+    /** atPost: a person firing must stand at the gun's control; the fleet's own crew (R66) fires in the commander's name. */
+    private static String fireCannonR66(ServerLevel level,LivingEntity operator,int index,boolean atPost)
     {
         if(index<0||index>1)return "ops.projectseele.marine.bad_gun";
-        var level=operator.serverLevel();var campaign=TvCampaignSavedData.get(level);var state=TvMarineSavedDataR50.get(level);var site=TvMarineSiteR50.site(level).orElse(null);
-        if(site==null||!state.bound(campaign)||operator.position().distanceTo(Vec3.atCenterOf(site.cannonControls()[index]))>6)return "ops.projectseele.marine.stand_at_gun";
+        var campaign=TvCampaignSavedData.get(level);var state=TvMarineSavedDataR50.get(level);var site=TvMarineSiteR50.site(level).orElse(null);
+        if(site==null||!state.bound(campaign)||atPost&&operator.position().distanceTo(Vec3.atCenterOf(site.cannonControls()[index]))>6)return "ops.projectseele.marine.stand_at_gun";
         if(!(state.boss!=null&&level.getEntity(state.boss) instanceof GaghielEntity boss)||!damageAllowed(level,boss))return "ops.projectseele.marine.target_unavailable";
         Entity cannon=originalCannon(level,index);if(cannon==null)return "ops.projectseele.marine.gun_missing";
         if(state.cannonCharge[index]<CHARGE_TICKS||state.cannonCooldown[index]>0)return "ops.projectseele.marine.gun_not_ready";

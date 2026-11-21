@@ -68,7 +68,8 @@ public class ClientEvents
         event.registerEntityRenderer(ModEntities.YASHIMA_CANNON_R52.get(),com.projectseele.client.render.YashimaCannonRendererR52::new);
         event.registerBlockEntityRenderer(com.projectseele.registry.ModBlockEntities.DEAD_SEA_ARCHIVE.get(),com.projectseele.client.render.DeadSeaArchiveRendererR45::new);
         event.registerEntityRenderer(ModEntities.RAMIEL.get(), RamielRenderer::new);
-        event.registerEntityRenderer(ModEntities.GAGHIEL.get(), com.projectseele.client.render.GaghielRendererR50::new);
+        // R66: original geometry only; the private marine mesh is never drawn.
+        event.registerEntityRenderer(ModEntities.GAGHIEL.get(), com.projectseele.client.render.GaghielRendererR66::new);
         event.registerEntityRenderer(ModEntities.EVA_UNIT01.get(), EvaUnit01Renderer::new);
         event.registerEntityRenderer(ModEntities.EVA_UNIT00.get(), EvaUnit01Renderer::new);
         event.registerEntityRenderer(ModEntities.EVA_UNIT02.get(), EvaUnit01Renderer::new);
@@ -114,8 +115,10 @@ public class ClientEvents
         event.registerEntityRenderer(ModEntities.SHAMSHEL.get(), com.projectseele.client.render.ShamshelRendererR66::new);
         event.registerEntityRenderer(ModEntities.ZERUEL.get(),
                 context -> new HybridAddonRenderer<>(context, ColossalHumanoidRenderer.Style.ZERUEL,"zeruel",5.0F));
-        event.registerEntityRenderer(ModEntities.ISRAFEL.get(), context -> new HybridAddonRenderer<>(context,
-                ColossalHumanoidRenderer.Style.SACHIEL, "israfel", 5.0F));
+        // R66: original geometry only; the installed private mesh is never drawn.
+        event.registerEntityRenderer(ModEntities.ISRAFEL.get(), com.projectseele.client.render.IsrafelRendererR66::new);
+        event.registerEntityRenderer(ModEntities.MATARAEL.get(), com.projectseele.client.render.MataraelRendererR66::new);
+        event.registerEntityRenderer(ModEntities.SAHAQUIEL.get(), com.projectseele.client.render.SahaquielRendererR66::new);
         event.registerEntityRenderer(ModEntities.LILITH.get(), LilithRenderer::new);
         event.registerEntityRenderer(ModEntities.MASS_PRODUCTION_EVA.get(), context -> new HybridAddonRenderer<>(context,
                 ColossalHumanoidRenderer.Style.MASS_PRODUCTION, "mass_production_eva", 6.5F));

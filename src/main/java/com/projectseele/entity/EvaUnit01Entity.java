@@ -5464,7 +5464,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 || marinePower && socket.getY() >= 32;
         boolean surfacePower = (com.projectseele.world.NervAirTransportRuntimeR52.sameOperatingRegion(server,this.position(),this.position())
                 || marinePower)
-                && this.getLaunchPhase() != LAUNCH_ASCENT && !this.isNervLogisticsLocked();
+                && this.getLaunchPhase() != LAUNCH_ASCENT && !this.isNervLogisticsLocked()
+                // R66 episode 11: in Matarael's blackout no cable carries power anywhere in the city
+                && !MataraelEntity.blackoutR66(server);
         int range = SeeleConfig.COMMON_SPEC.isLoaded()
                 ? SeeleConfig.UMBILICAL_RANGE.get() : 768;
         BlockPos anchor = this.getUmbilicalAnchor();

@@ -264,7 +264,7 @@ public final class TvCampaignDirector
         String preparation=TvCampaignCatalog.preparationBlockerR52(d.active);
         if(!preparation.isEmpty())return message(player,preparation,false);
         if(!player.getUUID().equals(d.owner)&&!player.hasPermissions(2))return message(player,"ops.projectseele.campaign.you_can_retry_only_missions_entrusted_to_you",false);
-        if(!(TvEncounterRulesR45.handles(d.active)||d.active.equals("shamshel"))||!d.phase.equals("failure"))return message(player,"ops.projectseele.campaign.no_encounter_is_awaiting_a_retry",false);
+        if(!(TvEncounterRulesR45.handles(d.active)||d.active.equals("shamshel")||d.active.equals("israfel")||d.active.equals("matarael")||d.active.equals("sahaquiel"))||!d.phase.equals("failure"))return message(player,"ops.projectseele.campaign.no_encounter_is_awaiting_a_retry",false);
         if(d.targetDeathConfirmedR45)return message(player,"ops.projectseele.campaign.the_target_is_gone_recover_the_units_and",false);
         if(!NervStaffDialogue.authorized(player)||player.level()!=l)return message(player,"ops.projectseele.campaign.the_commander_must_return_to_the_combat_area",false);
         if(d.owner==null||d.generationR43<=0||d.sorties.isEmpty())return message(player,"ops.projectseele.campaign.sortie_communications_records_do_not_match_contact_maintenance",false);
@@ -423,9 +423,9 @@ public final class TvCampaignDirector
                     var surfaceBar=BARS.computeIfAbsent(level,key->new ServerBossEvent(Component.translatable("message.projectseele.campaign.surface"),BossEvent.BossBarColor.RED,BossEvent.BossBarOverlay.PROGRESS));
                     surfaceBar.removeAllPlayers();surfaceBar.setVisible(!(boss instanceof SachielEntity s&&s.isFirstBattleActive()));
                     for(var sortie:data.sorties.values()){var p=event.getServer().getPlayerList().getPlayer(sortie.commander);if(p!=null&&p.level()==level)surfaceBar.addPlayer(p);}
-                    float field=boss instanceof Angel a?a.getAtField():0,max=data.active.equals("sachiel")?900:(float)(double)com.projectseele.config.SeeleConfig.SHAMSHEL_AT_FIELD.get();
+                    float field=boss instanceof Angel a?a.getAtField():0,max=data.active.equals("sachiel")?900:data.active.equals("sahaquiel")?(float)(double)com.projectseele.config.SeeleConfig.SAHAQUIEL_MAX_HEALTH.get():data.active.equals("matarael")?(float)(double)com.projectseele.config.SeeleConfig.MATARAEL_AT_FIELD.get():data.active.equals("israfel")?(float)(double)com.projectseele.config.SeeleConfig.ISRAFEL_AT_FIELD.get():(float)(double)com.projectseele.config.SeeleConfig.SHAMSHEL_AT_FIELD.get();
                     surfaceBar.setName(Component.translatable("ops.projectseele.campaign.surface_contact",
-                            OperationText.read(data.active.equals("sachiel") ? "第3使徒 萨基尔" : "第4使徒 夏姆榭尔"),
+                            OperationText.read(data.active.equals("sachiel") ? "第3使徒 萨基尔" : data.active.equals("israfel") ? "第7使徒 伊斯拉斐尔" : data.active.equals("matarael") ? "第9使徒 雨天使" : data.active.equals("sahaquiel") ? "第10使徒 撒哈奎尔" : "第4使徒 夏姆榭尔"),
                             OperationText.read(data.phase.equals("combat") ? "地表交战" : data.phase.equals("alert") ? "目标已出现，准备迎击" : "使徒正在进攻地表装甲井")));
                     surfaceBar.setProgress(Math.max(0,Math.min(1,field>0?field/max:boss.getHealth()/boss.getMaxHealth())));
                 }
@@ -455,6 +455,7 @@ public final class TvCampaignDirector
                 if (data.angel == null) { data.clear("任务已结束，可重新选择任务。"); continue; }
                 load(level, data.lastPosition == null ? BlockPos.containing(site.angel) : data.lastPosition);
                 var entity = level.getEntity(data.angel);
+                if (entity instanceof com.projectseele.entity.IsrafelEntity israfel&&TvEncounterDirectorR45.owned(israfel,data)) israfel.discardTwinR66();
                 if (entity != null && (entity.getTags().contains("seele_tv_shamshel_r24")
                         ||entity instanceof net.minecraft.world.entity.Mob mob&&TvEncounterDirectorR45.owned(mob,data))) entity.discard();
                 if(TvEncounterRulesR45.handles(data.active)&&entity==null)
@@ -554,7 +555,10 @@ public final class TvCampaignDirector
                 .then(Commands.literal("status").executes(c -> message(c.getSource().getPlayerOrException(), briefing(c.getSource().getPlayerOrException()), true)))
                 .then(Commands.literal("begin").executes(c -> begin(c.getSource().getPlayerOrException())))
                 .then(Commands.literal("select").then(Commands.literal("sachiel").executes(c->select(c.getSource().getPlayerOrException(),"sachiel"))).then(Commands.literal("shamshel").executes(c->select(c.getSource().getPlayerOrException(),"shamshel")))
-                    .then(Commands.literal("ramiel").executes(c->select(c.getSource().getPlayerOrException(),"ramiel"))).then(Commands.literal("gaghiel").executes(c->select(c.getSource().getPlayerOrException(),"gaghiel"))))
+                    .then(Commands.literal("ramiel").executes(c->select(c.getSource().getPlayerOrException(),"ramiel"))).then(Commands.literal("gaghiel").executes(c->select(c.getSource().getPlayerOrException(),"gaghiel")))
+                    .then(Commands.literal("israfel").executes(c->select(c.getSource().getPlayerOrException(),"israfel")))
+                    .then(Commands.literal("matarael").executes(c->select(c.getSource().getPlayerOrException(),"matarael")))
+                    .then(Commands.literal("sahaquiel").executes(c->select(c.getSource().getPlayerOrException(),"sahaquiel"))))
                 .then(Commands.literal("retry").executes(c->retry(c.getSource().getPlayerOrException())))
                 .then(Commands.literal("cancel").executes(c -> cancel(c.getSource().getPlayerOrException())));
     }

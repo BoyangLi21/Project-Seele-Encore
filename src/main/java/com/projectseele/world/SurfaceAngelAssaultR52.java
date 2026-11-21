@@ -33,15 +33,20 @@ public final class SurfaceAngelAssaultR52
         String tag=TvEncounterDirectorR45.tag(data.active);
         if(!level.getEntitiesOfClass(Mob.class,new AABB(site.spawn(),site.spawn()).inflate(180),m->m.isAlive()&&m.getTags().contains(tag)).isEmpty())
         {data.notice="远端仍有未归档的原使徒，不重复生成。";data.setDirty();return null;}
-        Mob boss=data.active.equals("sachiel")?ModEntities.SACHIEL.get().create(level):ModEntities.SHAMSHEL.get().create(level);
+        Mob boss=data.active.equals("sachiel")?ModEntities.SACHIEL.get().create(level):data.active.equals("israfel")?ModEntities.ISRAFEL.get().create(level):data.active.equals("matarael")?ModEntities.MATARAEL.get().create(level):data.active.equals("sahaquiel")?ModEntities.SAHAQUIEL.get().create(level)
+                :ModEntities.SHAMSHEL.get().create(level);
         if(boss==null)return null;
         boss.moveTo(site.spawn().x,site.spawn().y,site.spawn().z,site.yaw(),0);boss.yBodyRot=boss.yHeadRot=site.yaw();
         boss.setPersistenceRequired();boss.setNoAi(true);boss.addTag(tag);
         boss.getPersistentData().putLong("TvGenerationR45",data.generationR43);boss.getPersistentData().putUUID("TvOwnerR45",data.owner);
         boss.getPersistentData().putString("SurfaceLayoutR52",data.encounterLayoutR45);
         if(boss instanceof SachielEntity){boss.addTag("seele_first_battle_mission");boss.addTag("seele_first_battle_replay");}
+        else if(boss instanceof IsrafelEntity)boss.addTag(IsrafelEntity.MISSION_TAG);
+        else if(boss instanceof MataraelEntity)boss.addTag(MataraelEntity.MISSION_TAG);
+        else if(boss instanceof SahaquielEntity)boss.addTag(SahaquielEntity.MISSION_TAG);
         else boss.addTag("seele_tv_shamshel_r24");
-        if(!level.noCollision(boss,boss.getBoundingBox())){data.notice="远端原使徒完整躯干净空受阻，未挪到旧近城出生点。";data.setDirty();return null;}
+        // Sahaquiel leaves for the sky on its first tick; its broad body never stands at the walkers' spawn.
+        if(!(boss instanceof SahaquielEntity)&&!level.noCollision(boss,boss.getBoundingBox())){data.notice="远端原使徒完整躯干净空受阻，未挪到旧近城出生点。";data.setDirty();return null;}
         if(!level.addFreshEntity(boss))return null;
         data.angel=boss.getUUID();data.lastPosition=boss.blockPosition();data.setDirty();
         if(boss instanceof SachielEntity)
@@ -97,16 +102,21 @@ public final class SurfaceAngelAssaultR52
         retain(level,boss.position());for(double x:new double[]{boss.getBoundingBox().minX,boss.getBoundingBox().maxX})
             for(double z:new double[]{boss.getBoundingBox().minZ,boss.getBoundingBox().maxZ})retain(level,new Vec3(x,boss.getY(),z));
         if(data.phase.equals("alert")&&TvMissionAlertR30.tick(level,data,owner)){data.phase="approach";data.setDirty();}
-        // R66: Shamshel's fight can be lost: every assigned unit down or shut off for five seconds.
-        if(boss instanceof ShamshelEntity&&data.phase.equals("combat")&&!data.sorties.isEmpty())
+        // R66: Sahaquiel falls on NERV by itself; it has no route, no plate attack and no engagement range.
+        if(boss instanceof SahaquielEntity sky)
+        {Vec3 aim=NervArmorColumnR50.surfaceAimR52(level).orElse(site.intercept());retain(level,aim);sky.tickOperationR66(level,data,aim);return boss;}
+        // R66: Shamshel's and Israfel's fights can be lost: every assigned unit down or shut off for five seconds.
+        if((boss instanceof ShamshelEntity||boss instanceof IsrafelEntity||boss instanceof MataraelEntity)&&data.phase.equals("combat")&&!data.sorties.isEmpty())
         {
             boolean anyStanding=data.sorties.values().stream().map(s->TvSortiesR32.unit(level,s.unit))
                     .anyMatch(e->e!=null&&e.isAlive()&&!EvaShutdownR30.disabled(e));
             var tag=boss.getPersistentData();int down=anyStanding?0:tag.getInt("R66AllDownTicks")+1;tag.putInt("R66AllDownTicks",down);
             if(down>=100)
             {
-                hold(boss);data.phase="failure";data.notice="全部机体失去战斗力，夏姆榭尔仍在进攻。机体回收后可以重试。";data.setDirty();
-                ProjectSeele.LOGGER.info("R66 SHAMSHEL mission failed: every unit down");
+                hold(boss);if(boss instanceof IsrafelEntity israfel)israfel.holdTwinR66();
+                data.phase="failure";data.notice=boss instanceof MataraelEntity?"全部机体失去战斗力，雨天使仍在溶蚀总部装甲。机体回收后可以重试。":boss instanceof IsrafelEntity?"全部机体失去战斗力，伊斯拉斐尔仍在进攻。机体回收后可以重试。"
+                        :"全部机体失去战斗力，夏姆榭尔仍在进攻。机体回收后可以重试。";data.setDirty();
+                ProjectSeele.LOGGER.info("R66 {} mission failed: every unit down",boss.getType().toShortString().toUpperCase(java.util.Locale.ROOT));
                 return boss;
             }
         }
@@ -154,7 +164,8 @@ public final class SurfaceAngelAssaultR52
         Vec3 toward=aim.subtract(boss.position());float yaw=(float)Math.toDegrees(Math.atan2(-toward.x,toward.z));
         boss.setYRot(net.minecraft.util.Mth.approachDegrees(boss.getYRot(),yaw,3));boss.yBodyRot=boss.yHeadRot=boss.getYRot();
         if(Math.abs(net.minecraft.util.Mth.wrapDegrees(yaw-boss.getYRot()))>8)return boss;
-        boolean started=boss instanceof SachielEntity sachiel?sachiel.beginArmorBeamR52(aim):boss instanceof ShamshelEntity shamshel&&shamshel.beginArmorSweepR52(aim);
+        boolean started=boss instanceof SachielEntity sachiel?sachiel.beginArmorBeamR52(aim):boss instanceof MataraelEntity matarael?matarael.beginAcidOnArmorR66(aim,site.armorDamage())
+                :boss instanceof ShamshelEntity shamshel&&shamshel.beginArmorSweepR52(aim);
         if(started){tag.putBoolean("SurfaceArmorAttackR52",true);tag.putBoolean("SurfaceArmorHitR52",false);tag.putBoolean("SurfaceArmorBeamFiredR52",false);tag.putLong("SurfaceArmorNextAttackR52",level.getGameTime()+site.attackPeriod());}
         return boss;
     }
@@ -164,7 +175,7 @@ public final class SurfaceAngelAssaultR52
     private static boolean arrived(Mob boss,Vec3 point,double radius)
     {return boss.position().subtract(point).horizontalDistance()<=radius&&Math.abs(boss.getY()-point.y)<=1.6;}
     private static void cancelPlateAttack(Mob boss)
-    {if(boss instanceof SachielEntity s){s.cancelStrikeR31();s.cancelArmorBeamR52();}if(boss instanceof ShamshelEntity s)s.cancelSweepR31();boss.getPersistentData().putBoolean("SurfaceArmorAttackR52",false);}
+    {if(boss instanceof SachielEntity s){s.cancelStrikeR31();s.cancelArmorBeamR52();}if(boss instanceof ShamshelEntity s)s.cancelSweepR31();if(boss instanceof MataraelEntity m)m.stopAcidOnArmorR66();boss.getPersistentData().putBoolean("SurfaceArmorAttackR52",false);}
     private static void contact(ServerLevel level,Mob boss,SurfaceAngelPlanR52.Site site)
     {
         var tag=boss.getPersistentData();if(!tag.getBoolean("SurfaceArmorAttackR52")||tag.getBoolean("SurfaceArmorHitR52"))return;
