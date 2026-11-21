@@ -47,15 +47,18 @@ public final class HeavensDoor
         if (!moving || level.getGameTime() % 3 != 0) return;
         if (!loaded(level)) { moving = false; return; }
         int next = width + Integer.signum(target - width) * Math.min(2, Math.abs(target - width));
-        if (next < width)
-            for (int x = WEST; x <= EAST; x++)
-                if (material(x, TOP, NORTH, width) == Blocks.AIR && material(x, TOP, NORTH, next) != Blocks.AIR
-                        && !level.getEntities((Entity)null, new AABB(x, BOTTOM, NORTH, x + 1, TOP + 1, SOUTH + 1),
-                        e -> !e.isSpectator() && e.isPickable()).isEmpty())
-                {
-                    target = WIDTH;
-                    return;
-                }
+        // Like a door sensor: anyone in the opening, or a block in front of or behind it, sends the leaves back
+        // open before they move, instead of letting them close right up to the body.
+        if (next < width && width > 0)
+        {
+            int left = 30 - (width + 1) / 2, right = 31 + width / 2;
+            if (!level.getEntities((Entity)null, new AABB(left + 1, BOTTOM, NORTH - 1, right, TOP + 1, SOUTH + 2),
+                    e -> !e.isSpectator() && e.isPickable()).isEmpty())
+            {
+                target = WIDTH;
+                return;
+            }
+        }
         // Check the entire moving face before writing a step. A player modification leaves its surroundings intact.
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int x = WEST; x <= EAST; x++)
