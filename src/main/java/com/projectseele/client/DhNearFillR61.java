@@ -60,9 +60,13 @@ public final class DhNearFillR61
             throws ReflectiveOperationException
     {
         var level = minecraft.level;
-        if (!level.canSeeSky(BlockPos.containing(camera))) return false;
         int radius = (int) Math.ceil(minecraft.options.getEffectiveRenderDistance() * .7F);
         int centreX = SectionPos.blockToSectionCoord(camera.x), centreZ = SectionPos.blockToSectionCoord(camera.z);
+        if (!level.canSeeSky(BlockPos.containing(camera)))
+        {
+            if (!level.dimension().location().toString().equals("projectseele:geofront")) return false;
+            return interiorMissing(minecraft, frustum, renderer, centreX, centreZ, radius, camera.y);
+        }
         int columns = 0, built = 0;
         for (int x = -radius; x <= radius; x++)
         {
@@ -81,6 +85,49 @@ public final class DhNearFillR61
             }
         }
         return columns >= MINIMUM_COLUMNS && built < columns * BUILT_FRACTION;
+    }
+
+    private static boolean interiorMissing(Minecraft minecraft, Frustum frustum, Object renderer,
+                                           int centreX, int centreZ, int radius, double eyeY)
+            throws ReflectiveOperationException
+    {
+        var level = minecraft.level;
+        if (level.getChunkSource().getChunkNow(centreX, centreZ) == null) return true;
+        int eye = SectionPos.blockToSectionCoord(eyeY), sampled = 0, ready = 0;
+        for (int dx = -radius; dx <= radius; dx += 2)
+        {
+            for (int dz = -radius; dz <= radius; dz += 2)
+            {
+                if (dx * dx + dz * dz > radius * radius) continue;
+                int cx = centreX + dx, cz = centreZ + dz;
+                var chunk = level.getChunkSource().getChunkNow(cx, cz);
+                if (chunk == null)
+                {
+                    if (frustum.isVisible(new AABB(cx * 16D, eyeY - 640, cz * 16D,
+                            cx * 16D + 16, eyeY + 640, cz * 16D + 16))) sampled++;
+                    continue;
+                }
+                for (int step = -1; step <= 1; step += 2)
+                {
+                    // A cave's exposed floor and roof can be hundreds of blocks apart.
+                    int first = step < 0 ? eye : eye + 1;
+                    for (int cy = first; Math.abs(cy - eye) <= 40; cy += step)
+                    {
+                        if (cy < level.getMinSection() || cy >= level.getMaxSection()) break;
+                        if (chunk.getSection(level.getSectionIndexFromSectionY(cy)).hasOnlyAir()) continue;
+                        var bounds = new AABB(cx * 16D, cy * 16D, cz * 16D,
+                                cx * 16D + 16, cy * 16D + 16, cz * 16D + 16);
+                        if (frustum.isVisible(bounds))
+                        {
+                            sampled++;
+                            if ((Boolean) sectionReady.invoke(renderer, cx, cy, cz)) ready++;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        return sampled >= MINIMUM_COLUMNS && ready < sampled * BUILT_FRACTION;
     }
 
     private static boolean bind()
