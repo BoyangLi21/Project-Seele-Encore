@@ -50,7 +50,7 @@ public final class AngelSortieReviewR66
     private static final boolean CAPTURE = !Boolean.getBoolean("projectseele.angelReviewNoCaptureR66");
     private static final int CAPTURE_FROM = Integer.getInteger("projectseele.angelReviewCaptureFromR66", 0);
 
-    private static int ticks, frame, doneAt = -1, warm, lastSparseTick = -1;
+    private static int ticks, frame, doneAt = -1, warm, lastSparseTick = -1, facilityAt = -1;
     private static boolean started, finished, close;
     private static ArmorStand camera;
     private static Path folder;
@@ -80,16 +80,38 @@ public final class AngelSortieReviewR66
             return;
         }
         ticks++;
-        if (ticks == 20) command(mc, "seele sortie select " + CHAPTER);
-        if (ticks >= 60 && ticks <= 60 + 40 * 4 && (ticks - 60) % 40 == 0)
+        var server = mc.getSingleplayerServer();
+        // Whatever an earlier run left: every unit back in the hangar. Then wait for the facility, which loads in
+        // batches for about two minutes after the world opens and holds every sortie until it has.
+        if (ticks == 10) for (String unitName : new String[]{"unit00", "unit01", "unit02"}) command(mc, "seele eva reset " + unitName);
+        if (facilityAt < 0)
+        {
+            if (ticks % 20 == 0)
+            {
+                var operation = server.getPlayerList().getPlayers().isEmpty() ? null
+                        : com.projectseele.event.TvCampaignDirector.level(server.getPlayerList().getPlayers().get(0));
+                var status = operation == null ? java.util.List.<String>of() : com.projectseele.world.NervRouteRuntimeR52.sortieStatusR53(operation);
+                if (operation != null && com.projectseele.world.NervRouteRuntimeR52.ready(operation)
+                        && !status.isEmpty() && status.get(0).contains("installed=true"))
+                {
+                    facilityAt = ticks;
+                    ProjectSeele.LOGGER.info("angel_review facility installed at tick {}", ticks);
+                }
+                else if (ticks % 400 == 0) ProjectSeele.LOGGER.info("angel_review waiting for the facility at tick {}: {}", ticks, status.isEmpty() ? "no status" : status.get(0));
+            }
+            if (ticks > 8000) finish(mc, "facility_timeout");
+            return;
+        }
+        int since = ticks - facilityAt;
+        if (since == 20) command(mc, "seele sortie select " + CHAPTER);
+        if (since >= 60 && since <= 60 + 40 * 4 && (since - 60) % 40 == 0)
         {
             String[] units = UNITS.split(",");
-            int index = (ticks - 60) / 40;
+            int index = (since - 60) / 40;
             if (index < units.length) command(mc, "seele sortie support " + units[index].trim() + " npc");
         }
-        if (ticks % 200 == 100) command(mc, "seele sortie status");
+        if (since % 200 == 100) command(mc, "seele sortie status");
 
-        var server = mc.getSingleplayerServer();
         ServerLevel level = campaignLevel(server);
         if (level == null) return;
         var data = TvCampaignSavedData.get(level);
