@@ -222,6 +222,13 @@ public final class NervSiloDoorEntity extends Entity
     public NervSiloHatchGeometryR52 declaredGeometryR52()
     {try{return com.projectseele.world.NervLowerFrameR52.retiredServiceLeavesR53(getUUID(),getVariant(),declaredSpecR52(),actualFrameR52())
                 ?NervSiloHatchGeometryR52.loadRetiredServiceClasspathR53(declaredSpecR52()):NervSiloHatchGeometryR52.loadClasspath(declaredSpecR52());}catch(java.io.IOException missing){throw new IllegalStateException("Declared hatch exact source missing",missing);}}
+    /** The declared geometry once it has been read, else null while the background executor reads it (renderer, R65). */
+    public NervSiloHatchGeometryR52 declaredGeometryIfLoadedR65()
+    {
+        var spec=declaredSpecR52();if(spec==null)return null;
+        try{return NervSiloHatchGeometryR52.classpathIfLoadedR65(spec,com.projectseele.world.NervLowerFrameR52.retiredServiceLeavesR53(getUUID(),getVariant(),spec,actualFrameR52()));}
+        catch(java.io.IOException missing){throw new IllegalStateException("Declared hatch exact source missing",missing);}
+    }
     private void updateDeclaredBoundsR52(){if(declaredSpecR52()!=null)setBoundingBox(com.projectseele.world.NervRigidMeshSweepR52.transformed(declaredGeometryR52().bounds(actualOpenProgressR52()),actualFrameR52()));}
     public boolean clearDeclaredSweepR52(ServerLevel level,float from,float to,Set<java.util.UUID> own,Set<BlockPos> movingCells,Set<BlockPos> supportCells)
     {return clearDeclaredSweepR52(level,from,to,own,movingCells,supportCells,Set.of());}

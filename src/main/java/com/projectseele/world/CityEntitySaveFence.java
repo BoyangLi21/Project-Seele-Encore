@@ -10,13 +10,15 @@ import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.IEventBus;
 
-/** The endpoint journal waits across ticks for the native entity writer's final disk barrier. */
+/** The endpoint journal waits across ticks for the native entity and chunk writers' final disk barriers. */
 public final class CityEntitySaveFence
 {
     private static final ThreadLocal<CityEntitySaveFence> ACTIVE = new ThreadLocal<>();
     private final ServerLevel level;
     private final Object storage;
+    private final Object chunks;
     private CompletableFuture<Void> writes;
+    private CompletableFuture<Void> chunkWrites;
     private ProcessorMailbox<Runnable> mailbox;
     private Runnable announce;
     private boolean started;
@@ -26,6 +28,7 @@ public final class CityEntitySaveFence
         this.level = level;
         var manager = ((ServiceAircraftWorldR32Accessor) level).seele$entityManagerR32();
         storage = ((ServiceAircraftSectionsR32Accessor) manager).seele$storageR65();
+        chunks = level.getChunkSource().chunkMap;
     }
 
     public static boolean deferFinalFlush(Object source, IOWorker worker, ProcessorMailbox<Runnable> queue)
@@ -37,10 +40,19 @@ public final class CityEntitySaveFence
         return true;
     }
 
+    /** The full level save ends with a blocking flush of the region writer; the endpoint polls it instead (R65). */
+    public static boolean deferChunkFlush(Object source, IOWorker worker)
+    {
+        var fence = ACTIVE.get();
+        if (fence == null || source != fence.chunks || fence.chunkWrites != null) return false;
+        fence.chunkWrites = worker.synchronize(true);
+        return true;
+    }
+
     public static boolean postWhenDurable(IEventBus bus, Event event)
     {
         var fence = ACTIVE.get();
-        if (fence == null || fence.writes == null || !(event instanceof LevelEvent.Save save)
+        if (fence == null || fence.writes == null && fence.chunkWrites == null || !(event instanceof LevelEvent.Save save)
                 || save.getLevel() != fence.level) return bus.post(event);
         fence.announce = () -> bus.post(event);
         return false;
@@ -55,13 +67,14 @@ public final class CityEntitySaveFence
             try { level.save(null, true, false); }
             finally { ACTIVE.remove(); }
         }
+        if (writes != null && !writes.isDone() || chunkWrites != null && !chunkWrites.isDone()) return false;
+        if (chunkWrites != null) chunkWrites.join();
         if (writes != null)
         {
-            if (!writes.isDone()) return false;
             writes.join();
             mailbox.runAll();
-            if (announce != null) announce.run();
         }
+        if (announce != null) announce.run();
         return true;
     }
 }

@@ -43,8 +43,11 @@ public final class NervSiloDoorRenderer
     {
         if(door.declaredGeometryMissingR52())return;
         var declared=door.declaredSpecR52();
+        // The declared geometry is read off the render thread; until it is ready this hatch is not drawn (R65).
+        var geometry=declared==null?null:door.declaredGeometryIfLoadedR65();
+        if(declared!=null&&geometry==null)return;
         if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&declared!=null
-                &&declared.serviceColumnPorts()&&declared.separationSign()<0&&!door.declaredGeometryR52().retiredServiceLeavesR53())return;
+                &&declared.serviceColumnPorts()&&declared.separationSign()<0&&!geometry.retiredServiceLeavesR53())return;
         float open = door.getOpenProgress(partialTick);
         // Closed, a ground hatch is its cover blocks. Its steel lies inside them, a few centimetres under their
         // tops, and at a distance would fight them for depth. Seen from above there is nothing else of it.
@@ -52,7 +55,7 @@ public final class NervSiloDoorRenderer
                 &&this.entityRenderDispatcher.camera.getPosition().y>door.getY()+1)return;
         poses.pushPose();
         var spec=door.declaredSpecR52();if(spec!=null)poses.mulPose(door.actualFrameR52().rotation());
-        TvFacilityMeshes.withBuffers(buffers,()->{if(spec==null)TvFacilityMeshes.shaftHatch(poses,packedLight,open);else TvFacilityMeshes.shaftHatchDeclared(poses,packedLight,open,spec,door.declaredGeometryR52());});
+        TvFacilityMeshes.withBuffers(buffers,()->{if(spec==null)TvFacilityMeshes.shaftHatch(poses,packedLight,open);else TvFacilityMeshes.shaftHatchDeclared(poses,packedLight,open,spec,geometry);});
         // A hatch lying level with open ground shows that ground and no emblem.
         if(spec!=null&&spec.groundFlush())GroundHatchTurfR64.draw(poses,buffers,door,spec,open,packedLight);
         else if(!door.isTvBulkhead())renderSplitLogo(poses, buffers, open,spec);

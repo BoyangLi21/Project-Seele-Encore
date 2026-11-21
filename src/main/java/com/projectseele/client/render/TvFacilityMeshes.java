@@ -27,6 +27,8 @@ public final class TvFacilityMeshes
     private static final Map<com.projectseele.world.NervHangarGateGeometryR52.Spec,Map<String,RigidMachineryPartR44>> DECLARED_STACK_PARTS=new HashMap<>();
     private static final ThreadLocal<MultiBufferSource> ACTIVE_BUFFERS=new ThreadLocal<>();
     private static boolean attempted;
+    private record LoadedR65(Map<String,RigidMachineryPartR44> parts,Map<Integer,float[][]> mounts){}
+    private static java.util.concurrent.CompletableFuture<LoadedR65> pendingR65;
     /** Preserve the caller's normal/shadow/outline pass for nested machinery. */
     public static void withBuffers(MultiBufferSource buffers,Runnable rendering)
     {
@@ -41,26 +43,46 @@ public final class TvFacilityMeshes
     }
     public static void clearCache()
     {
-        Runnable release=()->{RigidMachineryGpuR44.clear();PARTS.clear();CARRIER_MOUNTS.clear();DECLARED_HATCH_PARTS.clear();DECLARED_STACK_PARTS.clear();attempted=false;R52FixedGuideRenderer.clearCache();EvaBayMachineryR33.clearCache();PlugGantryRenderer.clearCache();TripoMachineryR48.clearCache();TvShoulderRestraintsR44.clearCache();TvCageEnclosureR44.clearCache();LaunchChamberFinishR53.clear();};
+        Runnable release=()->{RigidMachineryGpuR44.clear();PARTS.clear();CARRIER_MOUNTS.clear();DECLARED_HATCH_PARTS.clear();DECLARED_STACK_PARTS.clear();attempted=false;pendingR65=null;R52FixedGuideRenderer.clearCache();EvaBayMachineryR33.clearCache();PlugGantryRenderer.clearCache();TripoMachineryR48.clearCache();TvShoulderRestraintsR44.clearCache();TvCageEnclosureR44.clearCache();LaunchChamberFinishR53.clear();};
         if(RenderSystem.isOnRenderThread())release.run();else RenderSystem.recordRenderCall(release::run);
     }
-    private static void load()
+    /** Starts the background parse when a world is joined, long before the first launch draws the machinery (R65). */
+    static void preloadR65()
     {
-        if(attempted)return;attempted=true;
+        if(!attempted&&pendingR65==null)pendingR65=java.util.concurrent.CompletableFuture.supplyAsync(TvFacilityMeshes::parseR65,net.minecraft.Util.backgroundExecutor());
+    }
+    private static LoadedR65 parseR65()
+    {
         try(var stream=Minecraft.getInstance().getResourceManager().open(new ResourceLocation(ProjectSeele.MODID,"mesh/tv_facilities_r16.json"));
             var reader=new InputStreamReader(stream,StandardCharsets.UTF_8))
         {
             var resource=JsonParser.parseReader(reader).getAsJsonObject();var parts=resource.getAsJsonObject("parts");
+            Map<String,RigidMachineryPartR44> meshes=new HashMap<>();Map<Integer,float[][]> carrier=new HashMap<>();
             if(resource.has("carrier_actuator_mounts"))for(var entry:resource.getAsJsonObject("carrier_actuator_mounts").entrySet())
             {
                 var rows=entry.getValue().getAsJsonArray();float[][] mounts=new float[rows.size()][4];
                 for(int i=0;i<rows.size();i++)for(int j=0;j<4;j++)mounts[i][j]=rows.get(i).getAsJsonArray().get(j).getAsFloat();
-                CARRIER_MOUNTS.put(Integer.parseInt(entry.getKey()),mounts);
+                carrier.put(Integer.parseInt(entry.getKey()),mounts);
             }
             for(var part:parts.entrySet())
             {
-                PARTS.put(part.getKey(),RigidMachineryPartR44.triangles(part.getValue().getAsJsonArray()));
+                meshes.put(part.getKey(),RigidMachineryPartR44.triangles(part.getValue().getAsJsonArray()));
             }
+            return new LoadedR65(meshes,carrier);
+        }
+        catch(Exception e){throw new java.util.concurrent.CompletionException(e);}
+    }
+    /** Publishes the parsed machinery on the render thread; until the background parse is done nothing is drawn. */
+    private static void load()
+    {
+        if(attempted)return;
+        preloadR65();
+        if(!pendingR65.isDone())return;
+        attempted=true;
+        try
+        {
+            var loaded=pendingR65.join();
+            PARTS.putAll(loaded.parts());CARRIER_MOUNTS.putAll(loaded.mounts());
             ProjectSeele.LOGGER.info("TV facility machinery loaded: {} rigid assemblies",PARTS.size());
         }
         catch(Exception e){ProjectSeele.LOGGER.error("TV facility machinery resource rejected",e);}
@@ -129,7 +151,7 @@ public final class TvFacilityMeshes
         draw("carrier_support_members",poses,light);
         float release=unit.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR?ramp(1-(unit.getLaunchTicks()-partial)/18F,0,1):0;
         poses.pushPose();poses.translate(0,0,-3*release);draw("carrier_clamp",poses,light,opacity);poses.popPose();
-        var mounts=CARRIER_MOUNTS.get(unit.getUnitVariant());
+        load();var mounts=CARRIER_MOUNTS.get(unit.getUnitVariant());
         if(mounts!=null)
         {
             draw("carrier_actuator_housings",poses,light);
