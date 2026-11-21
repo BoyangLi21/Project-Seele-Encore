@@ -113,6 +113,9 @@ def main():
         n = len(sample)
         weights = {name: np.ones(n)}
         for parent, child, centre, axis, r, reach in [z for z in zones if name in (z[0], z[1])]:
+            # The rigid pelvic shell is a separate surface above both thighs.
+            if name == "torso_lower" and child in ("leg_l", "leg_r"):
+                continue
             axis = unit(axis)
             d = (sample - centre) @ axis
             lat = np.linalg.norm((sample - centre) - np.outer(d, axis), axis=1)
@@ -187,7 +190,7 @@ def main():
         skins[name] = {"influences": {k: [float(x) for x in w] for k, w in rounded.items()},
                        "source": "tools/motion3/skin_weights.py continuous joint field"}
         stats[name] = (n, sorted(weights.keys()), rigid)
-    mesh["skin_revision"] = "motion3-field-v1"
+    mesh["skin_revision"] = "motion3-field-v2"
     with open(a.out, "w", encoding="utf-8") as f:
         json.dump(mesh, f, separators=(",", ":"))
     for k, (n, bones, rigid) in stats.items():

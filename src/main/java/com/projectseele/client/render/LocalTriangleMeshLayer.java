@@ -582,7 +582,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
 
     private static Map<String,JointSkin> authoredJointSkins(LocalMeshJsonR53.Document document,Map<String,MeshPart> parts,int stride) throws IOException
     {
-        JsonObject definitions=document.metadata().getAsJsonObject("jointSkins");
+        JsonObject root=document.metadata(),definitions=root.getAsJsonObject("jointSkins");
         Map<String,JointSkin> result=new HashMap<>();
         for(var entry:definitions.entrySet())
         {
@@ -598,6 +598,9 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                     influences.put(row.getKey(),weights);
                 }
                 for(float sum:sums)if(Math.abs(sum-1)>.0002)throw new IOException("Joint influences must sum to one");
+                if(entry.getKey().equals("torso_lower") && !definition.has("inverseBindColumnMajor")
+                        && root.has("skin_revision") && "motion3-field-v1".equals(root.get("skin_revision").getAsString()))
+                    anchorPelvicShell(influences);
                 Map<String,Matrix4f> inverseBind=new java.util.TreeMap<>();
                 if(definition.has("inverseBindColumnMajor"))
                 {
@@ -672,6 +675,21 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     {
         return new Vector3f(p.vertices()[offset]+p.pivotX(),
                 p.vertices()[offset+1]+p.pivotY(),p.vertices()[offset+2]+p.pivotZ());
+    }
+
+    /** The three field-v1 Tiger body meshes have a separate rigid pelvic shell.
+     * The broad hip weight field reaches its front plate from both thighs. */
+    static void anchorPelvicShell(Map<String,float[]> influences)
+    {
+        float[] pelvis=influences.get("torso_lower");
+        if(pelvis==null)return;
+        pelvis=pelvis.clone();
+        influences.put("torso_lower",pelvis);
+        for(String leg:new String[]{"leg_l","leg_r"})
+        {
+            float[] thigh=influences.remove(leg);
+            if(thigh!=null)for(int i=0;i<pelvis.length;i++)pelvis[i]+=thigh[i];
+        }
     }
 
     /**

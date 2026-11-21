@@ -497,6 +497,24 @@ public final class EvaBodyPose
                 ||name.startsWith("shin_")||name.startsWith("ankle_")||name.startsWith("foot_")||name.startsWith("toe_");
     }
 
+    /** Keep the strike's chest orientation as seen in model space, over the current standing or walking legs. */
+    static void strikeOverSupportR64(Sample strike,Sample support)
+    {
+        String chest="torso_upper",parent=strike.rig.get(chest).parent();
+        var chestRotation=strike.matrix(chest).getUnnormalizedRotation(new Quaternionf()).normalize();
+        for(String name:support.rig.keySet())if(locomotionBoneR51(name))
+        {
+            strike.rotations.get(name).set(support.rotations.get(name));
+            strike.positions.get(name).set(support.positions.get(name));
+        }
+        strike.contactGoals.clear();strike.contactGoals.putAll(support.contactGoals);
+        strike.contactOffsets.clear();strike.contactOffsets.putAll(support.contactOffsets);
+        strike.dirty();
+        var parentRotation=strike.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize();
+        strike.rotations.get(chest).set(parentRotation.invert().mul(chestRotation));
+        strike.dirty();
+    }
+
     public static Sample blendUpperKeepingLocomotionR51(Sample base,Sample upper,float amount)
     {
         Map<String,Quaternionf> rotations=new HashMap<>();Map<String,Vector3f> positions=new HashMap<>();

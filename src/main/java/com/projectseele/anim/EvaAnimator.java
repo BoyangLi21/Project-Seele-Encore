@@ -63,6 +63,11 @@ public final class EvaAnimator
 
     public static boolean owns(EvaUnit01Entity e, float partial)
     {
+        return !e.hasLiveActionForRender(partial) && canSupplyGait(e, partial);
+    }
+
+    public static boolean canSupplyGait(EvaUnit01Entity e, float partial)
+    {
         if (variant(e) == null)
         {
             return false;
@@ -82,7 +87,7 @@ public final class EvaAnimator
         {
             return false;
         }
-        if (e.hasLiveActionForRender(partial) || e.isVisuallyAirborneForRender() || EvaCombatR31.active(e)
+        if (e.isVisuallyAirborneForRender() || EvaCombatR31.active(e)
                 || CombatReactionsR36.active(e) || CombatFeelR31.beat(e) != null)
         {
             return false;

@@ -324,6 +324,7 @@ public final class EvaGameplayMotionR32
     {
         if(!directed(e)||!EvaCombatSupportR33.strike(e))return true;
         String name=activeGroundClip(e,partial);if(name.isEmpty())return true;
+        if(supportedPunchR64(e,name))return true;
         float phase=activeGroundPhase(e,partial);
         var frames=clip(e,name).getAsJsonArray("frames");var f=frames.get(Math.min(frames.size()-1,Math.round(Mth.clamp(phase,0,1)*(frames.size()-1)))).getAsJsonObject();
         return f.getAsJsonArray("foot_contact").get(side.equals("l")?0:1).getAsBoolean();
@@ -426,10 +427,14 @@ public final class EvaGameplayMotionR32
         return c.has("release_phase")?Mth.clamp(c.get("release_phase").getAsFloat(),.65F,.98F):.76F;
     }
     public static EvaBodyPose.Sample committedContactPose(EvaUnit01Entity e)
+    {return committedContactPose(e,null);}
+    public static EvaBodyPose.Sample committedContactPose(EvaUnit01Entity e,EvaBodyPose.Sample current)
     {
         if(!phrases(e)||e.getEntityData().get(LOW_TARGET)||e.getOrdinaryAttackStage()<0&&!e.isHeavyMotionActive()&&!EvaBerserkMotionR34.striking(e))return null;
         String name=EvaBerserkMotionR34.striking(e)?EvaBerserkMotionR34.name(e):e.isHeavyMotionActive()?"heavy":ordinary(e.getOrdinaryAttackStage());
-        return EvaBodyPose.gameplayClip(e,resolve(e,name),contactPhase(e,name));
+        var pose=EvaBodyPose.gameplayClip(e,resolve(e,name),contactPhase(e,name));
+        if(supportedPunchR64(e,name))EvaBodyPose.strikeOverSupportR64(pose,current!=null?current:EvaBodyPose.sample(e,0));
+        return pose;
     }
     public static String side(EvaUnit01Entity e,String name){return clip(e,name).get("leading_side").getAsString();}
     public static String ordinary(int stage)
@@ -453,12 +458,27 @@ public final class EvaGameplayMotionR32
     }
     public static Vec3 root(EvaUnit01Entity e,String name,float phase)
     {
+        if(supportedPunchR64(e,name))return Vec3.ZERO;
         if(e.isPilotCrouching()&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS
                 &&(name.equals("jab")||name.equals("cross"))&&!lowAttackReadyR44(e))return Vec3.ZERO;
         phase=phase(e,name,phase);
         var points=clip(e,name).getAsJsonArray("trajectory_m");
         float f=Math.min(EvaRootClosureR63.holdFrom(points,()->forwardR63(points)),Mth.clamp(phase,0,1)*(points.size()-1));int a=(int)f,b=Math.min(a+1,points.size()-1);
         var x=points.get(a).getAsJsonArray();var y=points.get(b).getAsJsonArray();return new Vec3(Mth.lerp(f-a,x.get(0).getAsDouble(),y.get(0).getAsDouble()),0,Mth.lerp(f-a,x.get(2).getAsDouble(),y.get(2).getAsDouble()));
+    }
+
+    /** Boxing on the spot uses the gait's feet. Steps and low-target strikes retain their authored support. */
+    private static boolean supportedPunchR64(EvaUnit01Entity e,String name)
+    {
+        return (name.equals("jab")||name.equals("cross")||name.equals("hook"))&&EvaCombatModelR64.flowStand(e)
+                &&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&actionStanceR44(e)==0
+                &&!e.isPilotCrouching()&&!e.isPilotProne()&&!e.getEntityData().get(LOW_TARGET);
+    }
+
+    public static boolean activeSupportedPunchR64(EvaUnit01Entity e)
+    {
+        int stage=e.getOrdinaryAttackStage();
+        return stage>=0&&ready(e)&&supportedPunchR64(e,ordinary(stage));
     }
     /**
      * R64 (flow, "step"): how far the whole of a clip's step in carries the body beyond the clip's own path, at a
@@ -602,7 +622,7 @@ public final class EvaGameplayMotionR32
             // would only now be seen. A kick's leg is in the air, and is brought down with the rest.
             var left=EvaBodyPose.gameplayClip(e,resolve(e,leaveR64.clip()),phase(e,leaveR64.clip(),leaveR64.phase()));
             offArmR64(e,left,base,leaveR64.clip());
-            if(leaveR64.share()<1)left=EvaBodyPose.blend(base,left,leaveR64.share());
+            if(leaveR64.share()<1)left=EvaBodyPose.blend(EvaBodyPose.copy(base),left,leaveR64.share());
             return new AppliedPoseR44(leaveR64.clip().equals("kick")?EvaBodyPose.blend(left,pose,leaveR64.weight())
                     :EvaBodyPose.blendUpperKeepingLocomotionR51(pose,left,1-leaveR64.weight()),movementOwner[0]);
         }
@@ -874,6 +894,9 @@ public final class EvaGameplayMotionR32
     }
     private static EvaBodyPose.Sample actionPose(EvaUnit01Entity e,String name,float progress,EvaBodyPose.Sample base,float partial)
     {
+        boolean supportedPunch=supportedPunchR64(e,name);
+        if(supportedPunch&&com.projectseele.anim.EvaAnimator.canSupplyGait(e,partial))
+            base=com.projectseele.anim.EvaAnimator.sample(e,partial);
         String resolved=resolve(e,name);float phase=phase(e,name,progress);
         var pose=EvaBodyPose.gameplayClip(e,resolved,phase);
         float entryEnd=actionEntryEndR51(e,name);
@@ -888,7 +911,7 @@ public final class EvaGameplayMotionR32
             // degrees in the first frame of the next punch.)
             var other=EvaBodyPose.gameplayClip(e,resolve(e,fadeR64.clip()),phase(e,fadeR64.clip(),fadeR64.phase()));
             // R64 (stand): the other was on its way back into the stand.
-            if(standR64!=null){offArmR64(e,other,base,fadeR64.clip());if(fadeR64.share()<1)other=EvaBodyPose.blend(base,other,fadeR64.share());}
+            if(standR64!=null){offArmR64(e,other,base,fadeR64.clip());if(fadeR64.share()<1)other=EvaBodyPose.blend(EvaBodyPose.copy(base),other,fadeR64.share());}
             pose=EvaBodyPose.blend(other,pose,fadeR64.weight());
         }
         else if(standR64!=null)
@@ -897,7 +920,7 @@ public final class EvaGameplayMotionR32
             // into it over its recovery; through its live ticks it is its clip's alone. Its clip begins and ends
             // in a pose of its own (the punches' in a boxer's), which the Unit is not to stand in.
             float shareR64=EvaRowClockR64.share(standR64,progress);
-            if(shareR64<1&&(progress>standR64.close()||!e.rowBeganOutOfBlowR64()))pose=EvaBodyPose.blend(base,pose,shareR64);
+            if(shareR64<1&&(progress>standR64.close()||!e.rowBeganOutOfBlowR64()))pose=EvaBodyPose.blend(EvaBodyPose.copy(base),pose,shareR64);
         }
         else if(!e.rowBeganOutOfBlowR64()&&progress<entryEnd&&!e.getEntityData().get(ACTION_FROM).isEmpty())
         {
@@ -912,7 +935,8 @@ public final class EvaGameplayMotionR32
         if(progress>.86F&&!phrases(e)){var end=guardWeight(e)>.5F?EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F):base;pose=EvaBodyPose.blend(pose,end,(progress-.86F)/.14F);}
         boolean crouchedPunch=e.isPilotCrouching()&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS
                 &&(name.equals("jab")||name.equals("cross"))&&!lowAttackReadyR44(e);
-        if(crouchedPunch||Unit03SourceRigR53.sharesGroundActions(e)&&e.rifleStanceLevel(partial)<.01F
+        if(supportedPunch)EvaBodyPose.strikeOverSupportR64(pose,base);
+        else if(crouchedPunch||Unit03SourceRigR53.sharesGroundActions(e)&&e.rifleStanceLevel(partial)<.01F
                 &&e.rifleMoveBlend(partial)>.001F
                 &&java.util.Set.of("jab","cross","hook","pounce_r64","knee_r64","heavy","knife_forward","knife_reverse").contains(name))
         {

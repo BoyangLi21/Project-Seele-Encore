@@ -47,7 +47,7 @@ public final class CombatBodyContacts
         // animation grow through the opponent after both roots had stopped.
         if(actor instanceof EvaUnit01Entity eva)
         {
-            var next=EvaGameplayMotionR32.committedContactPose(eva);
+            var next=EvaGameplayMotionR32.committedContactPose(eva,pose);
             if(next!=null)current=Math.max(current,frontage(actor,toward,profile,next));
         }
         else if(actor instanceof SachielEntity angel&&SachielGameplayMotionR32.phrases()&&angel.isStrikeActive())

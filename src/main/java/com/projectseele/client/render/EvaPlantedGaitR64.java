@@ -5,6 +5,7 @@ import com.projectseele.client.AircraftRenderClockR21;
 import com.projectseele.entity.CombatReactionsR36;
 import com.projectseele.entity.EvaBodyPose;
 import com.projectseele.entity.EvaCombatR31;
+import com.projectseele.entity.EvaGameplayMotionR32;
 import com.projectseele.entity.EvaMechanicalFrameR52;
 import com.projectseele.entity.EvaMotionModelR64;
 import com.projectseele.entity.EvaObstacleCollision;
@@ -311,13 +312,15 @@ public final class EvaPlantedGaitR64
 
     private static boolean wanted(EvaUnit01Entity e,float partial)
     {
-        return EvaMotionModelR64.walks(e)&&!e.hasLegacyStrikeForRender()&&EvaBodyPose.hasTerrainStances()
-                &&e.getMotionLabPhysicsPreview()==0&&!e.isVisuallyAirborneForRender()&&!e.hasLiveActionForRender(partial)
-                &&!e.hasActiveCarrierMotion()&&e.rifleStanceLevel(partial)<.02F&&e.getOrdinaryAttackStage()<0
+        boolean punch=EvaGameplayMotionR32.activeSupportedPunchR64(e);
+        return EvaMotionModelR64.walks(e)&&EvaBodyPose.hasTerrainStances()
+                &&(punch||!e.hasLegacyStrikeForRender()&&!e.hasLiveActionForRender(partial)&&e.getOrdinaryAttackStage()<0)
+                &&e.getMotionLabPhysicsPreview()==0&&!e.isVisuallyAirborneForRender()
+                &&!e.hasActiveCarrierMotion()&&e.rifleStanceLevel(partial)<.02F
                 &&!e.isHeavyMotionActive()&&!e.isKickMotionActive(partial)&&!e.fixedCannonOperatingR52()
                 &&EvaCombatR31.action(e)==EvaCombatR31.NONE&&!CombatReactionsR36.active(e)
                 &&!EvaMechanicalFrameR52.serviceSourceHeldR52(e)&&!EvaShutdownR30.displayed(e)
-                &&!com.projectseele.anim.EvaAnimator.owns(e,partial);
+                &&!com.projectseele.anim.EvaAnimator.canSupplyGait(e,partial);
     }
 
     /** -Dprojectseele.plantedDiagR64=true: what keeps this model off a Unit that asked for it, logged when it changes. */
