@@ -221,10 +221,11 @@ public final class HakoneSurfaceFieldTest
             {
                 PlaytestLandscapeR64.decorate(c);
                 int x = -1191, z = -2163;
-                if (!c.getBlockState(p.set(x, 59, z)).is(Blocks.STONE)
+                int bed = PlaytestLandscapeR64.class.getResource("/data/projectseele/worldgen/playtest_shores_r64/-3_-5.bin.gz") != null ? 57 : 59;
+                if (!c.getBlockState(p.set(x, bed, z)).is(Blocks.STONE)
                         || !c.getBlockState(p.set(x, 63, z)).isAir())
                     throw new AssertionError("Regenerated northwest bay bed or headroom differs from the save");
-                for (int y = 60; y <= 62; y++)
+                for (int y = bed + 1; y <= 62; y++)
                 {
                     var water = c.getBlockState(p.set(x, y, z));
                     if (!water.is(Blocks.WATER) || !water.getFluidState().isSource())
