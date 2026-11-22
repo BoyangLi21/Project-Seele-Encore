@@ -28,10 +28,12 @@ import java.util.*;
 public final class BattlefieldR21
 {
     private record Cell(BlockPos pos,BlockState before,BlockState covered,CompoundTag blockEntity){}
-    private record Plan(List<Cell> cells,AABB bounds){}
+    /** manifest: SHA-256 of battlefield_r21.json, so a saved conflict count can tell which manifest it was made against. */
+    private record Plan(List<Cell> cells,AABB bounds,String manifest){}
     private static final Map<ServerLevel,Optional<Plan>> PLANS=new WeakHashMap<>();
     private static final int CELL_LIMIT = 2048;
     private static final long WRITE_BUDGET_NS = 3_000_000;
+    private static final String RECOUNT = "recount";
     private static final TicketType<ChunkPos> FIXTURE_TICKET = TicketType.create(
             "projectseele_street_fixtures", Comparator.comparingLong(ChunkPos::toLong), 120);
 
@@ -96,9 +98,9 @@ public final class BattlefieldR21
     public static final class State extends SavedData
     {
         private ChunkWindow window;
-        public String job="";public int cursor,conflicts;public boolean hidden,restoreRequested;
-        static State load(CompoundTag t){State s=new State();s.job=t.getString("Job");s.cursor=t.getInt("Cursor");s.conflicts=t.getInt("Conflicts");s.hidden=t.getBoolean("Hidden");s.restoreRequested=t.getBoolean("RestoreRequested");return s;}
-        @Override public CompoundTag save(CompoundTag t){t.putString("Job",job);t.putInt("Cursor",cursor);t.putInt("Conflicts",conflicts);t.putBoolean("Hidden",hidden);t.putBoolean("RestoreRequested",restoreRequested);return t;}
+        public String job="",manifest="";public int cursor,conflicts;public boolean hidden,restoreRequested;
+        static State load(CompoundTag t){State s=new State();s.job=t.getString("Job");s.cursor=t.getInt("Cursor");s.conflicts=t.getInt("Conflicts");s.hidden=t.getBoolean("Hidden");s.restoreRequested=t.getBoolean("RestoreRequested");s.manifest=t.getString("Manifest");return s;}
+        @Override public CompoundTag save(CompoundTag t){t.putString("Job",job);t.putInt("Cursor",cursor);t.putInt("Conflicts",conflicts);t.putBoolean("Hidden",hidden);t.putBoolean("RestoreRequested",restoreRequested);t.putString("Manifest",manifest);return t;}
     }
     public static State state(ServerLevel l){return l.getDataStorage().computeIfAbsent(State::load,State::new,"projectseele_battlefield_r21");}
     @SuppressWarnings({"unchecked","rawtypes"}) private static BlockState parse(String text)
@@ -112,19 +114,22 @@ public final class BattlefieldR21
             var file=l.getServer().getWorldPath(LevelResource.ROOT).resolve("battlefield_r21.json");if(!Files.isRegularFile(file))return Optional.empty();
             try
             {
-                var d=JsonParser.parseString(Files.readString(file)).getAsJsonObject();var cells=new ArrayList<Cell>();
+                var bytes=Files.readAllBytes(file);
+                var manifest=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+                var d=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();var cells=new ArrayList<Cell>();
                 for(var e:d.getAsJsonArray("cells")){var a=e.getAsJsonArray();cells.add(new Cell(new BlockPos(a.get(0).getAsInt(),a.get(1).getAsInt(),a.get(2).getAsInt()),parse(a.get(3).getAsString()),parse(a.get(4).getAsString()),a.size()>5?TagParser.parseTag(a.get(5).getAsString()):null));}
-                var b=d.getAsJsonArray("bounds");return Optional.of(new Plan(cells,new AABB(b.get(0).getAsDouble(),81,b.get(1).getAsDouble(),b.get(2).getAsDouble()+1,320,b.get(3).getAsDouble()+1)));
+                var b=d.getAsJsonArray("bounds");return Optional.of(new Plan(cells,new AABB(b.get(0).getAsDouble(),81,b.get(1).getAsDouble(),b.get(2).getAsDouble()+1,320,b.get(3).getAsDouble()+1),manifest));
             }
             catch(Exception x){throw new IllegalStateException("Invalid explicit R21 battlefield manifest",x);}
         });
     }
     public static boolean installed(ServerLevel level){return plan(level).isPresent();}
-    public static boolean concealed(ServerLevel level){if(!installed(level))return false;var s=state(level);return s.hidden||!s.job.isEmpty();}
+    /** A recount writes nothing, so it does not hide the fixtures. */
+    public static boolean concealed(ServerLevel level){if(!installed(level))return false;var s=state(level);return s.hidden||!s.job.isEmpty()&&!s.job.equals(RECOUNT);}
     public static boolean deferRestore(ServerLevel level)
     {
         if(!installed(level))return false;var s=state(level);
-        if(!s.hidden&&s.job.isEmpty())return false;
+        if(!s.hidden&&(s.job.isEmpty()||s.job.equals(RECOUNT)))return false;
         s.restoreRequested=true;if(!s.job.equals("restore")){s.job="restore";s.cursor=0;s.conflicts=0;}s.setDirty();return true;
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent e)
@@ -138,6 +143,13 @@ public final class BattlefieldR21
                 s.window.release(level.getChunkSource());
                 s.window = null;
             }
+            // R65: the count is made only while covering or restoring, so a save covered under an older manifest
+            // (the 61 kerb cells taken out of it on 11-18) kept that count, and with it the NPC interlock in
+            // CityBattlefieldR29, until the city next moved. Count again, writing nothing, under the manifest as it is.
+            if(!s.manifest.equals(p.manifest())){s.job=RECOUNT;s.cursor=0;s.conflicts=0;s.setDirty();}
+        }
+        if(s.job.isEmpty())
+        {
             var city=Tokyo3RetractionSavedData.get(level).get(origin).orElse(null);
             if(s.hidden||city==null||city.depth()!=ThirdTokyoSurfaceBuilder.maximumRetractionDepth(origin)||city.targetDepth()!=city.depth()||city.cursor()!=0||city.voxelCursor()!=0)return;
             // The rigid city keeps its own state: a raise asked for right after a restore waits there (queued) for a
@@ -152,7 +164,7 @@ public final class BattlefieldR21
             if(!level.getEntitiesOfClass(Player.class,p.bounds,q->!q.isSpectator()&&q.getY()>82).isEmpty())return;
             s.job="cover";s.cursor=0;s.conflicts=0;s.setDirty();
         }
-        boolean restore=s.job.equals("restore");
+        boolean restore=s.job.equals("restore"),recount=s.job.equals(RECOUNT);
         long began = System.nanoTime();
         int first = s.cursor;
         var source = level.getChunkSource();
@@ -174,6 +186,7 @@ public final class BattlefieldR21
             if (chunk == null) break;
             BlockState from=restore?c.covered:c.before,to=restore?c.before:c.covered,actual=chunk.getBlockState(c.pos);
             if(!actual.equals(from)&&!actual.equals(to)){s.conflicts++;s.cursor++;continue;}
+            if(recount){s.cursor++;continue;}
             if(!actual.equals(to))
             {
                 if(restore&&!to.getCollisionShape(level,c.pos).isEmpty()&&!level.getEntitiesOfClass(Player.class,new AABB(c.pos),q->!q.isSpectator()).isEmpty())break;
@@ -187,6 +200,13 @@ public final class BattlefieldR21
         {
             s.window.release(source);
             s.window = null;
+            s.manifest=p.manifest();
+            if(recount)
+            {
+                s.job="";s.cursor=0;s.setDirty();
+                ProjectSeele.LOGGER.info("R21 BATTLEFIELD RECOUNTED hidden={} cells={} conflicts={}",s.hidden,p.cells.size(),s.conflicts);
+                return;
+            }
             s.hidden=!restore;s.job="";s.cursor=0;s.setDirty();ProjectSeele.LOGGER.info("R21 BATTLEFIELD {} cells={} conflicts={}",restore?"RESTORED":"COVERED",p.cells.size(),s.conflicts);
             if(restore&&s.restoreRequested){s.restoreRequested=false;s.setDirty();Tokyo3RetractionDirector.request(level,origin,false);}
         }
