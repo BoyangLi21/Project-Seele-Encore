@@ -333,11 +333,15 @@ def xaero_map(source, world, address):
     if not gate(surface, 'No baked region files in ' + str(converted)):
         return {}
     gate(surface <= leaves | outdated, ('Bake did not finish', sorted(surface - leaves - outdated)[:5]))
-    saved = world / 'dimensions/projectseele/geofront/region'
-    baked, newest = min(p.stat().st_mtime for p in regions.values()), max(p.stat().st_mtime for p in saved.glob('*.mca'))
+    # Region by region (a Xaero region and an .mca file cover the same 512 blocks): an incremental re-bake (R65) only
+    # rewrites the regions whose saved chunks changed. Zips over regions with no saved chunks are the outer ring the
+    # server generates; they come from a world where it had been generated and cannot be re-baked from this save.
+    saved = {tuple(map(int, p.name.split('.')[1:3])): p.stat().st_mtime
+             for p in (world / 'dimensions/projectseele/geofront/region').glob('*.mca') if p.stat().st_size}
     stamp = lambda t: datetime.datetime.fromtimestamp(t).isoformat(timespec='seconds')
-    gate(baked > newest, 'The world changed after the map was baked (oldest zip %s, newest region %s); bake it again'
-         % (stamp(baked), stamp(newest)))
+    stale = sorted((n, stamp(p.stat().st_mtime), stamp(saved[r])) for n, p in regions.items()
+                   for r in [tuple(map(int, region_name(n).split('_')))] if r in saved and p.stat().st_mtime <= saved[r])
+    gate(not stale, ('The world changed after these map regions were baked (zip, baked, region saved); bake them again', stale[:5]))
     # Cave mode type 2 ("full") makes Xaero use the one baked cave layer everywhere in the GeoFront.
     config = source / 'dimension_config.txt'
     caves = {n for n in regions if '/caves/' in n}
