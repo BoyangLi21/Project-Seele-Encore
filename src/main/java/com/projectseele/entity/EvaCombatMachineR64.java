@@ -104,8 +104,16 @@ public final class EvaCombatMachineR64
         {
             if(button<0||!owns()||e.hasLiveActionForRender(0)||e.leapLockedR64())return;
             Row next=sinceEnd<=LINK&&last!=null?follow(last,button):null;
-            if(next==null)next=EvaMoveTableR64.opener(e.getWeapon(),button==HEAVY,sinceEvade<=AFTER_EVADE,EvaGameplayMotionR32.knifeCutsReadyR64(e),
-                    EvaGameplayMotionR32.bodyReadyR64(e),e.isPilotSprinting()&&e.pilotLocomotionRequestedR45());
+            if(next==null)
+            {
+                boolean run=e.isPilotSprinting()&&e.pilotLocomotionRequestedR45();
+                // The body's openers (the string after an evade, the charge out of a run) only when switched on;
+                // otherwise these presses are punches. Grab and pound do not open here and are unaffected.
+                var config=com.projectseele.config.SeeleConfig.COMMON_SPEC.isLoaded();
+                boolean body=EvaGameplayMotionR32.bodyReadyR64(e)&&config&&(run?com.projectseele.config.SeeleConfig.EVA_COMBAT_RUN_CHARGE.get()
+                        :com.projectseele.config.SeeleConfig.EVA_COMBAT_EVADE_STRING.get());
+                next=EvaMoveTableR64.opener(e.getWeapon(),button==HEAVY,sinceEvade<=AFTER_EVADE,EvaGameplayMotionR32.knifeCutsReadyR64(e),body,run);
+            }
             if(next!=null&&ready(next))start(next,"standing");
             return;
         }

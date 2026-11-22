@@ -59,6 +59,8 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.ConfigValue<String> EVA_COMBAT_MODEL;
     public static final ForgeConfigSpec.ConfigValue<String> EVA_HIT_STOP;
     public static final ForgeConfigSpec.ConfigValue<String> EVA_COMBAT_FLOW;
+    public static final ForgeConfigSpec.BooleanValue EVA_COMBAT_EVADE_STRING;
+    public static final ForgeConfigSpec.BooleanValue EVA_COMBAT_RUN_CHARGE;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_RANGE;
     public static final ForgeConfigSpec.IntValue EVA_RIFLE_INTERVAL_TICKS;
@@ -320,6 +322,15 @@ public final class SeeleConfig
                         "and thrown with the heavy one; with stand, curve, clock and step).",
                         "In game: /seele combat flow.")
                 .define("flow", "on", value -> value instanceof String);
+        // Owner 2026-11-22: the pounce, knee and slam put the arms inside the chest and are not a normal attack.
+        EVA_COMBAT_EVADE_STRING = common
+                .comment("With the body flow, a light press just after an evade starts the pounce, knee, two-fisted slam string.",
+                        "Off by default: the press after an evade is a punch.")
+                .define("evadeString", false);
+        EVA_COMBAT_RUN_CHARGE = common
+                .comment("With the body flow, a light press out of a run is the shoulder charge.",
+                        "Off by default: the press out of a run is a punch.")
+                .define("runCharge", false);
         common.pop();
 
         common.push("eva_pallet_smg");
