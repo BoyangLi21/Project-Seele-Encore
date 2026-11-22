@@ -18,6 +18,8 @@
 
 山坡草方块侧面全绿的资源包 `SEELE_GreenGrassSide.zip` 默认开启，不想要可以在“选项 → 资源包”里关掉。
 
+分层图集资源包 `SEELE_GeoFront_Area_Maps.zip` 也默认开启，排在绿草包前面。它给小地图和大地图提供 GeoFront 地下各层（地底草原、金字塔各楼层、机库）的分层底图，关掉以后地下各层不再分层显示。
+
 光影下远处的小实体不投影，可以在 `config/projectseele-client.toml` 的 `[shadows]` 里调整距离，填 0 恢复全部投影。
 
 ## 服主
