@@ -2968,5 +2968,6 @@
   "radio.projectseele.combat.target_down": "目标生命反应消失。各机保持警戒，准备返回机库。",
   "message.projectseele.heavens_door.opening": "天堂之门 开启中",
   "message.projectseele.heavens_door.closing": "天堂之门 关闭中",
-  "message.projectseele.heavens_door.held": "门洞有人，天堂之门重新开启"
+  "message.projectseele.heavens_door.held": "门洞有人，天堂之门重新开启",
+  "message.projectseele.heavens_door.hint": "右键门扇、门框或门牌：开关天堂之门"
 }

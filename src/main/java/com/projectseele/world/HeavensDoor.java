@@ -21,6 +21,8 @@ public final class HeavensDoor
     private static final int BOTTOM = -1230, TOP = -1202, NORTH = 258, SOUTH = 260;
     private static int width, target;
     private static boolean moving;
+    private static final int HINT_EVERY = 1200;
+    private static final java.util.Map<java.util.UUID, Long> HINTED = new java.util.HashMap<>();
 
     private HeavensDoor() {}
 
@@ -63,6 +65,7 @@ public final class HeavensDoor
 
     public static void tick(ServerLevel level)
     {
+        if (level.getGameTime() % 40 == 0) hint(level);
         if (!moving || level.getGameTime() % 3 != 0) return;
         if (!loaded(level)) { moving = false; return; }
         int next = width + Integer.signum(target - width) * Math.min(2, Math.abs(target - width));
@@ -102,6 +105,22 @@ public final class HeavensDoor
         if (!moving) sound(level, ModSounds.SURFACE_BULKHEAD_STOP_R48.get());
     }
 
+    /** People walking up to the bulkhead are told it can be worked by hand: nothing on it looks like a switch. */
+    private static void hint(ServerLevel level)
+    {
+        long now = level.getGameTime();
+        for (ServerPlayer player : level.players())
+        {
+            if (player.isSpectator() || player.getX() < WEST - 4 || player.getX() > EAST + 5
+                    || player.getY() < BOTTOM - 2 || player.getY() > TOP + 4
+                    || player.getZ() < NORTH - 10 || player.getZ() > SOUTH + 11) continue;
+            Long last = HINTED.get(player.getUUID());
+            if (last != null && now - last < HINT_EVERY && now >= last) continue;
+            HINTED.put(player.getUUID(), now);
+            player.displayClientMessage(Component.translatable("message.projectseele.heavens_door.hint"), true);
+        }
+    }
+
     private static boolean loaded(ServerLevel level)
     {
         return level.hasChunkAt(new BlockPos(WEST, TOP, NORTH)) && level.hasChunkAt(new BlockPos(EAST, TOP, SOUTH));
@@ -119,5 +138,5 @@ public final class HeavensDoor
         return ModBlocks.NERV_STRUCTURAL_PANEL.get();
     }
 
-    public static void reset() { moving = false; }
+    public static void reset() { moving = false; HINTED.clear(); }
 }
