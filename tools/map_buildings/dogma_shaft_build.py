@@ -11,7 +11,7 @@ Reads BUILDINGS_WORLD. Writes rows.json (only cells that change), report.json an
 - Bulkheads: an armour band in the inner lining at each bulkhead's two layers; the plates themselves are left open
   (air) until the code that opens and closes them exists (shaft_r66.json carries their closed state).
 - Stations and hand ledges: 2-block slabs, floor panel on top, structural panel under.
-- Bottom gallery x 96-103, z 230-254, y -1264..-1202 into the lobby's east wall, floor level with the shaft floor.
+- Bottom gallery x 93-103, z 237-256, y -1264..-1202 through the lobby's east wall, floor level with the shaft floor.
 Every cell is checked against the city, lift and launch guards; only the doorway may lie in the launch reservation.
 """
 import json, sys

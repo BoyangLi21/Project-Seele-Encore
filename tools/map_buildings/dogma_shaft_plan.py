@@ -20,7 +20,7 @@ EVA_W, EVA_H = 17, 60
 LEDGE_LEN, LEDGE_DEPTH, LEDGE_STEP = 12, 6, 16
 BULKHEADS = [-1091, -1126, -1161, -1196, -1231]   # 35 apart (owner: every 30-40); 2 blocks thick
 DOOR_HALL = dict(x=(94, 95), z=(230, 254), y=(-1051, -989))     # 25 wide, 63 tall opening in the hall's east wall
-GALLERY = dict(x=(96, 103), z=(230, 254), y=(-1264, -1202))     # bottom, into the lobby's east wall
+GALLERY = dict(x=(93, 103), z=(237, 256), y=(-1264, -1202))     # bottom, through the lobby's 3-block east wall (x 93-95) into the lobby (z 237-257)
 FACES = ['N', 'E', 'S', 'W']
 STATION_LEN, STATION_DEPTH = 22, 14
 STATIONS = [('N', -1100), ('S', -1155), ('N', -1210)]
