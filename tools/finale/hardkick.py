@@ -105,6 +105,13 @@ ARMS_UP, ARMS_DOWN = 2.4, 17.5
 GUARD = {'l': ((-2.0, -3.0, 9.5), (-1.5, -3.5, 10.0)), 'r': ((-2.0, -3.0, 9.5), (-1.0, -4.5, 9.0))}
 GUARD_ELBOW = (.8, 1.0, .2)
 GUARD_OUT = (5.0, 8.5, 10.5, 14.5)     # ticks: out from, out by, back from, back by
+# The wrists (R65). The capture's hand is one pose from its first frame to its last, turned 61 degrees one way and
+# 81 another against its forearm: a hand folded against the forearm. Behind the body and out to the side it was
+# never looked at; in front of the chest, closed into the fist a blow is given, the owner saw "a ball" (2026-11-22).
+# The wrist and the hand are written as the standing Unit carries them (a capture of 2026-11-22, the game's own
+# angles in degrees about x, y and z; the right hand mirrors y and z): the hand goes on from the forearm.
+WRIST_TURN = (10.0, 0.0, 0.0)
+HAND_TURN = (-4.5, 2.5, 25.0)
 
 
 def unit(v):
@@ -486,6 +493,9 @@ def main():
         arms_carried(carried, pos, t)
         for n in ('arm_l', 'forearm_l', 'arm_r', 'forearm_r'):
             rot[n] = carried[n]
+        for s, k in (('l', 1.0), ('r', -1.0)):
+            rot['wrist_' + s] = R.qzyx(D(k * WRIST_TURN[2]), D(k * WRIST_TURN[1]), D(WRIST_TURN[0]))
+            rot['hand_' + s] = R.qzyx(D(k * HAND_TURN[2]), D(k * HAND_TURN[1]), D(HAND_TURN[0]))
         arms_hang(rot, pos, max(1 - smooth(t / ARMS_UP), smooth((t - ARMS_DOWN) / (TOTAL - ARMS_DOWN))))
         here = path(t)
         on = {'l': t < L_OFF or L_ON <= t < t_lift - .15 or t >= DOWN_TO, 'r': t < R_OFF or R_ON <= t < UP_OFF or t >= UP_ON}
