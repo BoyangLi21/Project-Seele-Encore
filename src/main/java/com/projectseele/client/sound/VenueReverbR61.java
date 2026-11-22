@@ -37,7 +37,10 @@ public final class VenueReverbR61
         SHAFT(.75F, .55F, .55F, .65F, 4.2F, .70F, .75F, .030F, 1.2F, .04F, .12F, .25F),
         ROOM(.90F, 1F, .45F, .75F, 1.6F, .80F, .60F, .012F, 1F, .02F, .25F, 0F),
         // R64, owner: Ramiel's attack as "一整个城市的夜空的回响": a long dark tail over the whole city with a slap-back echo.
-        CITY_NIGHT(1F, .85F, .70F, .45F, 7.5F, .40F, .35F, .090F, 1.6F, .05F, .25F, .60F);
+        CITY_NIGHT(1F, .85F, .70F, .45F, 7.5F, .40F, .35F, .090F, 1.6F, .05F, .25F, .60F),
+        // R65, owner: the air-raid alarm in the open city needs "特别大、特别远的空间回响". The far horns are in the
+        // take itself (EAX echoes stop at 0.25 s); this adds the basin's long, dark answer with loose repeats.
+        CITY_PA(1F, .55F, .75F, .30F, 9.5F, .35F, .20F, .300F, 1.1F, .10F, .25F, .70F);
 
         final float density, diffusion, gain, gainHf, decay, decayHf, reflections, reflectionsDelay, late, lateDelay, echoTime, echoDepth;
 
@@ -74,6 +77,8 @@ public final class VenueReverbR61
     private static final float ECHO_LOWPASS_GAINHF = .35F;
 
     private static volatile Venue current = Venue.OPEN;
+    /** The listener sees the sky: AlarmSoundInstance plays the open-city take. */
+    private static volatile boolean outdoors;
     private static int tick;
     private static long context;
     private static int slot;
@@ -89,6 +94,14 @@ public final class VenueReverbR61
     private static final Send VENUE = new Send();
     private static final Send BAY = new Send();
     private static final Send CITY = new Send();
+    /** R65: the dry alarm take follows the listener's venue while it loops; the city take keeps CITY_PA. */
+    private static final Send ALARM = new Send();
+    private static final Send ALARM_CITY = new Send();
+
+    public static boolean outdoors()
+    {
+        return outdoors;
+    }
 
     private static int[][] directions()
     {
@@ -155,7 +168,18 @@ public final class VenueReverbR61
             lengths[index] = hit.getType() == HitResult.Type.MISS ? PROBE_RANGE : (float) ear.distanceTo(hit.getLocation());
         }
         boolean deep = ear.y < CAVERN_CEILING && "projectseele:geofront".equals(minecraft.level.dimension().location().toString());
-        current = classify(deep, minecraft.level.canSeeSky(BlockPos.containing(ear)), lengths, PROBE_RANGE);
+        boolean sky = minecraft.level.canSeeSky(BlockPos.containing(ear));
+        current = classify(deep, sky, lengths, PROBE_RANGE);
+        // A street between towers can classify as a hangar; the alarm only asks whether the sky is overhead.
+        outdoors = sky;
+        // The looping alarm keeps its source: change the reverb it sends to when the listener walks into another space.
+        Venue alarm = alarmVenue(current);
+        if (ALARM.loaded != null && ALARM.loaded != alarm && ready()) load(ALARM, alarm);
+    }
+
+    static Venue alarmVenue(Venue listener)
+    {
+        return listener == Venue.OPEN ? Venue.CITY_PA : listener;
     }
 
     /** The server keeps sending wet takes to hangars, so a client without EFX still hears the room. */
@@ -196,6 +220,12 @@ public final class VenueReverbR61
         return listener == Venue.CAVERN ? Venue.CAVERN : Venue.HANGAR;
     }
 
+    private static boolean alarm(SoundInstance sound, String path)
+    {
+        var id = sound.getLocation();
+        return ProjectSeele.MODID.equals(id.getNamespace()) && id.getPath().equals(path);
+    }
+
     private static boolean cityNight(SoundInstance sound)
     {
         var id = sound.getLocation();
@@ -216,7 +246,7 @@ public final class VenueReverbR61
             return false;
         }
         AL10.alGetError();
-        for (Send send : new Send[]{VENUE, BAY, CITY})
+        for (Send send : new Send[]{VENUE, BAY, CITY, ALARM, ALARM_CITY})
         {
             send.effect = EXTEfx.alGenEffects();
             EXTEfx.alEffecti(send.effect, EXTEfx.AL_EFFECT_TYPE, EXTEfx.AL_EFFECT_EAXREVERB);
@@ -238,7 +268,8 @@ public final class VenueReverbR61
         return true;
     }
 
-    private static void load(Send send, Venue venue)
+    /** From the sound thread on attach and from the client thread when the looping alarm's venue changes. */
+    private static synchronized void load(Send send, Venue venue)
     {
         int effect = send.effect;
         EXTEfx.alEffectf(effect, EXTEfx.AL_EAXREVERB_DENSITY, venue.density);
@@ -273,6 +304,18 @@ public final class VenueReverbR61
             send = CITY;
             venue = Venue.CITY_NIGHT;
             rolloff = CITY_DISTANCE_ROLLOFF;
+        }
+        else if (alarm(sound, "alarm"))
+        {
+            send = ALARM;
+            venue = alarmVenue(current);
+            rolloff = 0F;
+        }
+        else if (alarm(sound, "alarm_city"))
+        {
+            send = ALARM_CITY;
+            venue = Venue.CITY_PA;
+            rolloff = 0F;
         }
         else if (sound instanceof DryTake)
         {

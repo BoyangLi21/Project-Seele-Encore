@@ -14,6 +14,8 @@ public class ModSounds
             DeferredRegister.create(ForgeRegistries.SOUND_EVENTS, ProjectSeele.MODID);
 
     public static final RegistryObject<SoundEvent> ALARM = register("alarm");
+    /** The same alarm loop as heard in the open city (far horns all over Tokyo-3); AlarmSoundInstance crossfades the two. */
+    public static final RegistryObject<SoundEvent> ALARM_CITY = register("alarm_city");
     // Fixed at the 96 blocks where RamielBattleSoundR54 takes over for distant observers.
     public static final RegistryObject<SoundEvent> BEAM_CHARGE = registerFixed("beam_charge",384);
     public static final RegistryObject<SoundEvent> BEAM_FIRE = registerFixed("beam_fire",1280);

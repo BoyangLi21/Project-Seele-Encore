@@ -10,7 +10,8 @@ import net.minecraft.client.Minecraft;
 public final class ClientAlarmState
 {
     private static boolean active;
-    private static AlarmSoundInstance siren;
+    /** R65: the dry facility take and the open-city take, started together and crossfaded by place. */
+    private static AlarmSoundInstance siren, city;
 
     private ClientAlarmState() {}
 
@@ -21,16 +22,16 @@ public final class ClientAlarmState
             return;
         }
         active = value;
-        Minecraft minecraft = Minecraft.getInstance();
         if (value)
         {
-            siren = new AlarmSoundInstance();
-            minecraft.getSoundManager().play(siren);
+            siren = new AlarmSoundInstance(false);
+            city = new AlarmSoundInstance(true);
+            Minecraft.getInstance().getSoundManager().play(siren);
+            Minecraft.getInstance().getSoundManager().play(city);
         }
-        else if (siren != null)
+        else
         {
-            minecraft.getSoundManager().stop(siren);
-            siren = null;
+            stopSirens();
         }
     }
 
@@ -38,9 +39,18 @@ public final class ClientAlarmState
     public static void resetConnectionR45()
     {
         active=false;
-        if(siren!=null)Minecraft.getInstance().getSoundManager().stop(siren);
-        siren=null;
+        stopSirens();
     }
+
+    private static void stopSirens()
+    {
+        var sounds = Minecraft.getInstance().getSoundManager();
+        if (siren != null) sounds.stop(siren);
+        if (city != null) sounds.stop(city);
+        siren = null;
+        city = null;
+    }
+
     public static boolean isActive()
     {
         return active;

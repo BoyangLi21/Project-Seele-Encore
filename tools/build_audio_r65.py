@@ -353,16 +353,13 @@ def siren_once(seed):
 # --------------------------------------------------------------- catalogue
 # event -> (new file stem, count, maker, loudness target LUFS, the files it replaces)
 FAMILIES = {
-    'eva_foot_concrete': ('eva_foot_concrete_r65', 6, lambda i: footstep(6500 + 17 * i, False), -19.5,
-                          ['eva_foot_concrete_r47_%d' % i for i in range(6)]),
-    'eva_foot_soil': ('eva_foot_soil_r65', 6, lambda i: footstep(6600 + 17 * i, True), -20.5,
-                      ['eva_foot_soil_r47_%d' % i for i in range(6)]),
+    # eva_foot_concrete / eva_foot_soil and the alarm loop: superseded by tools/build_audio_r65b.py (owner playtest,
+    # the footsteps read as water; the alarm is now zoned). footstep() and alarm_loop() stay for the record.
     'eva_joint_load': ('eva_joint_load_r65', 4, lambda i: joint_load(6700 + 13 * i), -17.5,
                        ['eva_joint_load_r47_%d' % i for i in range(3)]),
     'eva_at_pressure': ('eva_at_pressure_r65', 4, lambda i: at_pressure(6800 + 11 * i), -21.0,
                         ['eva_contact_body_r36_%d' % i for i in range(6)]),
     'eva_at_tear': ('eva_at_tear_r65', 2, lambda i: at_tear(6900 + 7 * i), -21.5, ['eva_at_tear']),
-    'alarm': ('facility_alarm_loop_r65', 1, lambda i: alarm_loop(7000), -17.0, ['facility_siren']),
     'facility_siren': ('facility_siren_r65', 1, lambda i: siren_once(7000), -16.5, ['facility_siren']),
 }
 LOOPED = {'alarm'}

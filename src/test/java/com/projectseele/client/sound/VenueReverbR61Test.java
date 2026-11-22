@@ -58,6 +58,11 @@ public final class VenueReverbR61Test
             check(listener == VenueReverbR61.Venue.CAVERN ? VenueReverbR61.Venue.CAVERN : VenueReverbR61.Venue.HANGAR,
                     VenueReverbR61.bayVenue(listener), "hangar bay PA heard from " + listener);
 
+        // R65: the dry alarm take sounds like the listener's space; under open sky it is the city's far answer.
+        for (var listener : VenueReverbR61.Venue.values())
+            check(listener == VenueReverbR61.Venue.OPEN ? VenueReverbR61.Venue.CITY_PA : listener,
+                    VenueReverbR61.alarmVenue(listener), "alarm heard from " + listener);
+
         // Every preset must stay inside OpenAL's EAX reverb ranges, or the effect is rejected and the send goes silent.
         for (var v : VenueReverbR61.Venue.values())
         {

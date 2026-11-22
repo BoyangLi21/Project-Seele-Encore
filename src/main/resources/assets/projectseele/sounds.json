@@ -12,7 +12,7 @@
     "subtitle": "subtitles.projectseele.alarm",
     "sounds": [
       {
-        "name": "projectseele:facility_alarm_loop_r65",
+        "name": "projectseele:facility_alarm_dry_r65b",
         "stream": false
       }
     ]
@@ -81,27 +81,27 @@
     "subtitle": "subtitles.projectseele.eva_foot_concrete",
     "sounds": [
       {
-        "name": "projectseele:eva_foot_concrete_r65_0",
+        "name": "projectseele:eva_foot_concrete_r65m_0",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r65_1",
+        "name": "projectseele:eva_foot_concrete_r65m_1",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r65_2",
+        "name": "projectseele:eva_foot_concrete_r65m_2",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r65_3",
+        "name": "projectseele:eva_foot_concrete_r65m_3",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r65_4",
+        "name": "projectseele:eva_foot_concrete_r65m_4",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_concrete_r65_5",
+        "name": "projectseele:eva_foot_concrete_r65m_5",
         "attenuation_distance": 384
       }
     ]
@@ -110,27 +110,27 @@
     "subtitle": "subtitles.projectseele.eva_foot_soil",
     "sounds": [
       {
-        "name": "projectseele:eva_foot_soil_r65_0",
+        "name": "projectseele:eva_foot_soil_r65m_0",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r65_1",
+        "name": "projectseele:eva_foot_soil_r65m_1",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r65_2",
+        "name": "projectseele:eva_foot_soil_r65m_2",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r65_3",
+        "name": "projectseele:eva_foot_soil_r65m_3",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r65_4",
+        "name": "projectseele:eva_foot_soil_r65m_4",
         "attenuation_distance": 384
       },
       {
-        "name": "projectseele:eva_foot_soil_r65_5",
+        "name": "projectseele:eva_foot_soil_r65m_5",
         "attenuation_distance": 384
       }
     ]
@@ -1063,6 +1063,15 @@
       {
         "name": "projectseele:cannon_fuse",
         "attenuation_distance": 16,
+        "stream": false
+      }
+    ]
+  },
+  "alarm_city": {
+    "subtitle": "subtitles.projectseele.alarm",
+    "sounds": [
+      {
+        "name": "projectseele:facility_alarm_city_r65b",
         "stream": false
       }
     ]

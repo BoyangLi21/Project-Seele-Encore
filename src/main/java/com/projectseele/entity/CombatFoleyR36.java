@@ -24,6 +24,7 @@ public final class CombatFoleyR36
         play(actor,foot,actor instanceof SachielEntity?ModSounds.SACHIEL_FOOT.get():soil?ModSounds.EVA_FOOT_SOIL.get():ModSounds.EVA_FOOT_CONCRETE.get(),2.5F*load,
                 .96F+.08F*actor.getRandom().nextFloat());
     }
+    /** Owner 2026-11-22: never on an attack (punch, kick, knife, slam, grab reach); only body moves and transport. */
     public static void load(EvaUnit01Entity actor)
     {play(actor,actor.position().add(0,actor.getBbHeight()*.57,0),ModSounds.EVA_JOINT_LOAD.get(),.8F,1);}
     /** Called once by a transport job after stable physical bearing contact. */

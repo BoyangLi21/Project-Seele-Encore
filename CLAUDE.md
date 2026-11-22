@@ -101,7 +101,7 @@ resources/
 | EVA重砸（右键，非炮模式） | 拳35/刀80，9格AOE，3s冷却 | 常量；炮模式右键=蓄力 |
 | 体型 | 拉米尔 12×12 / EVA 24 格（2026-07 用户拍板 ×2） | hitbox+渲染常量 |
 | 步枪伤害/冷却/射程 | 16 / 25t / 96（对使徒被 AT Field 全弹开） | `positron_rifle.*` |
-| 警报总开关/音量 | true / 0.45 | `ramiel.alarmEnabled`（音量为常量） |
+| 警报总开关/音量 | true / 0.30（R65 前 0.45） | `ramiel.alarmEnabled`（音量为常量 `AlarmSoundInstance.VOLUME`；露天用城市版、室内按所在空间混响） |
 | 客户端特效强度/警报红屏 | 1.0 / true | `screen_effects.*` |
 | 核心碎片掉落 | 4–8 (+抢夺) | `loot_tables/entities/ramiel.json`（不在 config） |
 

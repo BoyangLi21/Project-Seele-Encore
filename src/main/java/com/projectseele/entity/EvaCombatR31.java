@@ -130,7 +130,7 @@ public final class EvaCombatR31
         var destination=t.position().subtract(direction.scale(holdDistance(e,t)));destination=new Vec3(destination.x,e.getY(),destination.z);
         e.getEntityData().set(APPROACH_FROM,e.position().toVector3f());e.getEntityData().set(APPROACH_TO,destination.toVector3f());
         e.getEntityData().set(FACING,(float)Math.toDegrees(Math.atan2(-direction.x,direction.z)));
-        e.interruptCombatR31();start(e,REACH,t);CombatFoleyR36.load(e);
+        e.interruptCombatR31();start(e,REACH,t);
     }
     private static LivingEntity nearest(EvaUnit01Entity e,double range)
     {

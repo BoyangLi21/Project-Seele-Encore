@@ -3603,7 +3603,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.clearLegacyRecoveryR51();
         com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"punch");
         EvaGameplayMotionR32.beginAction(this);
-        if(EvaGameplayMotionR32.phrases(this))CombatFoleyR36.load(this);
         this.gameplayOrdinaryContactR32=false;
         if(EvaGameplayMotionR32.ready(this)&&!EvaGameplayMotionR32.directed(this))EvaMovementSounds.swing(this,.8F);
         boolean continuing = this.ordinaryAttackComboGraceTicks > 0;
@@ -3961,7 +3960,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.pendingKickContactTicks = this.kickContactTicks();
         this.kickContactR60=false;
         this.kickPreviousFootR60=null;
-        CombatFoleyR36.load(this);
         this.stompCooldown = this.fastMeleeCooldownR43(STOMP_COOLDOWN_TICKS);
         this.entityData.set(DATA_KICK_SEQUENCE,
                 (this.entityData.get(DATA_KICK_SEQUENCE) + 1)
@@ -4055,7 +4053,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.knifeVisualTicks = this.knifeVisualTicks(reverse);
         this.knifeElapsedTicks = 0;
         this.knifeDurationAtStart = this.knifeDurationTicks(reverse);
-        CombatFoleyR36.load(this);
         if(this.getTags().contains("seele_ordinary_motion_r52"))
             ProjectSeele.LOGGER.info("EVA native knife committed: eva={} tick={} reverse={} duration={} meleeSequence={} smashSequence={}",
                     this.getStringUUID(),this.level().getGameTime(),reverse,this.knifeDurationAtStart,
@@ -4147,7 +4144,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             {
                 this.entityData.set(DATA_SMASH_SEQUENCE,(this.entityData.get(DATA_SMASH_SEQUENCE)+1)&Integer.MAX_VALUE);
                 com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"smash");
-                CombatFoleyR36.load(this);
                 this.heavyDuration=ticks;this.heavyTicks=ticks;this.heavyElapsed=0;this.heavyContact=true;
                 this.liveCombatRootPrevious=EvaGameplayMotionR32.root(this,"heavy",0);
                 this.entityData.set(DATA_LIVE_ACTION_PHASE,0F);this.entityData.set(DATA_HEAVY_ACTIVE,true);
