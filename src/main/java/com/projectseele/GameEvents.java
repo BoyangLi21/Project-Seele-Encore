@@ -325,6 +325,16 @@ public class GameEvents
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event)
     {
+        // Client: a click on Heaven's Door is handled, so the hand swings and a held block is not placed.
+        // The use packet still goes to the server, which moves the door.
+        if (event.getHand() == InteractionHand.MAIN_HAND && event.getLevel().isClientSide()
+                && !event.getEntity().isSpectator()
+                && com.projectseele.world.HeavensDoor.controls(event.getLevel(), event.getPos()))
+        {
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
         if (event.getHand() == InteractionHand.MAIN_HAND
                 && event.getEntity() instanceof ServerPlayer player)
         {
