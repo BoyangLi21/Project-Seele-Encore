@@ -120,6 +120,26 @@ public final class BattlefieldR21
         });
     }
     public static boolean installed(ServerLevel level){return plan(level).isPresent();}
+    /**
+     * R66: counts the conflicts again against the manifest as it is now, for the state the field rests in. The count
+     * is otherwise only made while covering or restoring, so a save whose manifest was corrected afterwards (the 61
+     * kerb cells taken out on 11-18) keeps the old count, and with it the NPC interlock, until the city next moves.
+     * Loads each chunk it reads; meant for an idle field (no job running). Returns the new count, or -1 when idle
+     * is not the case.
+     */
+    public static int recountR66(ServerLevel level)
+    {
+        var optional=plan(level);if(optional.isEmpty())return -1;var s=state(level);if(!s.job.isEmpty())return -1;
+        int conflicts=0;var origin=IntegratedNervMapBuilder.tokyo3Origin(level);
+        for(var c:optional.get().cells)
+        {
+            if(ThirdTokyoSurfaceBuilder.fixedPowerPylonCell(origin,c.pos))continue;
+            var actual=level.getBlockState(c.pos);
+            if(!actual.equals(s.hidden?c.covered:c.before)&&!actual.equals(s.hidden?c.before:c.covered))conflicts++;
+        }
+        ProjectSeele.LOGGER.info("R66 BATTLEFIELD recount: hidden={} conflicts {} -> {}",s.hidden,s.conflicts,conflicts);
+        s.conflicts=conflicts;s.setDirty();return conflicts;
+    }
     public static boolean concealed(ServerLevel level){if(!installed(level))return false;var s=state(level);return s.hidden||!s.job.isEmpty();}
     public static boolean deferRestore(ServerLevel level)
     {

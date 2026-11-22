@@ -96,6 +96,9 @@ public final class AngelSortieReviewR66
                 {
                     facilityAt = ticks;
                     ProjectSeele.LOGGER.info("angel_review facility installed at tick {}", ticks);
+                    // the saved battlefield conflict count may predate the corrected manifest (see BattlefieldR21)
+                    var field = operation;
+                    server.execute(() -> com.projectseele.world.BattlefieldR21.recountR66(field));
                 }
                 else if (ticks % 400 == 0) ProjectSeele.LOGGER.info("angel_review waiting for the facility at tick {}: {}", ticks, status.isEmpty() ? "no status" : status.get(0));
             }
