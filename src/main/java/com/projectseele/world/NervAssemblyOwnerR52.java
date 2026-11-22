@@ -618,6 +618,42 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         }
         var to=new NervCranePoseR52.State(machine,next,null,false,eye,actual.rotation());if(!clearCrane(l,p,capsule,observed,to))return false;n.configurePlugCrane(p.variant(),next);n.moveControlled(machine.translation().x,machine.translation().y,machine.translation().z);n.setCraneReferenceR52(actual);n.linkCranePlug(age==36?capsule:null);return true;
     }
+    /** R65: the approaches under way in cages at rest, by unit; nothing of it needs saving. */
+    private final Map<Integer,CompoundTag> standbyHoistsR65=new HashMap<>();
+    /**
+     * R65: a cage at rest holds its capsule on the hoist, as the original shows it and as a cage is commissioned.
+     * A recovery of the hull alone (the capsule ejected in the field, a new one set at its dock) left the new
+     * capsule at the dock and the chuck retracted above the unit, where the last insertion had parked it. The
+     * next insertion copes with that, by approaching first; a visitor meanwhile saw a crane with nothing on it and
+     * a capsule lying by the bridge. Now the same approach is made as soon as the cage is at rest: the trolley
+     * runs to the capsule, the chuck comes down and takes it. A pilot who boards meanwhile is not waited for:
+     * the insertion's own approach goes on from wherever the chuck is.
+     */
+    public void standbyHoistsR65(ServerLevel l,java.util.function.IntPredicate atRest)
+    {
+        if(!commissioned||craneGeometry==null)return;
+        for(var p:units.values())
+        {
+            if(!atRest.test(p.variant())||!(l.getEntity(p.plug()) instanceof EntryPlugCarrierEntity capsule)
+                    ||!(l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist)
+                    ||!hoist.isPlugCrane()||hoist.getCranePlug()!=null
+                    ||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_SUSPENDED||capsule.isVehicle()
+                    ||capsule.isLockedToEva()||!pose(capsule.getCanonicalTransform(),p.dock()))
+            {standbyHoistsR65.remove(p.variant());continue;}
+            var data=standbyHoistsR65.computeIfAbsent(p.variant(),unit->new CompoundTag());
+            if(l.getGameTime()<data.getLong("RetryAtR65"))continue;
+            int age=data.getInt("AgeR65")+1;Vec3 before=hoist.position();float bottom=hoist.actualCraneBottomOffsetR52();
+            if(approachCrane(l,p,capsule,age,data))
+            {
+                if(age>=36){standbyHoistsR65.remove(p.variant());com.projectseele.ProjectSeele.LOGGER.info("R65 standby hoist: unit {} holds its capsule again",p.variant());}
+                else data.putInt("AgeR65",age);
+            }
+            // (Aligning along the runway is a refused step that moved the trolley; a refusal that moved nothing
+            // is something in the way, or a state this does not know: looked at again in a second.)
+            else if(hoist.position().distanceToSqr(before)<1e-10&&hoist.actualCraneBottomOffsetR52()==bottom)
+                data.putLong("RetryAtR65",l.getGameTime()+20);
+        }
+    }
     private boolean alignRetractedCraneReferenceR53(ServerLevel l,UnitPlant p,EntryPlugCarrierEntity capsule,
             NervCarrierPlatformEntity n,NervCranePoseR52.State from,Vec3 eye,org.joml.Quaternionf rotation)
     {

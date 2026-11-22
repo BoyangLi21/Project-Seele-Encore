@@ -304,6 +304,9 @@ public final class NervRouteRuntimeR52
         var c=LIVE.get(level);if(c==null)return;
         if(c.saved.interruptedContinuousCommitR53()!=null)c.recoverContinuousCommitR53();
         if(ready(level))c.tick();
+        // R65: a unit with no arrangement running, or parked, has its cage at rest (NervAssemblyOwnerR52.standbyHoistsR65).
+        if(ready(level)&&c.owner instanceof NervAssemblyOwnerR52 plant)
+            plant.standbyHoistsR65(level,variant->{var job=c.saved.job(variant);return job==null||job.phase()==Phase.PARKED||job.phase()==Phase.CANCELLED;});
     }
     /** Constructed only after current physical endpoint and old-clock checks. */
     static final class RecoveredContinuousStepR53
