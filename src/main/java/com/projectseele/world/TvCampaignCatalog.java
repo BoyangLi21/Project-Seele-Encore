@@ -14,7 +14,7 @@ public final class TvCampaignCatalog
             new Chapter("rain", "04", "雨中的间奏", "", 0, false, "城际列车与山间步行叙事尚在制作。"),
             new Chapter("ramiel", "05–06", "屋岛作战", "拉米尔", 5, true, "前往箱根阵地。初号机负责阳电子炮，零号机持盾掩护。接通阵地三路电网，初号机停在炮位、看向炮身并右键接入。充能后瞄准核心，在拉米尔发射光束时开火；打中外壳无效。"),
             new Chapter("jet_alone", "07", "反应堆事故", "J.A.", 0, false, "非使徒章节；待制作事故处置流程。"),
-            new Chapter("gaghiel", "08", "海上迎击", "迦基尔", 6, true, "迦基尔在深水湖区袭击船队。派二号机出击：运输机把它送到港区，二号机下水走到拦截点。迦基尔咬上来时会把机体衔进嘴里拖走，蹲下、空手、双手撑住上下颚，把嘴撑开；脐带缆要接着，A.T.力场要开着。舰桥接通电源后，两门舰炮在六秒内先后打进张开的嘴里，命中核心才算数。"),
+            new Chapter("gaghiel", "08", "海上迎击", "迦基尔", 6, false, "海上迎击等新的深水站位：GeoFront 湖改建后，原来登记的深水盆地已经是陆地。"),
             new Chapter("israfel", "09", "同步作战", "伊斯拉斐尔", 7, true, "伊斯拉斐尔从地面向第三新东京市进攻。派两台机体出击（初号机和二号机最合适）：用刀削掉它的A.T.力场，它被砍到一半时会分成两个，各带一个核心。只打倒一个没有用，另一个会把它修好；两台机体要各对付一个，在大约一秒之内同时把两个都打倒。"),
             new Chapter("sandalphon", "10", "火山行动", "圣德芬", 8, false, "待制作耐热装备与火山救援。"),
             new Chapter("matarael", "11", "停电迎击", "雨天使", 9, true, "总部和全城停电，脐带缆接不上，机体只能靠内部电源作战，时间有限。雨天使走到总部上方，从身体下面的眼睛滴下强酸，会溶穿地表装甲板，也会腐蚀机体。它的A.T.力场很弱，但只有从它身体正下方打上去才有效：避开酸液，钻到它下面，用步枪或近战打核心。"),
@@ -34,6 +34,6 @@ public final class TvCampaignCatalog
     public static Chapter at(int index) { return CHAPTERS.get(Math.max(0, Math.min(index, CHAPTERS.size() - 1))); }
     public static java.util.Optional<Chapter> find(String id){return CHAPTERS.stream().filter(c->c.id().equals(id)).findFirst();}
     public static String preparationBlockerR52(String id)
-    {return "";}
+    {return switch(id){case "gaghiel"->"海上迎击等新的深水站位：GeoFront 湖改建后，原来登记的深水盆地已经是陆地。";default->"";};}
     private TvCampaignCatalog() {}
 }

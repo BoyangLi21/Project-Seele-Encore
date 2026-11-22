@@ -303,8 +303,10 @@ public final class AngelSortieReviewR66
                     + data.notice.replace(',', ';').replace('\n', ' ') + "\n");
             status.flush();
             if (ticks % 200 == 0)
-                ProjectSeele.LOGGER.info("angel_review tick {} phase {} unit {} power {} angel {} health {} field {}",
-                        ticks, data.phase, unitHealth, power, angelName, angelHealth, field);
+                ProjectSeele.LOGGER.info("angel_review tick {} phase {} unit {} power {} angel {} health {} field {} unit_at {} angel_at {} notice {}",
+                        ticks, data.phase, unitHealth, power, angelName, angelHealth, field,
+                        unit == null ? "-" : unit.blockPosition().toShortString() + (com.projectseele.entity.EvaAirTransportR31.active(unit) ? " (air)" : "") + (unit.isNervLogisticsLocked() ? " (logistics)" : ""), angel == null ? "-" : angel.blockPosition().toShortString(),
+                        data.notice.replace('\n', ' '));
         }
         catch (Exception ignored) {}
     }
