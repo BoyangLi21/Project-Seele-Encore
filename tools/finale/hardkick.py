@@ -94,6 +94,17 @@ DOWN_FROM, DOWN_TO = 13.5, 20.6
 UP_OFF, UP_ON, UP_LIFT = 20.9, 23.4, 2.4
 SQUARE_FROM = 17.0          # the pelvis turns square and comes to where it stands between this and the end
 ARMS_UP, ARMS_DOWN = 2.4, 17.5
+# The arms through the kick (R65). The capture's own are a counter-swing: the left thrown back behind the body, the
+# right out to the side. Measured on the Unit's meshes (fr_meshpen, 2026-11-22) that put the left upper arm 23% into
+# the chest, two blocks deep, for the whole kick, and the right 10% into its shoulder pylon: on this body an upper
+# arm is clear of the chest and of its pylon only when it is raised ahead of its shoulder, not behind it or out to
+# the side, and a hand below the chest meets the kicking thigh. So the arms are carried in front of the chest, the
+# fists under the shoulders: each wrist's place from its own shoulder in the chest's frame (outward, up, ahead;
+# blocks), near through the wind-up and the return, a little lower and further as the leg is thrust out; and which
+# way the elbows go (outward, down, ahead).
+GUARD = {'l': ((-2.0, -3.0, 9.5), (-1.5, -3.5, 10.0)), 'r': ((-2.0, -3.0, 9.5), (-1.0, -4.5, 9.0))}
+GUARD_ELBOW = (.8, 1.0, .2)
+GUARD_OUT = (5.0, 8.5, 10.5, 14.5)     # ticks: out from, out by, back from, back by
 
 
 def unit(v):
@@ -405,6 +416,52 @@ def main():
         for n in ('arm_l', 'forearm_l', 'arm_r', 'forearm_r'):
             rot[n] = R.qnorm(R.qslerp(rot[n], hung[n], share))
 
+    def arm_as_drawn(rot, pos, s, reach_to, pole):
+        """An arm solved the way the game solves one to a point (EvaRigTransforms.solveChain, in the model's own
+        space): the hand's joint this far from the shoulder, the elbow on the pole's side, and the upper arm
+        rolled by its build, not by the pose it had. The forearm turns about the elbow's centre as the game seats
+        it, which is two blocks behind the forearm bone's own pivot. Written with the game's roll, the same arm
+        measured two blocks deep in the chest's mesh over a fifth of its length less than with reach() and
+        swivel()'s roll, which keeps whatever the pose before had."""
+        upper, lower, hand = 'arm_' + s, 'forearm_' + s, 'hand_' + s
+        centre = np.array([-23.489652 if s == 'l' else 23.489652, 123.435069, 7.737214]) / 16
+        m = rig.fk(rot, pos)
+        shoulder = m[upper][:3, :3] @ rig.pivot[upper] + m[upper][:3, 3]
+        u, v = centre - rig.pivot[upper], rig.pivot[hand] - centre
+        a, b = np.linalg.norm(u), np.linalg.norm(v)
+        length = np.linalg.norm(reach_to)
+        direction = np.asarray(reach_to, float) / length
+        distance = max(abs(a - b) + .001, min(a + b - .001, length))
+        along = (a * a - b * b + distance * distance) / (2 * distance)
+        bend = unit(pole - direction * float(np.dot(pole, direction)))
+        joint = shoulder + along * direction + math.sqrt(max(0.0, a * a - along * along)) * bend
+        axis = -unit(np.cross(direction, bend))
+
+        def frame(way, hinge):
+            y = unit(way)
+            x = unit(hinge - y * float(np.dot(hinge, y)))
+            return np.stack([x, y, np.cross(x, y)], axis=1)
+        q = frame(joint - shoulder, axis) @ frame(u, X).T
+        rot[upper] = R.qnorm(R.matq(m[rig.parent[upper]][:3, :3].T @ q))
+        m = rig.fk(rot, pos)
+        elbow = m[upper][:3, :3] @ centre + m[upper][:3, 3]
+        q = frame(shoulder + direction * distance - elbow, axis) @ frame(v, X).T
+        rot[lower] = R.qnorm(R.matq(m[upper][:3, :3].T @ q))
+
+    def arms_carried(rot, pos, t):
+        """The arms carried in front of the chest through the kick, in the capture's arms' place (see GUARD)."""
+        far = smooth((t - GUARD_OUT[0]) / (GUARD_OUT[1] - GUARD_OUT[0])) * (1 - smooth((t - GUARD_OUT[2]) / (GUARD_OUT[3] - GUARD_OUT[2])))
+        # from the hang, not from the capture's arm: the same roll of the upper arm on every frame
+        arms_hang(rot, pos, 1.0)
+        for s in 'lr':
+            m = rig.fk(rot, pos)
+            c = m['torso_upper'][:3, :3]
+            out = unit(c @ np.array([1.0 if s == 'r' else -1.0, 0, 0]))
+            up, ahead = unit(c @ np.array([0, 1.0, 0])), unit(c @ np.array([0, 0, -1.0]))
+            near, reached = GUARD[s]
+            w = np.asarray(near, float) + (np.asarray(reached, float) - np.asarray(near, float)) * far
+            arm_as_drawn(rot, pos, s, (out * w[0] + up * w[1] + ahead * w[2]) / S.SCALE, out * GUARD_ELBOW[0] - up * GUARD_ELBOW[1] + ahead * GUARD_ELBOW[2])
+
     def pose(t):
         f = played(t)
         rot, pos = source(f)
@@ -425,6 +482,10 @@ def main():
         if low > stood:
             now = hips_of(fk(rot, pos))
             shift(pos, np.array([0, (stand_hips[1] - hips_c[1]) * low - (now[1] - hips_c[1]), 0]))
+        carried = dict(rot)
+        arms_carried(carried, pos, t)
+        for n in ('arm_l', 'forearm_l', 'arm_r', 'forearm_r'):
+            rot[n] = carried[n]
         arms_hang(rot, pos, max(1 - smooth(t / ARMS_UP), smooth((t - ARMS_DOWN) / (TOTAL - ARMS_DOWN))))
         here = path(t)
         on = {'l': t < L_OFF or L_ON <= t < t_lift - .15 or t >= DOWN_TO, 'r': t < R_OFF or R_ON <= t < UP_OFF or t >= UP_ON}
