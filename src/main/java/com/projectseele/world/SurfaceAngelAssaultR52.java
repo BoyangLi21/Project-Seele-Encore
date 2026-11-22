@@ -119,13 +119,15 @@ public final class SurfaceAngelAssaultR52
         // R66: Shamshel's and Israfel's fights can be lost: every assigned unit down or shut off for five seconds.
         if((boss instanceof ShamshelEntity||boss instanceof IsrafelEntity||boss instanceof MataraelEntity)&&data.phase.equals("combat")&&!data.sorties.isEmpty())
         {
-            boolean anyStanding=data.sorties.values().stream().map(s->TvSortiesR32.unit(level,s.unit))
-                    .anyMatch(e->e!=null&&e.isAlive()&&!EvaShutdownR30.disabled(e)&&(e.isBerserk()||!e.isPowerDepleted()));
+            long standing=data.sorties.values().stream().map(s->TvSortiesR32.unit(level,s.unit))
+                    .filter(e->e!=null&&e.isAlive()&&!EvaShutdownR30.disabled(e)&&(e.isBerserk()||!e.isPowerDepleted())).count();
+            // Israfel divided can only fall to two units striking together (episode 9): one unit left cannot win
+            boolean anyStanding=boss instanceof IsrafelEntity israfel&&israfel.splitR66()?standing>=2:standing>0;
             var tag=boss.getPersistentData();int down=anyStanding?0:tag.getInt("R66AllDownTicks")+1;tag.putInt("R66AllDownTicks",down);
             if(down>=100)
             {
                 hold(boss);if(boss instanceof IsrafelEntity israfel)israfel.holdTwinR66();
-                data.phase="failure";data.notice=boss instanceof MataraelEntity?"全部机体失去战斗力，雨天使仍在溶蚀总部装甲。机体回收后可以重试。":boss instanceof IsrafelEntity?"全部机体失去战斗力，伊斯拉斐尔仍在进攻。机体回收后可以重试。"
+                data.phase="failure";data.notice=boss instanceof MataraelEntity?"全部机体失去战斗力，雨天使仍在溶蚀总部装甲。机体回收后可以重试。":boss instanceof IsrafelEntity?"能同时出击的机体不足两台，无法同时击倒两个分身。机体回收后可以重试。"
                         :"全部机体失去战斗力，夏姆榭尔仍在进攻。机体回收后可以重试。";data.setDirty();
                 ProjectSeele.LOGGER.info("R66 {} mission failed: every unit down",boss.getType().toShortString().toUpperCase(java.util.Locale.ROOT));
                 return boss;
