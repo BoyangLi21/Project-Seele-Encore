@@ -283,10 +283,12 @@ public final class NervPilotCombatR30
         if(angel instanceof MataraelEntity spider)
         {
             Vec3 core=spider.coreWorldR66(),under=core.subtract(eva.position()).multiply(1,0,1);
-            // the body box keeps a unit about its own half-width outside the centre; that edge is still under the body
-            boolean gun=(eva.getArmamentMask()&(1<<EvaUnit01Entity.WEAPON_RIFLE))!=0,beneath=under.length()<11;
+            // the body box keeps a unit (half-width about 8.5) some 16.5 out from the centre: still under the legs (22)
+            boolean gun=(eva.getArmamentMask()&(1<<EvaUnit01Entity.WEAPON_RIFLE))!=0,beneath=under.length()<18;
             eva.autonomousWeaponR30(pilot,gun?EvaUnit01Entity.WEAPON_RIFLE:EvaUnit01Entity.WEAPON_KNIFE);b.retreat=0;
-            eva.autonomousDriveR30(pilot,steer(l,eva,b,beneath?Vec3.ZERO:under.normalize()),core,!beneath&&under.length()>40);
+            // close in straight: the obstacle steering turns away from the body box and circles it
+            Vec3 drive=beneath?Vec3.ZERO:under.length()<30?under.normalize():steer(l,eva,b,under.normalize());
+            eva.autonomousDriveR30(pilot,drive,core,!beneath&&under.length()>40);
             if(beneath&&b.age%(gun?8:12)==0)eva.autonomousAttackR30(pilot,gun?3:0);
             say(owner,pilot,b,gun?"ranged":"melee");return;
         }
