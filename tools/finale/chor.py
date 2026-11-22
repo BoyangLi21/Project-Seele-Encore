@@ -66,6 +66,22 @@ ANGEL_DEFAULTS = {
 
 SACH_Z = 52.0
 
+# The embrace (16.3 to 18.8): where Unit-01 takes hold of the angel that has locked its arms round it. Each hand
+# goes to one of the angel's upper arms, this share of the way from the angel's shoulder to its elbow, and its
+# own joint stops this far short of that point (blocks): the angel's upper arms run from its shoulders on the
+# ground ahead up past Unit-01's flanks, so the hands are down, out and a little ahead of their own shoulders, 60
+# to 95% of an arm's length away, and the arms straighten as the trunk heaves up and fold as it is dragged down:
+# it presses the angel's arms down to push itself free.
+# Up to R65 the hands were sent to the angel's wrists, and those are clamped on Unit-01's own shoulders: 17 to 45%
+# of an arm's length from their own shoulders (the left one behind its shoulder), arms folded shut, and as the
+# trunk heaved under them each upper arm turned about its own length through half a turn and more (qa.py: 141
+# frames over 100 degrees, up to 180; 144 degrees in one frame at 18.6). The owner saw it as the arms twisting
+# while the angel shakes them.
+EMBRACE_GRIP = 0.5
+EMBRACE_BACK = 2.2
+EMBRACE_HANDS = ((16.0, 19.0, 77.0), (-16.0, 19.0, 77.0))
+EMBRACE_ELBOW = ((1.0, 0.2, -0.8), (-1.0, 0.2, -0.8))
+
 
 def build():
     eva = Actor(EVA_DEFAULTS)
@@ -411,8 +427,9 @@ def embrace(eva, ang):
     bent over it, braces both hands on the ground and heaves to break free, and is dragged back."""
     eva.key(16.42, pound_w=1.0)
     eva.key(16.62, pound_w=0.0)
-    ground_l, ground_r = (12.5, 2.4, 80.5), (-12.5, 2.4, 80.0)
-    eva.key(16.62, hand_l=ground_l, hand_r=ground_r, elbow_l=(1.0, 0.4, -0.2), elbow_r=(-1.0, 0.4, -0.2))
+    # the hands come off the core and out to where the angel's elbows will be (see Scene.solve: from 16.8 they
+    # are held to the angel's forearms), elbows down and back
+    eva.key(16.62, hand_l=EMBRACE_HANDS[0], hand_r=EMBRACE_HANDS[1], elbow_l=EMBRACE_ELBOW[0], elbow_r=EMBRACE_ELBOW[1])
     # pulled down onto the angel's chest
     eva.key(16.75, hip=(0, 16.4, KNEEL_Z + 1.2), pelvis_rot=(0, 24, 0), chest=(0, 26, 0), head=(0, 6, 0), jaw=30.0)
     # heave up, dragged back, heave again
@@ -558,11 +575,10 @@ class Scene:
             if w > 0:
                 hip = np.asarray(ce['hip'], float)
                 for side, s2 in (('l', 'r'), ('r', 'l')):
-                    fa = am['forearm_' + s2]
                     el = np.array([54.410686 if s2 == 'r' else -54.410686, 108.749362, 6.75443]) / 16
-                    hd = np.array([el[0], 108.749362 / 16, -34.572077 / 16])
-                    grip = B.point(fa, el + 0.7 * (hd - el))
+                    top = self.actors.angel_rig.pivot['arm_' + s2]
+                    grip = B.point(am['arm_' + s2], top + EMBRACE_GRIP * (el - top))
                     shoulder = hip + np.array([6.0 if side == 'l' else -6.0, 12.6, 0.0])
-                    ce['hand_' + side] = ce['hand_' + side] * (1 - w) + _toward(grip, shoulder, 2.4) * w
+                    ce['hand_' + side] = ce['hand_' + side] * (1 - w) + _toward(grip, shoulder, EMBRACE_BACK) * w
                 er, ep, em, ei = self.eva_body.solve(ce)
         return {'eva': (er, ep, em, ei, ce), 'angel': (ar, ap, am, ai, ca), 'core': core}
