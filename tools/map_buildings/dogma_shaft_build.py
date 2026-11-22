@@ -133,7 +133,20 @@ def main(out):
     (out / 'rows.json').write_text(json.dumps(rows), 'utf8')
     plan['shaft']['lip_y'] = HALL_FLOOR
     plan['rungs_y'] = rungs
+    # Fields the motion side reads (Fable, 2026-11-22): numbers, boxes as [x0, y0, z0, x1, y1, z1].
+    plan['y_convention'] = 'every *_y and top_y is the y of the top block layer; feet stand at that y + 1 (lip -1052: feet -1051; floor -1265: feet -1264)'
+    plan['rung'] = dict(kind='groove', depth=1, height=1, light='back_wall',
+                        note='the inner lining layer is air at each rungs_y, so the lower edge is free air 1 deep; the light strip is the outer layer behind it')
+    d, g = DOOR, P.GALLERY
+    plan['hall_doorway'] = dict(box=[d['x'][0], d['y'][0], d['z'][0], d['x'][1], d['y'][1], d['z'][1]],
+                                guard='inside the launch route reservation; written with write_deep_cells --dogma-hall-doorway')
+    plan['bottom_gallery'] = dict(box=[g['x'][0], g['y'][0], g['z'][0], g['x'][1], g['y'][1], g['z'][1]], floor_y=FLOOR)
+    plan['entry']['aisle'] = dict(box=[DOOR['x'][1] + 1, HALL_FLOOR + 1, Z0, X0 - 1, BAY_TOP, Z1], floor_y=HALL_FLOOR, faces='east',
+                                  note='the EVA walks east along this box and steps off at x = X0 (the shaft starts at x 104)')
+    plan['schema'] = 'projectseele.r66.central-dogma-shaft.v0-proposal'   # v1 when frozen for the pack
+    plan['file'] = 'r66_central_dogma_shaft.json in the world root, read once at server start'
     (out / 'shaft_r66.json').write_text(json.dumps(plan, indent=1), 'utf8')
+    (out / 'r66_central_dogma_shaft.json').write_text(json.dumps(plan, indent=1), 'utf8')
     rep = dict(rows=len(rows), kinds=[[a, b, n] for (a, b), n in kinds.most_common(20)], rungs=len(rungs), writer_flags=['--dogma-hall-doorway'])
     (out / 'report.json').write_text(json.dumps(rep, indent=1), 'utf8')
     print(json.dumps(rep, indent=1))
