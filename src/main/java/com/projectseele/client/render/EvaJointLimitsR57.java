@@ -39,6 +39,14 @@ final class EvaJointLimitsR57
         }
     }
 
+    /** One joint held to its range now, for a layer that reads it before the final pose is limited (it is unchanged then). */
+    static void limit(BakedGeoModel model,String name)
+    {
+        if(!ENABLED)return;
+        for(int i=0;i<BONES.length;i++)
+            if(BONES[i].equals(name)){GeoBone bone=model.getBone(name).orElse(null);if(bone!=null)limit(bone,RANGES[i]);}
+    }
+
     private static void limit(GeoBone bone,Range range)
     {
         var q=new Quaternionf().rotationZYX(bone.getRotZ(),bone.getRotY(),bone.getRotX());

@@ -1313,6 +1313,9 @@ public final class EvaPlantedGaitR64
             var q=new Quaternionf().rotationZYX(pelvis.getRotZ(),pelvis.getRotY(),pelvis.getRotX());
             EvaRigTransforms.rotate(pelvis,q.rotateX(-s.lean*Mth.DEG_TO_RAD).rotateZ(-s.bank*Mth.DEG_TO_RAD));
         }
+        // R65: a punch thrown from a stand has the hips in it (EvaPunchBodyR65): the pelvis is turned here, before
+        // the hips are read; its shift, its sinking and the driving foot's heel follow below.
+        var punch=s.moving||!s.left.down||!s.right.down?null:EvaPunchBodyR65.apply(eva,model,partial);
         Vector3f[] hips={EvaRigTransforms.point(legs[0],EvaRigTransforms.pivot(legs[0]),root),EvaRigTransforms.point(legs[1],EvaRigTransforms.pivot(legs[1]),root)};
         Vector3f centre=new Vector3f(hips[0]).add(hips[1]).mul(.5F);
 
@@ -1324,6 +1327,12 @@ public final class EvaPlantedGaitR64
         // Over the body's eased place (which is the frame's own place where this is its first frame).
         double originX=s.atX,originZ=s.atZ;
         double wantX=originX+leftX(s.yaw)*s.sway,wantZ=originZ+leftZ(s.yaw)*s.sway;
+        if(punch!=null)
+        {
+            // ahead of where it stands, and toward the foot away from the punching side
+            wantX+=-Mth.sin(s.yaw*Mth.DEG_TO_RAD)*punch.ahead()+leftX(s.yaw)*punch.left();
+            wantZ+=Mth.cos(s.yaw*Mth.DEG_TO_RAD)*punch.ahead()+leftZ(s.yaw)*punch.left();
+        }
         double shiftX=wantX-centre.x,shiftZ=wantZ-centre.z;
 
         // The level the pelvis is carried over: the feet's own ground.
@@ -1378,10 +1387,23 @@ public final class EvaPlantedGaitR64
                 // A planted foot turns on the ground with the body once the body has turned TWIST_MOST past it.
                 float twisted=Mth.wrapDegrees(f.yaw-s.yaw);
                 if(Math.abs(twisted)>TWIST_MOST)f.yaw=s.yaw+Math.copySign(TWIST_MOST,twisted);
-                float pitch=rolled(rig,f.x,f.y,f.z,f.yaw,f.slope,scheduled(s,f,rig,hipX,hipZ),hipX,hipZ,above,nominal);
-                pitch=supportedHeelRoll(s,eva,f.x,f.y,f.z,f.yaw,f.slope,pitch);
-                ankleAt(rig,f.x,f.y,f.z,f.yaw,f.slope,pitch,anklesAt[i]);
-                f.pitch=pitch;f.drawnYaw=f.yaw;f.drawnSlope=f.slope;reaches[i]=reach(rig,anklesAt[i],hipX,hipZ,above);
+                // R65: the foot that drives a punch is up on its toes and turned on them. The point of it the game
+                // holds to the ground (the outer front of its sole, EvaCombatSupportR33.toe) stays where it stands:
+                // the place under the ankle goes round that point, and the foot is rolled over its toes from there.
+                // (Turned about the middle of its toes, that point went half a block over the ground and back.)
+                double fx=f.x,fz=f.z;float fyaw=f.yaw,driven=0;
+                if(punch!=null&&punch.foot()==i)
+                {
+                    fyaw=f.yaw+punch.pivot();driven=punch.heel();
+                    float was=f.yaw*Mth.DEG_TO_RAD,now2=fyaw*Mth.DEG_TO_RAD;
+                    double ahead=punch.toeAhead()*rig.scale(),toLeft=punch.toeLeft()*rig.scale();
+                    fx=f.x+ahead*(-Mth.sin(was)+Mth.sin(now2))+toLeft*(Mth.cos(was)-Mth.cos(now2));
+                    fz=f.z+ahead*(Mth.cos(was)-Mth.cos(now2))+toLeft*(Mth.sin(was)-Mth.sin(now2));
+                }
+                float pitch=rolled(rig,fx,f.y,fz,fyaw,f.slope,scheduled(s,f,rig,hipX,hipZ)-driven,hipX,hipZ,above,nominal);
+                pitch=supportedHeelRoll(s,eva,fx,f.y,fz,fyaw,f.slope,pitch);
+                ankleAt(rig,fx,f.y,fz,fyaw,f.slope,pitch,anklesAt[i]);
+                f.pitch=pitch;f.drawnYaw=fyaw;f.drawnSlope=f.slope;reaches[i]=reach(rig,anklesAt[i],hipX,hipZ,above);
             }
             else
             {
@@ -1418,6 +1440,9 @@ public final class EvaPlantedGaitR64
         if(fresh)s.height=Double.isFinite(s.height)?s.height+(wanted-s.height)*(1-Math.exp(-dt/HEIGHT_EASE)):Math.min(centre.y,most);
         if(s.height>most)s.height=most;
         double shiftY=s.height-centre.y;
+        // R65: a punch's sinking is the punch's own, not the height the gait carries the pelvis at (eased over a
+        // punch's length that took a fifth of it).
+        if(punch!=null)shiftY-=punch.down();
 
         shift(pelvis,frame,rig.scale(),shiftX,shiftY,shiftZ);
         for(int i=0;i<2;i++)hips[i].add((float)shiftX,(float)shiftY,(float)shiftZ);
