@@ -144,6 +144,7 @@ def main(out):
     plan['entry']['aisle'] = dict(box=[DOOR['x'][1] + 1, HALL_FLOOR + 1, Z0, X0 - 1, BAY_TOP, Z1], floor_y=HALL_FLOOR, faces='east',
                                   note='the EVA walks east along this box and steps off at x = X0 (the shaft starts at x 104)')
     plan['schema'] = 'projectseele.r66.central-dogma-shaft.v0-proposal'   # v1 when frozen for the pack
+    plan['dimension'] = 'projectseele:geofront'
     plan['file'] = 'r66_central_dogma_shaft.json in the world root, read once at server start'
     (out / 'shaft_r66.json').write_text(json.dumps(plan, indent=1), 'utf8')
     (out / 'r66_central_dogma_shaft.json').write_text(json.dumps(plan, indent=1), 'utf8')
