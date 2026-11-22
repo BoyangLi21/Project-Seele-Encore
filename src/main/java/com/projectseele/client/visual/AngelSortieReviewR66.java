@@ -49,6 +49,17 @@ public final class AngelSortieReviewR66
     private static final int TIMEOUT = Integer.getInteger("projectseele.angelReviewTimeoutR66", 24000);
     private static final boolean CAPTURE = !Boolean.getBoolean("projectseele.angelReviewNoCaptureR66");
     private static final int CAPTURE_FROM = Integer.getInteger("projectseele.angelReviewCaptureFromR66", 0);
+    /** -Dprojectseele.angelReviewEvaHealthR66: max health given to every unit for the run (0: as saved). */
+    private static final int EVA_HEALTH = Integer.getInteger("projectseele.angelReviewEvaHealthR66", 0);
+
+    private static void reviewHealth(net.minecraft.world.entity.LivingEntity eva)
+    {
+        var health = eva.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
+        if (health == null) return;
+        health.setBaseValue(EVA_HEALTH);
+        eva.setHealth(eva.getMaxHealth());
+        ProjectSeele.LOGGER.info("angel_review test health {} for {}", EVA_HEALTH, eva.getUUID());
+    }
 
     private static int ticks, frame, doneAt = -1, warm, lastSparseTick = -1, facilityAt = -1;
     private static boolean started, finished, close;
@@ -99,6 +110,14 @@ public final class AngelSortieReviewR66
                     // the saved battlefield conflict count may predate the corrected manifest (see BattlefieldR21)
                     var field = operation;
                     server.execute(() -> com.projectseele.world.BattlefieldR21.recountR66(field));
+                    // test knob: units that last long enough to reach an Angel's own ending (saved units keep the max
+                    // health they were spawned with, so the config value alone does not reach them)
+                    if (EVA_HEALTH > 0) server.execute(() -> {
+                        for (var eva : field.getEntities(com.projectseele.registry.ModEntities.EVA_UNIT01.get(), e -> true))
+                            reviewHealth(eva);
+                        for (var eva : field.getEntities(com.projectseele.registry.ModEntities.EVA_UNIT00.get(), e -> true))
+                            reviewHealth(eva);
+                    });
                 }
                 else if (ticks % 400 == 0) ProjectSeele.LOGGER.info("angel_review waiting for the facility at tick {}: {}", ticks, status.isEmpty() ? "no status" : status.get(0));
             }
