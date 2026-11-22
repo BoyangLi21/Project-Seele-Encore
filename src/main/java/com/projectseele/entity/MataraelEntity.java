@@ -43,7 +43,7 @@ import org.joml.Vector3f;
 public class MataraelEntity extends Monster implements Angel
 {
     /** Body centre and core, in blocks above the feet. */
-    public static final double BODY_Y = 32, CORE_Y = 26.3, UNDER_RADIUS = 12;
+    public static final double BODY_Y = 32, CORE_Y = 26.3, UNDER_RADIUS = 14;
     public static final String MISSION_TAG = "seele_tv_matarael_r66";
     private static final EntityDataAccessor<Float> FIELD = SynchedEntityData.defineId(MataraelEntity.class, EntityDataSerializers.FLOAT);
     private static final DustParticleOptions ACID = new DustParticleOptions(new Vector3f(.72F, .86F, .18F), 2.2F);
