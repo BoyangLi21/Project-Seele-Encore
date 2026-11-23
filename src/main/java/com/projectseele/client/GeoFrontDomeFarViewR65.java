@@ -1,6 +1,14 @@
 package com.projectseele.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.platform.NativeImage;
+import java.util.List;
+import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.client.model.data.ModelData;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexBuffer;
@@ -45,7 +53,8 @@ import org.lwjgl.opengl.GL11;
  * The silhouette is drawn right after the sky with a projection of its own reaching the far side of the cavity; the
  * depth it wrote is then cleared, so the real chunks draw over it as if it were sky. Its shader drops everything within
  * the vanilla render distance (horizontally), where the real chunks are, so the two never overlap. Faces take their
- * block's map colour, shaded by facing and the cavity's ambient light, and fade into the fog colour with distance.
+ * block's texture colour for that side (as Distant Horizons colours its far view; tinted faces the cavity biome's tint),
+ * shaded by facing, and fade into the fog colour with distance.
  * <p>
  * The mesh is a private build product installed into the pack's jar; without it nothing changes.
  */
@@ -55,7 +64,7 @@ public final class GeoFrontDomeFarViewR65
     private static final ResourceLocation MESH = new ResourceLocation(ProjectSeele.MODID, "geofront/dome_far_r65.bin.gz");
     /** The cavity (the R64 area maps' measured rim), and the band from its floor to under its roof. */
     private static final double CENTRE_X = 32, CENTRE_Z = 320, RADIUS = 1900, MIN_Y = -530, MAX_Y = 56;
-    private static final float FAR = 6000F, NEAR = 8F, FOG_END = 2600F;
+    private static final float FAR = 6000F, NEAR = 8F, FOG_END = 5000F, FOG_STRENGTH = .7F;
 
     private static ShaderInstance shader;
     private static VertexBuffer buffer;
@@ -139,7 +148,7 @@ public final class GeoFrontDomeFarViewR65
         shader.safeGetUniform("NearCut").set(nearCut);
         RenderSystem.setShaderFogStart(nearCut);
         RenderSystem.setShaderFogEnd(FOG_END);
-        RenderSystem.setShaderFogColor(fogColour[0], fogColour[1], fogColour[2], .85F);
+        RenderSystem.setShaderFogColor(fogColour[0], fogColour[1], fogColour[2], FOG_STRENGTH);
         RenderSystem.setShaderColor(light, light, light, 1F);
         RenderSystem.enableDepthTest();
         RenderSystem.depthFunc(GL11.GL_LEQUAL);
@@ -193,13 +202,15 @@ public final class GeoFrontDomeFarViewR65
             int foliage = BiomeColors.getAverageFoliageColor(mc.level, at);
             int grass = BiomeColors.getAverageGrassColor(mc.level, at);
             int water = BiomeColors.getAverageWaterColor(mc.level, at);
-            int[] colours = new int[names];
+            // per block: the colour of its top, its bottom and its sides
+            int[][] colours = new int[3][names];
             for (int i = 0; i < names; i++)
             {
                 int length = little(in, 2).getShort() & 0xFFFF;
                 byte[] text = new byte[length];
                 in.readFully(text);
-                colours[i] = colour(new String(text, StandardCharsets.UTF_8), foliage, grass, water);
+                int[] three = colours(mc, new String(text, StandardCharsets.UTF_8), foliage, grass, water);
+                for (int k = 0; k < 3; k++) colours[k][i] = three[k];
             }
             quads = little(in, 4).getInt();
             // the bake keeps to 250,000 (16 MB of vertices); anything far past that is not a mesh this was made for
@@ -215,7 +226,8 @@ public final class GeoFrontDomeFarViewR65
                 int x = quad.getShort(), y = quad.getShort(), z = quad.getShort();
                 int du = quad.getShort() & 0xFFFF, dv = quad.getShort() & 0xFFFF, face = quad.get() & 0xFF;
                 int index = quad.getShort() & 0xFFFF;
-                emit(builder, face, x * cell, y * cell, z * cell, du * cell, dv * cell, cell, index < names ? colours[index] : 0x808080);
+                int which = face == 3 ? 0 : face == 2 ? 1 : 2;
+                emit(builder, face, x * cell, y * cell, z * cell, du * cell, dv * cell, cell, index < names ? colours[which][index] : 0x808080);
             }
             buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
             buffer.bind();
@@ -237,22 +249,88 @@ public final class GeoFrontDomeFarViewR65
         return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
     }
 
-    /** The block's map colour; blocks with none (glass) take a pale grey-blue. */
-    private static int colour(String id, int foliage, int grass, int water)
+    /**
+     * The block's colours as its own textures show them (the average of the texture each side of its model uses, as
+     * Distant Horizons colours its far view, so the silhouette meets the real blocks at the render distance without a
+     * change of colour); faces the biome tints take the cavity's tint. Water has no model: its still texture and the
+     * water tint. Anything unreadable falls back to the block's map colour.
+     */
+    private static int[] colours(Minecraft mc, String id, int foliage, int grass, int water)
     {
         ResourceLocation key = ResourceLocation.tryParse(id);
         Block block = key == null ? Blocks.AIR : BuiltInRegistries.BLOCK.get(key);
-        // blocks the biome tints take the cavity's own tint (Distant Horizons and the real chunks show them so; the
-        // map colour's fixed green read as a different forest), times the brightness of their texture
-        if (block == Blocks.SPRUCE_LEAVES) return scale(FoliageColor.getEvergreenColor(), .62F);
-        if (block == Blocks.BIRCH_LEAVES) return scale(FoliageColor.getBirchColor(), .62F);
-        if (block instanceof LeavesBlock || block == Blocks.VINE) return scale(foliage, .62F);
-        if (block == Blocks.GRASS_BLOCK) return scale(grass, .66F);
-        if (block == Blocks.WATER) return scale(water, .7F);
+        if (block == Blocks.WATER)
+        {
+            int c = tint(average(mc, new ResourceLocation("minecraft", "block/water_still")), water);
+            return new int[]{c, c, c};
+        }
+        BlockState state = block.defaultBlockState();
+        int fallback = mapColour(block);
+        int[] out = new int[3];
+        Direction[] sides = {Direction.UP, Direction.DOWN, Direction.NORTH};
+        var model = mc.getBlockRenderer().getBlockModel(state);
+        RandomSource random = RandomSource.create(42L);
+        for (int k = 0; k < 3; k++)
+        {
+            List<BakedQuad> quads = model.getQuads(state, sides[k], random, ModelData.EMPTY, null);
+            if (quads.isEmpty()) quads = model.getQuads(state, null, random, ModelData.EMPTY, null);
+            BakedQuad quad = quads.isEmpty() ? null : quads.get(0);
+            TextureAtlasSprite sprite = quad != null ? quad.getSprite() : model.getParticleIcon(ModelData.EMPTY);
+            int c = average(mc, sprite.contents().name());
+            if (c < 0) c = fallback;
+            else if (quad != null && quad.isTinted())
+                c = tint(c, block instanceof LeavesBlock || block == Blocks.VINE ? leafTint(block, foliage) : grass);
+            out[k] = c;
+        }
+        return out;
+    }
+
+    private static int leafTint(Block block, int foliage)
+    {
+        if (block == Blocks.SPRUCE_LEAVES) return FoliageColor.getEvergreenColor();
+        if (block == Blocks.BIRCH_LEAVES) return FoliageColor.getBirchColor();
+        return foliage;
+    }
+
+    private static int mapColour(Block block)
+    {
         MapColor colour = block.defaultMapColor();
         if (colour == null || colour == MapColor.NONE || colour.col == 0) return 0x8C9CA4;
-        // a map shows its colours at the "normal" brightness (220 of 255)
         return scale(colour.col, 220F / 255F);
+    }
+
+    /** The mean colour of a texture's opaque pixels (first frame of an animated one), or -1 when it cannot be read. */
+    private static int average(Minecraft mc, ResourceLocation sprite)
+    {
+        ResourceLocation file = new ResourceLocation(sprite.getNamespace(), "textures/" + sprite.getPath() + ".png");
+        try (InputStream in = mc.getResourceManager().open(file); NativeImage image = NativeImage.read(in))
+        {
+            int w = image.getWidth(), h = Math.min(image.getHeight(), image.getWidth());
+            long r = 0, g = 0, b = 0, n = 0;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    int abgr = image.getPixelRGBA(x, y);
+                    if ((abgr >>> 24) < 128) continue;
+                    r += abgr & 0xFF;
+                    g += (abgr >> 8) & 0xFF;
+                    b += (abgr >> 16) & 0xFF;
+                    n++;
+                }
+            if (n == 0) return -1;
+            return (int) (r / n) << 16 | (int) (g / n) << 8 | (int) (b / n);
+        }
+        catch (IOException | RuntimeException unreadable)
+        {
+            return -1;
+        }
+    }
+
+    private static int tint(int rgb, int tint)
+    {
+        if (rgb < 0) return tint;
+        return (((rgb >> 16) & 0xFF) * ((tint >> 16) & 0xFF) / 255) << 16 | (((rgb >> 8) & 0xFF) * ((tint >> 8) & 0xFF) / 255) << 8
+                | ((rgb & 0xFF) * (tint & 0xFF) / 255);
     }
 
     private static int scale(int rgb, float f)

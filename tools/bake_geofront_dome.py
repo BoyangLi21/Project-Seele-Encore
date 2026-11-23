@@ -11,8 +11,8 @@ The face budget is 250,000 quads (16 MB of vertices on the GPU; the client refus
 world (batch 699) 8-block cells give 246,685 quads in 0.98 MB; 4-block cells give 748,892, over the budget.
 
 Each face keeps the block that shows on that side: the top block of the cell for upward faces, the bottom block for
-downward faces, the middle block for side faces. The client colours a face with that block's map colour, so the bake
-needs no colour table of its own.
+downward faces, the middle block for side faces. The client colours a face with the average colour of that block's
+texture for that side (tinted faces with the cavity biome's tint), so the bake needs no colour table of its own.
 
 The output is a private build product (it is derived from the map): it is installed into the pack's jar at
 assets/projectseele/geofront/dome_far_r65.bin.gz and never committed.
