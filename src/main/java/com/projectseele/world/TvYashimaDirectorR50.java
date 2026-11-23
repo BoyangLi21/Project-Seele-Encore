@@ -31,7 +31,15 @@ import net.minecraft.world.level.storage.LevelResource;
 public final class TvYashimaDirectorR50
 {
     private static final TicketType<ChunkPos> TICKET=TicketType.create("tv_yashima_r50",Comparator.comparingLong(ChunkPos::toLong),100);
-    private record Controls(List<BlockPos> grid,List<BlockPos> pylons,List<BlockPos> supply,Map<Integer,BlockPos> recovery,BlockPos coolant,BlockPos reload,int drillStepTicks) {}
+    private record Controls(List<BlockPos> grid,List<BlockPos> pylons,List<BlockPos> coverPylons,List<BlockPos> supply,Map<Integer,BlockPos> recovery,BlockPos coolant,BlockPos reload,int drillStepTicks) {}
+    /**
+     * R65: the sockets a unit at the position takes its power from. The shield bearer (Unit-00) has sockets of its
+     * own where the site names any (cover_power_pylons): its station is to the left of the line of fire, and from
+     * the gun's sockets on the right its cable lay across the position in front of the muzzle. Everyone else, and
+     * Unit-00 at a site that names none, uses the gun's sockets as before.
+     */
+    static List<BlockPos> socketsR65(int unitVariant,List<BlockPos> gun,List<BlockPos> cover)
+    {return unitVariant==0&&!cover.isEmpty()?cover:gun;}
     private static final Map<ServerLevel,Optional<Controls>> CONTROLS=new WeakHashMap<>();
     private static BlockPos pos(com.google.gson.JsonArray row)
     {if(row.size()!=3)throw new IllegalArgumentException("Control position");return new BlockPos(row.get(0).getAsInt(),row.get(1).getAsInt(),row.get(2).getAsInt());}
@@ -45,8 +53,10 @@ public final class TvYashimaDirectorR50
                 var row=root.getAsJsonObject("sites").getAsJsonObject("ramiel").getAsJsonObject("yashima_controls");
                 if(row==null||!row.get("installed").getAsBoolean())return Optional.empty();
                 var grid=new java.util.ArrayList<BlockPos>();var pylons=new java.util.ArrayList<BlockPos>();var supply=new java.util.ArrayList<BlockPos>();
+                var coverPylons=new java.util.ArrayList<BlockPos>();
                 for(var p:row.getAsJsonArray("grid_switches"))grid.add(pos(p.getAsJsonArray()));
                 for(var p:row.getAsJsonArray("power_pylons"))pylons.add(pos(p.getAsJsonArray()));
+                if(row.has("cover_power_pylons"))for(var p:row.getAsJsonArray("cover_power_pylons"))coverPylons.add(pos(p.getAsJsonArray()));
                 if(row.has("supply_racks"))for(var raw:row.getAsJsonArray("supply_racks"))supply.add(pos(raw.getAsJsonObject().getAsJsonArray("position")));
                 var recovery=new java.util.HashMap<Integer,BlockPos>();
                 if(row.has("recovery_storage"))for(var raw:row.getAsJsonArray("recovery_storage"))
@@ -61,7 +71,7 @@ public final class TvYashimaDirectorR50
                 int step=row.get("drill_step_ticks").getAsInt();
                 if(grid.size()!=3||pylons.isEmpty()||coolant==null||reload==null||step<20||step>1200
                         ||grid.stream().distinct().count()!=3||coolant.equals(reload))throw new IllegalArgumentException("Yashima fixture contract");
-                return Optional.of(new Controls(List.copyOf(grid),List.copyOf(pylons),List.copyOf(supply),Map.copyOf(recovery),coolant,reload,step));
+                return Optional.of(new Controls(List.copyOf(grid),List.copyOf(pylons),List.copyOf(coverPylons),List.copyOf(supply),Map.copyOf(recovery),coolant,reload,step));
             }
             catch(Exception failure){ProjectSeele.LOGGER.error("Installed Yashima controls unavailable",failure);return Optional.empty();}
         }).orElse(null);
@@ -215,7 +225,7 @@ public final class TvYashimaDirectorR50
         if(site==null||plan==null||!data.active.equals("ramiel")||data.targetDeathConfirmedR45
                 ||!java.util.Set.of("approach","combat").contains(data.phase)||eva.isUmbilicalSevered()
                 ||role==null||eva.position().distanceTo(role)>90)return current;
-        return plan.pylons().stream().filter(p->level.hasChunkAt(p)&&level.getBlockEntity(p) instanceof UmbilicalPylonBlockEntity
+        return socketsR65(eva.getUnitVariant(),plan.pylons(),plan.coverPylons()).stream().filter(p->level.hasChunkAt(p)&&level.getBlockEntity(p) instanceof UmbilicalPylonBlockEntity
                 &&eva.position().distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(p))<=(double)range*range)
                 .min(Comparator.comparingDouble(p->eva.position().distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(p)))).orElse(current);
     }
@@ -343,7 +353,7 @@ public final class TvYashimaDirectorR50
         bar.addPlayer(owner);
         for(var sortie:data.sorties.values())
         {var p=level.getServer().getPlayerList().getPlayer(sortie.commander);if(p!=null&&p.level()==level)bar.addPlayer(p);}
-        for(var p:plan.grid())retain(level,p);for(var p:plan.pylons())retain(level,p);for(var p:plan.supply())retain(level,p);retain(level,plan.coolant());retain(level,plan.reload());
+        for(var p:plan.grid())retain(level,p);for(var p:plan.pylons())retain(level,p);for(var p:plan.coverPylons())retain(level,p);for(var p:plan.supply())retain(level,p);retain(level,plan.coolant());retain(level,plan.reload());
         // Chunk blocks can be present before their original rack entity attaches.
         // Retry the same one-time receipt after loading; the cargo ledger refuses
         // a second commission even after the original stock has been issued.
