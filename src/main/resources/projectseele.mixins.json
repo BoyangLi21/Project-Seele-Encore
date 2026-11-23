@@ -112,6 +112,7 @@
     "client.DhFirstLevelKeyWaitMixin",
     "client.DhArrivalQueueMixin",
     "client.DhTerrainDepthMixin",
+    "client.DhGeoFrontFarViewR65Mixin",
     "client.OculusDhReloadR53Mixin",
     "client.OculusDhRenderPassR54Mixin",
     "client.DhWaterTransparencyR53Mixin",

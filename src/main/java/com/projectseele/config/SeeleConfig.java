@@ -11,6 +11,8 @@ public final class SeeleConfig
 {
     public static final ForgeConfigSpec COMMON_SPEC;
     public static final ForgeConfigSpec CLIENT_SPEC;
+    public static final ForgeConfigSpec.BooleanValue GEOFRONT_FAR_VIEW;
+    public static final ForgeConfigSpec.DoubleValue GEOFRONT_FAR_LIGHT;
 
     // ----- common: performance rescue -----
     public static final ForgeConfigSpec.BooleanValue RESCUE_MODE;
@@ -554,6 +556,17 @@ public final class SeeleConfig
         COCKPIT_CANNON_SIGHT = client
                 .comment("First person in the plug: the positron cannon is aimed through the sight that comes down over the pilot (marks for the barrel, the charge and the target's core, the shot's figures, the gun's service). Off: the scope of R63.")
                 .define("cannonSight", true);
+        client.pop();
+
+        client.push("geofront_far_view");
+        GEOFRONT_FAR_VIEW = client
+                .comment("Inside the GeoFront cavity: draw the baked silhouette of the dome, the hanging city and the floor beyond",
+                        "the render distance, in place of the Distant Horizons far view (which cannot hold the cavity and draws the",
+                        "unlit hanging towers black). Off: Distant Horizons as before.")
+                .define("enabled", true);
+        GEOFRONT_FAR_LIGHT = client
+                .comment("Brightness of the baked silhouette (1 as baked; the cavity's own ambient light).")
+                .defineInRange("light", 1.0D, 0.2D, 2.0D);
         client.pop();
         CLIENT_SPEC = client.build();
     }

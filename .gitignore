@@ -72,3 +72,6 @@ forge*changelog.txt
 /src/main/resources/data/projectseele/worldgen/playtest_landscape_r64/
 /src/main/resources/data/projectseele/worldgen/playtest_shores_r64/
 /src/main/resources/data/projectseele/worldgen/playtest_floats_r64/
+
+# R65 GeoFront far-view mesh: baked from the map, a private build product installed into the pack jar
+src/main/resources/assets/projectseele/geofront/dome_far_r65.bin.gz

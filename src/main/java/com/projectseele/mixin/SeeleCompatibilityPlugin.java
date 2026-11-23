@@ -22,6 +22,7 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
                 &&com.projectseele.compat.MtrRailMathCompatibilityR51.accepted(getClass().getClassLoader());
         if(mixin.endsWith("CreateContraptionFlagsMixin"))return createFlagsAbi();
         if(mixin.contains("client.YashimaBlackout"))return blackoutAbiR64(mixin);
+        if(mixin.endsWith("client.DhGeoFrontFarViewR65Mixin"))return geofrontFarViewAbiR65();
         if (!mixin.endsWith("CityExactUnionCreateMixinR45") && !mixin.endsWith("CitySavedOwnerUnionMixinR45")) return true;
         if (!CityUnionPortableBootstrapR45.requested()) return false;
         if(cityAbiAccepted!=null)return cityAbiAccepted;
@@ -104,6 +105,19 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
                         &&method(c,"reloadPos","(J)V")!=null&&field(node,"sectionPos","J")&&method(tree,"nodeIterator","()Ljava/util/Iterator;")!=null;
             }
             return true;
+        }
+        catch(Exception unreadable){return false;}
+    }
+    /** R65 GeoFront far view: Distant Horizons' per-frame entry points as 2.3.4 has them; any other shape draws as before. */
+    private boolean geofrontFarViewAbiR65()
+    {
+        try
+        {
+            ClassNode c=readClass("com/seibel/distanthorizons/core/api/internal/ClientApi");
+            String levelMats="(Lcom/seibel/distanthorizons/core/wrapperInterfaces/world/IClientLevelWrapper;Lcom/seibel/distanthorizons/core/util/math/Mat4f;Lcom/seibel/distanthorizons/core/util/math/Mat4f;F)V";
+            String fade="(Lcom/seibel/distanthorizons/core/util/math/Mat4f;Lcom/seibel/distanthorizons/core/util/math/Mat4f;FLcom/seibel/distanthorizons/core/wrapperInterfaces/world/IClientLevelWrapper;)V";
+            return c!=null&&method(c,"renderLods",levelMats)!=null&&method(c,"renderDeferredLodsForShaders",levelMats)!=null
+                    &&method(c,"renderFade",fade)!=null&&method(c,"renderFadeOpaque",fade)!=null;
         }
         catch(Exception unreadable){return false;}
     }
