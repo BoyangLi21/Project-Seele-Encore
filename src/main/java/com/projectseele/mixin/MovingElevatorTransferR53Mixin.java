@@ -33,6 +33,13 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     @Unique private long seele$started=-1;
     @Unique private int seele$duration=1;
     @Unique private double seele$fraction;
+    /**
+     * Client: ticks this car has run, and that count at the server's transfer start. The game time a client
+     * keeps is reset by every server time packet, which arrives a link delay late; timing the transfer by it
+     * stepped the car back half a block to a block every second while the riders kept going (R65).
+     */
+    @Unique private long seele$clientTicks;
+    @Unique private long seele$clientOrigin=Long.MIN_VALUE;
     @Unique private static final TicketType<ChunkPos> seele$ticket=TicketType.create("seele_personnel_transfer_r53",Comparator.comparingLong(ChunkPos::toLong),40);
 
     @Override public PathSpec seele$transferPath(){return seele$path;}
@@ -53,8 +60,15 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     @Unique private double seele$fractionAt(double partial)
     {
         if(!seele$transferring||seele$started<0)return seele$fraction;
-        double t=Math.max(0,Math.min(1,(level.getGameTime()-seele$started+partial)/seele$duration));
+        double t=Math.max(0,Math.min(1,(seele$elapsed()+partial)/seele$duration));
         double eased=t*t*(3-2*t);return seele$descending?eased:1-eased;
+    }
+    /** Ticks since the transfer started: the server's own clock, or the client's monotonic count aligned once. */
+    @Unique private long seele$elapsed()
+    {
+        if(!level.isClientSide)return level.getGameTime()-seele$started;
+        if(seele$clientOrigin==Long.MIN_VALUE)seele$clientOrigin=seele$clientTicks-(level.getGameTime()-seele$started);
+        return seele$clientTicks-seele$clientOrigin;
     }
     @Unique private Vec3 seele$anchor(double y,double fraction)
     {
@@ -151,6 +165,7 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     @Inject(method="update",at=@At("HEAD"),cancellable=true,remap=false)
     private void seele$horizontalTravel(CallbackInfo ci)
     {
+        if(level.isClientSide)seele$clientTicks++;
         if(seele$path()==null||!seele$transferring)return;
         ci.cancel();currentY=lastY=seele$path.transferY();speed=0;
         // Upstream update would have consumed a pending correction; after the transfer it would put
@@ -175,8 +190,8 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
         }
         if(!level.isClientSide&&level.getGameTime()%20==0)seele$retainPath();
         double next=seele$fractionAt(0);seele$carry(seele$anchor(currentY,seele$fraction),seele$anchor(currentY,next));seele$fraction=next;
-        if(level.getGameTime()-seele$started>=seele$duration)
-        {seele$transferring=false;seele$fraction=seele$descending?1:0;seele$sync();}
+        if(seele$elapsed()>=seele$duration)
+        {seele$transferring=false;seele$fraction=seele$descending?1:0;seele$clientOrigin=Long.MIN_VALUE;seele$sync();}
     }
     @Inject(method="write",at=@At("RETURN"),remap=false)
     private void seele$writeTransfer(CallbackInfoReturnable<CompoundTag> result)
@@ -187,7 +202,7 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     private void seele$readTransfer(CompoundTag input,CallbackInfo ci)
     {
         var tag=input.getCompound(NervPersonnelTransferR53.TAG);if(tag.isEmpty()){seele$path=null;seele$transferring=false;return;}
-        seele$path=PathSpec.decode(tag);seele$transferring=tag.getBoolean("Active");seele$descending=tag.getBoolean("Descending");seele$started=tag.getLong("Started");seele$duration=Math.max(1,tag.getInt("Duration"));seele$fraction=tag.getDouble("Fraction");
+        seele$path=PathSpec.decode(tag);boolean wasActive=seele$transferring;long wasStarted=seele$started;seele$transferring=tag.getBoolean("Active");seele$descending=tag.getBoolean("Descending");seele$started=tag.getLong("Started");if(!seele$transferring||!wasActive||wasStarted!=seele$started)seele$clientOrigin=Long.MIN_VALUE;seele$duration=Math.max(1,tag.getInt("Duration"));seele$fraction=tag.getDouble("Fraction");
     }
     @Override public boolean seele$approachingTransfer()
     {return level.isClientSide&&isMoving&&seele$path!=null&&(!seele$transferring||!Double.isNaN(seele$approachFrom));}
