@@ -142,10 +142,14 @@ final class EvaPoseContinuity
             }
             state.physical = physical;
         }
+        // R65: the arm a punch's own path has (EvaPunchPathR65) is kept continuous by the path: it begins where the
+        // hand is and ends where it hangs. Watched here, its quick fold to the chamber and its way back were taken
+        // for jumps and spread over 120 ms each: the fist never came to the chamber (off its path by 12 blocks).
+        java.util.Set<String> own = EvaPunchPathR65.bones(entity);
         if (!repeat && !given && now - state.lastNanos < STALE_NANOS && !state.last.isEmpty())
         {
             long blend = !key.equals(state.key) ? transitionNanos(state.key, key)
-                    : state.offsets == null && popped(model, state, now - state.lastNanos) ? POP_NANOS : 0L;
+                    : state.offsets == null && popped(model, state, now - state.lastNanos, own) ? POP_NANOS : 0L;
             if (blend > 0)
             {
                 boolean kick=entity.getUnitVariant()==0&&!entity.isExperimentalUnit()
@@ -157,7 +161,7 @@ final class EvaPoseContinuity
                 forEach(model, bone ->
                 {
                     float[] prev = s.last.get(bone.getName());
-                    if (prev == null)
+                    if (prev == null || own.contains(bone.getName()))
                     {
                         return;
                     }
@@ -201,13 +205,13 @@ final class EvaPoseContinuity
         // Pops were only caught with no blend running, so a target that jumped
         // mid-blend (a combo strike taking over the previous one) reached the
         // screen in one frame. Restart the blend from the last drawn pose.
-        if (raw != null && state.kickEntry==null && state.offsets != null && now != state.blendFrame && !given && targetJumped(raw, state, now - state.lastNanos))
+        if (raw != null && state.kickEntry==null && state.offsets != null && now != state.blendFrame && !given && targetJumped(raw, state, now - state.lastNanos, own))
         {
             Map<String, float[]> offsets = new HashMap<>();
             for (var entry : raw.entrySet())
             {
                 float[] prev = state.last.get(entry.getKey()), r = entry.getValue();
-                if (prev == null)
+                if (prev == null || own.contains(entry.getKey()))
                 {
                     continue;
                 }
@@ -645,7 +649,7 @@ final class EvaPoseContinuity
     }
 
     /** A body bone turned far more since the last drawn frame than that frame's own motion predicts. */
-    private static boolean popped(BakedGeoModel model, State state, long elapsed)
+    private static boolean popped(BakedGeoModel model, State state, long elapsed, java.util.Set<String> own)
     {
         // A whole pose can be swapped without any one bone turning that far. Standing beside an
         // Angel, the full guard stance replaced the walking legs in the frame the gait blend
@@ -667,7 +671,7 @@ final class EvaPoseContinuity
         {
             float[] prev = state.last.get(name);
             GeoBone bone = model.getBone(name).orElse(null);
-            if (prev == null || bone == null)
+            if (prev == null || bone == null || own.contains(name))
             {
                 continue;
             }
@@ -687,7 +691,7 @@ final class EvaPoseContinuity
      * fast stride restarted the blend every frame, which held the body still
      * until the dash ended.
      */
-    private static boolean targetJumped(Map<String, float[]> target, State state, long elapsed)
+    private static boolean targetJumped(Map<String, float[]> target, State state, long elapsed, java.util.Set<String> own)
     {
         Map<String, float[]> before = state.lastTarget;
         if (before == null)
@@ -698,7 +702,7 @@ final class EvaPoseContinuity
         for (String name : DIAG_BONES)
         {
             float[] was = before.get(name), is = target.get(name);
-            if (was != null && is != null && degrees(new Quaternionf().rotationZYX(is[2], is[1], is[0]), was) > limit)
+            if (was != null && is != null && !own.contains(name) && degrees(new Quaternionf().rotationZYX(is[2], is[1], is[0]), was) > limit)
             {
                 return true;
             }

@@ -47,9 +47,27 @@ final class EvaJointLimitsR57
             if(BONES[i].equals(name)){GeoBone bone=model.getBone(name).orElse(null);if(bone!=null)limit(bone,RANGES[i]);}
     }
 
+    /** A joint's own rotation held to its range: for a pose that is worked out and not drawn (the same quaternion where it has no range). */
+    static Quaternionf limited(String name,Quaternionf rotation)
+    {
+        if(!ENABLED)return rotation;
+        for(int i=0;i<BONES.length;i++)if(BONES[i].equals(name))
+        {
+            var held=limit(new Quaternionf(rotation),RANGES[i]);
+            return held==null?rotation:held;
+        }
+        return rotation;
+    }
+
     private static void limit(GeoBone bone,Range range)
     {
-        var q=new Quaternionf().rotationZYX(bone.getRotZ(),bone.getRotY(),bone.getRotX());
+        var held=limit(new Quaternionf().rotationZYX(bone.getRotZ(),bone.getRotY(),bone.getRotX()),range);
+        if(held!=null)EvaRigTransforms.rotate(bone,held);
+    }
+
+    /** The rotation held to the range, or null where it is inside it. */
+    private static Quaternionf limit(Quaternionf q,Range range)
+    {
         if(q.w<0)q.set(-q.x,-q.y,-q.z,-q.w);
         float norm=(float)Math.hypot(q.y,q.w);
         var twist=norm<1e-6F?new Quaternionf():new Quaternionf(0,q.y/norm,0,q.w/norm);
@@ -72,7 +90,7 @@ final class EvaJointLimitsR57
             float limit=(float)(1/Math.sqrt(axis.x*axis.x/(bend*bend)+axis.z*axis.z/(side*side)+1e-12));
             if(angle>limit){swing.fromAxisAngleRad(axis,limit);changed=true;}
         }
-        if(changed)EvaRigTransforms.rotate(bone,new Quaternionf(swing).mul(twist));
+        return changed?new Quaternionf(swing).mul(twist):null;
     }
 
     private EvaJointLimitsR57(){}

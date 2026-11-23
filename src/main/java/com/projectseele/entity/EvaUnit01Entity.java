@@ -3214,6 +3214,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(tag!=this.rowToldTagR64){this.rowToldTagR64=tag;this.rowToldR64=EvaRowClockR64.read(tag);}
         return this.rowToldR64!=null&&this.rowToldR64.clip().equals(clip)?this.rowToldR64:null;
     }
+    /** Either side: the clock of the row in hand as the server told it, or null (R65: a punch's fist goes by the row's own ticks, EvaPunchPathR65). */
+    public EvaRowClockR64.Clock rowClockR65()
+    {
+        if(!EvaCombatModelR64.flowClock(this))return null;
+        var tag=EvaRowClockR64.tag(this);
+        if(tag!=this.rowToldTagR64){this.rowToldTagR64=tag;this.rowToldR64=EvaRowClockR64.read(tag);}
+        return this.rowToldR64;
+    }
     /** Client, STAND: a row that was left before it had played out is giving its place to what follows it, or null. */
     public EvaRowClockR64.Fade rowLeaveR64()
     {

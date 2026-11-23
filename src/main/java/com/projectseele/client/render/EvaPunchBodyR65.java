@@ -32,7 +32,7 @@ final class EvaPunchBodyR65
     /** The rest is in full at this much turn of the chest against the pelvis (degrees). */
     private static final float FULL=36F;
     /** Blocks the pelvis goes ahead, toward the foot away from the punching side, and down. */
-    private static final float AHEAD=1.0F,ASIDE=.6F,DOWN=.35F;
+    private static final float AHEAD=1.8F,ASIDE=.6F,DOWN=.5F;
     /** Degrees the driving foot's heel comes up, and the foot turns on its toes. */
     private static final float HEEL=13F,PIVOT=9F;
     private static final boolean ENABLED=!Boolean.getBoolean("projectseele.noPunchBodyR65");

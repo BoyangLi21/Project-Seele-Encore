@@ -70,7 +70,8 @@ final class EvaFollowThroughR56
             else
             {
                 var target=new Quaternionf().rotationZYX(bone.getRotZ(),bone.getRotY(),bone.getRotX());
-                float lag=LAG[i]*(striking?STRIKE_LAG:1);
+                // R65: an arm a punch's own path has trails less, so it comes to the path's chamber (EvaPunchPathR65).
+                float lag=LAG[i]*(striking?STRIKE_LAG:1)*EvaPunchPathR65.lag(eva,name);
                 drawn=fresh||last==null?target:new Quaternionf(last).slerp(target,1-(float)Math.exp(-dt/lag));
                 state.drawn.put(name,drawn);
             }

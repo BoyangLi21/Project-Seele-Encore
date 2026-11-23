@@ -240,6 +240,9 @@ public final class EvaPoseGraph
             // model takes the pelvis and the legs from it here as it does from the old stack below.
             if(planted)EvaPlantedGaitR64.apply(entity,model,partialTick,modelToWorld);
             EvaPoseContinuity.trace(entity,model,"planted.gait");
+            // R65: a punch's fist is thrust at its mark, over the trunk and the hips as they now are.
+            EvaPunchPathR65.apply(entity,model,partialTick,modelToWorld);
+            EvaPoseContinuity.trace(entity,model,"punch.path");
             var exit=EvaMotionEngineV2.BoneWrites.empty();
             return finish(entity,model,partialTick,modelToWorld,body,exit,hands);
         }
