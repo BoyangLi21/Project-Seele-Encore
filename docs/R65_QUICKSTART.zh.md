@@ -5,7 +5,7 @@
 ## 玩家
 
 1. 把 `Project_SEELE_Encore_R65_<日期>_Client_PCL.zip` 拖入 PCL，默认实例名为 `EVANGELION_Encore_R65`。
-2. 使用 Java 17，在本版本设置中分配 7.2 GB 内存。Minecraft 1.20.1、Forge 47.4.10 由启动器按清单安装。
+2. 使用 Java 17。包里已经给本版本设好 6 GB 内存，电脑内存充裕的话可以在本版本设置里调大。Minecraft 1.20.1、Forge 47.4.10 由启动器按清单安装。
 
    可选：想让卡顿更少，可以在 PCL 的版本设置 → 高级启动选项 → JVM 参数里，把 PCL 默认的两个 20% 参数（`-XX:G1NewSizePercent=20 -XX:G1ReservePercent=20`）换成 `-XX:+UseG1GC -XX:MaxGCPauseMillis=50 -XX:+PerfDisableSharedMem`。不改也能正常玩。
 3. 进入多人游戏，列表里已经有名为 `SEELE` 的服务器，直接加入。这个名称用来匹配预装的远景，不要改。

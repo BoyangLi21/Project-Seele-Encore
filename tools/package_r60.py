@@ -259,7 +259,9 @@ def shader_payload(path):
 
 def dh_config(text, settings):
     for key, value in settings.items():
-        text = re.sub(r'(?m)^(\s*' + re.escape(key) + r'\s*=\s*)[^\r\n]*', lambda m: m[1] + value, text)
+        # A key the shipped DH version lacks would otherwise be skipped without a word.
+        text, count = re.subn(r'(?m)^(\s*' + re.escape(key) + r'\s*=\s*)[^\r\n]*', lambda m: m[1] + value, text)
+        gate(count == 1, 'DistantHorizons.toml has %d "%s" keys, expected one' % (count, key))
     return text.encode('utf8')
 
 
@@ -270,7 +272,9 @@ DH_COMPRESSION = {'dataCompression': '"LZ4"'}
 
 def server_dh_config(text):
     # Remote city motion must update LODs outside vanilla chunk tracking, without generating distant terrain.
-    return dh_config(text, {'numberOfThreads': '2', 'threadRunTimeRatio': '"0.5"', 'enableDistantGeneration': 'false',
+    # R65 owner playtest (far view missing after a teleport): distant generation on, from saved chunks only
+    # (PRE_EXISTING_ONLY), so the server builds and sends LODs for the whole saved world, never new terrain.
+    return dh_config(text, {'numberOfThreads': '2', 'threadRunTimeRatio': '"0.5"', 'enableDistantGeneration': 'true',
                             'distantGeneratorMode': '"PRE_EXISTING_ONLY"', 'enableRealTimeUpdates': 'true',
                             'realTimeUpdateDistanceRadiusInChunks': '256', 'synchronizeOnLoad': 'true',
                             'sendLevelKeys': 'true', 'levelKeyPrefix': '""', **DH_COMPRESSION})
@@ -278,7 +282,24 @@ def server_dh_config(text):
 
 def client_dh_config(text):
     # Two threads at half duty leave the preinstalled terrain filling in for a minute after joining.
-    return dh_config(text, {'numberOfThreads': '4', 'threadRunTimeRatio': '"1.0"', **DH_COMPRESSION})
+    # R65: distant generation on, as on map-edges' render client (the same file otherwise). With it off a client only
+    # rebuilds sections near it and its private memory climbed about 1 GB a minute in the R65 render runs.
+    return dh_config(text, {'numberOfThreads': '4', 'threadRunTimeRatio': '"1.0"', 'enableDistantGeneration': 'true',
+                            'distantGeneratorMode': '"PRE_EXISTING_ONLY"', **DH_COMPRESSION})
+
+
+# R65 owner: clients get a 6 GB heap by default.
+CLIENT_HEAP_GB = 6
+
+
+def pcl_ram_slider(gb):
+    """PCL's per-instance memory slider position (VersionRamCustom) for a heap size: 0.1 GB steps from 0.3 GB to 1.5,
+    0.5 GB steps to 8, 1 GB steps to 16, then 2 GB steps. The owner's R65 instance reads 26 for the 9 GB it was given."""
+    for v in range(64):
+        size = v * 0.1 + 0.3 if v <= 12 else (v - 12) * 0.5 + 1.5 if v <= 25 else (v - 25) + 8.0 if v <= 33 else (v - 33) * 2 + 16.0
+        if abs(size - gb) < 1e-9:
+            return v
+    raise ValueError('PCL cannot set %s GB exactly' % gb)
 
 
 def sbw_server_config(text):
@@ -562,7 +583,9 @@ def build_inputs(a, work):
     pcl['overrides/servers.dat'] = servers_dat('SEELE', a.server_address)
     pcl['manifest.json'] = json_bytes(manifest)
     # PCL starts Java in the instance folder, so this relative path survives extraction anywhere.
-    pcl['overrides/PCL/Setup.ini'] = ('VersionArgumentIndie:1\r\nVersionArgumentIndieV2:True\r\nVersionAdvanceJvm:' + JVM + '\r\n').encode()
+    # VersionRamType 1 is the instance's own memory setting; players can still raise it in PCL.
+    pcl['overrides/PCL/Setup.ini'] = ('VersionArgumentIndie:1\r\nVersionArgumentIndieV2:True\r\nVersionAdvanceJvm:' + JVM
+                                      + '\r\nVersionRamType:1\r\nVersionRamCustom:%d\r\n' % pcl_ram_slider(CLIENT_HEAP_GB)).encode()
 
     batch = dict(version=VERSION, date=a.date, actual_save=str(world), client_contains_save=False, map_state=a.map_note,
                  acceptance='Friends test package; content and archive integrity checked, not verified in game')
