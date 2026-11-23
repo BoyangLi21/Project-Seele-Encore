@@ -32,6 +32,9 @@ public final class PublicStationGatesR44
     private static final Set<String> TYPES = Set.of(
             "mtr:ticket_barrier_entrance_1", "mtr:ticket_barrier_exit_1");
     private static final Map<MinecraftServer, Map<BlockPos, String>> INSTALLED = new WeakHashMap<>();
+    /** Gates whose manifest row says "pass": "nerv_card" (R65 spiral staff station): they open only for card holders. */
+    private static final Map<MinecraftServer, Set<BlockPos>> CARD_GATES = new WeakHashMap<>();
+    private static final Map<UUID, Long> REFUSED_AT = new HashMap<>();
     private static final int OPEN_TICKS = 40;
     public record ReviewCounters(long opened, long held, long closed,
                                  UUID lastOpener, Set<UUID> heldActors) { }
@@ -128,6 +131,22 @@ public final class PublicStationGatesR44
         // ticket/balance logic. No score or ticket-system method is called.
         if (actor.isAlive() && (actor instanceof Player || actor instanceof NervStaffEntity))
         {
+            if (actor instanceof net.minecraft.server.level.ServerPlayer player
+                    && CARD_GATES.getOrDefault(level.getServer(), Set.of()).contains(position)
+                    && !NervStaffDialogue.authorized(player))
+            {
+                // Card gate: stays shut for anyone without a NERV card (operators pass), says so at most every 2 s.
+                long now = level.getGameTime();
+                Long last = REFUSED_AT.get(player.getUUID());
+                if (last == null || now - last > 40)
+                {
+                    REFUSED_AT.put(player.getUUID(), now);
+                    player.displayClientMessage(net.minecraft.network.chat.Component
+                            .translatable("message.projectseele.surface.card")
+                            .withStyle(net.minecraft.ChatFormatting.RED), true);
+                }
+                return true;
+            }
             BlockState opened = withOpen(state, "open");
             if (opened != state)
             {
@@ -219,6 +238,7 @@ public final class PublicStationGatesR44
                 throw new IllegalArgumentException("Wrong installed public-gate service boundary");
             }
             var result = new HashMap<BlockPos, String>();
+            var card = new HashSet<BlockPos>();
             for (var item : document.getAsJsonArray("gates"))
             {
                 var row = item.getAsJsonObject();
@@ -243,7 +263,16 @@ public final class PublicStationGatesR44
                 {
                     throw new IllegalArgumentException("Duplicate native gate position");
                 }
+                if (row.has("pass"))
+                {
+                    if (!row.get("pass").getAsString().equals("nerv_card"))
+                    {
+                        throw new IllegalArgumentException("Unknown gate pass rule");
+                    }
+                    card.add(new BlockPos(position[0], position[1], position[2]));
+                }
             }
+            CARD_GATES.put(server, Set.copyOf(card));
             return Map.copyOf(result);
         }
         catch (Exception failure)

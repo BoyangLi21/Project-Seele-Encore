@@ -5,7 +5,8 @@ touched region file is copied to the output folder first, each cell's prior stat
 checked, and the rewritten chunks are compared with those copies: every planned cell must
 hold its new state and no other block may differ.
 Rows: [x, y, z, before, after] with block states written as name[prop=value,...], optionally a sixth item
-{"id": "trafficcraft:colored_block_entity", "color": n} giving the new block its paint.
+giving the new block its block entity: {"id": "trafficcraft:colored_block_entity", "color": n} for road paint, or
+{"id": "mtr:<block>", "snbt": "{...}"} for an MTR station fitting (PIDS boards, station name signs) with its data.
 """
 import argparse
 from collections import Counter, defaultdict
@@ -192,11 +193,17 @@ def preflight(folder, grouped, allow_block_entities):
 
 def apply(a):
     rows = json.loads(a.rows.read_text('utf8'))
-    # A row may carry a sixth item, the block entity to give the new block (only TrafficCraft paint for now).
+    # A row may carry a sixth item, the block entity to give the new block: TrafficCraft paint or an MTR fitting.
     given = {(r[0], r[1], r[2]): r[5] for r in rows if len(r) > 5 and r[5]}
     for pos, e in given.items():
-        if e.get('id') != 'trafficcraft:colored_block_entity':
-            raise SystemExit(f'{pos}: only trafficcraft:colored_block_entity can be given, not {e.get("id")}')
+        if e.get('id') == 'trafficcraft:colored_block_entity':
+            continue
+        if not (str(e.get('id', '')).startswith('mtr:') and isinstance(e.get('snbt'), str)):
+            raise SystemExit(f'{pos}: only trafficcraft:colored_block_entity or an mtr: entity with snbt can be given, not {e.get("id")}')
+        row = next(r for r in rows if (r[0], r[1], r[2]) == pos)
+        if row[4].split('[')[0] != e['id']:
+            raise SystemExit(f'{pos}: entity {e["id"]} given for block {row[4]}')
+        nbtlib.parse_nbt(e['snbt'])                     # refuse a malformed entity before anything is touched
     rows = [r[:5] for r in rows]
     signs = json.loads(a.signs.read_text('utf8')) if a.signs else []
     # A cell listed twice passes the preflight (both rows match the old world) and then fails halfway through the
@@ -306,8 +313,15 @@ def apply(a):
                         if (int(e['x']), int(e['y']), int(e['z'])) in given:
                             entities.remove(e)
                     for (x, y, z) in mine:
-                        entities.append(nbtlib.Compound({'id': nbtlib.String(given[x, y, z]['id']), 'x': nbtlib.Int(x), 'y': nbtlib.Int(y), 'z': nbtlib.Int(z),
-                                                         'color': nbtlib.Int(int(given[x, y, z]['color'])), 'keepPacked': nbtlib.Byte(0)}))
+                        e = given[x, y, z]
+                        if 'snbt' in e:
+                            entity = nbtlib.parse_nbt(e['snbt'])
+                            entity.update({'id': nbtlib.String(e['id']), 'x': nbtlib.Int(x), 'y': nbtlib.Int(y), 'z': nbtlib.Int(z),
+                                           'keepPacked': nbtlib.Byte(0)})
+                        else:
+                            entity = nbtlib.Compound({'id': nbtlib.String(e['id']), 'x': nbtlib.Int(x), 'y': nbtlib.Int(y), 'z': nbtlib.Int(z),
+                                                      'color': nbtlib.Int(int(e['color'])), 'keepPacked': nbtlib.Byte(0)})
+                        entities.append(entity)
                         written_entities += 1
                 for sign in sign_chunks.get((cx, cz), ()):
                     x, y, z = sign['pos']
@@ -369,7 +383,13 @@ def apply(a):
                             wrong += 1
                     elif pos in given:
                         e = new_entities.get(pos)
-                        if e is None or str(e['id']) != given[pos]['id'] or int(e['color']) != int(given[pos]['color']):
+                        if e is None or str(e['id']) != given[pos]['id']:
+                            wrong += 1
+                        elif 'snbt' in given[pos]:
+                            # every field given must read back as given
+                            if any(e.get(k) != v for k, v in nbtlib.parse_nbt(given[pos]['snbt']).items()):
+                                wrong += 1
+                        elif int(e['color']) != int(given[pos]['color']):
                             wrong += 1
                     elif pos in dropped:
                         if pos in new_entities:
