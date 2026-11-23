@@ -2965,5 +2965,9 @@
   "radio.projectseele.combat.blade": "%s, close-range attack confirmed. Keep a way out.",
   "radio.projectseele.combat.strike": "%s, attack confirmed. Keep moving. Stay clear of the target’s front.",
   "radio.projectseele.combat.hit": "%s scored a hit. Keep watching the target.",
-  "radio.projectseele.combat.target_down": "The target’s life signs are gone. All units, stay alert and prepare to return to the hangar."
+  "radio.projectseele.combat.target_down": "The target’s life signs are gone. All units, stay alert and prepare to return to the hangar.",
+  "message.projectseele.heavens_door.opening": "Heaven's Door opening",
+  "message.projectseele.heavens_door.closing": "Heaven's Door closing",
+  "message.projectseele.heavens_door.held": "Someone is in the doorway: Heaven's Door opens again",
+  "message.projectseele.heavens_door.hint": "Right-click a leaf, the frame or a plate to open or close Heaven's Door"
 }
