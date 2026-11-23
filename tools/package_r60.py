@@ -372,6 +372,72 @@ def xaero_map(source, world, address):
     return regions | caches | settings
 
 
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as handle:
+        for block in iter(lambda: handle.read(1 << 20), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def copy_zip_record(src, dst, info):
+    """Append info's compressed bytes from src to dst unchanged, with a fresh local header at its new offset."""
+    src.fp.seek(info.header_offset)
+    head = src.fp.read(30)
+    assert head[:4] == b'PK\x03\x04', info.filename
+    name_len, extra_len = struct.unpack('<HH', head[26:30])
+    src.fp.seek(info.header_offset + 30 + name_len + extra_len)
+    out = zipfile.ZipInfo(info.filename, info.date_time)
+    out.compress_type, out.CRC, out.compress_size, out.file_size = info.compress_type, info.CRC, info.compress_size, info.file_size
+    out.external_attr, out.create_system, out.create_version, out.extract_version = (
+        info.external_attr, info.create_system, info.create_version, info.extract_version)
+    out.flag_bits = info.flag_bits & ~0x08  # sizes are known: no data descriptor
+    out.extra = zipfile._strip_extra(info.extra, (1,))  # the zip64 field is rebuilt for the new offset
+    out.header_offset = dst.fp.tell()
+    dst.fp.write(out.FileHeader(out.file_size > zipfile.ZIP64_LIMIT or out.compress_size > zipfile.ZIP64_LIMIT))
+    left = info.compress_size
+    while left:
+        block = src.fp.read(min(left, 1 << 22))
+        assert block, info.filename
+        dst.fp.write(block)
+        left -= len(block)
+    dst.filelist.append(out)
+    dst.NameToInfo[out.filename] = out
+    dst.start_dir = dst.fp.tell()
+    dst._didModify = True
+
+
+def patched_jar(base, additions, work):
+    """R65: the installed mod jar with files baked at pack time (--jar-add INNER=SOURCE), added or replaced in place.
+    Every other entry's compressed record is copied unchanged, so the result differs from the installed jar only there."""
+    wanted = {}
+    for item in additions:
+        inner, _, source = item.partition('=')
+        inner, source = inner.strip().replace('\\', '/'), Path(source.strip())
+        if not gate(inner and not inner.startswith('/') and '..' not in inner.split('/') and source.is_file(),
+                    '--jar-add needs INNER=SOURCE with a relative jar path and an existing file: ' + item):
+            continue
+        wanted[inner] = source
+    target = work / ('patched-' + Path(base).name)
+    with zipfile.ZipFile(base) as src, zipfile.ZipFile(target, 'w', allowZip64=True) as dst:
+        for info in src.infolist():
+            if info.filename in wanted:
+                dst.write(wanted[info.filename], info.filename, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+            else:
+                copy_zip_record(src, dst, info)
+        for inner in sorted(wanted.keys() - set(src.namelist())):
+            dst.write(wanted[inner], inner, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+    with zipfile.ZipFile(base) as src, zipfile.ZipFile(target) as out:
+        before = {i.filename: (i.CRC, i.file_size) for i in src.infolist()}
+        after = {i.filename: (i.CRC, i.file_size) for i in out.infolist()}
+        changed = sorted(n for n in before.keys() | after.keys() if before.get(n) != after.get(n))
+        gate(set(changed) <= set(wanted), ('Patched jar changed entries it was not asked to', [n for n in changed if n not in wanted][:5]))
+        gate(out.testzip() is None, 'Patched jar fails its CRC check')
+    added = {inner: dict(source=str(source), bytes=source.stat().st_size, sha256=file_sha256(source),
+                         replaced=inner in before) for inner, source in wanted.items()}
+    return target, added
+
+
 def jar_report(path, compare=None):
     """Size, digest and release marker classes of the shipped mod jar; with a build of current main, every class must match."""
     digest = hashlib.sha256()
@@ -480,10 +546,17 @@ def build_inputs(a, work):
     seed, provenance = dh_identifier(client, world, a.logged_world_folder)
     client_lod, world_lod, lod_details = distant_caches(world, seed, a.pack, work, a.geofront_lod and a.geofront_lod.resolve())
     gate(a.geofront_lod, VERSION + ' needs --geofront-lod: the formal world still has the R62 far view (tools/rebake_r63.py core)')
-    jar = jar_report(client / MAIN_JAR, a.compare_build)
+    shipped_jar = client / MAIN_JAR
+    if a.jar_add:
+        shipped_jar, added = patched_jar(client / MAIN_JAR, a.jar_add, work)
+    jar = jar_report(shipped_jar, a.compare_build)
+    if a.jar_add:
+        jar.update(base_jar=dict(path=str(client / MAIN_JAR), sha256=file_sha256(client / MAIN_JAR)), jar_additions=added)
     config = config_report(client, a.release_source)
 
     current = {p.relative_to(client).as_posix(): p for tree in CLIENT_TREES for p in files(client / tree)}
+    # Client and server ship the same jar: the installed one, or that plus files baked at pack time.
+    current[MAIN_JAR] = shipped_jar
     for name in list(current):
         inactive_shader = name.startswith('shaderpacks/') and Path(name).name not in {SHADER, SHADER + '.txt'}
         if inactive_shader or name == 'config/projectseele-private-visuals-r46.json':
@@ -654,6 +727,8 @@ def main():
                                             'required with --pack, never written into the repository')
     p.add_argument('--xaero-map', type=Path, help='xaero/world-map/WORLD/projectseele$geofront written by a -Dprojectseele.xaeroBake=true run on a copy of --world')
     p.add_argument('--geofront-lod', type=Path, help='GeoFront DistantHorizons.sqlite from tools/rebake_r63.py (WORK/out/geofront_lod.sqlite)')
+    p.add_argument('--jar-add', action='append', metavar='INNER=SOURCE',
+                   help='Bake a file into the shipped mod jar at INNER (added, or replacing that entry); both packs get the same jar')
     p.add_argument('--extra-resource-pack', type=Path, action='append',
                    help='Resource pack ZIP the source client does not have; shipped and enabled in options.txt (repeatable)')
     p.add_argument('--compare-build', type=Path, help='A jar built from current main: every com/projectseele class of the shipped jar must match it')
