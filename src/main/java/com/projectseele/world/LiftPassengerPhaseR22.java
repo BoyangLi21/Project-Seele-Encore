@@ -5,5 +5,8 @@ import java.util.function.BiConsumer;
 public final class LiftPassengerPhaseR22
 {
     public static BiConsumer<Player,Double> afterClientCarry=(p,dy)->{};
+    /** Client: after a moving car carried its riders, place the other players standing in it (car in world space). */
+    public interface RemoteRiders{void place(net.minecraft.world.level.Level level,net.minecraft.world.phys.AABB car,double floor);}
+    public static RemoteRiders remoteRiders=(level,car,floor)->{};
     private LiftPassengerPhaseR22(){}
 }

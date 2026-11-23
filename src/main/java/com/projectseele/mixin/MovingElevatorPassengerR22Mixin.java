@@ -80,6 +80,7 @@ public abstract class MovingElevatorPassengerR22Mixin
                     &&car.inflate(.25).contains(p.position()))serverPlayer.connection.resetPosition();
             if(level.isClientSide)com.projectseele.world.LiftPassengerPhaseR22.afterClientCarry.accept(p,motion.y);
         }
+        if(level.isClientSide)com.projectseele.world.LiftPassengerPhaseR22.remoteRiders.place(level,car,floor);
         standing.clear();airborne.clear();projectSeele$localBounds.remove();
     }
 }

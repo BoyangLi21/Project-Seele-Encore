@@ -57,6 +57,7 @@
     "CitySavedOwnerUnionMixinR45"
   ],
   "client": [
+    "client.LivingEntityLerpAccessorR65",
     "client.AreaMapMinimapMixin",
     "client.AreaMapWaypointAccess",
     "client.AreaMapWaypointMixin",
