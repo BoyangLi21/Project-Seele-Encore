@@ -195,6 +195,25 @@ public final class NervLiftPassengerSync
         var lower=group.getCage().bounds.move(group.getCageAnchorPos(path.transferY()-1));
         return upper.minmax(lower);
     }
+    /**
+     * Whether a client may report this rider at (x, y, z) although that is more than vanilla's ten blocks from where
+     * the server last had them: a passenger of a car travelling now, reported inside that car (with the travel
+     * slack this sync allows). After a client stall its car catches up with the server's in one step and carries
+     * the rider with it; the owner's server set such riders back 10 to 19 blocks, out of the car (R65).
+     */
+    public static boolean ridingTo(ServerPlayer player,double x,double y,double z)
+    {
+        var groups=LEVELS.get(player.serverLevel());if(groups==null)return false;
+        long tick=player.getServer().getTickCount();
+        for(var riders:groups.values())
+        {
+            var car=riders.lastBounds;
+            if(car==null||tick-riders.observedTick>2||!riders.passengers.contains(player.getUUID())||!riders.moving&&riders.arrivalGuard<=0)continue;
+            if(riders.corridor!=null)car=car.minmax(riders.corridor);
+            if(x>car.minX&&x<car.maxX&&z>car.minZ&&z<car.maxZ&&y>car.minY-TRAVEL_SLACK&&y<car.maxY+TRAVEL_SLACK)return true;
+        }
+        return false;
+    }
     private static boolean inCorridor(AABB corridor,ServerPlayer player,double margin)
     {
         return corridor!=null&&player.getX()>corridor.minX+margin&&player.getX()<corridor.maxX-margin
