@@ -299,7 +299,28 @@ public class GameEvents
             AngelAlarmSystem.syncTo(player);
             ThirdImpactDirector.syncTo(player);
             NervCommandDisplayState.syncTo(player);
+            giveEmployeeCardOnce(player);
         }
+    }
+
+    /**
+     * R65: every pilot is NERV staff. The card gates (the spiral staff station, the surface access gates) opened
+     * only for operators, since nothing in survival hands out the card; one employee card on a player's first join
+     * fixes that. Kept across deaths with the persisted tag; the Terminal Dogma card stays apart.
+     */
+    private static void giveEmployeeCardOnce(ServerPlayer player)
+    {
+        var root = player.getPersistentData();
+        var kept = root.getCompound(net.minecraft.world.entity.player.Player.PERSISTED_NBT_TAG);
+        if (kept.getBoolean("projectseele_employee_card_r65")) return;
+        var card = com.projectseele.registry.ModItems.NERV_EMPLOYEE_CARD.get();
+        if (!player.getInventory().contains(new net.minecraft.world.item.ItemStack(card)))
+        {
+            var stack = new net.minecraft.world.item.ItemStack(card);
+            if (!player.getInventory().add(stack)) player.drop(stack, false);
+        }
+        kept.putBoolean("projectseele_employee_card_r65", true);
+        root.put(net.minecraft.world.entity.player.Player.PERSISTED_NBT_TAG, kept);
     }
 
     @SubscribeEvent
