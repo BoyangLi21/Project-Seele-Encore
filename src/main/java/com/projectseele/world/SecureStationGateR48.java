@@ -61,7 +61,9 @@ public final class SecureStationGateR48
     {if(!owned(level,pos,block))return false;maintain(level);return true;}
     private static boolean complete(ServerLevel level)
     {
-        if(!(level.getBlockEntity(READER) instanceof NervAccessReaderEntityR44))return false;
+        // Every second tick: never load the reader's chunk from here. A synchronous load on the server thread
+        // stalled one dedicated server for the full 60 s watchdog limit while nobody was near the gate (R65).
+        if(!level.hasChunkAt(READER)||!(level.getBlockEntity(READER) instanceof NervAccessReaderEntityR44))return false;
         for(var entry:GATES.entrySet())if(!level.hasChunkAt(entry.getKey())||!owned(level,entry.getKey(),level.getBlockState(entry.getKey())))return false;
         return true;
     }
