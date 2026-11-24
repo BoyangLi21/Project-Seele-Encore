@@ -54,7 +54,7 @@ R65 第一版发布后，负责人在远端服务器上看到外圈有缺口、�
 | a | 镜像正式世界 | 同第 4 步 |
 | b | 把试玩副本里生成好的外圈原样拷进镜像 | `tools/ringcopy_r65.py <镜像>/dimensions/projectseele/geofront/region D:/eva-R64-playtest-fix/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/region`<br>只填空位，镜像里已有的区块（包括第 697 批的 60 块）一律不碰；拷完逐条读回比对。<br>2026-11-23 实测：545,073 块，约 2.1 GB，十几秒，读回 0 错。 |
 | c | 升城 | 第 5b 步 |
-| d | 另存一份干净的包用世界 | 升城后立刻复制一份，不带 DH 库。level.dat 换回正式世界的那份（升城客户端改过游戏规则和时间），删掉正式世界里没有的 playerdata、stats、advancements 文件。这一份交打包；远景和小地图在另一份镜像上烘，因为烘焙客户端会改世界 |
+| d | 另存一份干净的包用世界 | 升城后立刻复制一份，不带 DH 库。level.dat 换回正式世界的那份（升城客户端改过游戏规则和时间），playerdata、stats、advancements 也换回正式世界的那份（升城客户端会改它自己账号的文件），正式世界里没有的删掉。这一份交打包；远景和小地图在另一份镜像上烘，因为烘焙客户端会改世界 |
 | e | 远景和小地图 | 不再全量烘，以试玩副本的远景库和 Xaero 图为起点。`chunkdiff.py` 找出和试玩世界不同的区块，只删掉那些段，用短会话补烘（每次一个视点，悬停 5 分钟，开远处生成）；Xaero 在试玩的图上重转已存区域 |
 
 配置：两边 DH 都是 `enableDistantGeneration=true`、`distantGeneratorMode="PRE_EXISTING_ONLY"`，服务器不会在外圈现场生成。客户端默认堆 6 GB。打包工具已经这样写。
