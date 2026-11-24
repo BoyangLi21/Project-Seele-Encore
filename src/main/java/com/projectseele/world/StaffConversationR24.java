@@ -251,7 +251,15 @@ public final class StaffConversationR24
                 String[] parts=request.split(":");
                 session.reply=switch(parts[1])
                 {
-                    case "status" -> NervAirLiftR30.status(player.serverLevel());
+                    case "status" -> {
+                        // R65: the shaft between the surface and the GeoFront is part of the transport picture.
+                        String flights=NervAirLiftR30.status(player.serverLevel()),shaft=NervAirTransportRuntimeR52.shaftStatus(player.serverLevel());
+                        yield shaft.isEmpty()?flights:OperationText.encode(Component.empty().append(OperationText.read(flights)).append(" | ").append(OperationText.read(shaft)));
+                    }
+                    case "shaft" -> {
+                        if(parts.length!=3||!Set.of("open","close").contains(parts[2]))throw new IllegalArgumentException("Ambiguous shaft order");
+                        yield NervAirTransportRuntimeR52.shaft(player,parts[2]);
+                    }
                     case "cancel" -> {
                         if(parts.length==2)yield NervAirLiftR30.cancel(player);
                         if(parts.length!=3)throw new IllegalArgumentException("Ambiguous transport cancellation");

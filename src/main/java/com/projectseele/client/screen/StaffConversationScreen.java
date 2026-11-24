@@ -246,6 +246,9 @@ public final class StaffConversationScreen extends Screen
             String returnPort=switch(transportReturnExit){case 1->"GeoFront";case 2->I18n.get("screen.projectseele.phone.tokyo_3");case 3->I18n.get("screen.projectseele.phone.hakone");default->I18n.get("screen.projectseele.phone.auto_route");};
             addButton(I18n.get("screen.projectseele.phone.return_port")+returnPort,x+12,controlsY+72,half,()->{String tx=transportX.getValue(),ty=transportY.getValue(),tz=transportZ.getValue();transportReturnExit=(transportReturnExit+1)%4;rebuildWidgets();transportX.setValue(tx);transportY.setValue(ty);transportZ.setValue(tz);},"");
             addButton(I18n.get("screen.projectseele.phone.transport_status"),x+16+half,controlsY+72,half,()->send("TRANSPORT:status"),"");
+            // R65: the shaft between the surface and the GeoFront, held open or let close on the caller's order.
+            addButton(I18n.get("screen.projectseele.phone.open_transport_shaft"),x+12,controlsY+96,half,()->send("TRANSPORT:shaft:open"),"");
+            addButton(I18n.get("screen.projectseele.phone.close_transport_shaft"),x+16+half,controlsY+96,half,()->send("TRANSPORT:shaft:close"),"");
         }
         else if (tab == 5)
         {

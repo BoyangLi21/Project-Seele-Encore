@@ -1652,6 +1652,17 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(progress==0)return true;
         return gate(l,g,false,Set.of());
     }
+    @Override public boolean openIdleAirshaftGateR65(ServerLevel l,String id)
+    {
+        if(!commissioned||!AirshaftHoldR65.shaftGate(id))return false;
+        var g=gates.get(id);if(g==null||l.getEntity(g.visual())==null)return false;
+        return gate(l,g,true,Set.of());
+    }
+    @Override public float airshaftGateProgressR65(ServerLevel l,String id)
+    {
+        var g=commissioned&&AirshaftHoldR65.shaftGate(id)?gates.get(id):null;var visual=g==null?null:l.getEntity(g.visual());
+        return visual instanceof NervHangarDoorEntity door?door.actualOpenProgressR52():visual instanceof NervSiloDoorEntity door?door.actualOpenProgressR52():-1;
+    }
     @Override public boolean adoptFlight(ServerLevel l,NervFlightProofR52.CheckedPickup proof,CompoundTag data)
     {
         if(proof==null||!commissioned||!proof.current(l)||data.hasUUID("FlightAircraftR52")&&!proof.aircraft().equals(data.getUUID("FlightAircraftR52")))return false;

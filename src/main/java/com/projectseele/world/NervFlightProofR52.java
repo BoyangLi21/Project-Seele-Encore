@@ -25,6 +25,10 @@ public final class NervFlightProofR52
         default Set<String> flightReceiverGates(ServerLevel level,String port){return Set.of();}
         default boolean flightGateSampleCurrent(ServerLevel level,String id){return false;}
         default boolean closeIdleAirshaftGateR53(ServerLevel level,String id){return false;}
+        /** R65: drives one gate of the surface-to-GeoFront shaft towards open with no passage in it; true once it rests open. */
+        default boolean openIdleAirshaftGateR65(ServerLevel level,String id){return false;}
+        /** R65: how far that gate stands open, 0 to 1, or -1 while its door is not loaded. */
+        default float airshaftGateProgressR65(ServerLevel level,String id){return -1;}
         default RigidTransform resolveFlightReceiverCargoRootR52(ServerLevel level,Original original,Kind kind,String port,CompoundTag data){return null;}
         default boolean prepareFlightGates(ServerLevel level,Original original,Kind kind,Set<String> gates,CompoundTag data){return gates.isEmpty();}
         default boolean holdFlightPickup(ServerLevel level,CheckedPickupHold proof,CompoundTag data){return false;}
