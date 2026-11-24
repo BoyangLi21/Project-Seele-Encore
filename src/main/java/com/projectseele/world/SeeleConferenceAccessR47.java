@@ -145,10 +145,19 @@ public final class SeeleConferenceAccessR47
                 .put(player.getUUID(),new Lease(player.serverLevel().getGameTime()+600));
     }
 
-    /** Ordinary lift endpoints stay public; the meeting stop always needs an actual swipe. */
+    /**
+     * Ordinary lift endpoints stay public; the meeting stop always needs an actual swipe. A card swiped at one of this
+     * lift's readers opens every floor of it while the swipe lasts, the restricted ones too (R65 owner): before, those
+     * asked for the card in hand again at the moment of choosing, so a card put away after the swipe locked them.
+     */
     public static boolean allowDestination(ServerPlayer player, int targetY)
     {
         int middle=middle(player.serverLevel());
+        if (leased(player))
+        {
+            if (targetY != middle && Math.abs(player.getY() - middle) < 2) revoke(player);
+            return true;
+        }
         if (targetY != middle)
         {
             if(NervRouteRuntimeR52.claimed(player.serverLevel()))
