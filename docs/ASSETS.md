@@ -588,3 +588,5 @@ GeoFront 倒挂城市的楼群布局，以及后续的湖面和螺旋路线，�
 - 替换 `facility_alarm_loop_r65`（全城回声烤在文件里，在机库里也是城市回声）。
 
 被替换的 13 个 R65 文件（`eva_foot_concrete_r65_0..5`、`eva_foot_soil_r65_0..5`、`facility_alarm_loop_r65`）没有发布过，已从仓库删除。
+
+R65 第二轮试玩（第 13 项，机库里使徒死后警报还在响）：`facility_siren` 改回 R21 的 `facility_siren.ogg`，也就是负责人在 R21 定下的短促 660 Hz 双鸣（本项目合成，见上文 R21 一节）。这个声音也用作机库里笼架、轨道和发射转运时的设备警示，每 4 秒响一次。R65 换成防空警报式的升降警笛 `facility_siren_r65` 以后，使徒死后机体回库的整段转运听起来就像警报没停。`facility_siren_r65` 已删除；现在只有全局使徒警报（`facility_alarm_dry_r65b` / `facility_alarm_city_r65b`）是警笛，它在使徒死亡确认后由服务端停止。

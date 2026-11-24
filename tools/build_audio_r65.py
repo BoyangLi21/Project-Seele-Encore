@@ -360,7 +360,9 @@ FAMILIES = {
     'eva_at_pressure': ('eva_at_pressure_r65', 4, lambda i: at_pressure(6800 + 11 * i), -21.0,
                         ['eva_contact_body_r36_%d' % i for i in range(6)]),
     'eva_at_tear': ('eva_at_tear_r65', 2, lambda i: at_tear(6900 + 7 * i), -21.5, ['eva_at_tear']),
-    'facility_siren': ('facility_siren_r65', 1, lambda i: siren_once(7000), -16.5, ['facility_siren']),
+    # facility_siren stays the R21 short 660 Hz double tone: the owner had the wailing warning replaced in R21, and it
+    # also sounds for every cage, rail and launch transfer in the hangars, so a wail there reads as the Angel alarm
+    # going on after the kill (R65 second playtest, item 13). siren_once() stays for the record.
 }
 LOOPED = {'alarm'}
 

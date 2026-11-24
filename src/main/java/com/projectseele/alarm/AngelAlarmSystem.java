@@ -132,12 +132,15 @@ public final class AngelAlarmSystem
         }
         SeeleNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.ALL.noArg(),
                 new ClientboundAlarmPacket(true));
+        // R65: the siren's on and off are the checkpoints for "does the alarm end when the Angel dies".
+        ProjectSeele.LOGGER.info("Angel alarm on: {}", angel == null ? "combat mission alert" : net.minecraft.world.entity.EntityType.getKey(angel.getType()) + " " + angel.getUUID());
     }
 
     private static void broadcastStop(MinecraftServer server)
     {
         SeeleNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.ALL.noArg(),
                 new ClientboundAlarmPacket(false));
+        ProjectSeele.LOGGER.info("Angel alarm off: no engaged Angel and no combat mission holds it");
     }
 
     /** Grants a mod advancement; silently ignores ones that do not exist yet. */

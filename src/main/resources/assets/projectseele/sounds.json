@@ -514,7 +514,7 @@
     "subtitle": "subtitles.projectseele.facility_siren",
     "sounds": [
       {
-        "name": "projectseele:facility_siren_r65",
+        "name": "projectseele:facility_siren",
         "attenuation_distance": 220,
         "stream": false
       }
