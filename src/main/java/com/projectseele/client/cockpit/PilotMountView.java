@@ -20,8 +20,11 @@ public final class PilotMountView {
     private static EntryPlugCarrierEntity seat;
     private static float lastYaw, lastPitch, localYaw, localPitch, bank;
     /** Where the pilot looked climbing in, against the seat's straight ahead; it settles away once the insertion begins. */
-    private static float boardYaw, boardPitch;
+    private static float boardYaw, boardPitch, boardRoll;
+    private static boolean boarding;
     private static long frameNanos;
+    /** The mouse's movement since the last frame drawn in the plug (degrees), from Entity.turn (PlugLookMouseR65Mixin). */
+    private static float mouseYaw, mousePitch;
     /** The settling's time constant: 95% of the way to the seat's straight ahead in about 1.4 seconds. */
     static final float SETTLE_SECONDS = .45F;
 
@@ -40,6 +43,13 @@ public final class PilotMountView {
     public static float pitch(float input) { return Mth.clamp(input, -55F, 60F); }
 
     public static void leave() { seat = null; bank = 0; }
+
+    /** The mouse turned the pilot by these degrees; the plug's look takes them on its next frame. */
+    public static void mouse(float yaw, float pitch) {
+        if (seat == null) return;
+        mouseYaw += yaw;
+        mousePitch += pitch;
+    }
 
     /**
      * R65 (owner's feedback 2, item 15): the first picture in the plug turned the view by itself. It jumped to the
@@ -61,20 +71,27 @@ public final class PilotMountView {
             boardYaw = look[0];
             boardPitch = look[1];
             localYaw = localPitch = 0;
+            boarding = true;
+            mouseYaw = mousePitch = 0;
         } else {
-            localYaw = Mth.clamp(localYaw + Mth.wrapDegrees(inputYaw - lastYaw), -65F, 65F);
-            localPitch = pitch(localPitch + inputPitch - lastPitch);
+            localYaw = Mth.clamp(localYaw + mouseYaw, -65F, 65F);
+            localPitch = pitch(localPitch + mousePitch);
+            // Where the pilot's own angles would point now: what was shown, turned by the mouse.
+            inputYaw = lastYaw + mouseYaw;
+            inputPitch = Mth.clamp(lastPitch + mousePitch, -90F, 90F);
+            mouseYaw = mousePitch = 0;
             if (plug.getInsertionStage() != EntryPlugCarrierEntity.STAGE_SUSPENDED && plug.getInsertionStage() != EntryPlugCarrierEntity.STAGE_OCCUPIED) {
                 float keep = settle((now - frameNanos) / 1e9F);
                 boardYaw *= keep;
                 boardPitch *= keep;
-                if (Math.abs(boardYaw) < .01F && Math.abs(boardPitch) < .01F) boardYaw = boardPitch = 0;
+                boardRoll *= keep;
+                if (Math.abs(boardYaw) < .01F && Math.abs(boardPitch) < .01F && Math.abs(boardRoll) < .01F) boardYaw = boardPitch = boardRoll = 0;
             }
         }
         frameNanos = now;
         Angles view = angles(frame, localYaw + boardYaw, Mth.clamp(localPitch + boardPitch, -89F, 89F), opticalBlend, inputYaw, inputPitch, bodyYaw);
         if (pilot instanceof net.minecraft.client.player.LocalPlayer self) {
-            // What the mouse adds between two frames still reaches the next one; nothing else turns the pilot.
+            // The pilot's own angles follow what is shown: the hand-over to the Unit's optics and leaving the plug start from it.
             self.setYRot(view.yaw());
             self.setXRot(view.pitch());
             self.yRotO = view.yaw();
@@ -86,8 +103,10 @@ public final class PilotMountView {
             lastYaw = inputYaw;
             lastPitch = inputPitch;
         }
-        bank = view.roll();
-        return view;
+        // The horizon of the first pictures is the pilot's own (level); the seat's tilt comes in with the settling.
+        if (boarding) { boardRoll = -view.roll(); boarding = false; }
+        bank = view.roll() + boardRoll;
+        return new Angles(view.yaw(), view.pitch(), bank);
     }
 
     /** The share of the boarding look kept over a frame of this many seconds (a long or a missing frame counts as a tenth of a second). */
