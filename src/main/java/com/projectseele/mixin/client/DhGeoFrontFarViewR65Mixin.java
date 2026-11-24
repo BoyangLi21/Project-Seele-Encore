@@ -11,14 +11,24 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * R65: inside the GeoFront cavity the baked silhouette (GeoFrontDomeFarViewR65) stands in for the Distant Horizons
  * far view (2.3.4), which breaks up the dome and draws the hanging towers black there. Every way DH draws its far view
  * for a frame (the plain pass, the deferred pass shader packs use, and the fades) is skipped while it does.
+ * <p>
+ * The two passes also run DH's queued render-thread work (buffer uploads and frees); that still runs here, or the far
+ * view DH keeps loading piles up in native memory (15 GB in 90 s in the cavity).
  */
 @Pseudo
 @Mixin(targets = "com.seibel.distanthorizons.core.api.internal.ClientApi", remap = false)
 public abstract class DhGeoFrontFarViewR65Mixin
 {
-    @Inject(method = {"renderLods", "renderDeferredLodsForShaders", "renderFade", "renderFadeOpaque"}, at = @At("HEAD"),
-            cancellable = true, require = 0)
+    @Inject(method = {"renderLods", "renderDeferredLodsForShaders"}, at = @At("HEAD"), cancellable = true, require = 0)
     private void seele$geofrontFarView(CallbackInfo ci)
+    {
+        if (!GeoFrontDomeFarViewR65.suppressDistantHorizons()) return;
+        GeoFrontDomeFarViewR65.runDistantHorizonsTasks();
+        ci.cancel();
+    }
+
+    @Inject(method = {"renderFade", "renderFadeOpaque"}, at = @At("HEAD"), cancellable = true, require = 0)
+    private void seele$geofrontFarViewFade(CallbackInfo ci)
     {
         if (GeoFrontDomeFarViewR65.suppressDistantHorizons()) ci.cancel();
     }

@@ -9,6 +9,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.client.model.data.ModelData;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexBuffer;
@@ -41,7 +43,15 @@ import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.joml.Matrix4f;
+import java.nio.FloatBuffer;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
+
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.GL_ACTIVE_TEXTURE;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL20.*;
 
 /**
  * R65: the GeoFront cavity's far view. Distant Horizons cannot hold the cavity: with the vertical quality the pack
@@ -51,8 +61,10 @@ import org.lwjgl.opengl.GL11;
  * (DhGeoFrontFarViewR65Mixin).
  * <p>
  * The silhouette is drawn right after the sky with a projection of its own reaching the far side of the cavity; the
- * depth it wrote is then cleared, so the real chunks draw over it as if it were sky. Its shader drops everything within
- * the vanilla render distance (horizontally), where the real chunks are, so the two never overlap. Faces take their
+ * depth it wrote is then cleared, so the real chunks draw over it as if it were sky. Under a shader pack it is drawn
+ * after the pack's last pass instead, with GL programs of its own, and laid only where nothing was drawn (afterLevel).
+ * Its shader drops everything within the vanilla render distance (horizontally), where the real chunks are, so the two
+ * never overlap. Faces take their
  * block's texture colour for that side (as Distant Horizons colours its far view; tinted faces the cavity biome's tint),
  * shaded by facing, and fade into the fog colour with distance.
  * <p>
@@ -72,6 +84,13 @@ public final class GeoFrontDomeFarViewR65
     private static int quads;
     private static float originX, originY, originZ;
     private static boolean active;
+    /** Under a shader pack: the frame's matrices, eye and fog colour from before the sky, drawn after the pack's passes. */
+    private static Matrix4f pendingView, pendingProjection;
+    private static float[] pendingCamera, pendingFog;
+    private static TextureTarget target;
+    private static VertexBuffer screen;
+    private static int farProgram, blitProgram;
+    private static final FloatBuffer MATRIX = BufferUtils.createFloatBuffer(16);
 
     private GeoFrontDomeFarViewR65() {}
 
@@ -90,6 +109,37 @@ public final class GeoFrontDomeFarViewR65
     public static boolean suppressDistantHorizons()
     {
         return active;
+    }
+
+    private static java.lang.invoke.MethodHandle dhInstance, dhTasks;
+    private static boolean dhTasksMissing;
+
+    /**
+     * Distant Horizons' queued render-thread work (uploads and frees of its far-view buffers), which its skipped render
+     * passes would have run. The compatibility plugin only lets the suppressing mixin in when this method is there.
+     */
+    public static void runDistantHorizonsTasks()
+    {
+        if (dhTasksMissing) return;
+        try
+        {
+            if (dhTasks == null)
+            {
+                var lookup = java.lang.invoke.MethodHandles.publicLookup();
+                Class<?> proxy = Class.forName("com.seibel.distanthorizons.core.render.glObject.GLProxy");
+                dhInstance = lookup.findStatic(proxy, "getInstance", java.lang.invoke.MethodType.methodType(proxy));
+                dhTasks = lookup.findVirtual(proxy, "runRenderThreadTasks", java.lang.invoke.MethodType.methodType(void.class));
+            }
+            dhTasks.invoke(dhInstance.invoke());
+        }
+        catch (Throwable problem)
+        {
+            // without them DH's far-view buffers pile up, so the silhouette gives way and DH draws again
+            dhTasksMissing = true;
+            failed = true;
+            active = false;
+            ProjectSeele.LOGGER.warn("GeoFront far view R65 off: Distant Horizons' render-thread tasks cannot run: {}", problem.toString());
+        }
     }
 
     private static boolean inCavity(Minecraft mc, double x, double y, double z)
@@ -122,7 +172,25 @@ public final class GeoFrontDomeFarViewR65
                 return;
             }
             active = true;
-            draw(event, mc, camera.x, camera.y, camera.z);
+            float camX = (float) (camera.x - originX), camY = (float) (camera.y - originY), camZ = (float) (camera.z - originZ);
+            Matrix4f view = new Matrix4f(event.getPoseStack().last().pose()).translate(-camX, -camY, -camZ);
+            // the frame's own projection (field of view, bobbing) with a depth range that reaches across the cavity
+            Matrix4f projection = new Matrix4f(event.getProjectionMatrix());
+            projection.m22((FAR + NEAR) / (NEAR - FAR));
+            projection.m32(2F * FAR * NEAR / (NEAR - FAR));
+            if (com.projectseele.client.render.ShaderShadowPassR44.enabled())
+            {
+                // under a shader pack anything drawn now is lit by the pack as a surface it knows nothing about (black)
+                // or, with its depth cleared, painted over as sky; it is drawn after the pack's last pass instead
+                pendingView = view;
+                pendingProjection = projection;
+                pendingCamera = new float[]{camX, camY, camZ};
+                pendingFog = RenderSystem.getShaderFogColor().clone();
+                return;
+            }
+            draw(mc, view, projection, camX, camY, camZ, RenderSystem.getShaderFogColor());
+            // the real chunks draw over the silhouette as over the sky
+            RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
         }
         catch (IOException | RuntimeException problem)
         {
@@ -132,14 +200,156 @@ public final class GeoFrontDomeFarViewR65
         }
     }
 
-    private static void draw(RenderLevelStageEvent event, Minecraft mc, double x, double y, double z)
+    /**
+     * Under a shader pack, right after the level (and the pack's composite and final passes) is drawn. The silhouette
+     * goes into a target of its own, with its own depth, and is laid onto the picture only where the depth buffer the pack
+     * shares with the main target still holds the cleared value: where no real block, entity or hand was drawn.
+     * <p>
+     * Everything here is plain GL with programs of its own. While a pack is in use, Oculus turns colour and depth writes
+     * off whenever a shader of a mod is applied (MixinShaderInstance), and swaps the vanilla shaders for the pack's
+     * programs, so neither kind can draw this. Every piece of GL state touched is read first and put back as it was.
+     */
+    public static void afterLevel()
     {
-        float camX = (float) (x - originX), camY = (float) (y - originY), camZ = (float) (z - originZ);
-        Matrix4f view = new Matrix4f(event.getPoseStack().last().pose()).translate(-camX, -camY, -camZ);
-        // the frame's own projection (field of view, bobbing) with a depth range that reaches across the cavity
-        Matrix4f projection = new Matrix4f(event.getProjectionMatrix());
-        projection.m22((FAR + NEAR) / (NEAR - FAR));
-        projection.m32(2F * FAR * NEAR / (NEAR - FAR));
+        Matrix4f view = pendingView, projection = pendingProjection;
+        float[] camera = pendingCamera, fog = pendingFog;
+        pendingView = null;
+        pendingProjection = null;
+        pendingCamera = null;
+        pendingFog = null;
+        if (view == null || failed || buffer == null) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (EvaCommandFeedClient.captureTargetOverride() != null) return;
+        RenderTarget main = mc.getMainRenderTarget();
+        boolean depthTest = glIsEnabled(GL_DEPTH_TEST), blend = glIsEnabled(GL_BLEND), cull = glIsEnabled(GL_CULL_FACE),
+                scissor = glIsEnabled(GL_SCISSOR_TEST), depthMask = glGetBoolean(GL_DEPTH_WRITEMASK);
+        int depthFunc = glGetInteger(GL_DEPTH_FUNC), program = glGetInteger(GL_CURRENT_PROGRAM), unit = glGetInteger(GL_ACTIVE_TEXTURE);
+        ByteBuffer mask = BufferUtils.createByteBuffer(16);
+        glGetBooleanv(GL_COLOR_WRITEMASK, mask);
+        FloatBuffer clear = BufferUtils.createFloatBuffer(16);
+        glGetFloatv(GL_COLOR_CLEAR_VALUE, clear);
+        glActiveTexture(GL_TEXTURE0);
+        int texture = glGetInteger(GL_TEXTURE_BINDING_2D);
+        try
+        {
+            if (farProgram == 0)
+            {
+                farProgram = link("geofront_dome_far", "Color");
+                blitProgram = link("geofront_dome_blit", "UV0");
+                BufferBuilder quad = new BufferBuilder(256);
+                quad.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+                quad.vertex(-1, -1, 1).uv(0, 0).endVertex();
+                quad.vertex(1, -1, 1).uv(1, 0).endVertex();
+                quad.vertex(1, 1, 1).uv(1, 1).endVertex();
+                quad.vertex(-1, 1, 1).uv(0, 1).endVertex();
+                screen = new VertexBuffer(VertexBuffer.Usage.STATIC);
+                screen.bind();
+                screen.upload(quad.end());
+                VertexBuffer.unbind();
+            }
+            if (target == null) target = new TextureTarget(main.width, main.height, true, Minecraft.ON_OSX);
+            else if (target.width != main.width || target.height != main.height)
+                target.resize(main.width, main.height, Minecraft.ON_OSX);
+            glColorMask(true, true, true, true);
+            glDisable(GL_BLEND);
+            glDisable(GL_CULL_FACE);
+            glDisable(GL_SCISSOR_TEST);
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_LEQUAL);
+            glDepthMask(true);
+            target.bindWrite(true);
+            glClearColor(0F, 0F, 0F, 0F);
+            glClearDepth(1D);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            float nearCut = mc.options.getEffectiveRenderDistance() * 16F - 8F;
+            float light = (float) (double) SeeleConfig.GEOFRONT_FAR_LIGHT.get();
+            glUseProgram(farProgram);
+            glUniformMatrix4fv(glGetUniformLocation(farProgram, "ModelViewMat"), false, view.get(MATRIX));
+            glUniformMatrix4fv(glGetUniformLocation(farProgram, "ProjMat"), false, projection.get(MATRIX));
+            glUniform4f(glGetUniformLocation(farProgram, "ColorModulator"), light, light, light, 1F);
+            glUniform1f(glGetUniformLocation(farProgram, "FogStart"), nearCut);
+            glUniform1f(glGetUniformLocation(farProgram, "FogEnd"), FOG_END);
+            glUniform4f(glGetUniformLocation(farProgram, "FogColor"), fog[0], fog[1], fog[2], FOG_STRENGTH);
+            glUniform3f(glGetUniformLocation(farProgram, "Camera"), camera[0], camera[1], camera[2]);
+            glUniform1f(glGetUniformLocation(farProgram, "NearCut"), nearCut);
+            buffer.bind();
+            buffer.draw();
+            main.bindWrite(true);
+            glDepthMask(false);
+            glUseProgram(blitProgram);
+            glUniform1i(glGetUniformLocation(blitProgram, "Sampler0"), 0);
+            glBindTexture(GL_TEXTURE_2D, target.getColorTextureId());
+            screen.bind();
+            screen.draw();
+            VertexBuffer.unbind();
+        }
+        catch (IOException | RuntimeException problem)
+        {
+            failed = true;
+            active = false;
+            ProjectSeele.LOGGER.warn("GeoFront far view R65 off: {}", problem.toString(), problem);
+            VertexBuffer.unbind();
+            main.bindWrite(true);
+        }
+        finally
+        {
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glActiveTexture(unit);
+            glUseProgram(program);
+            glClearColor(clear.get(0), clear.get(1), clear.get(2), clear.get(3));
+            glColorMask(mask.get(0) != 0, mask.get(1) != 0, mask.get(2) != 0, mask.get(3) != 0);
+            glDepthMask(depthMask);
+            glDepthFunc(depthFunc);
+            set(GL_DEPTH_TEST, depthTest);
+            set(GL_BLEND, blend);
+            set(GL_CULL_FACE, cull);
+            set(GL_SCISSOR_TEST, scissor);
+        }
+    }
+
+    private static void set(int capability, boolean on)
+    {
+        if (on) glEnable(capability);
+        else glDisable(capability);
+    }
+
+    /** A program from shaders/core/<name>.vsh and .fsh, Position at attribute 0 and the second element at 1. */
+    private static int link(String name, String second) throws IOException
+    {
+        int vertex = compile(GL_VERTEX_SHADER, name + ".vsh"), fragment = compile(GL_FRAGMENT_SHADER, name + ".fsh");
+        int linked = glCreateProgram();
+        glAttachShader(linked, vertex);
+        glAttachShader(linked, fragment);
+        glBindAttribLocation(linked, 0, "Position");
+        glBindAttribLocation(linked, 1, second);
+        glLinkProgram(linked);
+        glDeleteShader(vertex);
+        glDeleteShader(fragment);
+        if (glGetProgrami(linked, GL_LINK_STATUS) == 0) throw new IOException(name + ": " + glGetProgramInfoLog(linked));
+        return linked;
+    }
+
+    private static int compile(int kind, String file) throws IOException
+    {
+        String path = "/assets/projectseele/shaders/core/" + file;
+        try (InputStream stream = GeoFrontDomeFarViewR65.class.getResourceAsStream(path))
+        {
+            if (stream == null) throw new IOException("missing " + path);
+            int id = glCreateShader(kind);
+            glShaderSource(id, new String(stream.readAllBytes(), StandardCharsets.UTF_8));
+            glCompileShader(id);
+            if (glGetShaderi(id, GL_COMPILE_STATUS) == 0)
+            {
+                String message = glGetShaderInfoLog(id);
+                glDeleteShader(id);
+                throw new IOException(file + ": " + message);
+            }
+            return id;
+        }
+    }
+
+    private static void draw(Minecraft mc, Matrix4f view, Matrix4f projection, float camX, float camY, float camZ, float[] fog)
+    {
         float nearCut = mc.options.getEffectiveRenderDistance() * 16F - 8F;
         float light = (float) (double) SeeleConfig.GEOFRONT_FAR_LIGHT.get();
         float fogStart = RenderSystem.getShaderFogStart(), fogEnd = RenderSystem.getShaderFogEnd();
@@ -148,7 +358,7 @@ public final class GeoFrontDomeFarViewR65
         shader.safeGetUniform("NearCut").set(nearCut);
         RenderSystem.setShaderFogStart(nearCut);
         RenderSystem.setShaderFogEnd(FOG_END);
-        RenderSystem.setShaderFogColor(fogColour[0], fogColour[1], fogColour[2], FOG_STRENGTH);
+        RenderSystem.setShaderFogColor(fog[0], fog[1], fog[2], FOG_STRENGTH);
         RenderSystem.setShaderColor(light, light, light, 1F);
         RenderSystem.enableDepthTest();
         RenderSystem.depthFunc(GL11.GL_LEQUAL);
@@ -168,8 +378,6 @@ public final class GeoFrontDomeFarViewR65
             RenderSystem.setShaderFogEnd(fogEnd);
             RenderSystem.setShaderFogColor(fogColour[0], fogColour[1], fogColour[2], fogColour[3]);
             RenderSystem.enableCull();
-            // the real chunks draw over the silhouette as over the sky
-            RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
         }
     }
 

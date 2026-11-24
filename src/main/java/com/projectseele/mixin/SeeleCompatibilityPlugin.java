@@ -114,10 +114,14 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
         try
         {
             ClassNode c=readClass("com/seibel/distanthorizons/core/api/internal/ClientApi");
+            ClassNode gl=readClass("com/seibel/distanthorizons/core/render/glObject/GLProxy");
             String levelMats="(Lcom/seibel/distanthorizons/core/wrapperInterfaces/world/IClientLevelWrapper;Lcom/seibel/distanthorizons/core/util/math/Mat4f;Lcom/seibel/distanthorizons/core/util/math/Mat4f;F)V";
             String fade="(Lcom/seibel/distanthorizons/core/util/math/Mat4f;Lcom/seibel/distanthorizons/core/util/math/Mat4f;FLcom/seibel/distanthorizons/core/wrapperInterfaces/world/IClientLevelWrapper;)V";
             return c!=null&&method(c,"renderLods",levelMats)!=null&&method(c,"renderDeferredLodsForShaders",levelMats)!=null
-                    &&method(c,"renderFade",fade)!=null&&method(c,"renderFadeOpaque",fade)!=null;
+                    &&method(c,"renderFade",fade)!=null&&method(c,"renderFadeOpaque",fade)!=null
+                    // the queued GL work the skipped passes would have run (GeoFrontDomeFarViewR65.runDistantHorizonsTasks)
+                    &&gl!=null&&method(gl,"getInstance","()Lcom/seibel/distanthorizons/core/render/glObject/GLProxy;")!=null
+                    &&method(gl,"runRenderThreadTasks","()V")!=null;
         }
         catch(Exception unreadable){return false;}
     }
