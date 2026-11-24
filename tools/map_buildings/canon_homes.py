@@ -12,6 +12,7 @@ from pathlib import Path
 from mca import REGION, World
 from blocks import is_open
 from float_fix import guards
+from panes import is_pane, connected
 
 AIR = 'minecraft:air'
 
@@ -224,8 +225,7 @@ def rei_room(b, x0, y, z0, u0, u1, dwx, dz):
     b.put(mid + inside, y + 1, north, M('smooth_stone_slab[type=top,waterlogged=false]'))
     b.put(mid + inside, y + 2, north, M('white_candle[candles=3,lit=false,waterlogged=false]'))
     b.put(X(near), y + 1, north + 2, M('barrel[facing=up,open=false]'))       # chest of drawers
-    b.put(X(near), y + 2, north + 2, M('black_carpet'))                        # the glasses case on top
-    b.sign(X(near), y + 2, north + 3, wall_sign('east' if inside > 0 else 'west', 'birch'), ['眼镜盒', '碇司令的', '破眼镜', ''])
+    b.put(X(near), y + 2, north + 2, M('black_carpet'))                        # the glasses case on top (no label: the owner wants none)
     b.put(X(far - inside), y + 1, south - 1, M('white_wool'))                  # bin bag
     b.put(X(far - inside), y + 2, south - 1, M('red_carpet'))                  # bloodied bandages on top
     b.put(X(near + 2 * inside), y + 3, north + 2, LAMP_OFF)                   # bare bulb in the ceiling
@@ -236,7 +236,7 @@ def rei_room(b, x0, y, z0, u0, u1, dwx, dz):
     b.put(X(out), y + 2, dz - 1, button('west' if inside > 0 else 'east'))          # on the landing, stair side of the door
     b.put(X(dwx + inside), y + 2, dz + 1, button('east' if inside > 0 else 'west'))  # inside, beside the door
     b.put(X(dwx), y + 1, dz + 1, M(f'barrel[facing={"west" if inside > 0 else "east"},open=false]'))   # letterbox in the wall
-    b.sign(X(out), y + 2, dz + 1, wall_sign('west' if inside > 0 else 'east'), ['402', '綾波', '信箱塞满了传单', ''])
+    b.sign(X(out), y + 2, dz + 1, wall_sign('west' if inside > 0 else 'east'), ['402', '綾波', '', ''])
 
 
 # ---------------------------------------------------------------- Comfort 17 (50 x 14, 14 floors)
@@ -247,7 +247,9 @@ C17_WALLS = (0, 8, 20, 29, 39, 49)
 
 def comfort17(b, x0, y0, z0):
     """North face (z0) is the balcony side facing the city; south face carries the outdoor corridor.
-    z0 balcony, z0+1 north wall, z0+2..z0+9 rooms, z0+10 south wall, z0+11..12 corridor, z0+13 parapet."""
+    z0-1 glass balustrade on the cantilevered slab, z0 balcony floor, z0+1 north wall, z0+2..z0+9 rooms, z0+10 south
+    wall, z0+11..12 corridor, z0+13 parapet. The balustrade stands one block out from the windows: touching them, the
+    panes would join the window glass in fins."""
     top = y0 + 3 * C17_F
     b.box(x0, y0 + 1, z0, x0 + C17_L - 1, top + 5, z0 + C17_D - 1, AIR)
     zN, zS, zC, zP = z0 + 1, z0 + 10, z0 + 11, z0 + 13
@@ -255,6 +257,8 @@ def comfort17(b, x0, y0, z0):
         y = y0 + 3 * k
         b.box(x0, y, z0, x0 + C17_L - 1, y, zP, M('white_concrete') if k else M('smooth_stone'))
         b.box(x0 + 1, y, zN + 1, x0 + C17_L - 2, y, zS - 1, M('light_gray_concrete') if k else M('polished_andesite'))
+        if k:
+            b.box(x0, y, z0 - 1, x0 + C17_L - 1, y, z0 - 1, M('white_concrete'))   # cantilevered balcony edge
         if k == C17_F:
             break
         for x in (23, 24, 25):                                               # stairwell open through every floor
@@ -270,10 +274,15 @@ def comfort17(b, x0, y0, z0):
                     b.put(x0 + wx, yy, z, M('light_gray_concrete'))
             for wx in C17_WALLS[1:-1]:
                 b.put(x0 + wx, yy, z0, M('light_gray_concrete'))              # balcony dividers
+                if k:
+                    b.put(x0 + wx, yy, z0 - 1, M('light_gray_concrete'))
         for x in range(x0, x0 + C17_L):
-            b.put(x, y + 1, z0, PANE if k else AIR)                            # glass balcony front
+            b.put(x, y + 1, z0, AIR)
+            if k:
+                b.put(x, y + 1, z0 - 1, PANE)                                  # glass balustrade
             b.put(x, y + 1, zP, M('light_gray_concrete'))                      # corridor parapet
-        b.put(x0, y + 1, z0, M('light_gray_concrete')); b.put(x0 + C17_L - 1, y + 1, z0, M('light_gray_concrete'))
+        for z in ((z0 - 1, z0) if k else (z0,)):
+            b.put(x0, y + 1, z, M('light_gray_concrete')); b.put(x0 + C17_L - 1, y + 1, z, M('light_gray_concrete'))
         for name, u0, u1 in C17_UNITS:
             for x in range(u0 + 1, u1):                                        # big windows to the balcony
                 for dy in (1, 2):
@@ -312,12 +321,12 @@ def comfort17(b, x0, y0, z0):
     b.sign(x0 + 23, y0 + 2, z0, wall_sign('north', 'dark_oak'), ['コンフォート17', 'COMFORT 17', '', ''], color='white')
     # roof parapet and the stair/elevator penthouse
     for x in range(x0, x0 + C17_L):
-        b.put(x, top + 1, z0, M('light_gray_concrete')); b.put(x, top + 1, zP, M('light_gray_concrete'))
-    for z in range(z0, zP + 1):
+        b.put(x, top + 1, z0 - 1, M('light_gray_concrete')); b.put(x, top + 1, zP, M('light_gray_concrete'))
+    for z in range(z0 - 1, zP + 1):
         b.put(x0, top + 1, z, M('light_gray_concrete')); b.put(x0 + C17_L - 1, top + 1, z, M('light_gray_concrete'))
     b.box(x0 + 21, top + 1, zN, x0 + 28, top + 4, zS, M('light_gray_concrete'))
     b.box(x0 + 21, top + 5, zN, x0 + 28, top + 5, zS, M('white_concrete'))
-    return (x0, z0, x0 + C17_L - 1, zP)
+    return (x0, z0 - 1, x0 + C17_L - 1, zP)
 
 
 A2_PLAN = ['LLLLLL#MMMM',
@@ -355,20 +364,20 @@ def apartment_11a2(b, x0, y, z0, u0, u1, zN, zS):
     b.put(X(3), y + 1, Z(1), M('spruce_slab[type=bottom,waterlogged=false]'))
     b.put(X(2), y + 1, Z(1), M('orange_carpet')); b.put(X(4), y + 1, Z(1), M('light_blue_carpet'))
     # kitchen-dining: stove, sink, the tall fridge, Pen Pen's fridge, the table with beer cans
-    b.put(X(0), y + 1, Z(3), M('furnace[facing=east,lit=false]'))
-    b.put(X(0), y + 1, Z(4), M('cauldron'))
-    b.put(X(5), y + 1, Z(3), M('white_concrete')); b.put(X(5), y + 2, Z(3), M('white_concrete'))
-    b.put(X(4), y + 1, Z(4), M('light_blue_concrete'))
-    b.sign(X(4), y + 2, Z(4), M('birch_sign[rotation=8,waterlogged=false]'), ['Pen Pen', '的冰箱', '', ''])
-    b.put(X(2), y + 1, Z(3), M('spruce_slab[type=top,waterlogged=false]')); b.put(X(3), y + 1, Z(3), M('spruce_slab[type=top,waterlogged=false]'))
-    b.put(X(2), y + 2, Z(3), M('yellow_candle[candles=3,lit=false,waterlogged=false]'))
-    b.put(X(3), y + 2, Z(3), M('yellow_candle[candles=4,lit=false,waterlogged=false]'))
-    b.put(X(1), y + 1, Z(3), stair('oak_stairs', 'west')); b.put(X(4), y + 1, Z(3), stair('oak_stairs', 'east'))
+    # The ceiling is 2 blocks, so nothing on the floor can be stepped over: the hall (u6) reaches the living room through
+    # u5, Shinji's door (2,5) through (2,4) and (2,3), the bathroom door (5,5) through (5,4).
+    b.put(X(0), y + 1, Z(3), M('white_concrete')); b.put(X(0), y + 2, Z(3), M('white_concrete'))      # the tall fridge
+    b.put(X(0), y + 1, Z(4), M('furnace[facing=east,lit=false]'))
+    b.put(X(1), y + 1, Z(4), M('cauldron'))
+    b.put(X(4), y + 1, Z(4), M('light_blue_concrete'))                                                # Pen Pen's fridge
+    b.put(X(3), y + 1, Z(3), M('spruce_slab[type=top,waterlogged=false]')); b.put(X(4), y + 1, Z(3), M('spruce_slab[type=top,waterlogged=false]'))
+    b.put(X(3), y + 2, Z(3), M('yellow_candle[candles=3,lit=false,waterlogged=false]'))
+    b.put(X(4), y + 2, Z(3), M('yellow_candle[candles=4,lit=false,waterlogged=false]'))
+    b.put(X(3), y + 1, Z(2), stair('oak_stairs', 'north')); b.put(X(3), y + 1, Z(4), stair('oak_stairs', 'south'))
     # Misato's room: bed, cans and clothes on the floor
     b.put(X(10), y + 1, Z(0), M('red_bed[facing=east,occupied=false,part=head]'))
     b.put(X(9), y + 1, Z(0), M('red_bed[facing=east,occupied=false,part=foot]'))
-    for u, v, s in ((7, 1, M('yellow_candle[candles=2,lit=false,waterlogged=false]')), (9, 2, M('yellow_candle[candles=1,lit=false,waterlogged=false]')),
-                    (8, 2, M('purple_carpet')), (10, 2, M('black_carpet')), (7, 0, M('white_carpet'))):
+    for u, v, s in ((9, 2, M('yellow_carpet')), (8, 2, M('purple_carpet')), (10, 2, M('black_carpet')), (7, 0, M('white_carpet'))):
         b.put(X(u), y + 1, Z(v), s)
     # Asuka's room: bed, desk, rug
     b.put(X(10), y + 1, Z(7), M('pink_bed[facing=north,occupied=false,part=foot]'))
@@ -377,7 +386,6 @@ def apartment_11a2(b, x0, y, z0, u0, u1, zN, zS):
     # Shinji's small room: futon and the cello standing in the corner
     b.put(X(0), y + 1, Z(6), M('light_blue_carpet')); b.put(X(0), y + 1, Z(7), M('light_blue_carpet'))
     b.put(X(2), y + 1, Z(7), M('stripped_spruce_wood[axis=y]')); b.put(X(2), y + 2, Z(7), M('spruce_fence[east=false,north=false,south=false,waterlogged=false,west=false]'))
-    b.sign(X(1), y + 1, Z(7), M('birch_sign[rotation=0,waterlogged=false]'), ['大提琴', '', '', ''])
     # bathroom: tub and basin
     b.put(X(4), y + 1, Z(6), M('water_cauldron[level=3]')); b.put(X(4), y + 1, Z(7), M('water_cauldron[level=3]'))
     b.put(X(5), y + 1, Z(7), M('water_cauldron[level=1]'))
@@ -495,6 +503,13 @@ def pad(b, w, box, gy, margin=2, keep=()):
             b.c.setdefault((x, gy, z), M('smooth_stone') if inside else M('grass_block[snowy=false]'))
 
 
+def connect_panes(b, w):
+    """Every planned pane and bar joined to its neighbours (planned cells first, then the world)."""
+    get = lambda x, y, z: b.c.get((x, y, z)) or w.get(x, y, z)
+    joined = {p: connected(s, *p, get) for p, s in b.c.items() if is_pane(s)}
+    b.c.update(joined)
+
+
 def plan(site, out):
     w = World(REGION)
     gs = guards()
@@ -561,6 +576,7 @@ def plan(site, out):
                 n += 1
             report[f'old_{ox}_{oz}'] = dict(box=obox, ground_y=gy, old_top=top)
     b.finish()
+    connect_panes(b, w)
     for st in set(b.c.values()):                        # every state with sorted properties, as the readback expects
         if '[' in st:
             props = st[st.index('[') + 1:-1].split(',')

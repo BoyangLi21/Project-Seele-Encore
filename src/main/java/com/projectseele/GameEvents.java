@@ -299,8 +299,34 @@ public class GameEvents
             AngelAlarmSystem.syncTo(player);
             ThirdImpactDirector.syncTo(player);
             NervCommandDisplayState.syncTo(player);
+            startAtHomeOnce(player);
             giveEmployeeCardOnce(player);
         }
+    }
+
+    /** Shinji's room in Misato's apartment, Comfort 17 unit 11-A-2: feet on the floor, south of his door. */
+    static final double HOME_X = -54.5D, HOME_Y = 163.0D, HOME_Z = 776.5D;
+    static final float HOME_YAW = 180.0F;
+
+    /**
+     * R65 owner feedback: a new game starts in Misato's apartment (11-A-2), not at the empty overworld spawn. Only a
+     * player who has never played here is moved, once; a returning player keeps their place and is only marked. The
+     * apartment also becomes the respawn point, forced, since there is no bed of their own there.
+     */
+    private static void startAtHomeOnce(ServerPlayer player)
+    {
+        var root = player.getPersistentData();
+        var kept = root.getCompound(net.minecraft.world.entity.player.Player.PERSISTED_NBT_TAG);
+        if (kept.getBoolean("projectseele_start_11a2_r65")) return;
+        kept.putBoolean("projectseele_start_11a2_r65", true);
+        root.put(net.minecraft.world.entity.player.Player.PERSISTED_NBT_TAG, kept);
+        boolean fresh = player.getStats().getValue(net.minecraft.stats.Stats.CUSTOM.get(net.minecraft.stats.Stats.PLAY_TIME)) == 0;
+        ServerLevel geofront = player.server.getLevel(FacilitySchemaV2.DIMENSION);
+        if (!fresh || geofront == null || player.isPassenger()) return;
+        BlockPos home = BlockPos.containing(HOME_X, HOME_Y, HOME_Z);
+        player.setRespawnPosition(geofront.dimension(), home, HOME_YAW, true, false);
+        player.teleportTo(geofront, HOME_X, HOME_Y, HOME_Z, HOME_YAW, 0.0F);
+        ProjectSeele.LOGGER.info("New player {} starts in apartment 11-A-2", player.getGameProfile().getName());
     }
 
     /**

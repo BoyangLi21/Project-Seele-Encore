@@ -256,6 +256,19 @@ def apply(a):
         # The broad 32-block route reservations include the outside of the
         # solid casing. All rows above are strictly on its four outside faces.
         positions = []
+    if getattr(a, 'dogma_hall_doorway', False):
+        # The one approved opening in the hangar hall (inside the launch reservation): only cells of the declared
+        # doorway, only opened, never a mechanical cell. Every other row is checked as usual below.
+        from plan_r66_dogma_doorway import in_doorway
+        from query_blocks import AIR
+        mechanical = {tuple(box[:3]) for name, box in launch.boxes if name == 'mechanical-cell'}
+        inside = launch.inside(positions)
+        for x, y, z, before, after in rows:
+            if (x, y, z) not in inside:
+                continue
+            if not in_doorway(x, y, z) or after not in AIR or before in AIR or (x, y, z) in mechanical:
+                raise SystemExit(f'{(x, y, z)}: inside the launch reservation and not an opening of the declared hall doorway ({before} -> {after})')
+        positions = [p for p in positions if p not in inside]
     launch.assert_positions(positions)
     folder = a.world / REGION
     if given:
@@ -433,5 +446,7 @@ if __name__ == '__main__':
     parser.add_argument('--allow-launch-repaint', action='store_true',
                         help='launch tunnel walls: rows inside the launch space may only turn one wall block into another (no air, seals or rail anchors)')
     parser.add_argument('--bank2-exterior', action='store_true', help='install the measured exterior cladding of the second launch bank')
+    parser.add_argument('--dogma-hall-doorway', action='store_true',
+                        help='open the declared EVA doorway to the Central Dogma shaft in the hangar hall (plan_r66_dogma_doorway); nothing else in the launch reservation')
     parser.add_argument('--refresh-heightmaps', action='store_true', help='drop the stored heightmaps of touched chunks, for terrain cut or raised')
     apply(parser.parse_args())
