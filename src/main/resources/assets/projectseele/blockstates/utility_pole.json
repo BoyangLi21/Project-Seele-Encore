@@ -1,0 +1,64 @@
+{
+ "variants": {
+  "facing=north,part=shaft": {
+   "model": "projectseele:block/utility_pole_shaft"
+  },
+  "facing=north,part=top": {
+   "model": "projectseele:block/utility_pole_top"
+  },
+  "facing=north,part=lamp": {
+   "model": "projectseele:block/utility_pole_lamp"
+  },
+  "facing=north,part=transformer": {
+   "model": "projectseele:block/utility_pole_transformer"
+  },
+  "facing=east,part=shaft": {
+   "model": "projectseele:block/utility_pole_shaft",
+   "y": 90
+  },
+  "facing=east,part=top": {
+   "model": "projectseele:block/utility_pole_top",
+   "y": 90
+  },
+  "facing=east,part=lamp": {
+   "model": "projectseele:block/utility_pole_lamp",
+   "y": 90
+  },
+  "facing=east,part=transformer": {
+   "model": "projectseele:block/utility_pole_transformer",
+   "y": 90
+  },
+  "facing=south,part=shaft": {
+   "model": "projectseele:block/utility_pole_shaft",
+   "y": 180
+  },
+  "facing=south,part=top": {
+   "model": "projectseele:block/utility_pole_top",
+   "y": 180
+  },
+  "facing=south,part=lamp": {
+   "model": "projectseele:block/utility_pole_lamp",
+   "y": 180
+  },
+  "facing=south,part=transformer": {
+   "model": "projectseele:block/utility_pole_transformer",
+   "y": 180
+  },
+  "facing=west,part=shaft": {
+   "model": "projectseele:block/utility_pole_shaft",
+   "y": 270
+  },
+  "facing=west,part=top": {
+   "model": "projectseele:block/utility_pole_top",
+   "y": 270
+  },
+  "facing=west,part=lamp": {
+   "model": "projectseele:block/utility_pole_lamp",
+   "y": 270
+  },
+  "facing=west,part=transformer": {
+   "model": "projectseele:block/utility_pole_transformer",
+   "y": 270
+  }
+ }
+}

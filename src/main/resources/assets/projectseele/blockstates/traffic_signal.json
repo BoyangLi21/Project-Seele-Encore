@@ -1,0 +1,19 @@
+{
+ "variants": {
+  "facing=north": {
+   "model": "projectseele:block/traffic_signal"
+  },
+  "facing=east": {
+   "model": "projectseele:block/traffic_signal",
+   "y": 90
+  },
+  "facing=south": {
+   "model": "projectseele:block/traffic_signal",
+   "y": 180
+  },
+  "facing=west": {
+   "model": "projectseele:block/traffic_signal",
+   "y": 270
+  }
+ }
+}

@@ -98,6 +98,12 @@ public final class ModBlocks
     public static final RegistryObject<Block> ROAD_ASPHALT_SLAB=BLOCKS.register("road_asphalt_slab",()->new net.minecraft.world.level.block.SlabBlock(BlockBehaviour.Properties.copy(Blocks.BLACK_CONCRETE)));
     public static final RegistryObject<Block> ROAD_MARKING_SLAB=BLOCKS.register("road_marking_slab",()->new net.minecraft.world.level.block.SlabBlock(BlockBehaviour.Properties.copy(Blocks.WHITE_CONCRETE)));
     public static final RegistryObject<Block> STREET_LIGHT_HEAD=BLOCKS.register("street_light_head",()->new com.projectseele.world.StreetLightHeadBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).lightLevel(s->15).noOcclusion()));
+    // R65 feedback 2 item 2: Japanese street furniture (static models).
+    public static final RegistryObject<Block> UTILITY_POLE=BLOCKS.register("utility_pole",()->new com.projectseele.world.StreetFurnitureR65.UtilityPole(BlockBehaviour.Properties.copy(Blocks.STONE).strength(2F).noOcclusion()
+            .lightLevel(s->s.getValue(com.projectseele.world.StreetFurnitureR65.PART)==com.projectseele.world.StreetFurnitureR65.PolePart.LAMP?15:0)));
+    public static final RegistryObject<Block> POWER_LINE=BLOCKS.register("power_line",()->new com.projectseele.world.StreetFurnitureR65.PowerLine(BlockBehaviour.Properties.copy(Blocks.CHAIN).strength(0.5F).noOcclusion().noCollission()));
+    public static final RegistryObject<Block> TRAFFIC_SIGNAL=BLOCKS.register("traffic_signal",()->new com.projectseele.world.StreetFurnitureR65.Signal(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion().lightLevel(s->6)));
+    public static final RegistryObject<Block> SIGNAL_POLE=BLOCKS.register("signal_pole",()->new com.projectseele.world.StreetFurnitureR65.SignalPole(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()));
     public static final RegistryObject<Block> PERIOD_STATION_FLOOR=BLOCKS.register("period_station_floor",()->new Block(BlockBehaviour.Properties.copy(Blocks.SMOOTH_STONE)));
     public static final RegistryObject<Block> STATION_DRAIN=BLOCKS.register("station_drain",()->new Block(BlockBehaviour.Properties.copy(Blocks.SMOOTH_STONE)));
     public static final RegistryObject<Block> PERIOD_FIXTURE_PART=BLOCKS.register("period_fixture_part",()->new com.projectseele.world.PeriodFixturePartBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(2).noOcclusion().dynamicShape().noLootTable()));

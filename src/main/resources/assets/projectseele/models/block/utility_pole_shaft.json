@@ -1,0 +1,93 @@
+{
+ "parent": "minecraft:block/block",
+ "textures": {
+  "c": "projectseele:block/street_pole_concrete",
+  "particle": "projectseele:block/street_pole_concrete"
+ },
+ "elements": [
+  {
+   "from": [
+    5.5,
+    0,
+    5.5
+   ],
+   "to": [
+    10.5,
+    16,
+    10.5
+   ],
+   "faces": {
+    "north": {
+     "texture": "#c"
+    },
+    "south": {
+     "texture": "#c"
+    },
+    "east": {
+     "texture": "#c"
+    },
+    "west": {
+     "texture": "#c"
+    },
+    "up": {
+     "texture": "#c"
+    },
+    "down": {
+     "texture": "#c"
+    }
+   }
+  },
+  {
+   "from": [
+    4.5,
+    0,
+    6.25
+   ],
+   "to": [
+    11.5,
+    16,
+    9.75
+   ],
+   "faces": {
+    "east": {
+     "texture": "#c"
+    },
+    "west": {
+     "texture": "#c"
+    },
+    "up": {
+     "texture": "#c"
+    },
+    "down": {
+     "texture": "#c"
+    }
+   }
+  },
+  {
+   "from": [
+    6.25,
+    0,
+    4.5
+   ],
+   "to": [
+    9.75,
+    16,
+    11.5
+   ],
+   "faces": {
+    "north": {
+     "texture": "#c"
+    },
+    "south": {
+     "texture": "#c"
+    },
+    "up": {
+     "texture": "#c"
+    },
+    "down": {
+     "texture": "#c"
+    }
+   }
+  }
+ ]
+}

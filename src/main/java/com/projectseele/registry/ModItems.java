@@ -50,6 +50,10 @@ public class ModItems
     public static final RegistryObject<Item> ROAD_ASPHALT_SLAB=ITEMS.register("road_asphalt_slab",()->new BlockItem(ModBlocks.ROAD_ASPHALT_SLAB.get(),new Item.Properties()));
     public static final RegistryObject<Item> ROAD_MARKING_SLAB=ITEMS.register("road_marking_slab",()->new BlockItem(ModBlocks.ROAD_MARKING_SLAB.get(),new Item.Properties()));
     public static final RegistryObject<Item> STREET_LIGHT_HEAD=ITEMS.register("street_light_head",()->new BlockItem(ModBlocks.STREET_LIGHT_HEAD.get(),new Item.Properties()));
+    public static final RegistryObject<Item> UTILITY_POLE=ITEMS.register("utility_pole",()->new BlockItem(ModBlocks.UTILITY_POLE.get(),new Item.Properties()));
+    public static final RegistryObject<Item> POWER_LINE=ITEMS.register("power_line",()->new BlockItem(ModBlocks.POWER_LINE.get(),new Item.Properties()));
+    public static final RegistryObject<Item> TRAFFIC_SIGNAL=ITEMS.register("traffic_signal",()->new BlockItem(ModBlocks.TRAFFIC_SIGNAL.get(),new Item.Properties()));
+    public static final RegistryObject<Item> SIGNAL_POLE=ITEMS.register("signal_pole",()->new BlockItem(ModBlocks.SIGNAL_POLE.get(),new Item.Properties()));
     public static final RegistryObject<Item> STATION_SEAT=ITEMS.register("station_seat",()->new BlockItem(ModBlocks.STATION_SEAT.get(),new Item.Properties()));
     public static final RegistryObject<Item> RESIDENTIAL_CHAIR=ITEMS.register("residential_chair",()->new BlockItem(ModBlocks.RESIDENTIAL_CHAIR.get(),new Item.Properties()));
     public static final RegistryObject<Item> MILITARY_SEAT=ITEMS.register("military_seat",()->new BlockItem(ModBlocks.MILITARY_SEAT.get(),new Item.Properties()));
