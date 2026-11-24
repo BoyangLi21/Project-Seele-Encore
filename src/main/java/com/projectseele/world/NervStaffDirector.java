@@ -20,7 +20,13 @@ public final class NervStaffDirector
     public record Station(String id,String name,String role,String skin,BlockPos feet,float yaw) {}
     private static final Map<ServerLevel,List<Station>> ROSTERS=new WeakHashMap<>();
     private static final Map<ServerLevel,Map<Long,Integer>> LOADED=new WeakHashMap<>();
+    /** Posts nobody stands at any more (owner 2026-11-24: no guard on the Heaven's Door level). Saved rosters keep them. */
+    public static final Set<String> RETIRED_POSTS=Set.of("guard/dogma_checkpoint");
     public static List<Station> roster(ServerLevel level)
+    {
+        return allStations(level).stream().filter(s->!RETIRED_POSTS.contains(s.id())).toList();
+    }
+    private static List<Station> allStations(ServerLevel level)
     {
         if(NervRouteRuntimeR52.claimed(level))return NervOriginalActorsR52.roster(level);
         return ROSTERS.computeIfAbsent(level,key->{
@@ -46,6 +52,7 @@ public final class NervStaffDirector
         {
             // Existing actors continue their ordinary behaviour. Only the
             // old-coordinate replacement spawner waits for Root roster data.
+            if(level.getGameTime()%100==0&&level.dimension().equals(FacilitySchemaV2.DIMENSION))retire(level);
             if(NervRouteRuntimeR52.claimed(level)){NervOriginalActorsR52.tickStaff(level);continue;}
             if(level.getGameTime()%20!=0)continue;var roster=roster(level);if(roster.isEmpty())continue;var state=NervStaffSavedData.get(level);var age=LOADED.computeIfAbsent(level,l->new HashMap<>());
             Set<Long> visible=new HashSet<>();for(var station:roster)
@@ -65,6 +72,15 @@ public final class NervStaffDirector
                 if(!level.noCollision(npc)||level.getBlockState(p.below()).getCollisionShape(level,p.below()).isEmpty())continue;
                 if(level.addFreshEntity(npc)){state.record(station.id(),npc.getUUID());spawned++;}
             }
+        }
+    }
+    /** An actor still standing at a retired post leaves once its chunk is loaded. */
+    private static void retire(ServerLevel level)
+    {
+        for(String post:RETIRED_POSTS)
+        {
+            UUID id=NervRouteRuntimeR52.claimed(level)?NervOriginalActorsR52.staffIdentity(level,post):NervStaffSavedData.get(level).identity(post);
+            if(id!=null&&level.getEntity(id) instanceof NervStaffEntity actor&&post.equals(actor.memberId()))actor.discard();
         }
     }
     private NervStaffDirector() {}

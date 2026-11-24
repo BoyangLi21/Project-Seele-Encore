@@ -18,6 +18,9 @@ import net.minecraft.world.phys.AABB;
 public final class HeavensDoor
 {
     private static final int WEST = 18, EAST = 42, WIDTH = EAST - WEST + 1;
+    // The jambs are the pockets the leaves slide into: the outer two columns each side never open, and show the
+    // leaf's red inner edge once it is fully retracted (the door's own geometry puts that edge at x 17 and 43).
+    private static final int POCKET_WEST = WEST - 2, POCKET_EAST = EAST + 2;
     private static final int BOTTOM = -1230, TOP = -1202, NORTH = 258, SOUTH = 260;
     private static int width, target;
     private static boolean moving;
@@ -40,8 +43,9 @@ public final class HeavensDoor
     {
         ServerLevel level = player.serverLevel();
         if (player.isSpectator() || !controls(level, hit)) return false;
-        if (!loaded(level) || !level.getBlockState(new BlockPos(WEST - 1, BOTTOM, NORTH)).is(Blocks.POLISHED_BASALT)
-                || !level.getBlockState(new BlockPos(EAST + 1, BOTTOM, SOUTH)).is(Blocks.POLISHED_BASALT)) return false;
+        // The basalt lintel marks an installed door; the jambs below it now move with the leaves.
+        if (!loaded(level) || !level.getBlockState(new BlockPos(WEST, TOP + 2, NORTH)).is(Blocks.POLISHED_BASALT)
+                || !level.getBlockState(new BlockPos(EAST, TOP + 2, SOUTH)).is(Blocks.POLISHED_BASALT)) return false;
         if (moving) target = target == WIDTH ? 0 : WIDTH;
         else
         {
@@ -85,7 +89,7 @@ public final class HeavensDoor
         }
         // Check the entire moving face before writing a step. A player modification leaves its surroundings intact.
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (int x = WEST; x <= EAST; x++)
+        for (int x = POCKET_WEST; x <= POCKET_EAST; x++)
             for (int y = BOTTOM; y <= TOP; y++)
                 for (int z = NORTH; z <= SOUTH; z++)
                     if (!level.getBlockState(pos.set(x, y, z)).is(material(x, y, z, width)))
@@ -93,7 +97,7 @@ public final class HeavensDoor
                         moving = false;
                         return;
                     }
-        for (int x = WEST; x <= EAST; x++)
+        for (int x = POCKET_WEST; x <= POCKET_EAST; x++)
             for (int y = BOTTOM; y <= TOP; y++)
                 for (int z = NORTH; z <= SOUTH; z++)
                 {
@@ -123,7 +127,7 @@ public final class HeavensDoor
 
     private static boolean loaded(ServerLevel level)
     {
-        return level.hasChunkAt(new BlockPos(WEST, TOP, NORTH)) && level.hasChunkAt(new BlockPos(EAST, TOP, SOUTH));
+        return level.hasChunkAt(new BlockPos(POCKET_WEST, TOP, NORTH)) && level.hasChunkAt(new BlockPos(POCKET_EAST, TOP, SOUTH));
     }
 
     private static Block material(int x, int y, int z, int opening)

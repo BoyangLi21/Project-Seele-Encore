@@ -2131,6 +2131,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var result=new ArrayList<NervNpcResetR53.Target>();
         for(var binding:staff)
         {
+            if(NervStaffDirector.RETIRED_POSTS.contains(binding.station().id()))continue;
             var s=binding.station();var home=new Vec3(s.feet().getX()+.5,s.feet().getY(),s.feet().getZ()+.5);
             result.add(new NervNpcResetR53.Target(binding.original(),s.id(),ModEntities.NERV_STAFF.get(),home,s.yaw(),()->"",mob->{
                 var actor=(NervStaffEntity)mob;actor.finishTask();actor.assign(s.id(),s.name(),s.role(),s.skin(),s.feet());actor.stationYaw(s.yaw());
