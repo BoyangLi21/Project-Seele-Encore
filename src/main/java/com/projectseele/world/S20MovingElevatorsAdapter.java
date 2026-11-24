@@ -614,6 +614,24 @@ public final class S20MovingElevatorsAdapter
         configureTargetSpeed(spec, group);
     }
 
+    /** R65 public lifts: the headquarters cage (5 x 6 x 5, centred, floor one below the stop) and speed. */
+    public static void configurePublicCage(
+            S20PhysicalElevatorDirector.LiftSpec spec, ElevatorGroup group)
+    {
+        if (group.isMoving()
+                || group.getCageWidth() == CAGE_HORIZONTAL
+                && group.getCageDepth() == CAGE_HORIZONTAL
+                && group.getCageHeight() == CAGE_VERTICAL
+                && group.getCageSideOffset() == 0
+                && group.getCageDepthOffset() == 0
+                && group.getCageHeightOffset() == -1
+                && Math.abs(group.getTargetSpeed() - TARGET_SPEED) <= 0.001D)
+        {
+            return;
+        }
+        configureGroup(spec, group);
+    }
+
     private static void configureTargetSpeed(
             S20PhysicalElevatorDirector.LiftSpec spec, ElevatorGroup group)
     {
