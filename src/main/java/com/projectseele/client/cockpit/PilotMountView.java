@@ -36,21 +36,52 @@ public final class PilotMountView {
 
     public static void leave() { seat = null; bank = 0; }
 
+    /**
+     * R65 (owner's feedback 2, item 15): the first picture in the plug turned the view by itself. The look started
+     * at the seat's straight ahead whatever way the pilot faced climbing in (from the boarding bridge: the hatch,
+     * to one side of it); and the pilot's own angles stayed where they were left outside, so the glide into the
+     * Unit's optics at the end of the synchronisation swung the view a second time, to them. Now the look goes on
+     * from where the pilot looked, as the seat's range allows, and the pilot's own angles follow what is shown.
+     */
     public static Angles plug(EntryPlugCarrierEntity plug, Entity pilot, float partial, float opticalBlend, float bodyYaw) {
         float inputYaw = pilot.getViewYRot(partial), inputPitch = pilot.getViewXRot(partial);
+        RigidTransform frame = plug.getInterpolatedCanonicalTransform(partial);
         if (seat != plug) {
             seat = plug;
-            localYaw = localPitch = 0;
+            float[] look = local(frame, inputYaw, inputPitch);
+            localYaw = look[0];
+            localPitch = look[1];
         } else {
             localYaw = Mth.clamp(localYaw + Mth.wrapDegrees(inputYaw - lastYaw), -65F, 65F);
             localPitch = pitch(localPitch + inputPitch - lastPitch);
         }
-        lastYaw = inputYaw;
-        lastPitch = inputPitch;
-        Angles view = angles(plug.getInterpolatedCanonicalTransform(partial), localYaw, localPitch,
-                opticalBlend, inputYaw, inputPitch, bodyYaw);
+        Angles view = angles(frame, localYaw, localPitch, opticalBlend, inputYaw, inputPitch, bodyYaw);
+        if (pilot instanceof net.minecraft.client.player.LocalPlayer self) {
+            // What the mouse adds between two frames still reaches the next one; nothing else turns the pilot.
+            self.setYRot(view.yaw());
+            self.setXRot(view.pitch());
+            self.yRotO = view.yaw();
+            self.xRotO = view.pitch();
+            self.setYHeadRot(view.yaw());
+            lastYaw = view.yaw();
+            lastPitch = view.pitch();
+        } else {
+            lastYaw = inputYaw;
+            lastPitch = inputPitch;
+        }
         bank = view.roll();
         return view;
+    }
+
+    /** The seat's look (yaw from straight ahead, pitch) that points where the world angles point, inside the seat's range. */
+    static float[] local(RigidTransform frame, float yaw, float pitch) {
+        Vec3 forward = EntryPlugKinematics.PILOT_VIEW_FORWARD_P;
+        Vec3 side = forward.cross(new Vec3(0, 1, 0)).normalize();
+        Vec3 up = side.cross(forward);
+        Vec3 look = frame.inverse().transformVector(Vec3.directionFromRotation(pitch, yaw));
+        double el = -Math.asin(Mth.clamp(look.dot(up), -1, 1));
+        double az = Math.atan2(look.dot(side), look.dot(forward));
+        return new float[]{Mth.clamp((float) Math.toDegrees(az), -65F, 65F), pitch((float) Math.toDegrees(el))};
     }
 
     static Angles angles(RigidTransform frame, float localYaw, float localPitch, float opticalBlend,
