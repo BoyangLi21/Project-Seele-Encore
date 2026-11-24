@@ -74,14 +74,16 @@ public final class NervStaffDirector
             }
         }
     }
-    /** An actor still standing at a retired post leaves once its chunk is loaded. */
+    /**
+     * An actor still standing at a retired post leaves once it is loaded. Found by the post it carries, not through a
+     * roster: while the R52 installation is held neither roster can name it.
+     */
     private static void retire(ServerLevel level)
     {
-        for(String post:RETIRED_POSTS)
-        {
-            UUID id=NervRouteRuntimeR52.claimed(level)?NervOriginalActorsR52.staffIdentity(level,post):NervStaffSavedData.get(level).identity(post);
-            if(id!=null&&level.getEntity(id) instanceof NervStaffEntity actor&&post.equals(actor.memberId()))actor.discard();
-        }
+        var leaving=new ArrayList<NervStaffEntity>();
+        level.getEntities(net.minecraft.world.level.entity.EntityTypeTest.forClass(NervStaffEntity.class),
+                actor->RETIRED_POSTS.contains(actor.memberId()),leaving);
+        leaving.forEach(NervStaffEntity::discard);
     }
     private NervStaffDirector() {}
 }
