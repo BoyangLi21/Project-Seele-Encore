@@ -44,13 +44,22 @@ public final class PilotMountViewTest {
                     throw new AssertionError("The first picture in the seat turned from where the pilot looked");
                 boarded++;
             }
-            // Looking past the seat's range, the look is the nearest the seat allows, never straight ahead.
+            // A look further round than the seat's own range is read as it is (the boarding keeps it, not the seat's edge).
             Vec3 forward = transform.transformVector(EntryPlugKinematics.PILOT_VIEW_FORWARD_P);
             var behind = PilotMountView.angles(transform, 120, 0, 0, 0, 0, 0);
             float[] edge = PilotMountView.local(transform, behind.yaw(), behind.pitch());
-            if (Math.abs(edge[0] - 65) > .01) throw new AssertionError("A look past the seat's range was not held at its edge: " + edge[0]);
+            if (Math.abs(edge[0] - 120) > .1) throw new AssertionError("A look past the seat's range was not read as it is: " + edge[0]);
             if (forward.lengthSqr() < .5) throw new AssertionError("Seat frame lost");
         }
+        // The boarding look settles to the seat's straight ahead: none of it goes in a frame of no time, 95% in about 1.4 s
+        // of frames at any rate, and a stalled frame counts as a tenth of a second (no jump after a hitch).
+        if (PilotMountView.settle(0) != 1F) throw new AssertionError("A frame of no time moved the look");
+        for (float fps : new float[]{30, 60, 144}) {
+            float left = 1;
+            for (int i = 0; i < Math.round(1.4F * fps); i++) left *= PilotMountView.settle(1 / fps);
+            if (left > .05F || left < .03F) throw new AssertionError("Settle at " + fps + " fps left " + left + " after 1.4 s");
+        }
+        if (PilotMountView.settle(5F) < PilotMountView.settle(.1F) - 1e-6F) throw new AssertionError("A stalled frame jumped the look");
         System.out.println("PilotMountViewTest: " + boarded + " boarding looks kept");
     }
 }
