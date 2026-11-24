@@ -92,6 +92,11 @@ SHADER_PATCHES = (
 
 @contextmanager
 def stopped_world(world):
+    if not (world / 'session.lock').exists():
+        # A copy no game has opened has no lock to hold (map-edges' pack world); the input-changed check still applies.
+        print('No session.lock in ' + str(world) + ': never opened as is, packing without a lock', flush=True)
+        yield
+        return
     with (world / 'session.lock').open('r+b') as handle:
         import msvcrt
         msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
@@ -203,16 +208,20 @@ def lod_summary(db):
     return dict(rows=sum(n for _, n in levels), levels=levels, pending_parent_updates=pending, quick_check=check)
 
 
-def distant_caches(world, seed, pack, work, geofront_lod=None):
+def distant_caches(world, seed, pack, work, geofront_lod=None, world_lods=None):
     client, server, details = {}, {}, []
     for dim in dimensions(world):
         db = dim / 'data/DistantHorizons.sqlite'
-        if not db.exists():
-            continue
         entry = db.relative_to(world).as_posix()
         source = 'formal world'
+        # R65: a re-baked world copy (map-edges' pack world) carries no DH databases; the re-bake supplies the
+        # GeoFront one and --world-lods the others (a world folder laid out the same way).
         if entry == GEOFRONT_LOD and geofront_lod:
             db, source = geofront_lod, 'tools/rebake_r63.py'
+        elif not db.exists() and world_lods and (world_lods / entry).exists():
+            db, source = world_lods / entry, 'world LODs: ' + str(world_lods)
+        if not db.exists():
+            continue
         rel = dim.relative_to(world).as_posix()
         name = {'.': 'minecraft:overworld', 'DIM-1': 'minecraft:the_nether', 'DIM1': 'minecraft:the_end'}.get(rel) or ':'.join(Path(rel).parts[1:])
         wal = Path(str(db) + '-wal')
@@ -336,7 +345,28 @@ def servers_dat(name, address):
     return b'\x0a\x00\x00\x09\x00\x07servers\x0a' + struct.pack('>i', 1) + entry + b'\x00'
 
 
-def xaero_map(source, world, address):
+def region_chunks(path):
+    """Every stored chunk of an .mca file as (index, compression type and compressed bytes); a chunk kept in an external
+    .mcc file is compared by that file's bytes."""
+    data = Path(path).read_bytes()
+    chunks = {}
+    for index in range(1024):
+        offset = int.from_bytes(data[index * 4:index * 4 + 3], 'big')
+        if not offset:
+            continue
+        start = offset * 4096
+        length = int.from_bytes(data[start:start + 4], 'big')
+        kind = data[start + 4]
+        body = data[start + 5:start + 4 + length]
+        if kind & 0x80:
+            x, z = (int(v) for v in Path(path).name.split('.')[1:3])
+            external = Path(path).with_name(f'c.{x * 32 + index % 32}.{z * 32 + index // 32}.mcc')
+            body = external.read_bytes() if external.exists() else b'missing'
+        chunks[index] = (kind, body)
+    return chunks
+
+
+def xaero_map(source, world, address, ring_source=None):
     """The baked world map, moved to where Xaero looks for it on this server.
 
     A multiplayer client only lists regions that have an N_M.zip in the map folder, so tile
@@ -362,6 +392,19 @@ def xaero_map(source, world, address):
     stamp = lambda t: datetime.datetime.fromtimestamp(t).isoformat(timespec='seconds')
     stale = sorted((n, stamp(p.stat().st_mtime), stamp(saved[r])) for n, p in regions.items()
                    for r in [tuple(map(int, region_name(n).split('_')))] if r in saved and p.stat().st_mtime <= saved[r])
+    if ring_source and stale:
+        # R65: the outer ring's chunks were copied as they are from the world its maps were baked in. Such a region's
+        # map still holds if every chunk in it equals that world's and that world's region had not changed after the bake.
+        source_regions = ring_source / 'dimensions/projectseele/geofront/region'
+        held = []
+        for item in stale:
+            r = region_name(item[0])
+            here, there = world / 'dimensions/projectseele/geofront/region' / f'r.{r.replace("_", ".")}.mca', source_regions / f'r.{r.replace("_", ".")}.mca'
+            if there.exists() and there.stat().st_mtime <= regions[item[0]].stat().st_mtime and region_chunks(here) == region_chunks(there):
+                held.append(item)
+        print('Minimap regions older than their region file but equal, chunk by chunk, to %s: %d of %d'
+              % (ring_source, len(held), len(stale)), flush=True)
+        stale = [item for item in stale if item not in held]
     gate(not stale, ('The world changed after these map regions were baked (zip, baked, region saved); bake them again', stale[:5]))
     # Cave mode type 2 ("full") makes Xaero use the one baked cave layer everywhere in the GeoFront.
     config = source / 'dimension_config.txt'
@@ -544,7 +587,8 @@ def build_inputs(a, work):
     client, world = a.client.resolve(), a.world.resolve()
     assert (world / 'level.dat').is_file() and (client / MAIN_JAR).is_file()
     seed, provenance = dh_identifier(client, world, a.logged_world_folder)
-    client_lod, world_lod, lod_details = distant_caches(world, seed, a.pack, work, a.geofront_lod and a.geofront_lod.resolve())
+    client_lod, world_lod, lod_details = distant_caches(world, seed, a.pack, work, a.geofront_lod and a.geofront_lod.resolve(),
+                                                        a.world_lods and a.world_lods.resolve())
     gate(a.geofront_lod, VERSION + ' needs --geofront-lod: the formal world still has the R62 far view (tools/rebake_r63.py core)')
     shipped_jar = client / MAIN_JAR
     if a.jar_add:
@@ -650,7 +694,7 @@ def build_inputs(a, work):
         manifest = json.loads(z.read('manifest.json'))
     assert not manifest.get('files')
     manifest.update(name=NAME, version=VERSION + '-' + a.date)
-    minimap = xaero_map(a.xaero_map.resolve(), world, a.server_address) if a.xaero_map else {}
+    minimap = xaero_map(a.xaero_map.resolve(), world, a.server_address, a.xaero_ring_source and a.xaero_ring_source.resolve()) if a.xaero_map else {}
     gate(a.xaero_map, 'No --xaero-map given: bake the minimap with tools/rebake_r63.py xaero')
     pcl = {'overrides/' + n: p for n, p in (current | client_lod | minimap).items()}
     pcl['overrides/servers.dat'] = servers_dat('SEELE', a.server_address)
@@ -727,6 +771,9 @@ def main():
                                             'required with --pack, never written into the repository')
     p.add_argument('--xaero-map', type=Path, help='xaero/world-map/WORLD/projectseele$geofront written by a -Dprojectseele.xaeroBake=true run on a copy of --world')
     p.add_argument('--geofront-lod', type=Path, help='GeoFront DistantHorizons.sqlite from tools/rebake_r63.py (WORK/out/geofront_lod.sqlite)')
+    p.add_argument('--xaero-ring-source', type=Path,
+                   help='World the outer ring was copied from as it is, with its minimap: such regions pass if every chunk equals it')
+    p.add_argument('--world-lods', type=Path, help='World folder whose DH databases stand in for those --world lacks (not the GeoFront one)')
     p.add_argument('--jar-add', action='append', metavar='INNER=SOURCE',
                    help='Bake a file into the shipped mod jar at INNER (added, or replacing that entry); both packs get the same jar')
     p.add_argument('--extra-resource-pack', type=Path, action='append',
