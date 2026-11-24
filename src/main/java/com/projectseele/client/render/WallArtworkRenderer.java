@@ -51,4 +51,10 @@ public final class WallArtworkRenderer implements BlockEntityRenderer<WallArtwor
         poses.popPose();
     }
     @Override public int getViewDistance(){return 112;}
+    /**
+     * A mural is metres wide but anchored at one block. Drawn only while that block's chunk section was visible, the
+     * command room's screen vanished from farther back whenever the anchor's section was culled, though the screen
+     * itself was in view (R65 owner). Off-screen renderers are tested against the full render bounding box instead.
+     */
+    @Override public boolean shouldRenderOffScreen(WallArtworkBlockEntity panel){return true;}
 }
