@@ -105,11 +105,14 @@ def plan(w):
     button, display = (CX - 2, y0 + 1, CZ), (CX - 2, y0 + 2, CZ)
     c[button] = 'movingelevators:button_block'
     c[display] = 'movingelevators:display_block'
+    top = (CX - 2, y0 + 3, CZ)                    # a second display on top: the big panel lists all 14 floors
+    c[top] = 'movingelevators:display_block'
     entities[button] = {'id': 'movingelevators:button_tile',
                         'snbt': '{data: {camoState: {Name: "minecraft:white_concrete"}, '
                                 f'controllerX: {CTRL_X}, controllerY: {y0}, controllerZ: {CZ}, '
-                                'facing: 3, controllerFacing: 3, redstone: 0b}}'}
+                                'facing: 5, controllerFacing: 3, redstone: 0b}}'}
     entities[display] = {'id': 'movingelevators:display_tile', 'snbt': '{data: {camoState: {Name: "minecraft:white_concrete"}}}'}
+    entities[top] = {'id': 'movingelevators:display_tile', 'snbt': '{data: {camoState: {Name: "minecraft:white_concrete"}}}'}
     lift = dict(id=LIFT_ID, controller_side='west', controller_facing='east',
                 inside_button_offset=[-2, 1, 0], inside_display_offset=[-2, 2, 0], floors=floors)
     return c, entities, lift

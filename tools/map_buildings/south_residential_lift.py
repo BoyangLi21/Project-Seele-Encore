@@ -150,7 +150,7 @@ def plan(two_stop=False):
     entities[button] = {'id': 'movingelevators:button_tile',
                         'snbt': '{data: {camoState: {Name: "minecraft:black_concrete"}, '
                                 f'controllerX: {start_ctrl[0]}, controllerY: {start_ctrl[1]}, controllerZ: {start_ctrl[2]}, '
-                                'facing: 3, controllerFacing: 3, redstone: 0b}}'}
+                                'facing: 5, controllerFacing: 3, redstone: 0b}}'}
     entities[display] = {'id': 'movingelevators:display_tile', 'snbt': '{data: {camoState: {Name: "minecraft:black_concrete"}}}'}
     manifest = dict(schema='projectseele.r65.public-lifts.v1',
                     lifts=[dict(id=LIFT_ID, controller_side='west', controller_facing='east',
