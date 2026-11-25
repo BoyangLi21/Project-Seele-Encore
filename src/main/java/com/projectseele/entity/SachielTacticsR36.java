@@ -142,7 +142,7 @@ public final class SachielTacticsR36 extends Goal
         }
         if(actor.isStrikeActive()) {wasStriking=true;stop();return;}
         if(wasStriking){wasStriking=false;regroup=actor.lastStrikeConnectedR36()?9:16;}
-        if(CombatFeelR31.restrained(actor)||CombatFeelR31.hitPaused(actor)||EvaCombatR31.holds(actor)){stop();return;}
+        if(CombatFeelR31.restrained(actor)||CombatFeelR31.hitPaused(actor)){stop();return;}
         if(range<.01)return;
         var forward=delta.normalize();var lateral=new Vec3(forward.z,0,-forward.x);
         float yaw=(float)Math.toDegrees(Math.atan2(-forward.x,forward.z));actor.setYRot(Mth.approachDegrees(actor.getYRot(),yaw,4.5F));actor.yHeadRot=actor.yBodyRot=actor.getYRot();

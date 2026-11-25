@@ -5,95 +5,31 @@ import com.projectseele.registry.ModSounds;
 import com.projectseele.util.WeakIdentityMap;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.*;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.*;
 import java.util.*;
 
-/** Player-controlled aerial strikes and a contact-led, two-hand grapple. */
+/** Player-controlled aerial strikes. */
 public final class EvaCombatR31
 {
-    public static final int NONE=0,AIR_STRIKE=1,AIR_SLAM=2,REACH=3,HOLD=4,THROW=5,LAND=6;
+    public static final int NONE=0,AIR_STRIKE=1,AIR_SLAM=2,LAND=6;
     private static final EntityDataAccessor<Integer> ACTION=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Long> SINCE=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Long> STROKE=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Integer> TARGET=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.INT);
-    private static final EntityDataAccessor<org.joml.Vector3f> APPROACH_FROM=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.VECTOR3);
-    private static final EntityDataAccessor<org.joml.Vector3f> APPROACH_TO=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.VECTOR3);
-    private static final EntityDataAccessor<Float> FACING=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
     private static final WeakIdentityMap<EvaUnit01Entity,Runtime> STATES=new WeakIdentityMap<>();
-    private static final class Runtime {boolean contact,airborne,pounded;Vec3 previousContact;int cooldown;}
-    /**
-     * R64 (flow, "body"): a held Angel is beaten on with the free hand, the left keeping its hold: the light press
-     * raises the right fist and brings it down on the Angel's core (in the original Unit-01 holds the Third Angel
-     * and beats on its core). POUND_TICKS from one blow to the next, the fist landing at POUND_HIT; the heavy press
-     * and the grab's own key throw as they did. A hold lasts ninety ticks whatever is done in it: seven blows at
-     * the most.
-     */
-    public static final int POUND_TICKS=12,POUND_HIT=5;
-    private static void pound(EvaUnit01Entity e)
-    {
-        float since=strokeAge(e,0);
-        if(since>=0&&since<POUND_TICKS)return;
-        e.getEntityData().set(STROKE,e.level().getGameTime());
-        var s=STATES.get(e);if(s!=null)s.pounded=false;
-        e.playSound(ModSounds.EVA_SWING.get(),1.8F,.85F);
-    }
-    /** Client: how far a blow on a held Angel has got, 0 to 1, or -1 with none in hand. */
-    public static float pounding(EvaUnit01Entity e,float partial)
-    {
-        if(action(e)!=HOLD)return -1;
-        float since=strokeAge(e,partial);
-        return since>=0&&since<POUND_TICKS?since/POUND_TICKS:-1;
-    }
-    /**
-     * Where a hand is on a held Angel as it is drawn: its hold (grip), but for the right hand through a blow, which
-     * goes up over the shoulder, comes down on the core, and goes back to its hold.
-     */
-    public static Vec3 hand(EvaUnit01Entity e,LivingEntity t,boolean left,float partial)
-    {
-        Vec3 hold=grip(e,t,left,partial);float at=left?-1:pounding(e,partial);
-        if(at<0)return hold;
-        Vec3 f=forward(e),r=f.cross(new Vec3(0,1,0));
-        Vec3 raised=e.getPosition(partial).add(0,e.getBbHeight()*1.12,0).add(f.scale(3)).add(r.scale(7));
-        Vec3 core=t.getPosition(partial).add(0,t.getBbHeight()*.6,0).subtract(f.scale(t.getBbWidth()*.5-1.5));
-        float hit=POUND_HIT/(float)POUND_TICKS;
-        // up in the first three fifths of the way to the hit, down in the rest (a fist gathers speed coming down), then back
-        if(at<hit*.6F)return hold.lerp(raised,CombatMotionR29.ease(at/(hit*.6F)));
-        if(at<hit){double u=(at-hit*.6F)/(hit*.4F);return raised.lerp(core,u*u);}
-        if(at<hit+.12F)return core;
-        return core.lerp(hold,CombatMotionR29.ease((at-hit-.12F)/(1-hit-.12F)));
-    }
+    private static final class Runtime {boolean contact,airborne;Vec3 previousContact;}
     public static boolean bootstrap(){return true;}
-    public static void define(SynchedEntityData d){d.define(ACTION,NONE);d.define(SINCE,0L);d.define(STROKE,-1L);d.define(TARGET,-1);d.define(APPROACH_FROM,new org.joml.Vector3f());d.define(APPROACH_TO,new org.joml.Vector3f());d.define(FACING,0F);}
+    public static void define(SynchedEntityData d){d.define(ACTION,NONE);d.define(SINCE,0L);d.define(STROKE,-1L);d.define(TARGET,-1);}
     public static float strokeAge(EvaUnit01Entity e,float partial){long t=e.getEntityData().get(STROKE);return t<0?-1:e.level().getGameTime()-t+partial;}
     public static int action(EvaUnit01Entity e){return e.getEntityData().get(ACTION);}
     public static float age(EvaUnit01Entity e,float partial){return (float)((e.level().getGameTime()-e.getEntityData().get(SINCE))+(double)partial);}
     public static boolean active(EvaUnit01Entity e){return action(e)!=NONE;}
-    public static boolean locksInput(EvaUnit01Entity e){return action(e)>=REACH;}
-    public static boolean locksFacing(EvaUnit01Entity e){return action(e)>=REACH&&action(e)<=THROW;}
-    public static float facing(EvaUnit01Entity e){return e.getEntityData().get(FACING);}
-    public static void approach(EvaUnit01Entity e)
-    {
-        if(action(e)!=REACH||!e.isControlledByLocalInstance())return;
-        Vec3 from=new Vec3(e.getEntityData().get(APPROACH_FROM)),to=new Vec3(e.getEntityData().get(APPROACH_TO));
-        Vec3 goal=from.lerp(to,CombatMotionR29.ease(age(e,1)/14)),delta=goal.subtract(e.position()).multiply(1,0,1);
-        if(delta.lengthSqr()<1e-10)return;
-        boolean grounded=e.onGround();if(delta.length()>1)delta=delta.normalize();e.move(MoverType.SELF,delta);
-        if(grounded)
-        {
-            var b=e.getBoundingBox();var support=new AABB(b.minX+.1,b.minY-.10,b.minZ+.1,b.maxX-.1,b.minY+.01,b.maxZ-.1);
-            if(e.level().getBlockCollisions(e,support).iterator().hasNext())e.setOnGround(true);
-        }
-    }
     public static LivingEntity target(EvaUnit01Entity e){return e.level().getEntity(e.getEntityData().get(TARGET)) instanceof LivingEntity t?t:null;}
     private static Vec3 forward(EvaUnit01Entity e){Vec3 v=e.getForward().multiply(1,0,1);return v.lengthSqr()<1e-8?new Vec3(0,0,1):v.normalize();}
     private static void start(EvaUnit01Entity e,int action,LivingEntity target)
@@ -104,7 +40,6 @@ public final class EvaCombatR31
     {return !e.level().isClientSide&&!e.isPilotControlLocked()&&!e.isFirstBattleActive()&&!CombatFeelR31.restrained(e)&&e.getPilotEntity()!=null;}
     public static boolean attack(EvaUnit01Entity e,boolean heavy)
     {
-        if(action(e)==HOLD){if(!heavy&&EvaGameplayMotionR32.bodyReadyR64(e))pound(e);else requestThrow(e);return true;}
         if(active(e))return true;
         // Horizontal authored root motion can clear vanilla's onGround bit.
         // An aerial action needs the same confirmed jump/fall state as the body.
@@ -114,24 +49,6 @@ public final class EvaCombatR31
         e.interruptCombatR31();start(e,heavy?AIR_SLAM:AIR_STRIKE,nearest(e,52));STATES.get(e).airborne=true;
         return true;
     }
-    public static void grapple(EvaUnit01Entity e,ServerPlayer pilot)
-    {
-        if(action(e)==HOLD){requestThrow(e);return;}
-        if(active(e)||!available(e)||!e.onGround()||e.isPilotProne()||e.isPilotCrouching())return;
-        if(e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS){pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.empty"),true);return;}
-        var t=nearest(e,38);
-        if(t==null){pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.face"),true);return;}
-        if(AngelGrappleSurfaceR31.contact(t,true,1)==null){pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.pose"),true);return;}
-        if(t instanceof SachielEntity s&&s.getAtField()>270)
-        {pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.field"),true);return;}
-        if(grappler(t)!=null||t instanceof FirstBattleSignals.Actor a&&a.firstBattleSignals().active(t))return;
-        if(e.distanceTo(t)>holdDistance(e,t)+8){pilot.displayClientMessage(Component.translatable("message.projectseele.grapple.upper"),true);return;}
-        Vec3 direction=t.position().subtract(e.position()).multiply(1,0,1).normalize();
-        var destination=t.position().subtract(direction.scale(holdDistance(e,t)));destination=new Vec3(destination.x,e.getY(),destination.z);
-        e.getEntityData().set(APPROACH_FROM,e.position().toVector3f());e.getEntityData().set(APPROACH_TO,destination.toVector3f());
-        e.getEntityData().set(FACING,(float)Math.toDegrees(Math.atan2(-direction.x,direction.z)));
-        e.interruptCombatR31();start(e,REACH,t);
-    }
     private static LivingEntity nearest(EvaUnit01Entity e,double range)
     {
         Vec3 direction=forward(e);
@@ -139,26 +56,6 @@ public final class EvaCombatR31
                 t.isAlive()&&(t instanceof SachielEntity||t instanceof ShamshelEntity||t instanceof ZeruelEntity||t instanceof IsrafelEntity)
                 &&t.position().subtract(e.position()).multiply(1,0,1).normalize().dot(direction)>.55&&e.hasLineOfSight(t))
                 .stream().filter(t->e.distanceTo(t)<range).min(Comparator.comparingDouble(e::distanceToSqr)).orElse(null);
-    }
-    private static double holdDistance(EvaUnit01Entity e,LivingEntity t){return e.isExperimentalUnit()?17.5:18.5;}
-    public static EvaUnit01Entity grappler(LivingEntity t)
-    {
-        for(var e:t.level().getEntitiesOfClass(EvaUnit01Entity.class,t.getBoundingBox().inflate(72)))
-            if(target(e)==t&&(action(e)==HOLD||action(e)==THROW&&age(e,0)<16))return e;
-        return null;
-    }
-    public static boolean holds(LivingEntity t){return grappler(t)!=null;}
-    public static boolean constrainVictim(LivingEntity t)
-    {
-        var e=grappler(t);if(e==null)return false;
-        if(t.level().isClientSide)return false;
-        if(t instanceof Mob mob)mob.getNavigation().stop();t.setDeltaMovement(Vec3.ZERO);t.resetFallDistance();return true;
-    }
-    public static Vec3 grip(EvaUnit01Entity e,LivingEntity t,boolean left,float partial)
-    {
-        var surface=AngelGrappleSurfaceR31.contact(t,left,partial);if(surface!=null)return surface.position();
-        Vec3 f=forward(e),r=f.cross(new Vec3(0,1,0));Vec3 at=t.getPosition(partial);
-        return at.add(0,t.getBbHeight()*.76,0).subtract(f.scale(t.getBbWidth()*.5-.75)).add(r.scale((left?-1:1)*t.getBbWidth()*.23));
     }
     public static Vec3 aerialHand(EvaUnit01Entity e,float partial)
     {
@@ -168,8 +65,6 @@ public final class EvaCombatR31
         var desired=e.getPosition(partial).add(0,e.getBbHeight()*(.84-.22*drive),0).add(f.scale(5+17*drive)).add(r.scale(4*(1-drive)));
         return CombatReachR31.clampContact(e,"r",desired,partial);
     }
-    private static void requestThrow(EvaUnit01Entity e)
-    {if(action(e)==HOLD&&target(e)!=null)start(e,THROW,target(e));}
     public static void tick(EvaUnit01Entity e)
     {
         if(e.level().isClientSide)return;int a=action(e);if(a==NONE)return;
@@ -217,51 +112,6 @@ public final class EvaCombatR31
             if(age>150)clear(e);return;
         }
         if(a==LAND){if(age>12)clear(e);return;}
-        if(victim==null||!victim.isAlive()||e.distanceTo(victim)>48){clear(e);return;}
-        if(a==REACH)
-        {
-            if(age>=18)
-            {
-                if(e.distanceTo(victim)>holdDistance(e,victim)+4||!e.hasLineOfSight(victim)||!CombatReachR31.canReach(e,victim,0))
-                {if(age>36)clear(e);return;}
-                start(e,HOLD,victim);CombatFeelR31.send(victim,CombatFeelR31.STAGGER,forward(e),.8F,24,2);
-                CombatFoleyR36.impact(e,victim,grip(e,victim,true,1),false,false);
-            }
-            return;
-        }
-        if(a==HOLD||a==THROW&&age<16)
-        {
-            Vec3 f=forward(e);double lift=6*CombatMotionR29.ease((a==HOLD?age:18)/18);
-            double additional=e.getY()+lift-victim.getY();
-            if(additional>0&&!CombatReachR31.canReach(e,victim,additional))
-            {double lo=0,hi=additional;for(int i=0;i<8;i++){double mid=(lo+hi)*.5;if(CombatReachR31.canReach(e,victim,mid))lo=mid;else hi=mid;}lift=victim.getY()-e.getY()+lo;}
-            Vec3 goal=e.position().add(f.scale(holdDistance(e,victim))).add(0,lift,0),delta=goal.subtract(victim.position());
-            if(delta.length()>1.15)delta=delta.normalize().scale(1.15);
-            Vec3 allowed=net.minecraft.world.entity.Entity.collideBoundingBox(victim,delta,victim.getBoundingBox().deflate(.06),e.level(),List.of());
-            if(allowed.subtract(delta).lengthSqr()>.02){clear(e);return;}
-            victim.move(MoverType.SELF,delta);victim.setDeltaMovement(Vec3.ZERO);victim.resetFallDistance();
-            float yaw=Mth.approachDegrees(victim.yBodyRot,(float)Math.toDegrees(Math.atan2(f.x,-f.z)),6);victim.setYRot(yaw);victim.yBodyRot=victim.yHeadRot=yaw;victim.hurtMarked=true;
-            if(a==HOLD)
-            {
-                float stroke=strokeAge(e,0);
-                if(stroke>=POUND_HIT&&stroke<POUND_TICKS&&!s.pounded)
-                {
-                    s.pounded=true;
-                    Vec3 at=victim.position().add(0,victim.getBbHeight()*.6,0).subtract(f.scale(victim.getBbWidth()*.5-1.5));
-                    float damage=EvaMoveTableR64.get("jab").damage()*e.getMeleeMultiplier();
-                    if(EvaHitFeedback.hurt(victim,e.damageSources().mobAttack(e),damage,at,f))
-                        CombatFoleyR36.impact(e,victim,at,false,false);
-                }
-            }
-            if(a==HOLD&&age>90){clear(e);return;}
-        }
-        if(a==THROW&&age>=16&&!s.contact)
-        {
-            s.contact=true;var f=forward(e);EvaHitFeedback.hurt(victim,e.damageSources().mobAttack(e),35,victim.position().add(0,victim.getBbHeight()*.65,0),f);
-            if(victim instanceof FirstBattleSignals.Actor actor&&actor.firstBattleSignals().active(victim)){clear(e);return;}
-            CombatFeelR31.throwBody(victim,f.scale(3.6).add(0,2.6,0));e.playSound(ModSounds.EVA_SWING.get(),2.5F,.65F);
-        }
-        if(a==THROW&&age>26)clear(e);
     }
     /** How far from the kicking leg an air kick connects (blocks). */
     private static final double AIR_KICK_RADIUS=4;

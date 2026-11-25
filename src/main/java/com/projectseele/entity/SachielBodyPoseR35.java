@@ -21,13 +21,6 @@ public final class SachielBodyPoseR35
         }
         else pose=SachielGameplayMotionR32.released(actor,pose,partial);
         SachielArmorBeamR52.pose(actor,pose,partial);
-        if(EvaCombatR31.holds(actor))
-        {
-            float held=AngelGrappleSurfaceR31.heldWeight(actor,partial);
-            pose.rotations.get("torso_upper").rotateX(-.18F*held);pose.rotations.get("head").rotateX(-.12F*held);
-            for(String s:new String[]{"l","r"})
-            {pose.rotations.get("arm_"+s).rotateX(.65F*held).rotateZ((s.equals("l")?.35F:-.35F)*held);pose.rotations.get("forearm_"+s).rotateX(2.0F*held);}
-        }
         if(CombatReactionsR36.active(actor))
         {pose=CombatReactionsR36.apply(actor,pose,partial);CombatBodyDynamics.normalize(actor,pose);com.projectseele.physics.AuthoredTerrainContactR45.apply(actor,pose,partial);return pose;}
         var hit=EvaImpactResponse.sample(actor,partial);

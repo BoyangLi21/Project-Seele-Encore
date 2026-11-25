@@ -61,20 +61,7 @@ public final class AngelCombatPoseR31
             }));
             frame.last=capture(model);return;
         }
-        if(EvaCombatR31.holds(actor))
-        {
-            float held=AngelGrappleSurfaceR31.heldWeight(actor,partial);
-            rotate(model,"torso_upper",-.18F*held,0,0);rotate(model,"head",-.12F*held,0,0);
-            if(actor instanceof ShamshelEntity)
-            {
-                rotate(model,"body",-.18F*held,0,0);
-                for(String side:new String[]{"l","r"})for(int segment=0;segment<4;segment++)
-                    rotate(model,"whip_"+side+"_"+segment,(segment==0?.4F:.12F)*held,0,(side.equals("l")?.1F:-.1F)*held);
-            }
-            for(String side:new String[]{"l","r"})
-            {rotate(model,"arm_"+side,.65F*held,0,(side.equals("l")?.35F:-.35F)*held);rotate(model,"forearm_"+side,2.5F*held,0,0);rotate(model,"leg_"+side,-.18F*held,0,0);rotate(model,"shin_"+side,.33F*held,0,0);}
-        }
-        else if(beat!=null&&beat.kind()!=CombatFeelR31.CONTACT)
+        if(beat!=null&&beat.kind()!=CombatFeelR31.CONTACT)
         {
             float age=CombatFeelR31.age(actor,partial),end=beat.duration();
             Vector3f direction=beat.direction().toVector3f().rotateY((float)-Math.toRadians(180-actor.yBodyRot));

@@ -200,7 +200,7 @@ public final class SachielIntentR64 extends Goal
             wasStriking=false;
             if(plan==null||next>=plan.length)regard(0);
         }
-        if(CombatFeelR31.restrained(actor)||CombatFeelR31.hitPaused(actor)||EvaCombatR31.holds(actor))
+        if(CombatFeelR31.restrained(actor)||CombatFeelR31.hitPaused(actor))
         {
             var beat=CombatFeelR31.beat(actor);
             if(CombatBodyDynamics.active(actor)||beat!=null&&beat.kind()>=CombatFeelR31.STAGGER&&beat.kind()<=CombatFeelR31.THROWN)wasHurt=true;

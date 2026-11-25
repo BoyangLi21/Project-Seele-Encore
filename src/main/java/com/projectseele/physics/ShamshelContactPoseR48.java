@@ -1,6 +1,5 @@
 package com.projectseele.physics;
 
-import com.projectseele.entity.AngelGrappleSurfaceR31;
 import com.projectseele.entity.CombatFeelR31;
 import com.projectseele.entity.CombatMotionR29;
 import com.projectseele.entity.EvaImpactResponse;
@@ -53,19 +52,6 @@ public final class ShamshelContactPoseR48
     public static Vector3f reaction(ShamshelEntity actor, String name, Vector3f current, float partial)
     {
         Vector3f result = new Vector3f(current);
-        float held = AngelGrappleSurfaceR31.heldWeight(actor, partial);
-        if (held > 0)
-        {
-            if (name.equals("body")) result.x -= .18F * held;
-            if (name.equals("head")) result.x -= .12F * held;
-            if (whip(name))
-            {
-                int segment = Integer.parseInt(name.substring(name.lastIndexOf('_') + 1));
-                result.x += (segment == 0 ? .4F : .12F) * held;
-                result.z += (name.startsWith("whip_l_") ? .1F : -.1F) * held;
-            }
-            return result;
-        }
         var beat = CombatFeelR31.beat(actor);
         if (beat == null || beat.kind() == CombatFeelR31.CONTACT) return result;
         float age = CombatFeelR31.age(actor, partial);

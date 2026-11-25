@@ -18,7 +18,8 @@ public final class SeeleNetwork
     // data beyond it (planted model, gait keys), so it must not accept an R63r peer.
     // 81 adds the Yashima gunnery told to the shooter's sight (ClientboundCannonServiceR64).
     // 82 adds the street-pass list (ClientboundStreetPassR64): an older client would collide where the server does not.
-    private static final String PROTOCOL_VERSION = "83";
+    // 84 removes the grab's synchronized data from the Unit (its approach points and facing).
+    private static final String PROTOCOL_VERSION = "84";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),

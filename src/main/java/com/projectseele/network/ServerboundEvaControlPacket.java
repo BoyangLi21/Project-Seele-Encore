@@ -38,7 +38,6 @@ public class ServerboundEvaControlPacket
     public static final int ACTION_UN_EYE_LASER=19;
     public static final int ACTION_UN_FLIGHT=20;
     public static final int ACTION_UN_FLIGHT_INPUT=21;
-    public static final int ACTION_GRAPPLE=22;
     public static final int ACTION_RIFLE_SIGHT_START_R45=23;
     public static final int ACTION_RIFLE_SIGHT_STOP_R45=24;
     public static final int ACTION_DASH_START_R50=25;
@@ -91,7 +90,6 @@ public class ServerboundEvaControlPacket
                     case ACTION_CYCLE_WEAPON -> eva.cycleWeapon(sender);
                     case ACTION_TOGGLE_AT_FIELD -> eva.toggleAtField(sender);
                     case ACTION_MELEE -> eva.meleeAttack(sender);
-                    case ACTION_GRAPPLE -> com.projectseele.entity.EvaCombatR31.grapple(eva,sender);
                     case ACTION_SMASH -> eva.smashAttack(sender);
                     case ACTION_FIXED_CANNON_R52 ->
                     {var gun=eva.fixedCannonBodyR52();if(gun!=null&&gun.getId()==this.requestId)sender.sendSystemMessage(OperationText.read(com.projectseele.world.TvYashimaStationR52.interact(sender,gun)));}

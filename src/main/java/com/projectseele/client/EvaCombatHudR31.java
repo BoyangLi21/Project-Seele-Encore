@@ -104,23 +104,16 @@ public final class EvaCombatHudR31
 
     private static String actionHint(Minecraft mc,EvaUnit01Entity eva)
     {
-        String key=(Keybinds.EVA_GRAB.isUnbound()?Keybinds.EVA_GRAPPLE:Keybinds.EVA_GRAB).getTranslatedKeyMessage().getString();
         String radio=Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString();
         if(EvaAirTransportR31.active(eva))return I18n.get("hud.projectseele.combat.transport", radio);
         if(EvaShutdownR30.disabled(eva))return I18n.get("hud.projectseele.combat.recovery", radio);
         if(eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive())return I18n.get("hud.projectseele.combat.interlock", radio);
         return switch(EvaCombatR31.action(eva))
         {
-            case EvaCombatR31.REACH -> I18n.get("hud.projectseele.combat.reach");
-            case EvaCombatR31.HOLD -> com.projectseele.entity.EvaGameplayMotionR32.bodyReadyR64(eva)
-                    ? I18n.get("hud.projectseele.combat.pummel_throw_keys", mc.options.keyAttack.getTranslatedKeyMessage().getString(),
-                            key, mc.options.keyUse.getTranslatedKeyMessage().getString())
-                    : I18n.get("hud.projectseele.combat.throw_keys", key, mc.options.keyAttack.getTranslatedKeyMessage().getString());
-            case EvaCombatR31.THROW -> I18n.get("hud.projectseele.combat.throw");
             case EvaCombatR31.AIR_STRIKE -> I18n.get("hud.projectseele.combat.air_strike");
             case EvaCombatR31.AIR_SLAM -> com.projectseele.entity.EvaGameplayMotionR32.ready(eva)?I18n.get("hud.projectseele.combat.kick"):I18n.get("hud.projectseele.combat.slam");
             case EvaCombatR31.LAND -> I18n.get("hud.projectseele.combat.brake");
-            default -> eva.isPilotProne()||eva.isPilotCrouching()?I18n.get("hud.projectseele.combat.stand"):eva.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS?I18n.get("hud.projectseele.combat.empty_hands", key):I18n.get("hud.projectseele.combat.grapple", key);
+            default -> "";
         };
     }
 

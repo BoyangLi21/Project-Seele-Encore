@@ -26,7 +26,7 @@ import java.util.Map;
  * landed when the live ticks end is told once as a miss.
  * <p>
  * Server only. The old core keeps every case the table has no row for: crouched fists, the aerial
- * blows, the grapple, the sword, and every Unit but Unit-01.
+ * blows, the sword, and every Unit but Unit-01.
  */
 public final class EvaCombatMachineR64
 {
@@ -108,7 +108,7 @@ public final class EvaCombatMachineR64
             {
                 boolean run=e.isPilotSprinting()&&e.pilotLocomotionRequestedR45();
                 // The body's openers (the string after an evade, the charge out of a run) only when switched on;
-                // otherwise these presses are punches. Grab and pound do not open here and are unaffected.
+                // otherwise these presses are punches.
                 var config=com.projectseele.config.SeeleConfig.COMMON_SPEC.isLoaded();
                 boolean body=EvaGameplayMotionR32.bodyReadyR64(e)&&config&&(run?com.projectseele.config.SeeleConfig.EVA_COMBAT_RUN_CHARGE.get()
                         :com.projectseele.config.SeeleConfig.EVA_COMBAT_EVADE_STRING.get());

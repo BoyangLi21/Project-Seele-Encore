@@ -15,19 +15,17 @@ public final class EvaHandsR41
         float stance=eva.rifleStanceLevel(partial);
         boolean rifle=eva.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE;
         boolean weapon=eva.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS;
-        int action=EvaCombatR31.action(eva);
-        boolean grasp=action>=EvaCombatR31.REACH&&action<=EvaCombatR31.THROW;
         float low=Mth.clamp((stance-.5F)/1.5F,0,1);low=low*low*(3-2*low);
         float transitionSupport=stance>1&&stance<3?(float)Math.pow(Math.sin((stance-1)*Math.PI/2),2):0;
         for(String side:new String[]{"l","r"})
         {
-            boolean gripping=grasp||rifle||weapon&&side.equals("r");
+            boolean gripping=rifle||weapon&&side.equals("r");
             Vector3f along=longitudinal(body,side);
             Vector3f palmar=palmar(body,side,along);
             Quaternionf extended=new Quaternionf().setFromNormalized(new Matrix3f()
                     .setColumn(0,palmar).setColumn(1,new Vector3f(along).negate())
                     .setColumn(2,new Vector3f(palmar).cross(new Vector3f(along).negate())));
-            float support=rifle&&side.equals("l")?transitionSupport:!weapon&&!grasp?low:0;
+            float support=rifle&&side.equals("l")?transitionSupport:!weapon?low:0;
             for(String digit:new String[]{"index","middle","ring","little","thumb"})
             {
                 String stem="finger_"+digit;
@@ -50,7 +48,6 @@ public final class EvaHandsR41
                     }
                 }
                 float[] curl=digit.equals("thumb")?(gripping?new float[]{28,42,0}:new float[]{6,12,0})
-                        :grasp?new float[]{34,48,25}
                         :rifle&&side.equals("r")&&digit.equals("index")?new float[]{12,24,8}
                         :gripping?new float[]{57,84,54}:new float[]{10,14,7};
                 for(int joint=0;joint<3;joint++)

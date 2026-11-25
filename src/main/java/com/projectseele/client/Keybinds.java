@@ -23,8 +23,6 @@ public final class Keybinds
             "key.projectseele.toggle_prone", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Z, CATEGORY);
     public static final KeyMapping UN_EYE_LASER=new KeyMapping("key.projectseele.un_eye_laser",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_K,CATEGORY);
     public static final KeyMapping UN_FLIGHT=new KeyMapping("key.projectseele.un_flight",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_F,CATEGORY);
-    public static final KeyMapping EVA_GRAPPLE=new KeyMapping("key.projectseele.eva_grapple",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_COMMA,CATEGORY);
-    public static final KeyMapping EVA_GRAB=new KeyMapping("key.projectseele.eva_grab",InputConstants.Type.MOUSE,GLFW.GLFW_MOUSE_BUTTON_MIDDLE,CATEGORY);
     // Evade and roll in the field. Until R64 the same key also called a launch off from the cage and the
     // catapult; the key's id is the old one, so that a player's own binding of it is kept.
     public static final KeyMapping CANCEL_LAUNCH = new KeyMapping(

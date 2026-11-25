@@ -29,7 +29,7 @@ public final class CombatSpacingR32
             if(Math.abs(actor.getY()-other.getY())>12)continue;
             if(com.projectseele.physics.CombatBodyDynamics.active(other))
             {
-                if(CombatReactionsR36.enabled(actor)&&!EvaCombatR31.holds(other))
+                if(CombatReactionsR36.enabled(actor))
                 {
                     var core=com.projectseele.physics.CombatBodyContacts.coreBounds(other).inflate(Math.min(5,actor.getBbWidth()*.22));
                     var planar=new net.minecraft.world.phys.AABB(core.minX,actor.getY()-2,core.minZ,core.maxX,actor.getY()+2,core.maxZ);

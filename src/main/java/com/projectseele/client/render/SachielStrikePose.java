@@ -12,7 +12,7 @@ public final class SachielStrikePose
         if(actor.isFirstBattleActive())return;
         if(!actor.isStrikeActive())
         {
-            if(SachielGameplayMotionR32.directed()&&!EvaCombatR31.holds(actor))write(model,SachielGameplayMotionR32.locomotion(actor,partial));
+            if(SachielGameplayMotionR32.directed())write(model,SachielGameplayMotionR32.locomotion(actor,partial));
             return;
         }
         int mode=actor.strikeMode();float age=actor.strikeAge(partial),w=SachielStrike.weight(mode,age);

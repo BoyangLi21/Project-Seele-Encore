@@ -35,7 +35,7 @@ public final class FirstBattleDirector
     public static boolean tryStart(SachielEntity angel,EvaUnit01Entity eva,boolean review)
     {
         if(!review&&(EvaBerserkMotionR34.introduction(eva)||EvaBerserkMotionR34.striking(eva)&&EvaBerserkMotionR34.phase(eva,0)<.72F))return false;
-        if(!review&&(com.projectseele.entity.EvaCombatR31.active(eva)||com.projectseele.entity.EvaCombatR31.holds(angel)
+        if(!review&&(com.projectseele.entity.EvaCombatR31.active(eva)
                 ||com.projectseele.entity.CombatFeelR31.restrained(eva)||com.projectseele.entity.CombatFeelR31.restrained(angel)))return false;
         if(!(angel.level() instanceof ServerLevel level)||eva.level()!=level||!angel.isAlive()||!eva.isAlive()||!FirstBattleClip.ready())return false;
         if(level.getEntity(eva.getUUID())!=eva||level.getEntity(angel.getUUID())!=angel)return false;

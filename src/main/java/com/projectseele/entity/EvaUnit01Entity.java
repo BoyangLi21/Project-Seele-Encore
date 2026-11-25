@@ -4590,7 +4590,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         boolean retainedRoot=EvaMechanicalFrameR52.releasedHullRest(this);Vec3 actualRoot=retainedRoot?this.position():null;AABB before=retainedRoot?this.getBoundingBox():null;
         if(this.tickCount>0&&this.getPilotEntity()!=null&&!this.isNervLogisticsLocked()&&!this.isFirstBattleActive()
-                &&!EvaShutdownR30.disabled(this)&&!CombatFeelR31.restrained(this)&&!EvaCombatR31.locksFacing(this))motion=CombatSpacingR32.clip(this,motion);
+                &&!EvaShutdownR30.disabled(this)&&!CombatFeelR31.restrained(this))motion=CombatSpacingR32.clip(this,motion);
         // R64 (M2): the pilot's side moves the body and the server moves it again by what that side reports, to
         // see that it could. A step up a terrace comes to it as a move up and along, and a body is carried up a
         // step only from the ground: after one such move the server holds the body to be in the air (it went up
@@ -8188,7 +8188,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // values to the camera yaw made the sixty-block chassis teleport under
         // the pilot whenever the mouse moved.
         bodyYaw=this.combatR64().yaw(previousBodyYaw,bodyYaw,player.getYRot());
-        if(EvaCombatR31.locksFacing(this))bodyYaw=Mth.approachDegrees(previousBodyYaw,EvaCombatR31.facing(this),6);
         this.setRot(bodyYaw, 0.0F);
         if(longHull)this.setBoundingBox(stanceBounds(bodyYaw));
         this.yRotO = previousBodyYaw;
@@ -8338,7 +8337,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void travel(Vec3 input)
     {
         if(CombatFeelR31.travel(this))return;
-        if(EvaCombatR31.locksInput(this))input=Vec3.ZERO;
         if(!this.level().isClientSide&&this.getPilotEntity() instanceof TrainingPilotEntity
                 &&com.projectseele.world.NervPilotCombatR30.controls(this)&&this.autonomousInputAtR30!=Long.MIN_VALUE&&this.level().getGameTime()-this.autonomousInputAtR30<=2)
         {
@@ -8436,7 +8434,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             else if(this.leapStunR64>0)this.leapStunR64--;
             this.leapAirTicksR64=0;
         }
-        EvaCombatR31.approach(this);
         if (this.level().isClientSide)
         {
             if (this.isControlledByLocalInstance())
@@ -8510,7 +8507,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(this.fixedCannonOperatingR52()){this.pilotMovementRequested=false;return null;}
         if(this.isBerserk()){this.pilotMovementRequested=false;return null;}
         if(com.projectseele.physics.CombatBodyDynamics.active(this)){this.pilotMovementRequested=false;return null;}
-        if(CombatFeelR31.restrained(this)||EvaCombatR31.locksInput(this))return null;
+        if(CombatFeelR31.restrained(this))return null;
         if(EvaShutdownR30.disabled(this)){this.pilotMovementRequested=false;return null;}
         if (this.getActivationTicks() > 20 || this.isLaunchSequenceActive())
         {

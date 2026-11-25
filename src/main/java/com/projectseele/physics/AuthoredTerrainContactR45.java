@@ -42,7 +42,7 @@ public final class AuthoredTerrainContactR45
     }
     public static void apply(SachielEntity actor,EvaBodyPose.Sample pose,float partial)
     {
-        if(actor.isFirstBattleActive()||EvaCombatR31.holds(actor))return;
+        if(actor.isFirstBattleActive())return;
         if(!actor.onGround())
         {
             // The remote interpolation flag may lag the visible landing.

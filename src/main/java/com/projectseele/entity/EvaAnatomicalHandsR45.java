@@ -498,8 +498,6 @@ public final class EvaAnatomicalHandsR45
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_LANCE||e.getWeapon()==EvaUnit01Entity.WEAPON_N2)return "grab";
         // Aerial attacks strike with closed fists; the hammer clasps them.
         if(EvaCombatR31.action(e)==EvaCombatR31.AIR_STRIKE||EvaCombatR31.action(e)==EvaCombatR31.AIR_SLAM||EvaCombatR31.action(e)==EvaCombatR31.LAND)return "fist";
-        if(EvaCombatR31.action(e)==EvaCombatR31.REACH)return "spread";
-        if(EvaCombatR31.action(e)==EvaCombatR31.HOLD||EvaCombatR31.action(e)==EvaCombatR31.THROW)return "grab";
         // A released crouch/prone key does not mean the palms have left the
         // floor. Keep the support hand through the actual get-up capture.
         if(e.isPilotProne()||EvaCapturedLocomotionR44.ownsMultiContactPoseR45(e))

@@ -579,7 +579,7 @@ public final class EvaGameplayMotionR32
     }
     public static boolean owns(EvaUnit01Entity e,float partial)
     {
-        if(!ready(e)||legacyPoseVetoR51(e)||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)||EvaCombatR31.action(e)>=EvaCombatR31.REACH&&EvaCombatR31.action(e)<=EvaCombatR31.THROW)return false;
+        if(!ready(e)||legacyPoseVetoR51(e)||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e))return false;
         if(e instanceof EvaPrototypeEntity un&&un.isUNFlying())return false;
         if(EvaDorsalMechanism.bow(e)>.001F||EvaDorsalMechanism.open(e)>.001F)return false;
         if(EvaFieldActionsR45.active(e)||EvaSwordActionsR45.active(e))return true;

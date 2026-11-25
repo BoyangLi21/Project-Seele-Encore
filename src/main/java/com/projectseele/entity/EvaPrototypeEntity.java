@@ -40,7 +40,6 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     {
         if(!isUNFlying()){super.travel(input);return;}
         if(CombatFeelR31.travel(this))return;
-        if(EvaCombatR31.locksInput(this))input=Vec3.ZERO;
         if(isNervLogisticsLocked()){setDeltaMovement(Vec3.ZERO);return;}
         if(!isControlledByLocalInstance())return;
         double vertical=isUNLanding()?-.48:level().getGameTime()-flightInputAt>10?0:((flightInput&1)!=0?1:0)-((flightInput&2)!=0?1:0);

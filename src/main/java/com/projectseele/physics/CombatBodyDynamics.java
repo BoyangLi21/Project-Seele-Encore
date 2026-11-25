@@ -126,7 +126,6 @@ public final class CombatBodyDynamics
     {
         if(!(entity.level() instanceof ServerLevel level)||!available(entity)||scripted(entity))return false;
         if(entity instanceof EvaUnit01Entity eva&&(eva.isNervLogisticsLocked()||eva.hasActiveCarrierMotion()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)))return false;
-        if(EvaCombatR31.holds(entity))return false;
         var previous=SERVER.get(entity);
         // A recovery is already a supported movement. Ordinary follow-up hits
         // may recoil the trunk, but must not restart it forever from frame zero.
@@ -267,9 +266,6 @@ public final class CombatBodyDynamics
         for(var other:entity.level().getEntitiesOfClass(LivingEntity.class,s.bounds.inflate(45),e->e!=entity&&(e instanceof EvaUnit01Entity||e instanceof SachielEntity)&&e.isAlive()&&!active(e)))
         {
             if(other instanceof EvaUnit01Entity eva&&(eva.isNervLogisticsLocked()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)))continue;
-            // The throwing pair deliberately overlaps at the shoulder grip.
-            // Enable body contact after release, not inside the paired hold.
-            if(other instanceof EvaUnit01Entity eva&&EvaCombatR31.target(eva)==entity&&EvaCombatR31.action(eva)==EvaCombatR31.THROW)continue;
             var profile=CombatBodyProfiles.get(other);if(profile==null)continue;
             var pose=raw(other,0);AnatomicalLimbConstraints.apply(pose,profile);
             var frame=new Matrix4f().translation(local(s,other.position())).rotateY((s.yaw-other.getYRot())*Mth.DEG_TO_RAD);

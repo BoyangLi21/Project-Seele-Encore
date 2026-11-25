@@ -16,8 +16,7 @@ public final class EvaCombatPoseR31
     private record BonePose(Quaternionf rotation,Vector3f position) {}
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,Map<String,BonePose>> FROZEN=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,Long> STAMP=new com.projectseele.util.WeakIdentityMap<>();
-    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,Vec3[]> RELEASE=new com.projectseele.util.WeakIdentityMap<>();
-    public static void resetEntityR31(EvaUnit01Entity e){FROZEN.remove(e);STAMP.remove(e);RELEASE.remove(e);}
+    public static void resetEntityR31(EvaUnit01Entity e){FROZEN.remove(e);STAMP.remove(e);}
     private static void rotate(BakedGeoModel m,String name,float x,float y,float z,float w,Set<String> changed)
     {m.getBone(name).ifPresent(b->{b.setRotX(b.getRotX()+x*w);b.setRotY(b.getRotY()+y*w);b.setRotZ(b.getRotZ()+z*w);changed.add(name);});}
     public static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity e,BakedGeoModel m,float partial,Matrix4f root)
@@ -38,7 +37,7 @@ public final class EvaCombatPoseR31
             var optics=EvaUNLaserPose.apply(e,m,root);changed.addAll(optics.rotationBones());
             return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.copyOf(position),"MOTION_ENGINE_LIVE_ACTION");
         }
-        String capture=switch(action){case EvaCombatR31.REACH,EvaCombatR31.HOLD->"r31_grapple_start";case EvaCombatR31.THROW->"r31_shoulder_throw";case EvaCombatR31.AIR_STRIKE,EvaCombatR31.AIR_SLAM,EvaCombatR31.LAND->"r31_air_downstrike";default->"";};
+        String capture=switch(action){case EvaCombatR31.AIR_STRIKE,EvaCombatR31.AIR_SLAM,EvaCombatR31.LAND->"r31_air_downstrike";default->"";};
         boolean captured=!capture.isEmpty()&&EvaBodyPose.combatCaptureReadyR31(e,capture);
         if(captured)
         {
@@ -68,41 +67,6 @@ public final class EvaCombatPoseR31
             {
                 float weight=(float)Math.sin(Math.PI*Mth.clamp(age/12,0,1));rotate(m,"torso_upper",.22F,0,0,weight,changed);
                 for(String side:List.of("l","r")){rotate(m,"leg_"+side,.3F,0,0,weight,changed);rotate(m,"shin_"+side,-.55F,0,0,weight,changed);}
-            }
-            else
-            {
-                var victim=EvaCombatR31.target(e);
-                if(victim!=null)
-                {
-                    float reach=action==EvaCombatR31.REACH?(float)CombatMotionR29.ease(age/18):1;
-                    if(action==EvaCombatR31.THROW)reach*=1-(float)CombatMotionR29.ease((age-20)/6);
-                    float throwing=action==EvaCombatR31.THROW?(float)CombatMotionR29.ease(age/13):0;
-                    rotate(m,"torso_lower",-.08F,.12F*throwing,0,w,changed);rotate(m,"torso_upper",.08F-.32F*throwing,-.25F*throwing,0,w,changed);
-                    Vec3 f=e.getForward().multiply(1,0,1).normalize(),r=f.cross(new Vec3(0,1,0));
-                    if(action==EvaCombatR31.HOLD||action==EvaCombatR31.THROW&&age<=16)
-                        RELEASE.put(e,new Vec3[]{EvaCombatR31.grip(e,victim,true,partial),EvaCombatR31.grip(e,victim,false,partial)});
-                    for(String side:List.of("l","r"))
-                    {
-                        if(EvaCombatR31.pounding(e,partial)>=0)
-                        {
-                            // The rest of the pose graph can still freeze or blend these arms.
-                            // Claim the same bones now; solve once against the finished torso below.
-                            for(String prefix:List.of("arm_","forearm_","wrist_","hand_"))
-                            {changed.add(prefix+side);position.add(prefix+side);}
-                            continue;
-                        }
-                        boolean left=side.equals("l");Vec3 target=EvaCombatR31.hand(e,victim,left,partial);
-                        if(action==EvaCombatR31.THROW&&age>16)
-                        {
-                            var release=RELEASE.get(e);Vec3 from=release==null?target:release[left?0:1];
-                            var follow=e.getPosition(partial).add(0,48-9*throwing,0).add(f.scale(18+6*throwing)).add(r.scale(left?-5:5));
-                            target=from.lerp(follow,CombatMotionR29.ease((age-16)/8));
-                        }
-                        var surface=AngelGrappleSurfaceR31.contact(victim,left,partial);
-                        Vec3 normal=surface==null?r.scale(left?1:-1):surface.outwardNormal().multiply(-1,0,-1).normalize();
-                        hand(e,m,side,target,normal.toVector3f(),reach,root,changed,position);
-                    }
-                }
             }
         }
         var beat=CombatFeelR31.beat(e);
@@ -149,22 +113,6 @@ public final class EvaCombatPoseR31
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.copyOf(position),"MOTION_ENGINE_LIVE_ACTION");
     }
     private static void collect(GeoBone b,List<GeoBone> all){all.add(b);for(var child:b.getChildBones())collect(child,all);}
-    static void finishHeldStrike(EvaUnit01Entity e,BakedGeoModel model,float partial,Matrix4f root)
-    {
-        if(EvaCombatR31.pounding(e,partial)<0||e.isNervLogisticsLocked()||e.isFirstBattleActive()
-                ||EvaShutdownR30.disabled(e)||com.projectseele.physics.CombatBodyDynamics.active(e))return;
-        var victim=EvaCombatR31.target(e);
-        if(victim==null)return;
-        Vec3 right=e.getForward().multiply(1,0,1).normalize().cross(new Vec3(0,1,0));
-        for(String side:List.of("l","r"))
-        {
-            boolean left=side.equals("l");
-            var surface=AngelGrappleSurfaceR31.contact(victim,left,partial);
-            Vec3 normal=surface==null?right.scale(left?1:-1):surface.outwardNormal().multiply(-1,0,-1).normalize();
-            Vec3 target=left&&surface!=null?surface.position():EvaCombatR31.hand(e,victim,left,partial);
-            hand(e,model,side,target,normal.toVector3f(),1,root,null,null);
-        }
-    }
     private static Matrix3f frame(Vector3f y,Vector3f x)
     {y=new Vector3f(y).normalize();x=new Vector3f(x).sub(new Vector3f(y).mul(x.dot(y))).normalize();return new Matrix3f().setColumn(0,x).setColumn(1,y).setColumn(2,new Vector3f(x).cross(y));}
     private static void hand(EvaUnit01Entity e,BakedGeoModel m,String side,Vec3 contact,Vector3f palmNormal,float weight,Matrix4f root,Set<String> changed,Set<String> position)

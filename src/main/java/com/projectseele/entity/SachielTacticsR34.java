@@ -39,7 +39,7 @@ public final class SachielTacticsR34 extends Goal
     @Override public void tick()
     {
         actor.getNavigation().stop();
-        if(actor.isStrikeActive()||CombatFeelR31.restrained(actor)||CombatFeelR31.hitPaused(actor)||EvaCombatR31.holds(actor))
+        if(actor.isStrikeActive()||CombatFeelR31.restrained(actor)||CombatFeelR31.hitPaused(actor))
         {velocity=Vec3.ZERO;actor.getEntityData().set(MOTION,new Vector3f());return;}
         var target=actor.getTarget();if(target==null)return;
         Vec3 to=target.position().subtract(actor.position()).multiply(1,0,1);double range=to.length();

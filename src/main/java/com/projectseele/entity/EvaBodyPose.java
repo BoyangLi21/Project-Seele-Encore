@@ -757,12 +757,11 @@ public final class EvaBodyPose
             corrected.contactGoals.putAll(body.contactGoals);corrected.contactOffsets.putAll(body.contactOffsets);body=corrected;
         }
         int combat=EvaCombatR31.action(entity);float combatAge=EvaCombatR31.age(entity,partial);
-        String capture=switch(combat){case EvaCombatR31.REACH,EvaCombatR31.HOLD->"r31_grapple_start";case EvaCombatR31.THROW->"r31_shoulder_throw";case EvaCombatR31.AIR_STRIKE,EvaCombatR31.AIR_SLAM,EvaCombatR31.LAND->"r31_air_downstrike";default->"";};
+        String capture=switch(combat){case EvaCombatR31.AIR_STRIKE,EvaCombatR31.AIR_SLAM,EvaCombatR31.LAND->"r31_air_downstrike";default->"";};
         if(!capture.isEmpty()&&combatCaptureReadyR31(entity,capture)&&!(EvaGameplayMotionR32.ready(entity)&&(combat==EvaCombatR31.AIR_STRIKE||combat==EvaCombatR31.AIR_SLAM||combat==EvaCombatR31.LAND)))
         {
-            float capturePhase=switch(combat){case EvaCombatR31.HOLD->.47F;case EvaCombatR31.REACH->.47F*combatAge/18;case EvaCombatR31.THROW->combatAge/26;case EvaCombatR31.LAND->.7F+combatAge/40;default->combatAge/28;};
-            float w=(float)CombatMotionR29.ease(combatAge/5);if(combat==EvaCombatR31.HOLD)w=1;
-            if(combat==EvaCombatR31.THROW)w*=1-(float)CombatMotionR29.ease((combatAge-21)/5);
+            float capturePhase=switch(combat){case EvaCombatR31.LAND->.7F+combatAge/40;default->combatAge/28;};
+            float w=(float)CombatMotionR29.ease(combatAge/5);
             body=mix(body,clip(d,variant,capture,capturePhase),w);
             preserveJointCentres(body);
         }

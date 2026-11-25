@@ -28,7 +28,7 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     @Override public void registerControllers(software.bernie.geckolib.core.animation.AnimatableManager.ControllerRegistrar controllers)
     {
         controllers.add(new software.bernie.geckolib.core.animation.AnimationController<>(this,"base",6,state->state.setAndContinue(
-                software.bernie.geckolib.core.animation.RawAnimation.begin().thenLoop(state.isMoving()&&!CombatFeelR31.restrained(this)&&!EvaCombatR31.holds(this)?"animation.Shamshel.move":"animation.Shamshel.idle"))));
+                software.bernie.geckolib.core.animation.RawAnimation.begin().thenLoop(state.isMoving()&&!CombatFeelR31.restrained(this)?"animation.Shamshel.move":"animation.Shamshel.idle"))));
     }
     private static final EntityDataAccessor<Float> FIELD=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Integer> SWEEP=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.INT);
@@ -84,14 +84,14 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     /** Independent visible ground sweep keeps the original root, shoulder and segment lengths. */
     public boolean beginArmorSweepR52(Vec3 aim)
     {
-        if(level().isClientSide||aim==null||!Double.isFinite(aim.lengthSqr())||isSweeping()||sweepCooldown>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        if(level().isClientSide||aim==null||!Double.isFinite(aim.lengthSqr())||isSweeping()||sweepCooldown>0||CombatFeelR31.restrained(this))return false;
         entityData.set(ARMOR_AIM_R52,aim.toVector3f());entityData.set(SWEEP,0);entityData.set(SIDE,-sweepSide());entityData.set(SWEEP_MODE,ShamshelWhipMotion.GROUND);
         entityData.set(YAW,getYRot());hitVictims.clear();sweepChoice++;
         playSound(com.projectseele.registry.ModSounds.SHAMSHEL_WHIP_CHARGE.get(),1.3F,1);return true;
     }
     @Override public void aiStep()
     {
-        if(!level().isClientSide&&(EvaCombatR31.constrainVictim(this)||CombatFeelR31.travel(this)))return;
+        if(!level().isClientSide&&CombatFeelR31.travel(this))return;
         if(!level().isClientSide&&CombatFeelR31.hitPaused(this)){setDeltaMovement(Vec3.ZERO);return;}
         super.aiStep();
     }
@@ -108,8 +108,8 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
         var reaction=CombatFeelR31.beat(this);
         this.setNoGravity(reaction==null||reaction.kind()!=CombatFeelR31.THROWN&&reaction.kind()!=CombatFeelR31.DOWN);
         if(level().isClientSide)return;
-        if(CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))
-        {if(EvaCombatR31.holds(this)||reaction!=null&&reaction.kind()>=CombatFeelR31.STAGGER&&reaction.kind()<=CombatFeelR31.THROWN)cancelSweepR31();return;}
+        if(CombatFeelR31.restrained(this))
+        {if(reaction!=null&&reaction.kind()>=CombatFeelR31.STAGGER&&reaction.kind()<=CombatFeelR31.THROWN)cancelSweepR31();return;}
         if(isSweeping()){tickSweep();return;}
         if(sweepCooldown>0)sweepCooldown--;
         LivingEntity target = this.getTarget();

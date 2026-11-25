@@ -1420,7 +1420,8 @@ public final class EvaConnectedActionReview
      * -Dprojectseele.combatDiagR64=true. A still Sachiel with its field down each time. The pounce at a mark 30
      * ahead (40), at one 38 ahead (140: half a stride), at one 44 ahead (240: the whole stride); the string
      * pounce, knee, slam at one 36 ahead (340, 349, 359); the charge: a run from 480 at a mark 80 ahead, the light
-     * press when it is 32 off; a grab at one 24 ahead (640), three blows on it (670, 684, 698) and the throw (722).
+     * press when it is 32 off; at one 24 ahead (610), three light presses (670, 684, 698) and a heavy one (722),
+     * which were a grab, its blows and the throw until the grab was removed (R65).
      * Where the two bodies stand is logged as in the kick's tour.
      * Since R65 a light press from a stand is the old jab again, and the pounce is what a light press within twelve
      * ticks of an evade's end gives. With tourEnd=1000 the tour goes on: an evade back (760), a mark 36 ahead of
@@ -1447,7 +1448,6 @@ public final class EvaConnectedActionReview
         if(at(482)||at(927)||at(1042))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
         if(at(540)||at(990)||at(1105))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
         if(at(610))dummyR64(mc,eva,24,0);
-        if(at(640))send(ServerboundEvaControlPacket.ACTION_GRAPPLE);
         if(at(670)||at(684)||at(698))lightR64();
         if(at(722))heavyR64();
         if(at(750)||at(850)||at(902))removeTargetR63(mc,"sachiel");
@@ -1461,7 +1461,7 @@ public final class EvaConnectedActionReview
                 .min(java.util.Comparator.comparingDouble(eva::distanceToSqr)).orElse(null);
         if(run&&!bodyChargedR64&&near!=null&&Math.hypot(near.getX()-eva.getX(),near.getZ()-eva.getZ())<(tick<600?32:tick<1000?40:26)){bodyChargedR64=true;lightR64();}
         if(tick%2==0||eva.hasLiveActionForRender(0)||com.projectseele.entity.EvaCombatR31.active(eva))
-            ProjectSeele.LOGGER.info("R64DUMMY tick {} game {} target at {} {} unit at {} {} yaw {} feet {} grab {} {}",tick,mc.level.getGameTime(),
+            ProjectSeele.LOGGER.info("R64DUMMY tick {} game {} target at {} {} unit at {} {} yaw {} feet {} air {} {}",tick,mc.level.getGameTime(),
                     near==null?"-":String.format(java.util.Locale.ROOT,"%.2f",near.getX()),near==null?"-":String.format(java.util.Locale.ROOT,"%.2f",near.getZ()),
                     String.format(java.util.Locale.ROOT,"%.2f",eva.getX()),String.format(java.util.Locale.ROOT,"%.2f",eva.getZ()),
                     String.format(java.util.Locale.ROOT,"%.1f",eva.getYRot()),com.projectseele.entity.EvaCombatSupportR33.diagR64(eva),

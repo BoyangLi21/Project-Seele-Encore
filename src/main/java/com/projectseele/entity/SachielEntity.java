@@ -46,7 +46,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     public Vec3 armorBeamAimR52(){return new Vec3(entityData.get(ARMOR_BEAM_AIM_R52));}
     public boolean beginArmorBeamR52(Vec3 aim)
     {
-        if(level().isClientSide||aim==null||!Double.isFinite(aim.lengthSqr())||isArmorBeamR52()||isStrikeActive()||isFirstBattleActive()||isSelfDestructing()||meleeRecovery>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this)||!SachielGameplayMotionR32.ready())return false;
+        if(level().isClientSide||aim==null||!Double.isFinite(aim.lengthSqr())||isArmorBeamR52()||isStrikeActive()||isFirstBattleActive()||isSelfDestructing()||meleeRecovery>0||CombatFeelR31.restrained(this)||!SachielGameplayMotionR32.ready())return false;
         entityData.set(ARMOR_BEAM_AIM_R52,aim.toVector3f());entityData.set(ARMOR_BEAM_AGE_R52,0);getNavigation().stop();playSound(com.projectseele.registry.ModSounds.BEAM_CHARGE.get(),3F,1.62F);return true;
     }
     public void cancelArmorBeamR52(){if(isArmorBeamR52()){entityData.set(ARMOR_BEAM_AGE_R52,-1);meleeRecovery=Math.max(meleeRecovery,8);}}
@@ -104,7 +104,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     public boolean breakIntoR63(LivingEntity target,int mode)
     {
         // Everything beginStrike asks for but the free arm, before the strike in hand is given up for it.
-        if(level().isClientSide||!isStrikeActive()||isFirstBattleActive()||!target.isAlive()||meleeRecovery>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        if(level().isClientSide||!isStrikeActive()||isFirstBattleActive()||!target.isAlive()||meleeRecovery>0||CombatFeelR31.restrained(this))return false;
         // The new strike starts from where the old one has brought the body, read while the old one still holds
         // it: read after it was given up, that was the standing pose, and a raised arm dropped to it in a frame.
         var from=BREAK_SMOOTH_R63&&SachielGameplayMotionR32.phrases()?EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0)):null;
@@ -121,7 +121,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
      */
     public boolean jabOutOfRecoveryR64(LivingEntity target)
     {
-        if(level().isClientSide||isFirstBattleActive()||!target.isAlive()||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        if(level().isClientSide||isFirstBattleActive()||!target.isAlive()||CombatFeelR31.restrained(this))return false;
         if(isStrikeActive())
         {
             // Still to be thrown, or being thrown: that is no recovery.
@@ -141,7 +141,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
      */
     public boolean followStrikeR64(LivingEntity target,int mode)
     {
-        if(level().isClientSide||isFirstBattleActive()||!target.isAlive()||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        if(level().isClientSide||isFirstBattleActive()||!target.isAlive()||CombatFeelR31.restrained(this))return false;
         if(isStrikeActive())
         {
             if(entityData.get(STRIKE_AGE)<=SachielStrike.contactEnd(strikeMode()))return false;
@@ -155,7 +155,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     }
     public boolean beginStrike(LivingEntity target,int mode)
     {
-        if(level().isClientSide||isStrikeActive()||isFirstBattleActive()||!target.isAlive()||meleeRecovery>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        if(level().isClientSide||isStrikeActive()||isFirstBattleActive()||!target.isAlive()||meleeRecovery>0||CombatFeelR31.restrained(this))return false;
         if(SachielGameplayMotionR32.phrases())entityData.set(STRIKE_FROM,EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0)));
         mode=Math.max(1,Math.min(SachielGameplayMotionR32.ready()?6:5,mode));strikeTarget=target;strikeHit=false;committedStrikeYaw=yBodyRot;strikeChoice++;
         strikeAdvance=mode==SachielStrike.PILE?0:(float)Math.min(mode==SachielStrike.OVERHEAD?2:5,Math.max(0,distanceTo(target)-17));
@@ -165,7 +165,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     public boolean beginArmorStrikeR52(Vec3 aim)
     {
         if(level().isClientSide||aim==null||!Double.isFinite(aim.lengthSqr())||isStrikeActive()||isFirstBattleActive()
-                ||meleeRecovery>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this)||!SachielGameplayMotionR32.ready())return false;
+                ||meleeRecovery>0||CombatFeelR31.restrained(this)||!SachielGameplayMotionR32.ready())return false;
         if(SachielGameplayMotionR32.phrases())entityData.set(STRIKE_FROM,EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0)));
         strikeTarget=null;strikeHit=false;committedStrikeYaw=yBodyRot;strikeAdvance=0;strikeChoice++;
         entityData.set(STRIKE_MODE,SachielStrike.STOMP);entityData.set(STRIKE_AIM,aim.toVector3f());entityData.set(STRIKE_AGE,0);
@@ -269,7 +269,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     @Override public void aiStep()
     {
         FIRST_BATTLE.clientPhysics(this);if(isFirstBattleActive()){FirstBattleClip.applyKinematics(this);return;}
-        if(!level().isClientSide&&(EvaCombatR31.constrainVictim(this)||CombatFeelR31.travel(this)))return;
+        if(!level().isClientSide&&CombatFeelR31.travel(this))return;
         if(!level().isClientSide&&CombatFeelR31.hitPaused(this)){setDeltaMovement(0,getDeltaMovement().y,0);getNavigation().stop();return;}
         super.aiStep();
     }
@@ -299,7 +299,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
 
     @Override public void move(net.minecraft.world.entity.MoverType type,Vec3 motion)
     {
-        if(tickCount>0&&!isFirstBattleActive()&&!CombatFeelR31.restrained(this)&&!EvaCombatR31.holds(this))motion=CombatSpacingR32.clip(this,motion);
+        if(tickCount>0&&!isFirstBattleActive()&&!CombatFeelR31.restrained(this))motion=CombatSpacingR32.clip(this,motion);
         super.move(type,motion);
     }
 
@@ -345,8 +345,8 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         }
         this.entityData.set(FIELD,this.atField);
         if(isFirstBattleActive())return;
-        if(CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))
-        {var reaction=CombatFeelR31.beat(this);if(EvaCombatR31.holds(this)||reaction!=null&&reaction.kind()>=CombatFeelR31.STAGGER&&reaction.kind()<=CombatFeelR31.THROWN){cancelStrikeR31();cancelArmorBeamR52();}return;}
+        if(CombatFeelR31.restrained(this))
+        {var reaction=CombatFeelR31.beat(this);if(reaction!=null&&reaction.kind()>=CombatFeelR31.STAGGER&&reaction.kind()<=CombatFeelR31.THROWN){cancelStrikeR31();cancelArmorBeamR52();}return;}
         if(meleeRecovery>0)meleeRecovery--;
         if (this.selfDestructTicks >= 0)
         {
@@ -560,7 +560,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers)
     {
         controllers.add(new AnimationController<>(this, "base", 6, state ->
-                state.setAndContinue(state.isMoving()&&!CombatFeelR31.restrained(this)&&!EvaCombatR31.holds(this)&&!isStrikeActive() ? ANIM_WALK : ANIM_IDLE)));
+                state.setAndContinue(state.isMoving()&&!CombatFeelR31.restrained(this)&&!isStrikeActive() ? ANIM_WALK : ANIM_IDLE)));
     }
 
     @Override
