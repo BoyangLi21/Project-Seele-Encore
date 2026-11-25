@@ -108,6 +108,7 @@
     "client.MtrSpokenAnnouncementR25Mixin",
     "client.MtrSpokenPlatformR25Mixin",
     "client.MtrRideSyncR63Mixin",
+    "client.MtrEffectiveRenderDistanceR65Mixin",
     "client.MtrClampedTextLeakR65Mixin",
     "client.PianoInventoryOverlayR22Mixin",
     "client.AircraftCorrectionBudgetMixin",
