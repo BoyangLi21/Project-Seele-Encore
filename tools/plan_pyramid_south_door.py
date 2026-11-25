@@ -78,20 +78,38 @@ X0, X1 = AX - 4, AX + 4                     # stair and door opening width 9
 face_z = {y: [z for z in range(370, 395) if short(box[(AX, y, z)]) in ('nerv_pyramid_panel', 'nerv_pyramid_marking')]
           for y in range(-470, -455)}
 
-# ---- door house: walls x 36 / 46, front z 388, flat light grey roof at -462 running back to the face
-HX0, HX1, FRONT = X0 - 1, X1 + 1, 388
-for x in range(HX0, HX1 + 1):
-    for z in range(383, FRONT + 1):
-        put(x, -467, z, FLOOR)
-        for y in range(-466, -462):
-            put(x, y, z, PYR if x in (HX0, HX1) else AIR)
-    for z in range(376, FRONT + 1):
-        if z >= 383 or (face_z.get(-462) and z > max(face_z[-462])):
-            put(x, -462, z, ROOF)
-    put(x, -463, FRONT, PYR)                 # black fascia under the roof edge
-for z in (384, 387):
-    for x in (AX - 2, AX + 2):
-        put(x, -463, z, LIGHT)
+# ---- the entrance: a small triangular prism on the face's foot, as in the reference picture. Its two sloping sides
+# rise at the pyramid's own pitch (79 up over 55 across), it is clad in the pyramid's panels, and the door is cut into
+# its triangular front (z 389). The ridge runs back until it meets the face.
+HALF, PEAK, FRONT = 7, 10, 389
+
+
+def ridge(d):
+    """Height of the prism's sloping top above the floor (-467) at offset d from the axis."""
+    return round(PEAK * (1 - abs(d) / HALF)) if abs(d) <= HALF else -1
+
+
+for x in range(AX - HALF, AX + HALF + 1):
+    d = x - AX
+    top = -467 + ridge(d)
+    lo = min(top, -467 + ridge(abs(d) + 1) + 1)  # down to the outer neighbour's top: no gaps in the slope
+    for z in range(370, FRONT + 1):
+        for y in range(-467, top + 1):
+            f = face_cell(x, y)
+            if f is not None and z <= f:
+                continue                        # inside the pyramid already
+            passage = abs(d) <= 4 and -467 < y < -463
+            if y == -467:
+                s_ = FLOOR if abs(d) <= 4 else PYR
+            elif abs(d) <= 4 and y < lo:
+                s_ = AIR if (z < FRONT or passage) else PYR
+            else:
+                s_ = PYR
+            if z < 383 and y == -467:
+                continue                        # the gutter behind is left as it is
+            put(x, y, z, s_)
+for x, z in ((X0, 384), (X1, 384), (X0, 387), (X1, 387)):
+    put(x, -467, z, LIGHT)
 # the opening in the face, and the inner landing (floor -467, z 380..382)
 for x in range(X0, X1 + 1):
     for y in range(-466, -463):
@@ -116,8 +134,8 @@ for x in range(X0, X1 + 1):
             clear(x, h, z)
 for z in range(372, 380):
     top = steps.get(z, -472) + 1
-    for x in (X0 - 1, X1 + 1):
-        put(x, top, z, rail(n=True, s=True))
+    put(X0 - 1, top, z, rail(e=True))           # beams along the edge, on the side facing the steps
+    put(X1 + 1, top, z, rail(w=True))
 for x, z in ((X0, 373), (X1, 373), (X0, 381), (X1, 381)):
     put(x, -472 if z < 380 else -467, z, LIGHT)
 
@@ -144,13 +162,13 @@ for z in STAIR:                              # side walls from the hall floor to
         for h in range(-482, top + 1):
             put(x, h, z, WALL)
         if z in OPEN:
-            put(x, -471, z, rail(n=True, s=True))
+            put(x, -471, z, rail(e=True) if x < AX else rail(w=True))
             for h in range(-470, -463):
                 clear(x, h, z)
 # rest room level: rail along the north edge of the opening (z 354)
 for x in range(X0, X1 + 1):
     put(x, -472, 354, FLOOR) if short(get(x, -472, 354)) == 'air' else None
-    put(x, -471, 354, rail(e=True, w=True))
+    put(x, -471, 354, rail(s=True))
     for h in range(-470, -463):
         clear(x, h, 354)
 # lights in the office ceiling over the stair
@@ -215,15 +233,15 @@ for x in range(-30, 92):                    # every marking block on the south f
                 put(x, y, z, PYR)
 ox0, ox1 = min(x for x, _ in old), max(x for x, _ in old)
 oy0, oy1 = min(y for _, y in old), max(y for _, y in old)
-NW, NH = int(sys.argv[3]) if len(sys.argv) > 3 else 14, int(sys.argv[4]) if len(sys.argv) > 4 else 12
-nx0, ny0 = 30 - NW // 2, -403               # bottom row right above the light band
+NW, NH = int(sys.argv[3]) if len(sys.argv) > 3 else 14, int(sys.argv[4]) if len(sys.argv) > 4 else 13
+nx0, ny0 = 30 - NW // 2, -404               # bottom row right on the light band; 14 x 13 is the most the triangle holds
 sx, sy = (ox1 - ox0 + 1) / NW, (oy1 - oy0 + 1) / NH
 new = set()
 for i in range(NW):
     for j in range(NH):
         cells = [(x, y) for x in range(ox0 + round(i * sx), ox0 + round((i + 1) * sx))
                  for y in range(oy0 + round(j * sy), oy0 + round((j + 1) * sy))]
-        if cells and sum((c in old) for c in cells) / len(cells) >= 0.3:
+        if cells and sum((c in old) for c in cells) / len(cells) >= 0.35:
             new.add((nx0 + i, ny0 + j))
 placed = 0
 for x, y in new:
