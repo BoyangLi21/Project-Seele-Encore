@@ -80,10 +80,10 @@ face_z = {y: [z for z in range(370, 395) if short(box[(AX, y, z)]) in ('nerv_pyr
 
 # ---- the entrance: seen from above an isosceles triangle, its base on the face's foot (z 383, x 33..49) and its point
 # reaching south to z 393, as in the reference picture: a flat triangular slab of one height throughout (walls -466..
-# -464, top -463), sides upright in the pyramid's panels, the top one shade lighter. The point stays whole; the doors
+# -464, top -463), sides upright, all of it in the pyramid's own panels. The point stays whole; the doors
 # are in the two sloping sides (rows z 386..388), and inside both lead to the axis and the 9-wide opening in the face.
 BASE, TIP, HALF, TOPY = 383, 393, 8, -463
-SLAB_TOP = 'projectseele:nerv_shaft_panel'
+SLAB_TOP = PYR                               # owner: the whole entrance in the pyramid's own panel
 DOOR_ROWS = range(386, 389)
 
 
