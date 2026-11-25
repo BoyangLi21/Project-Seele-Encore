@@ -104,6 +104,19 @@ public record AreaMapLayer(String id, String label, Bounds bounds, int priority,
         return (int)Math.round(Math.max(min, Math.min(max - size, start + move)));
     }
 
+    /**
+     * Where Xaero's minimap should start its cave scan, which reads minimap_cave_mode_depth (30) blocks down: high enough
+     * over the floor to keep tree crowns (Xaero's own start, feet + 4, cuts them to trunks), never above the dome.
+     */
+    public int caveStartY(double x, double y, double z)
+    {
+        int start = (int)Math.floor(y) + 4;
+        int floor = ground != null ? ground.at(bounds, x, z) : Short.MIN_VALUE;
+        if (floor != Short.MIN_VALUE && floor != Short.MAX_VALUE) start = Math.max(start, floor + 24);
+        int roof = ceiling != null ? ceiling.at(bounds, x, z) : Short.MAX_VALUE;
+        return roof == Short.MIN_VALUE || roof == Short.MAX_VALUE ? start : Math.min(start, roof);
+    }
+
     /** Xaero uses Short.MAX_VALUE for an unknown cursor Y. Do not place underground waypoints on surface roofs. */
     public int cursorHeight(double x, double z)
     {
