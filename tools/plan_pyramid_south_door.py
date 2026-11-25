@@ -48,7 +48,7 @@ def short(s):
     return s.split('[')[0].split(':')[-1]
 
 
-box = read_box(W, D, (-32, -505, 288), (111, -385, 447))
+box = read_box(W, D, (-32, -505, 288), (111, -385, 447 + 16))
 want = {}
 
 
@@ -79,9 +79,12 @@ face_z = {y: [z for z in range(370, 395) if short(box[(AX, y, z)]) in ('nerv_pyr
           for y in range(-470, -455)}
 
 # ---- the entrance: seen from above an isosceles triangle, its base on the face's foot (z 383, x 33..49) and its point
-# reaching south to z 393, as in the reference picture. It is low, clad in the pyramid's panels, its top sloping down
-# from -461 at the base to -463 at the point; the door (3 wide, 3 high) is the point itself, on the main stair's axis.
-BASE, TIP, HALF = 383, 393, 8
+# reaching south to z 393, as in the reference picture: a flat triangular slab of one height throughout (walls -466..
+# -464, top -463), sides upright in the pyramid's panels, the top one shade lighter. The point stays whole; the doors
+# are in the two sloping sides (rows z 386..388), and inside both lead to the axis and the 9-wide opening in the face.
+BASE, TIP, HALF, TOPY = 383, 393, 8, -463
+SLAB_TOP = 'projectseele:nerv_shaft_panel'
+DOOR_ROWS = range(386, 389)
 
 
 def extent(z):
@@ -91,26 +94,22 @@ def extent(z):
     return HALF if z <= BASE else round(HALF * (TIP - z) / (TIP - BASE))
 
 
-def roof_at(z):
-    return -461 - round(2 * (min(max(z, BASE), TIP - 2) - BASE) / (TIP - 2 - BASE))
-
-
 for z in range(374, TIP + 1):
     e, ahead = extent(z), extent(z + 1)
     for d in range(-e, e + 1):
-        x, top = AX + d, roof_at(z)
-        for y in range(-467, top + 1):
+        x = AX + d
+        shell = abs(d) == e or abs(d) > ahead      # the sides, and the south-facing step of each row
+        door = z in DOOR_ROWS and shell and abs(d) == e
+        for y in range(-467, TOPY + 1):
             f = face_cell(x, y)
             if f is not None and z <= f:
                 continue                        # inside the pyramid already
             if y == -467 and z < BASE:
                 continue                        # the gutter behind the base is left as it is
-            door = abs(d) <= 1 and -467 < y < -463
-            shell = abs(d) == e or abs(d) > ahead   # the sides, and the south-facing step of each row
-            if y == top:
-                s_ = PYR
+            if y == TOPY:
+                s_ = SLAB_TOP
             elif y == -467:
-                s_ = FLOOR if abs(d) < e or door else PYR
+                s_ = FLOOR if not shell or door else PYR
             elif door or not shell:
                 s_ = AIR
             else:
@@ -212,18 +211,19 @@ for x in range(21, 89):
             if short(box[(x, -466, z)]) in PLANTS:
                 clear(x, -466, z)
 
-# ---- helipad east of the entrance, where the reference has its car park: a grey apron with two square pads, each
-# with a white edge, a white ring and a white H, lights flush at the corners and edge middles. map-buildings parks
-# the two helicopters on the pad centres (PADS), noses south.
-PADS = ((65, 402), (86, 402))
+# ---- helipad east of the entrance, where the reference has its car park: two separate square pads on the lawn,
+# well south of the face and apart, each with a white edge, a white ring and a white H, lights flush at the corners and
+# edge middles, and a paved walk from the band at the face's foot. map-buildings parks a helicopter on each pad centre
+# (PADS), nose south.
+PADS = ((62, 414), (94, 414))
 R = 9
-for x in range(PADS[0][0] - R - 2, PADS[1][0] + R + 3):
-    for z in range(391, 414):
-        if short(box[(x, -467, z)]) in ('grass_block', 'dirt') and short(box[(x, -466, z)]) in PLANTS:
-            put(x, -467, z, ASPH)
-            clear(x, -466, z)
 H = {(dx, dz) for dz in range(-3, 4) for dx in (-2, 2)} | {(dx, 0) for dx in (-1, 0, 1)}
 for cx, cz in PADS:
+    for x in range(cx - 1, cx + 2):             # walk from the band to the pad
+        for z in range(390, cz - R):
+            if short(box[(x, -467, z)]) in ('grass_block', 'dirt'):
+                put(x, -467, z, PAVE)
+                clear(x, -466, z)
     for dx in range(-R, R + 1):
         for dz in range(-R, R + 1):
             r = (dx * dx + dz * dz) ** .5
