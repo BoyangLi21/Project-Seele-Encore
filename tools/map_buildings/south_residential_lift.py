@@ -1,7 +1,10 @@
 """The south residential lift (R65 owner feedback round 2, items 22 and 25): the 80-block staircase by the South
 Residential station becomes a three-stop personnel lift, glass landing doors like the headquarters lifts.
 
-  python south_residential_lift.py <out dir>
+  python south_residential_lift.py <out dir> [--two-stop]
+
+--two-stop leaves out the y 63 stop (and its landing hall and the shaft below y 79), if the spiral-line platform
+under the lift is dropped.
 
 Reads BUILDINGS_WORLD. Writes rows.json (only cells that change; the controllers and the cabin panel carry their
 Moving Elevators block entities as a sixth item), public_lifts_r65.json (the world-root file the R65 public lift code
@@ -77,7 +80,9 @@ def call(stop):
     return (151, y + 1, 772), 'south'
 
 
-def plan():
+def plan(two_stop=False):
+    stops = [s for s in STOPS if not (two_stop and s['y'] == 63)]
+    pit = min(s['y'] for s in stops) - 2
     c, entities = {}, {}
     put = lambda p, s: c.__setitem__(p, s)
     # the staircase room outside the shaft
@@ -97,18 +102,18 @@ def plan():
     # the shaft: walls, pit floor, cap, clear travel space
     for x in range(ENCL[0], ENCL[1] + 1):
         for z in range(ENCL[2], ENCL[3] + 1):
-            put((x, PIT, z), SHAFT)
+            put((x, pit, z), SHAFT)
             put((x, CAP, z), SHAFT)
-            for y in range(PIT + 1, CAP):
+            for y in range(pit + 1, CAP):
                 put((x, y, z), AIR if inside(CAR, x, z) else SHAFT)
     # landing hall at the y 63 stop
-    for x in (157, 158):
+    for x in ((157, 158) if not two_stop else ()):
         for z in range(765, 772):
             put((x, 62, z), FLOORP)
             for y in range(63, 67):
                 put((x, y, z), AIR)
     floors = []
-    for i, s in enumerate(STOPS):
+    for i, s in enumerate(stops):
         y = s['y']
         ctrl = (CTRL_X, y, CZ)
         put(ctrl, CONTROLLER)
@@ -136,7 +141,7 @@ def plan():
             edge = x in (CAR[0], CAR[1]) or z in (CAR[2], CAR[3])
             for y in range(y0, y0 + 4):
                 put((x, y, z), CAR_WALL if edge else AIR)
-    for s in STOPS:                                   # both door sides travel with the car
+    for s in stops:                                   # both door sides travel with the car
         for (x, dy, z) in [(p[0], p[1] - s['y'], p[2]) for p in cabin_doors(s)]:
             put((x, y0 + dy, z), CABIN_DOOR)
     button, display = (CX - 2, y0 + 1, CZ), (CX - 2, y0 + 2, CZ)
@@ -153,9 +158,9 @@ def plan():
     return c, entities, manifest
 
 
-def main(out):
+def main(out, two_stop=False):
     out = Path(out); out.mkdir(parents=True, exist_ok=True)
-    c, entities, manifest = plan()
+    c, entities, manifest = plan(two_stop)
     w = World(REGION)
     gs = guards()
     rows, kinds, carried = [], Counter(), []
@@ -181,10 +186,10 @@ def main(out):
     (out / 'public_lifts_r65.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=1), 'utf8')
     xs, ys, zs = zip(*[r[:3] for r in rows])
     rep = dict(rows=len(rows), entities=len(entities), box=[min(xs), min(ys), min(zs), max(xs), max(ys), max(zs)],
-               kinds=[[a, b, n] for (a, b), n in kinds.most_common(25)], lift=LIFT_ID, stops=[s['y'] for s in STOPS])
+               kinds=[[a, b, n] for (a, b), n in kinds.most_common(25)], lift=LIFT_ID, stops=[f['approach_y'] for f in manifest['lifts'][0]['floors']])
     (out / 'report.json').write_text(json.dumps(rep, indent=1, ensure_ascii=False), 'utf8')
     print(json.dumps(rep, indent=1, ensure_ascii=False))
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main(sys.argv[1], '--two-stop' in sys.argv)

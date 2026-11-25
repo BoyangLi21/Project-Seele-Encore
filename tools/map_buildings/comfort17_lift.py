@@ -1,7 +1,9 @@
 """The Comfort 17 lift (R65 owner request after feedback round 2): Misato's building gets a personnel lift, glass
 landing doors like the South Residential one, stopping at the lobby and every residential floor (11F is 11-A-2).
 
-  python comfort17_lift.py <out dir>
+  python comfort17_lift.py <out dir> [--two-stop]
+
+--two-stop: the South Residential lift in the shared file without its y 63 stop.
 
 Reads BUILDINGS_WORLD. Writes rows.json (controllers and the cabin panel carry their Moving Elevators block entities),
 public_lifts_r65.json (BOTH public lifts: the South Residential one from south_residential_lift.py and this one; it
@@ -113,7 +115,7 @@ def plan(w):
     return c, entities, lift
 
 
-def main(out):
+def main(out, two_stop=False):
     out = Path(out); out.mkdir(parents=True, exist_ok=True)
     w = World(REGION)
     c, entities, lift = plan(w)
@@ -136,7 +138,7 @@ def main(out):
         g.assert_positions([tuple(r[:3]) for r in rows])
     if carried:
         raise SystemExit(f'{len(carried)} cells carry a block entity: {carried[:5]}')
-    _, _, south = SR.plan()
+    _, _, south = SR.plan(two_stop)
     manifest = dict(schema=south['schema'], lifts=south['lifts'] + [lift])
     (out / 'rows.json').write_text(json.dumps(rows, ensure_ascii=False), 'utf8')
     (out / 'public_lifts_r65.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=1), 'utf8')
@@ -149,4 +151,4 @@ def main(out):
 
 
 if __name__ == '__main__':
-    main(sys.argv[1])
+    main(sys.argv[1], '--two-stop' in sys.argv)
