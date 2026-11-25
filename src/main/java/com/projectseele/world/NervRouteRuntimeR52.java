@@ -458,6 +458,9 @@ public final class NervRouteRuntimeR52
             if(job!=null&&job.phase()==Phase.PARKED&&!job.waiting().isEmpty())return resumeParkedServiceR53(level,variant);
             if(job!=null&&job.phase()==Phase.CANCELLED)return recoverCancelledContinuousR52(job);if(job==null||job.phase()!=Phase.DEPLOYED)return new EvaLogisticsDirector.ActionResult(false,"没有这台机体的出动记录，无法安排接应。");
             var moving=level.getEntity(job.snapshot().original().eva());if(moving instanceof EvaUnit01Entity current&&NervAirTransportRuntimeR52.pending(level,current))return new EvaLogisticsDirector.ActionResult(false,"这台机体已有空运任务，不再另排地面路线。");
+            // R65: a Unit lying prone or crouching is stood up first; the recovery is asked for again once it stands.
+            String rising=moving instanceof EvaUnit01Entity standing?TransportStandUpR65.standFirst(level,standing,job.snapshot().original().owner(),()->recover(variant).message()):null;
+            if(rising!=null)return new EvaLogisticsDirector.ActionResult(true,rising);
             var old=job.snapshot().original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level,old.variant()),old.dimension());
             if(job.snapshot().stage()==Stage.COMPLETE)pool.releaseCompletion(job.snapshot().task(),old.owner());
             Entity actor=level.getEntity(original.eva());if(!(actor instanceof EvaUnit01Entity eva)||!((eva.getDeltaMovement().horizontalDistanceSqr()<.001)))return new EvaLogisticsDirector.ActionResult(false,"机体尚未停稳。");

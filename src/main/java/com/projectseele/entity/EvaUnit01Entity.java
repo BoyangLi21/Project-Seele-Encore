@@ -4983,6 +4983,36 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 this.isPilotProne());
     }
 
+    /**
+     * R65: a Unit is carried standing. The owner, of the second R65 playtest: "运输机回收时，任何时候都要先把eva体态摆正再
+     * 运输"; a Unit lying prone was taken as it lay and hung upside down under the aircraft. Before any aircraft takes a
+     * powered Unit, a pilot's prone or crouch is ended here (whoever has the Unit), and the pickup waits until the Unit
+     * is up: what it waits for is returned, or "" once the Unit stands. A Unit that has shut down is not asked: it is
+     * carried as a hull, righted by the aircraft.
+     */
+    /** standForTransportR65's note while the get-up plays out (the other notes need the pilot or time). */
+    public static final String STANDING_UP_R65="机体正在起身，站稳后再吊装。";
+    public String standForTransportR65()
+    {
+        if(this.level().isClientSide||!this.isPoweredOn()||EvaShutdownR30.displayed(this))return "";
+        if(com.projectseele.physics.CombatBodyDynamics.active(this)||CombatFeelR31.restrained(this))return "机体倒地，起身后再吊装。";
+        if(this.isPilotProne()||this.isPilotCrouching())
+        {
+            if(!this.hasStandingRoom())return "机体上方空间不足，无法起身。请移到开阔处等待吊装。";
+            if(this.getWeapon()==WEAPON_FISTS&&(this.getOrdinaryAttackStage()>=0||this.isHeavyMotionActive()))EvaGameplayMotionR32.releaseToMovement(this);
+            this.cancelLiveActionsForStanceChange();
+            this.entityData.set(DATA_PRONE,false);
+            this.entityData.set(DATA_CROUCHING,false);
+            this.entityData.set(DATA_SPRINTING,false);
+            this.updatePoseDimensions();
+            ProjectSeele.LOGGER.info("EVA stands up for air transport: eva={}",this.getStringUUID());
+            return STANDING_UP_R65;
+        }
+        // Up from prone or a crouch only when the get-up has played out.
+        if(this.rifleStanceLevel(0)>.05F||EvaCapturedLocomotionR44.ownsMultiContactPoseR45(this))return STANDING_UP_R65;
+        return "";
+    }
+
     public void toggleProne(ServerPlayer pilot)
     {
         if (this.getControllingPassenger() != pilot || this.isPilotControlLocked() || this.fixedCannonOperatingR52())

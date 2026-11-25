@@ -290,6 +290,10 @@ public final class NervAirTransportRuntimeR52
             var ground=ground();if(ground==null||!saved.fault().isEmpty())return status(level);var original=original(variant,commander);if(original==null)return "机体、插入栓、驾驶员或任务归属尚未就绪。";
             if(intent==Intent.RECOVER&&NervRouteRuntimeR52.originalForFlight(level,variant,commander)==null)return "机体的出击记录与回库接应尚未接通，机体保持原位。";
             if(saved.payload(original.eva())!=null)return "这台机体已有运输任务。";
+            // R65: a Unit lying prone or crouching is stood up first; the request is made again once it stands.
+            String rising=TransportStandUpR65.standFirst(level,level.getEntity(original.eva()) instanceof EvaUnit01Entity unit?unit:null,commander,
+                    ()->request(variant,commander,intent,x,z,receiverId,y));
+            if(rising!=null)return rising;
             if(intent==Intent.RECOVER&&receiverId==null&&NervRouteRuntimeR52.atRecoveryPortR54(level,variant))
                 return NervRouteRuntimeR52.recover(level,variant).message();
             var eva=(EvaUnit01Entity)level.getEntity(original.eva());Kind kind=EntryPlugEjectionR48.originalFieldEjection(level,variant,eva,original.pilot())?Kind.HULL_ONLY_RECOVERY:Kind.OCCUPIED;
@@ -593,6 +597,17 @@ public final class NervAirTransportRuntimeR52
             // requires evidence at the actual stopped destination.
             if(!job.payloadTransferred()&&(p==null||!p.current(level))&&Set.of("UNCLAMP","TRANSFER").contains(data.getString("FlightStage"))){var actual=ground().owner().previewFlight(level,job.original(),job.kind(),data);if(actual!=null){p=actual;previews.put(job.task(),p);}}
             var current=NervAircraftFrameR52.decode(data.getCompound("Frame"));if(!sameFlightFrameR53(current,actualFrame)){if(!resumeCommittedFlightStepR53(job,m,p,plane,current,actualFrame,data))hold(job,"原飞机保存 fraction 与实际同步帧不同");return;}
+            // R65: the Unit is taken standing (EvaUnit01Entity.standForTransportR65). Before the aircraft leaves its
+            // stand a pilot's prone or crouch is ended and the flight waits until the Unit is up; the pose the pickup
+            // captures is then an upright one, and nothing is left to right under the aircraft.
+            if(!job.carrying()&&!job.payloadTransferred()&&!data.getBoolean("FlightWaitingR52")
+                    &&data.getString("FlightStage").equals("PREFLIGHT")
+                    &&level.getEntity(job.original().eva()) instanceof EvaUnit01Entity rising
+                    &&!rising.isNervLogisticsLocked()&&!EvaMechanicalFrameR52.active(rising))
+            {
+                String up=rising.standForTransportR65();
+                if(!up.isEmpty()){hold(job,up);return;}
+            }
             // Before pickup custody exists, an occupied EVA still owns its
             // ordinary idle pose. Refresh that observation before testing the
             // captured source; otherwise the old pose blocks entry into the

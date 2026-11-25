@@ -19,6 +19,8 @@ public final class TransportClearanceR30
     {
         if(eva.hasLiveActionForRender(1)||com.projectseele.entity.EvaCombatR31.active(eva)||eva.isFirstBattleActive())
             return "等待当前攻击动作结束后接载";
+        String standing=eva.standForTransportR65();
+        if(!standing.isEmpty())return standing;
         var centre=new ChunkPos(eva.blockPosition());boolean loaded=true;
         level.getChunkSource().addRegionTicket(AIRSPACE,centre,8,centre);
         for(int x=centre.x-5;x<=centre.x+5;x++)for(int z=centre.z-4;z<=centre.z+4;z++)

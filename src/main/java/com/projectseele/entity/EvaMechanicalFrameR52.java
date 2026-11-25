@@ -296,6 +296,9 @@ public final class EvaMechanicalFrameR52
                 ||EvaAirTransportR31.active(e)||com.projectseele.physics.CombatBodyDynamics.active(e)||!com.projectseele.world.NervR50CarrierModeR53.enabled()&&!com.projectseele.world.EvaLogisticsDirector.recoveryMotionSettled(e)
                 ||!plug.isHatchFullySealed())return null;
         if(!com.projectseele.world.NervR50CarrierModeR53.enabled()&&(e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||EvaShieldRigR47.equipped(e)||EvaDorsalMechanism.open(e)>=.0001F||EvaDorsalMechanism.bow(e)>=.0001F||EvaBerserkMotionR34.mouth(e,1)!=0))return null;
+        // R65: every carry of a piloted Unit (an aircraft's, a launch exit's receiver) takes it from here, as it stands
+        // now. A Unit lying prone was taken as it lay. It is stood up first and taken once it is up.
+        if(!e.standForTransportR65().isEmpty())return null;
         var body=EvaBodyPose.sample(e,1);var hands=EvaFrozenHandsR52.capture(e,1);var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();var geometry=provider.evaluate(e.getUnitVariant(),body,EvaFrozenHandsR52.decode(e.getUnitVariant(),provider.handJoints(e.getUnitVariant()),hands));
         float yaw=EvaAirTransportR31.frameYaw(e,1);var socket=emptySocketReferenceR52(body,EvaRifleKinematics.frameWorldR52(e.position(),yaw),EvaDorsalProfile.of(e));if(!com.projectseele.world.NervR50CarrierModeR53.enabled()&&!same(socket,plug.getCanonicalTransform()))return null;
         return new OccupiedCapture(o,body,hands,e,yaw,plug.getCanonicalTransform(),geometry);

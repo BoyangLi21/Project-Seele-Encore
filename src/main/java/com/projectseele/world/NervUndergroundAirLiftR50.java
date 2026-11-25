@@ -264,6 +264,8 @@ public final class NervUndergroundAirLiftR50
         if(eva.hasLiveActionForRender(1)||EvaCombatR31.active(eva)||eva.isFirstBattleActive()
                 ||eva.isLaunchSequenceActive()||eva.hasActiveCarrierMotion())
         {PICKUP_OBSERVATIONS.remove(eva);return "机体仍在动作中，请结束动作后等待接载。";}
+        String standing=eva.standForTransportR65();
+        if(!standing.isEmpty()){PICKUP_OBSERVATIONS.remove(eva);return standing;}
         if(!actualPickupStillR50(eva))return "请保持机体停稳，运输机正在准备吊装。";
         var hover=eva.position().add(0,NervUndergroundTransportSiteR50.HOIST,0);
         if(!site.airContains(planeBox(hover,eva.getYRot())))return "机体上方没有足够的悬停空间，请移至开阔处。";
