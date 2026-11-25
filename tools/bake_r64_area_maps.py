@@ -247,7 +247,9 @@ def bake_cavern(world, out, workers):
     put_height(a/"geofront_ceiling.png",ceil)
     put_height(a/"geofront_ground.png",np.where(valid,land+1,NO_Y))
     record = layer("geofront","地下草原",CAVERN,int(bottom[valid].min()),int(ceil[valid].max())+1,10,
-                   ground="projectseele:area_maps/geofront_ground.png",bottom="projectseele:area_maps/geofront_bottom.png",ceiling="projectseele:area_maps/geofront_ceiling.png")
+                   ground="projectseele:area_maps/geofront_ground.png",bottom="projectseele:area_maps/geofront_bottom.png",ceiling="projectseele:area_maps/geofront_ceiling.png",
+                   # R65 owner: Xaero draws the cavern itself (its baked cave map); only here may it switch to cave mode.
+                   display="native",caves=True)
     z,x=np.where(valid)
     report = dict(complete_chunks=chunks,valid_texels=int(valid.sum()),resolution=2,
                   observedXZ=[int(x0+x.min()*2),int(z0+z.min()*2),int(x0+x.max()*2+2),int(z0+z.max()*2+2)],

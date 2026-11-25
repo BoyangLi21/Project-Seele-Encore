@@ -63,6 +63,7 @@
     "client.AreaMapWaypointAccess",
     "client.AreaMapWaypointMixin",
     "client.AreaMapWorldMixin",
+    "client.AreaMapCaveMixin",
     "client.AreaMapRegionAccess",
     "client.BufferBuilderDirectMixin",
     "client.LclBubbleR54Mixin",
