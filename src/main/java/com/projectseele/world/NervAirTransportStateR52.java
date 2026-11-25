@@ -89,6 +89,9 @@ public final class NervAirTransportStateR52 extends SavedData
         }
     }
     public void put(Job job){if(!fault.isEmpty())throw new IllegalStateException(fault);validate(job);jobs.put(job.task(),job);setDirty();}
+    /** R65: the shaft between the surface and the GeoFront is held open on an order (AirshaftHoldR65). Kept with the save's other fields. */
+    public boolean shaftHeldOpenR65(){return extra.getBoolean("ShaftHeldOpenR65");}
+    public void shaftHeldOpenR65(boolean held){if(held!=shaftHeldOpenR65()){extra.putBoolean("ShaftHeldOpenR65",held);setDirty();}}
     @Override public CompoundTag save(CompoundTag ignored)
     {
         var tag=extra.copy();if(!fault.isEmpty())return tag;

@@ -19,6 +19,14 @@ import net.minecraftforge.fml.common.Mod;
 public final class PilotMountView {
     private static EntryPlugCarrierEntity seat;
     private static float lastYaw, lastPitch, localYaw, localPitch, bank;
+    /** Where the pilot looked climbing in, against the seat's straight ahead; it settles away once the insertion begins. */
+    private static float boardYaw, boardPitch, boardRoll;
+    private static boolean boarding;
+    private static long frameNanos;
+    /** The mouse's movement since the last frame drawn in the plug (degrees), from Entity.turn (PlugLookMouseR65Mixin). */
+    private static float mouseYaw, mousePitch;
+    /** The settling's time constant: 95% of the way to the seat's straight ahead in about 1.4 seconds. */
+    static final float SETTLE_SECONDS = .45F;
 
     public record Angles(float yaw, float pitch, float roll) {}
 
@@ -36,21 +44,85 @@ public final class PilotMountView {
 
     public static void leave() { seat = null; bank = 0; }
 
+    /** The mouse turned the pilot by these degrees; the plug's look takes them on its next frame. */
+    public static void mouse(float yaw, float pitch) {
+        if (seat == null) return;
+        mouseYaw += yaw;
+        mousePitch += pitch;
+    }
+
+    /**
+     * R65 (owner's feedback 2, item 15): the first picture in the plug turned the view by itself. It jumped to the
+     * seat's straight ahead whatever way the pilot faced climbing in (from the east platform, the hatch is to the
+     * pilot's right: a turn of some 80 degrees to the left and 36 up, in one frame); and the pilot's own angles
+     * stayed as they were outside, so the glide into the Unit's optics swung the view again, back to them.
+     * Now the first pictures look where the pilot looked; once the hatch is shut and the insertion begins, that
+     * look settles to the seat's straight ahead (the cabin's own picture, and the Unit's front once synchronised)
+     * in about a second and a half, before the capsule itself moves; the mouse keeps the seat's range about it.
+     * The pilot's own angles follow what is shown, so nothing turns at the hand-over to the Unit's optics.
+     */
     public static Angles plug(EntryPlugCarrierEntity plug, Entity pilot, float partial, float opticalBlend, float bodyYaw) {
         float inputYaw = pilot.getViewYRot(partial), inputPitch = pilot.getViewXRot(partial);
+        RigidTransform frame = plug.getInterpolatedCanonicalTransform(partial);
+        long now = System.nanoTime();
         if (seat != plug) {
             seat = plug;
+            float[] look = local(frame, inputYaw, inputPitch);
+            boardYaw = look[0];
+            boardPitch = look[1];
             localYaw = localPitch = 0;
+            boarding = true;
+            mouseYaw = mousePitch = 0;
         } else {
-            localYaw = Mth.clamp(localYaw + Mth.wrapDegrees(inputYaw - lastYaw), -65F, 65F);
-            localPitch = pitch(localPitch + inputPitch - lastPitch);
+            localYaw = Mth.clamp(localYaw + mouseYaw, -65F, 65F);
+            localPitch = pitch(localPitch + mousePitch);
+            // Where the pilot's own angles would point now: what was shown, turned by the mouse.
+            inputYaw = lastYaw + mouseYaw;
+            inputPitch = Mth.clamp(lastPitch + mousePitch, -90F, 90F);
+            mouseYaw = mousePitch = 0;
+            if (plug.getInsertionStage() != EntryPlugCarrierEntity.STAGE_SUSPENDED && plug.getInsertionStage() != EntryPlugCarrierEntity.STAGE_OCCUPIED) {
+                float keep = settle((now - frameNanos) / 1e9F);
+                boardYaw *= keep;
+                boardPitch *= keep;
+                boardRoll *= keep;
+                if (Math.abs(boardYaw) < .01F && Math.abs(boardPitch) < .01F && Math.abs(boardRoll) < .01F) boardYaw = boardPitch = boardRoll = 0;
+            }
         }
-        lastYaw = inputYaw;
-        lastPitch = inputPitch;
-        Angles view = angles(plug.getInterpolatedCanonicalTransform(partial), localYaw, localPitch,
-                opticalBlend, inputYaw, inputPitch, bodyYaw);
-        bank = view.roll();
-        return view;
+        frameNanos = now;
+        Angles view = angles(frame, localYaw + boardYaw, Mth.clamp(localPitch + boardPitch, -89F, 89F), opticalBlend, inputYaw, inputPitch, bodyYaw);
+        if (pilot instanceof net.minecraft.client.player.LocalPlayer self) {
+            // The pilot's own angles follow what is shown: the hand-over to the Unit's optics and leaving the plug start from it.
+            self.setYRot(view.yaw());
+            self.setXRot(view.pitch());
+            self.yRotO = view.yaw();
+            self.xRotO = view.pitch();
+            self.setYHeadRot(view.yaw());
+            lastYaw = view.yaw();
+            lastPitch = view.pitch();
+        } else {
+            lastYaw = inputYaw;
+            lastPitch = inputPitch;
+        }
+        // The horizon of the first pictures is the pilot's own (level); the seat's tilt comes in with the settling.
+        if (boarding) { boardRoll = -view.roll(); boarding = false; }
+        bank = view.roll() + boardRoll;
+        return new Angles(view.yaw(), view.pitch(), bank);
+    }
+
+    /** The share of the boarding look kept over a frame of this many seconds (a long or a missing frame counts as a tenth of a second). */
+    static float settle(float seconds) {
+        return (float) Math.exp(-Mth.clamp(seconds, 0F, .1F) / SETTLE_SECONDS);
+    }
+
+    /** The seat's look (yaw from straight ahead, pitch) that points where the world angles point. */
+    static float[] local(RigidTransform frame, float yaw, float pitch) {
+        Vec3 forward = EntryPlugKinematics.PILOT_VIEW_FORWARD_P;
+        Vec3 side = forward.cross(new Vec3(0, 1, 0)).normalize();
+        Vec3 up = side.cross(forward);
+        Vec3 look = frame.inverse().transformVector(Vec3.directionFromRotation(pitch, yaw));
+        double el = -Math.asin(Mth.clamp(look.dot(up), -1, 1));
+        double az = Math.atan2(look.dot(side), look.dot(forward));
+        return new float[]{(float) Math.toDegrees(az), (float) Math.toDegrees(el)};
     }
 
     static Angles angles(RigidTransform frame, float localYaw, float localPitch, float opticalBlend,

@@ -233,7 +233,6 @@ public final class StaffConversationScreen extends Screen
             {
                 int selection=i;addButton((unit==i?"● ":"")+unitName(i),x+12+i*(column+4),controlsY,column,()->{unit=selection;rebuildWidgets();},"");
             }
-            int half=(panelWidth-28)/2;
             transportX=new PhoneUiR54.Field(font,x+12,controlsY+24,column,20,Component.translatable("screen.projectseele.phone.destination_x"),PhoneUiR54.NERV);transportY=new PhoneUiR54.Field(font,x+16+column,controlsY+24,column,20,Component.translatable("screen.projectseele.phone.destination_y"),PhoneUiR54.NERV);transportZ=new PhoneUiR54.Field(font,x+20+column*2,controlsY+24,column,20,Component.translatable("screen.projectseele.phone.destination_z"),PhoneUiR54.NERV);
             transportY.setMaxLength(10);transportY.setFilter(s->s.matches("-?\\d*"));transportY.setValue(enteredY==null?Integer.toString(feet.getY()):enteredY);addRenderableWidget(transportY);
             transportX.setHint(Component.literal("X"));transportY.setHint(Component.translatable("screen.projectseele.phone.y_ground_level"));transportZ.setHint(Component.literal("Z"));
@@ -244,8 +243,13 @@ public final class StaffConversationScreen extends Screen
             addButton(I18n.get("screen.projectseele.phone.airlift_to_hangar"),x+16+column,controlsY+48,column,()->send("TRANSPORT:recover:"+unit+(transportReturnExit==0?"":":unit"+unit+"/exit"+transportReturnExit+"/port")),"");
             addButton(I18n.get("screen.projectseele.phone.cancel_return_safely"),x+20+column*2,controlsY+48,column,()->send("TRANSPORT:cancel:"+unit),"");
             String returnPort=switch(transportReturnExit){case 1->"GeoFront";case 2->I18n.get("screen.projectseele.phone.tokyo_3");case 3->I18n.get("screen.projectseele.phone.hakone");default->I18n.get("screen.projectseele.phone.auto_route");};
-            addButton(I18n.get("screen.projectseele.phone.return_port")+returnPort,x+12,controlsY+72,half,()->{String tx=transportX.getValue(),ty=transportY.getValue(),tz=transportZ.getValue();transportReturnExit=(transportReturnExit+1)%4;rebuildWidgets();transportX.setValue(tx);transportY.setValue(ty);transportZ.setValue(tz);},"");
-            addButton(I18n.get("screen.projectseele.phone.transport_status"),x+16+half,controlsY+72,half,()->send("TRANSPORT:status"),"");
+            // R65: the shaft between the surface and the GeoFront, held open or let close on the caller's order. Its two
+            // buttons share the fourth row with the return port and the status: a fifth row is below the page's fold.
+            int quarter=(panelWidth-36)/4;
+            addButton(I18n.get("screen.projectseele.phone.return_port")+returnPort,x+12,controlsY+72,quarter,()->{String tx=transportX.getValue(),ty=transportY.getValue(),tz=transportZ.getValue();transportReturnExit=(transportReturnExit+1)%4;rebuildWidgets();transportX.setValue(tx);transportY.setValue(ty);transportZ.setValue(tz);},"");
+            addButton(I18n.get("screen.projectseele.phone.open_transport_shaft"),x+16+quarter,controlsY+72,quarter,()->send("TRANSPORT:shaft:open"),"");
+            addButton(I18n.get("screen.projectseele.phone.close_transport_shaft"),x+20+quarter*2,controlsY+72,quarter,()->send("TRANSPORT:shaft:close"),"");
+            addButton(I18n.get("screen.projectseele.phone.transport_status"),x+24+quarter*3,controlsY+72,quarter,()->send("TRANSPORT:status"),"");
         }
         else if (tab == 5)
         {

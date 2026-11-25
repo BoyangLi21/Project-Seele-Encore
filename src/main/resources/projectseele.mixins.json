@@ -92,6 +92,7 @@
     "client.CreateContraptionVisualLightMixin",
     "client.CatnipBlockQuadsMixin",
     "client.EntityShadowRangeMixin",
+    "client.PlugLookMouseR65Mixin",
     "client.HeavyTextureLoadMixin",
     "client.GeckoTextureLoadMixin",
     "client.MovingElevatorPanelMixin",

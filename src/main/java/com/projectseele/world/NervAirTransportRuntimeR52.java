@@ -135,6 +135,17 @@ public final class NervAirTransportRuntimeR52
         if(variant<0||variant>2||!NervStaffDialogue.authorized(caller)||!StaffConversationR24.radioAllowed(caller))return "需要 NERV 指挥通信权限。";
         return request(caller.serverLevel(),variant,caller.getUUID(),returning?Intent.RECOVER:Intent.DELIVER,x,z);
     }
+    /** R65: the phone's order to hold the shaft between the surface and the GeoFront open ("open"), to let it close ("close"), or to say how it stands. */
+    public static String shaft(ServerPlayer caller,String action)
+    {
+        if(!NervStaffDialogue.authorized(caller)||!StaffConversationR24.radioAllowed(caller))return "需要 NERV 指挥通信权限。";
+        var c=LIVE.get(caller.serverLevel());
+        if(c==null||!ready(caller.serverLevel()))return "运输机尚未完成航路准备，请稍后再试。";
+        return switch(action){case "open"->c.shaftOrderR65(true);case "close"->c.shaftOrderR65(false);case "status"->c.shaftStatusR65();default->throw new IllegalArgumentException("Unknown shaft order");};
+    }
+    /** R65: one line on the shaft for the transport status reply; empty where the map has no such shaft. */
+    public static String shaftStatus(ServerLevel l)
+    {var c=LIVE.get(l);return c==null||!ready(l)||!AirshaftHoldR65.GATES.stream().allMatch(id->c.manifest.directory().declaredResources().containsKey(id))?"":c.shaftStatusR65();}
     public static String requestXYZ(ServerPlayer caller,int variant,int x,int y,int z)
     {
         if(variant<0||variant>2||!NervStaffDialogue.authorized(caller)||!StaffConversationR24.radioAllowed(caller))return "需要 NERV 指挥通信权限。";
@@ -224,6 +235,29 @@ public final class NervAirTransportRuntimeR52
         final Set<UUID> flightProofAttemptsR53=new HashSet<>();
         final Map<UUID,Long> heldRetryAtR53=new HashMap<>();
         final AirshaftGateClosingR64 closingGatesR64=new AirshaftGateClosingR64();boolean closingGatesSeededR64;
+        final AirshaftHoldR65 shaftHoldR65=new AirshaftHoldR65();
+        /** R65: the order from the phone. The gates follow it in tick(); a passage in the shaft finishes first. */
+        String shaftOrderR65(boolean open)
+        {
+            boolean declared=AirshaftHoldR65.GATES.stream().allMatch(id->{var r=manifest.directory().declaredResources().get(id);return r!=null&&r.kind()==NervRouteDirectoryR52.ResourceKind.DOOR;});
+            if(!declared||ground()==null)return "ops.projectseele.airroutes.shaft_not_registered";
+            if(!saved.fault().isEmpty())return "ops.projectseele.airroutes.the_transport_aircraft_has_not_finished_route";
+            if(saved.shaftHeldOpenR65()==open)return open?"ops.projectseele.airroutes.shaft_already_held_open":"ops.projectseele.airroutes.shaft_already_closed";
+            saved.shaftHeldOpenR65(open);shaftHoldR65.ordered();
+            // The closing stroke needs its chunks for as long as the opening did.
+            if(!open)for(String id:AirshaftHoldR65.GATES)closingGatesR64.noted(id,level.getGameTime());
+            boolean passage=saved.jobs().stream().anyMatch(j->j.active()&&j.mechanisms().stream().anyMatch(AirshaftHoldR65::shaftGate));
+            com.projectseele.ProjectSeele.LOGGER.info("R65 transport shaft: ordered {}",open?"open":"closed");
+            return open?"ops.projectseele.airroutes.shaft_opening":passage?"ops.projectseele.airroutes.shaft_closing_after_passage":"ops.projectseele.airroutes.shaft_closing";
+        }
+        String shaftStatusR65()
+        {
+            if(ground()==null)return "";
+            boolean held=saved.shaftHeldOpenR65();float least=1,most=0;boolean seen=false;
+            for(String id:AirshaftHoldR65.GATES){float p=ground().owner().airshaftGateProgressR65(level,id);if(p<0)continue;seen=true;least=Math.min(least,p);most=Math.max(most,p);}
+            if(held)return !seen||least==1?"ops.projectseele.airroutes.shaft_status_held_open":"ops.projectseele.airroutes.shaft_status_opening";
+            return !seen||most==0?"ops.projectseele.airroutes.shaft_status_closed":"ops.projectseele.airroutes.shaft_status_closing";
+        }
         Controller(ServerLevel l,NervAirTransportManifestR52 m,NervAirframeGeometryR52 g,NervAirTransportStateR52 s){level=l;manifest=m;geometry=g;saved=s;}
         NervRouteRuntimeR52.FlightContext ground(){return NervRouteRuntimeR52.flightContext(level);}
         Original original(int variant,UUID commander)
@@ -487,7 +521,10 @@ public final class NervAirTransportRuntimeR52
                 // The remote shaft's two doors are also looked at once after loading, for a session
                 // that stopped mid-stroke and left them ajar.
                 if(used.contains(id)||!closingGatesSeededR64&&id.startsWith("remote_airshaft_"))closingGatesR64.noted(id,gateTime);
-                if(used.contains(id)||!ground().pool().resourcesAvailable(null,Set.of(id)))continue;
+                // R65: the shaft held open on an order from the phone is opened here and is not closed again.
+                var step=shaftHoldR65.step(id,saved.shaftHeldOpenR65(),used.contains(id),ground().pool().resourcesAvailable(null,Set.of(id)),gateTime);
+                if(step==AirshaftHoldR65.Step.OPEN){tickets(Set.of(id));if(ground().owner().openIdleAirshaftGateR65(level,id))shaftHoldR65.opened(id);}
+                if(step!=AirshaftHoldR65.Step.CLOSE)continue;
                 // The closing stroke outlasts the passage's own chunk tickets.
                 if(closingGatesR64.keepLoaded(id,gateTime))tickets(Set.of(id));
                 if(ground().owner().closeIdleAirshaftGateR53(level,id))closingGatesR64.closed(id);
