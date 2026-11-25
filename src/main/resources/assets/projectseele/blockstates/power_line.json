@@ -1,0 +1,11 @@
+{
+ "variants": {
+  "axis=z": {
+   "model": "projectseele:block/power_line"
+  },
+  "axis=x": {
+   "model": "projectseele:block/power_line",
+   "y": 90
+  }
+ }
+}

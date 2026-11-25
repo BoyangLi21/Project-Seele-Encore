@@ -1,0 +1,41 @@
+{
+ "parent": "minecraft:block/block",
+ "textures": {
+  "g": "projectseele:block/street_steel_galv",
+  "particle": "projectseele:block/street_steel_galv"
+ },
+ "elements": [
+  {
+   "from": [
+    6.5,
+    0,
+    6.5
+   ],
+   "to": [
+    9.5,
+    16,
+    9.5
+   ],
+   "faces": {
+    "north": {
+     "texture": "#g"
+    },
+    "south": {
+     "texture": "#g"
+    },
+    "east": {
+     "texture": "#g"
+    },
+    "west": {
+     "texture": "#g"
+    },
+    "up": {
+     "texture": "#g"
+    },
+    "down": {
+     "texture": "#g"
+    }
+   }
+  }
+ ]
+}

@@ -20,7 +20,10 @@ public final class EvaObstacleCollision
     {
         Block block=state.getBlock();
         return block instanceof WallBlock||block instanceof FenceBlock||state.is(Blocks.IRON_BARS)||block instanceof ChainBlock
-                ||block instanceof LanternBlock||block instanceof RodBlock;
+                ||block instanceof LanternBlock||block instanceof RodBlock
+                // R65 street furniture models replace the walls, chains and rods above, so they stay soft to giants
+                ||block instanceof com.projectseele.world.StreetFurnitureR65.UtilityPole||block instanceof com.projectseele.world.StreetFurnitureR65.PowerLine
+                ||block instanceof com.projectseele.world.StreetFurnitureR65.Signal||block instanceof com.projectseele.world.StreetFurnitureR65.SignalPole;
     }
 
     public static boolean ignores(EvaUnit01Entity eva,BlockState state,BlockPos pos,VoxelShape shape)

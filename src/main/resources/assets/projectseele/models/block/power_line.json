@@ -1,0 +1,78 @@
+{
+ "parent": "minecraft:block/block",
+ "textures": {
+  "w": "projectseele:block/street_wire",
+  "particle": "projectseele:block/street_wire"
+ },
+ "elements": [
+  {
+   "from": [
+    -3.9,
+    15.2,
+    0
+   ],
+   "to": [
+    -3.1,
+    15.8,
+    16
+   ],
+   "faces": {
+    "down": {
+     "texture": "#w"
+    },
+    "east": {
+     "texture": "#w"
+    },
+    "west": {
+     "texture": "#w"
+    }
+   }
+  },
+  {
+   "from": [
+    19.1,
+    15.2,
+    0
+   ],
+   "to": [
+    19.9,
+    15.8,
+    16
+   ],
+   "faces": {
+    "down": {
+     "texture": "#w"
+    },
+    "east": {
+     "texture": "#w"
+    },
+    "west": {
+     "texture": "#w"
+    }
+   }
+  },
+  {
+   "from": [
+    11.4,
+    5.6,
+    0
+   ],
+   "to": [
+    12.6,
+    6.8,
+    16
+   ],
+   "faces": {
+    "down": {
+     "texture": "#w"
+    },
+    "east": {
+     "texture": "#w"
+    },
+    "west": {
+     "texture": "#w"
+    }
+   }
+  }
+ ]
+}

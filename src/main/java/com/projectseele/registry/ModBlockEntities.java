@@ -17,6 +17,8 @@ public final class ModBlockEntities
             BLOCK_ENTITY_TYPES.register("dead_sea_archive",()->BlockEntityType.Builder.of(com.projectseele.world.DeadSeaArchiveEntityR45::new,ModBlocks.DEAD_SEA_ARCHIVE.get()).build(null));
     public static final RegistryObject<BlockEntityType<com.projectseele.world.NervAccessReaderEntityR44>> NERV_ACCESS_READER=
             BLOCK_ENTITY_TYPES.register("nerv_access_reader",()->BlockEntityType.Builder.of(com.projectseele.world.NervAccessReaderEntityR44::new,ModBlocks.NERV_ACCESS_READER.get()).build(null));
+    public static final RegistryObject<BlockEntityType<com.projectseele.world.NervStaffGateEntityR65>> NERV_STAFF_GATE=
+            BLOCK_ENTITY_TYPES.register("nerv_staff_gate",()->BlockEntityType.Builder.of(com.projectseele.world.NervStaffGateEntityR65::new,ModBlocks.NERV_STAFF_GATE.get()).build(null));
 
     public static final RegistryObject<BlockEntityType<UmbilicalPylonBlockEntity>>
             UMBILICAL_PYLON = BLOCK_ENTITY_TYPES.register("umbilical_pylon",

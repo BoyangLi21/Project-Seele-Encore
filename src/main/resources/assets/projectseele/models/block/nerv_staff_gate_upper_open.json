@@ -1,0 +1,80 @@
+{
+ "parent": "minecraft:block/block",
+ "textures": {
+  "s": "projectseele:block/nerv_gate_steel",
+  "d": "projectseele:block/nerv_gate_dark",
+  "r": "projectseele:block/nerv_gate_red",
+  "g": "projectseele:block/nerv_gate_glass",
+  "lg": "projectseele:block/nerv_gate_lamp_green",
+  "lr": "projectseele:block/nerv_gate_lamp_red",
+  "p": "projectseele:block/nerv_gate_plate",
+  "particle": "projectseele:block/nerv_gate_steel"
+ },
+ "elements": [
+  {
+   "from": [
+    2.5,
+    0,
+    2
+   ],
+   "to": [
+    3.1,
+    12,
+    8
+   ],
+   "faces": {
+    "north": {
+     "texture": "#g"
+    },
+    "south": {
+     "texture": "#g"
+    },
+    "east": {
+     "texture": "#g"
+    },
+    "west": {
+     "texture": "#g"
+    },
+    "up": {
+     "texture": "#g"
+    },
+    "down": {
+     "texture": "#g"
+    }
+   }
+  },
+  {
+   "from": [
+    12.9,
+    0,
+    2
+   ],
+   "to": [
+    13.5,
+    12,
+    8
+   ],
+   "faces": {
+    "north": {
+     "texture": "#g"
+    },
+    "south": {
+     "texture": "#g"
+    },
+    "east": {
+     "texture": "#g"
+    },
+    "west": {
+     "texture": "#g"
+    },
+    "up": {
+     "texture": "#g"
+    },
+    "down": {
+     "texture": "#g"
+    }
+   }
+  }
+ ],
+ "render_type": "minecraft:translucent"
+}

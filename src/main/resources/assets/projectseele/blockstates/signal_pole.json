@@ -1,0 +1,10 @@
+{
+ "variants": {
+  "top=false": {
+   "model": "projectseele:block/signal_pole"
+  },
+  "top=true": {
+   "model": "projectseele:block/signal_pole_top"
+  }
+ }
+}
