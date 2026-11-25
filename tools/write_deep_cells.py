@@ -6,7 +6,8 @@ checked, and the rewritten chunks are compared with those copies: every planned 
 hold its new state and no other block may differ.
 Rows: [x, y, z, before, after] with block states written as name[prop=value,...], optionally a sixth item
 giving the new block its block entity: {"id": "trafficcraft:colored_block_entity", "color": n} for road paint, or
-{"id": "mtr:<block>", "snbt": "{...}"} for an MTR station fitting (PIDS boards, station name signs) with its data.
+{"id": "mtr:<block>", "snbt": "{...}"} for an MTR station fitting (PIDS boards, station name signs) with its data, or
+{"id": "projectseele:nerv_staff_gate", "snbt": "{}"} for the lower half of a NERV staff gate lane.
 """
 import argparse
 from collections import Counter, defaultdict
@@ -191,6 +192,11 @@ def preflight(folder, grouped, allow_block_entities):
         raise SystemExit(f'Preflight refused {len(problems)} rows, nothing written:\n' + '\n'.join(problems[:20]))
 
 
+# Project block entities a row may give (the block's own state machine, no data needed): the NERV staff gate's lower
+# half ticks its lane from its block entity, so a gate written without one would never open.
+PROJECT_ENTITIES = {'projectseele:nerv_staff_gate'}
+
+
 def apply(a):
     rows = json.loads(a.rows.read_text('utf8'))
     # A row may carry a sixth item, the block entity to give the new block: TrafficCraft paint or an MTR fitting.
@@ -198,8 +204,8 @@ def apply(a):
     for pos, e in given.items():
         if e.get('id') == 'trafficcraft:colored_block_entity':
             continue
-        if not (str(e.get('id', '')).startswith('mtr:') and isinstance(e.get('snbt'), str)):
-            raise SystemExit(f'{pos}: only trafficcraft:colored_block_entity or an mtr: entity with snbt can be given, not {e.get("id")}')
+        if not ((str(e.get('id', '')).startswith('mtr:') or e.get('id') in PROJECT_ENTITIES) and isinstance(e.get('snbt'), str)):
+            raise SystemExit(f'{pos}: only trafficcraft:colored_block_entity, an mtr: entity or {sorted(PROJECT_ENTITIES)} with snbt can be given, not {e.get("id")}')
         row = next(r for r in rows if (r[0], r[1], r[2]) == pos)
         if row[4].split('[')[0] != e['id']:
             raise SystemExit(f'{pos}: entity {e["id"]} given for block {row[4]}')

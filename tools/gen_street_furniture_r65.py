@@ -77,9 +77,14 @@ def model(name, elements, textures, parent='minecraft:block/block'):
 
 
 def shaft(y0, y1, tex='c'):
-    # an octagon-ish round pole about half a block across
-    return [box((5.5, y0, 5.5), (10.5, y1, 10.5), tex), box((4.5, y0, 6.25), (11.5, y1, 9.75), tex, ('east', 'west', 'up', 'down')),
-            box((6.25, y0, 4.5), (9.75, y1, 11.5), tex, ('north', 'south', 'up', 'down'))]
+    # one box per segment, about a third of a block across; stacked segments cull their touching faces, so a pole
+    # costs four quads per block like the wall post it replaces (a rounder cross-section tripled the city's quads)
+    e = box((5.5, y0, 5.5), (10.5, y1, 10.5), tex)
+    if y0 == 0:
+        e['faces']['down']['cullface'] = 'down'
+    if y1 == 16:
+        e['faces']['up']['cullface'] = 'up'
+    return [e]
 
 
 T = {'c': 'projectseele:block/street_pole_concrete', 's': 'projectseele:block/street_crossarm', 'i': 'projectseele:block/street_insulator',
@@ -103,11 +108,10 @@ model('utility_pole_street', shaft(0, 16) + [box((5, 15.5, 5), (11, 16.5, 11), '
 can = [box((11, 1, 4.5), (17, 11, 11.5), 't'), box((10.5, 11, 5), (17.5, 12, 11), 't'), box((10.5, 2, 7.5), (11.5, 3, 8.5), 's'),
        box((10.5, 9, 7.5), (11.5, 10, 8.5), 's'), box((13.5, 12, 7.5), (14.5, 14, 8.5), 'i')]
 model('utility_pole_transformer', shaft(0, 16) + [box((7.5, 1, 11), (8.5, 2, 12), 's')] + [dict(e) for e in can], {k: T[k] for k in 'csti'})
-# Overhead line along z: three conductors in line with the crossarm insulators, a telecom cable lower down.
-wires = [box((-3.9, 15.2, 0), (-3.1, 15.8, 16), 'w'), box((7.6, 18.2, 0), (8.4, 18.8, 16), 'w'), box((19.1, 15.2, 0), (19.9, 15.8, 16), 'w'),
-         box((11.4, 5.6, 0), (12.6, 6.8, 16), 'w')]
-for e in wires:
-    e['faces'] = {k: v for k, v in e['faces'].items() if k not in ('north', 'south')}
+# Overhead line along z: the two outer conductors in line with the crossarm insulators and the telecom cable lower
+# down; no top faces (nobody looks down on them), three quads a strand, which keeps 15,000 cells of line cheap.
+wires = [box((-3.9, 15.2, 0), (-3.1, 15.8, 16), 'w', ('down', 'east', 'west')), box((19.1, 15.2, 0), (19.9, 15.8, 16), 'w', ('down', 'east', 'west')),
+         box((11.4, 5.6, 0), (12.6, 6.8, 16), 'w', ('down', 'east', 'west'))]
 model('power_line', wires, {'w': T['w']})
 # Signal pole and the horizontal three-lamp head (modelled facing north, the bracket reaching back to the pole one block south).
 model('signal_pole', [box((6.5, 0, 6.5), (9.5, 16, 9.5), 'g')], {'g': T['g']})

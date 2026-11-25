@@ -5,7 +5,12 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -20,9 +25,10 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * NERV staff gate (R65 owner feedback 2, item 3): one lane of a staff gate line, with a steel cabinet on each side and
  * two full-height glass leaves across the lane. Facing is the direction of travel through it; card marks a lane that
  * opens only for a NERV card (the reader on the cabinet shows the lamp), the others are free exits. Lanes stand side by
- * side, so neighbouring cabinets form one continuous row. The upper half carries the top of the leaves.
+ * side, so neighbouring cabinets form one continuous row. The upper half carries the top of the leaves; the lower
+ * half's block entity (NervStaffGateEntityR65) opens and closes both.
  */
-public final class NervStaffGateR65 extends HorizontalDirectionalBlock
+public final class NervStaffGateR65 extends HorizontalDirectionalBlock implements EntityBlock
 {
     public static final EnumProperty<DoubleBlockHalf> HALF = BlockStateProperties.DOUBLE_BLOCK_HALF;
     public static final BooleanProperty OPEN = BlockStateProperties.OPEN;
@@ -61,6 +67,24 @@ public final class NervStaffGateR65 extends HorizontalDirectionalBlock
         double top = lower ? 16 : 12;
         VoxelShape leaves = alongZ ? Block.box(2.5, 0, 7.5, 13.5, top, 8.5) : Block.box(7.5, 0, 2.5, 8.5, top, 13.5);
         return Shapes.or(cabinets, leaves);
+    }
+
+    @Override
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state)
+    {
+        return state.getValue(HALF) == DoubleBlockHalf.LOWER ? new NervStaffGateEntityR65(pos, state) : null;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type)
+    {
+        if (level.isClientSide || state.getValue(HALF) != DoubleBlockHalf.LOWER
+                || type != com.projectseele.registry.ModBlockEntities.NERV_STAFF_GATE.get())
+        {
+            return null;
+        }
+        return (BlockEntityTicker<T>) (BlockEntityTicker<NervStaffGateEntityR65>) NervStaffGateEntityR65::tick;
     }
 
     @Override
