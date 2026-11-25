@@ -84,6 +84,7 @@
     "client.TimerPrecisionMixin",
     "client.GameRendererFeedProjectionMixin",
     "client.GameRendererGeoFrontFarViewR65Mixin",
+    "client.LevelRendererGeoFrontCloudsR65Mixin",
     "client.LargeStructureRenderMixin",
     "client.PlayerModelGendoPoseMixin",
     "client.PlugPilotHeldItemR64Mixin",
