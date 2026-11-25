@@ -133,7 +133,7 @@ def main(out, two_stop=False):
             continue
         if want == AIR and cur.split('[')[0].endswith('air'):
             continue
-        if w.block_entity(x, y, z):
+        if w.block_entity(x, y, z) and e is None:    # an existing lift block is only rewritten with its new entity
             carried.append([x, y, z, cur])
         rows.append([x, y, z, cur, want] + ([e] if e else []))
         kinds[(cur.split('[')[0].split(':')[-1], want.split('[')[0].split(':')[-1])] += 1

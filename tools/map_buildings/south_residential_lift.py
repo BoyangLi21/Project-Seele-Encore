@@ -1,20 +1,21 @@
-"""The south residential lift (R65 owner feedback round 2, items 22 and 25): the 80-block staircase by the South
-Residential station becomes a three-stop personnel lift, glass landing doors like the headquarters lifts.
+"""The south residential lift (R65 owner feedback round 2, items 22, 25 and 31): the 80-block staircase by the South
+Residential station becomes a four-stop personnel lift, glass landing doors like the headquarters lifts.
 
-  python south_residential_lift.py <out dir> [--two-stop]
-
---two-stop leaves out the y 63 stop (and its landing hall and the shaft below y 79), if the spiral-line platform
-under the lift is dropped.
+  python south_residential_lift.py <out dir>
 
 Reads BUILDINGS_WORLD. Writes rows.json (only cells that change; the controllers and the cabin panel carry their
 Moving Elevators block entities as a sixth item), public_lifts_r65.json (the world-root file the R65 public lift code
 reads) and report.json.
 
 The staircase room is x 150-158, z 760-776 (walls x 149/159, z 759/777), floor y 80, top floor y 160.
-- Shaft x 150-156, z 765-771 from the pit floor y 61 to a cap at y 166 (one above the pavilion roof, so the car's roof
+- Shaft x 150-156, z 765-771 from the pit floor y 79 to a cap at y 166 (one above the pavilion roof, so the car's roof
   has room at the top stop); car 5 x 6 x 5 at x 151-155, z 766-770; controllers in x 150, z 768, facing east.
-- Stops: y 63 (the new spiral-line platform, map-roads; landing hall x 157-158 here, their passage joins at x 159),
-  y 81 (the old bottom, out through the east tunnel), y 161 (the hilltop pavilion, out south to its door).
+- Stops: y 81 (the old bottom, out through the east tunnel), y 95 (the old station's west platform, floor y 94),
+  y 106 (the old station's roof, y 105, where the through line's eastbound platform joins it), y 161 (the hilltop
+  pavilion, out south to its door).
+- 95 and 106: a hall x 157-158 cut out of the fill, an opening in the room wall x 159 and a covered walkway over the
+  open trench x 160-162 (ground y 90). At 95 the walkway runs north along the trench to z 759-761, where the station's
+  west glass has no waiting room behind it, and opens into the platform; at 106 it steps straight onto the roof.
 - The rest of the room: the bottom hall y 81-84 stays open with a ceiling at y 85, y 86-159 filled solid, the top hall
   floor closed over the old stair opening and its railing removed.
 The car is written at the y 81 stop.
@@ -49,10 +50,14 @@ PIT, CAP = 61, 166
 START = 81
 LIFT_ID = 'r65-public-south-residential'
 STOPS = [
-    dict(y=63, label='螺旋線ホーム / 螺旋线站台', exit='east', color=1),
-    dict(y=81, label='南部住宅区站', exit='east', color=3),
+    dict(y=81, label='南部住宅区 东口通道', exit='east', color=3),
+    dict(y=95, label='南部住宅区站 ホーム', exit='east', color=1),
+    dict(y=106, label='直通線ホーム (屋上)', exit='east', color=1),
     dict(y=161, label='南部住宅区 山顶', exit='south', color=3),
 ]
+GLASS = 'projectseele:clear_glass'
+ROOF = 'minecraft:light_gray_concrete'
+LAMP = 'minecraft:sea_lantern'
 
 
 def inside(box, x, z):
@@ -106,8 +111,31 @@ def plan(two_stop=False):
             put((x, CAP, z), SHAFT)
             for y in range(pit + 1, CAP):
                 put((x, y, z), AIR if inside(CAR, x, z) else SHAFT)
+    # the platform stop (95) and the roof stop (106): a hall east of the shaft cut out of the fill, an opening in the room
+    # wall x 159, and a covered walkway over the open trench x 160-162 (ground y 90) to the station
+    for y0 in [s['y'] for s in stops if s['y'] in (95, 106)]:
+        fl, top = y0 - 1, y0 + 3
+        for x in (157, 158):
+            for z in range(766, 771):
+                put((x, fl, z), FLOORP)
+                for y in range(y0, top):
+                    put((x, y, z), AIR)
+        for z in (767, 768, 769):
+            for y in range(y0, top):
+                put((159, y, z), AIR)
+        zs = range(758, 771) if y0 == 95 else range(766, 771)   # 95 turns north to the open platform at z 759-761
+        for x in (160, 161, 162):
+            for z in zs:
+                put((x, fl, z), STATION_FLOOR)
+                for y in range(y0, top):
+                    put((x, y, z), GLASS if z in (zs[0], zs[-1]) else AIR)
+                put((x, top, z), LAMP if (x, z) in ((161, 768), (161, 762)) else ROOF)
+        if y0 == 95:
+            for z in (759, 760, 761):                     # into the station through its west glass, door height
+                for y in (95, 96):
+                    put((163, y, z), AIR)
     # landing hall at the y 63 stop
-    for x in ((157, 158) if not two_stop else ()):
+    for x in ((157, 158) if any(s['y'] == 63 for s in stops) else ()):
         for z in range(765, 772):
             put((x, 62, z), FLOORP)
             for y in range(63, 67):
@@ -173,7 +201,7 @@ def main(out, two_stop=False):
             continue
         if want == AIR and cur.split('[')[0].endswith('air'):
             continue
-        if w.block_entity(x, y, z):
+        if w.block_entity(x, y, z) and e is None:    # an existing lift block is only rewritten with its new entity
             carried.append([x, y, z, cur])
         row = [x, y, z, cur, want] + ([e] if e else [])
         rows.append(row)
