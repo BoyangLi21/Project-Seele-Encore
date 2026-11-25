@@ -213,17 +213,11 @@ for x in range(21, 89):
 
 # ---- helipad east of the entrance, where the reference has its car park: two separate square pads on the lawn,
 # well south of the face and apart, each with a white edge, a white ring and a white H, lights flush at the corners and
-# edge middles, and a paved walk from the band at the face's foot. map-buildings parks a helicopter on each pad centre
-# (PADS), nose south.
+# edge middles, standing on their own on the grass. map-buildings parks a Mi-28 on each pad centre (PADS), nose south.
 PADS = ((62, 414), (94, 414))
 R = 9
 H = {(dx, dz) for dz in range(-3, 4) for dx in (-2, 2)} | {(dx, 0) for dx in (-1, 0, 1)}
 for cx, cz in PADS:
-    for x in range(cx - 1, cx + 2):             # walk from the band to the pad
-        for z in range(390, cz - R):
-            if short(box[(x, -467, z)]) in ('grass_block', 'dirt'):
-                put(x, -467, z, PAVE)
-                clear(x, -466, z)
     for dx in range(-R, R + 1):
         for dz in range(-R, R + 1):
             r = (dx * dx + dz * dz) ** .5
