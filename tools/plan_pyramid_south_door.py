@@ -247,8 +247,8 @@ for x in range(-30, 92):                    # every marking block on the south f
                 put(x, y, z, PYR)
 ox0, ox1 = min(x for x, _ in old), max(x for x, _ in old)
 oy0, oy1 = min(y for _, y in old), max(y for _, y in old)
-NW, NH = int(sys.argv[3]) if len(sys.argv) > 3 else 8, int(sys.argv[4]) if len(sys.argv) > 4 else 7
-nx0, ny0 = 30 - NW // 2, -403               # far-view base for the high-resolution plate laid over it
+NW, NH = int(sys.argv[3]) if len(sys.argv) > 3 else 11, int(sys.argv[4]) if len(sys.argv) > 4 else 11
+nx0, ny0 = 30 - NW // 2, -404               # far-view base under the high-resolution plate (agreed frame x 25..35, y -404..-394)
 sx, sy = (ox1 - ox0 + 1) / NW, (oy1 - oy0 + 1) / NH
 new = set()
 for i in range(NW):
