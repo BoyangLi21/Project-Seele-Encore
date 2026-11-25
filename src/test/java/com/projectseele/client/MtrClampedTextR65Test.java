@@ -32,6 +32,19 @@ public final class MtrClampedTextR65Test
         public void close() { closed = true; }
     }
 
+    private static boolean mtrOnClasspath()
+    {
+        try
+        {
+            Class.forName("org.mtr.mod.config.Config", false, MtrClampedTextR65Test.class.getClassLoader());
+            return true;
+        }
+        catch (ClassNotFoundException | LinkageError absent)
+        {
+            return false;
+        }
+    }
+
     public static void main(String[] args)
     {
         that(MtrClampedTextR65.limit(0) == 2048, "resolution 0 keeps 2048");
@@ -52,13 +65,17 @@ public final class MtrClampedTextR65Test
         that(MtrClampedTextR65.closedCount() == 2, "two originals closed");
         MtrClampedTextR65.closeIfClamped(null, 2);
         that(MtrClampedTextR65.closedCount() == 2, "nothing to close is nothing closed");
-        // Without MTR (as in this check) the config cannot be read: the fix stands down instead of failing.
-        var noMtr = new FakeImage(9600, 96);
-        MtrClampedTextR65.closeIfClamped(noMtr);
-        that(!noMtr.closed, "without MTR's config nothing is closed");
-        var after = new FakeImage(9600, 96);
-        MtrClampedTextR65.closeIfClamped(after, 2);
-        that(!after.closed, "and after standing down it stays down");
+        // Without MTR the config cannot be read: the fix stands down instead of failing. A checkout with the local MTR
+        // jar (.Codex/local-mods) has it on the check's classpath, and there the config is read for real.
+        if (!mtrOnClasspath())
+        {
+            var noMtr = new FakeImage(9600, 96);
+            MtrClampedTextR65.closeIfClamped(noMtr);
+            that(!noMtr.closed, "without MTR's config nothing is closed");
+            var after = new FakeImage(9600, 96);
+            MtrClampedTextR65.closeIfClamped(after, 2);
+            that(!after.closed, "and after standing down it stays down");
+        }
         System.out.println("MtrClampedTextR65Test: " + checked + " checks passed");
     }
 }
