@@ -127,7 +127,8 @@ public final class AtFieldEffects
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event)
     {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES || FIELDS.isEmpty())
+        // after clouds and weather, so the clouds behind a field show through it instead of over it
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER || FIELDS.isEmpty())
         {
             return;
         }
@@ -158,6 +159,17 @@ public final class AtFieldEffects
             }
             buffers.endBatch(type);
         }
+        // Last, the fill's depth alone. A shader pack draws its clouds and sky fog afterwards on every pixel whose
+        // depth is still the sky's, which a field drawn without depth was: the clouds came out in front of it.
+        VertexConsumer depth = buffers.getBuffer(Types.DEPTH);
+        for (Field field : FIELDS)
+        {
+            stack.pushPose();
+            stack.translate(field.center.x - cam.x, field.center.y - cam.y, field.center.z - cam.z);
+            field.renderFill(stack.last().pose(), depth, now);
+            stack.popPose();
+        }
+        buffers.endBatch(Types.DEPTH);
     }
 
     private static void ensureLevel()
@@ -487,6 +499,11 @@ public final class AtFieldEffects
                         .setShaderState(RENDERTYPE_BEACON_BEAM_SHADER).setTextureState(new TextureStateShard(PROFILE, true, false))
                         .setTransparencyState(TRANSLUCENT_TRANSPARENCY).setCullState(NO_CULL)
                         .setDepthTestState(LEQUAL_DEPTH_TEST).setWriteMaskState(COLOR_WRITE)
+                        .createCompositeState(false));
+        static final RenderType DEPTH = create("seele_at_field_depth", DefaultVertexFormat.BLOCK,
+                VertexFormat.Mode.QUADS, 16384, false, false, CompositeState.builder()
+                        .setShaderState(RENDERTYPE_BEACON_BEAM_SHADER).setTextureState(new TextureStateShard(PROFILE, false, false))
+                        .setCullState(NO_CULL).setDepthTestState(LEQUAL_DEPTH_TEST).setWriteMaskState(DEPTH_WRITE)
                         .createCompositeState(false));
         static final RenderType GLOW = create("seele_at_field_glow", DefaultVertexFormat.BLOCK,
                 VertexFormat.Mode.QUADS, 131072, false, true, CompositeState.builder()
