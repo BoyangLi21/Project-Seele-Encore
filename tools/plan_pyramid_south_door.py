@@ -78,37 +78,45 @@ X0, X1 = AX - 4, AX + 4                     # stair and door opening width 9
 face_z = {y: [z for z in range(370, 395) if short(box[(AX, y, z)]) in ('nerv_pyramid_panel', 'nerv_pyramid_marking')]
           for y in range(-470, -455)}
 
-# ---- the entrance: a small triangular prism on the face's foot, as in the reference picture. Its two sloping sides
-# rise at the pyramid's own pitch (79 up over 55 across), it is clad in the pyramid's panels, and the door is cut into
-# its triangular front (z 389). The ridge runs back until it meets the face.
-HALF, PEAK, FRONT = 7, 10, 389
+# ---- the entrance: seen from above an isosceles triangle, its base on the face's foot (z 383, x 33..49) and its point
+# reaching south to z 393, as in the reference picture. It is low, clad in the pyramid's panels, its top sloping down
+# from -461 at the base to -463 at the point; the door (3 wide, 3 high) is the point itself, on the main stair's axis.
+BASE, TIP, HALF = 383, 393, 8
 
 
-def ridge(d):
-    """Height of the prism's sloping top above the floor (-467) at offset d from the axis."""
-    return round(PEAK * (1 - abs(d) / HALF)) if abs(d) <= HALF else -1
+def extent(z):
+    """Half-width of the triangle in row z (the base width behind it, nothing beyond the point)."""
+    if z > TIP:
+        return -1
+    return HALF if z <= BASE else round(HALF * (TIP - z) / (TIP - BASE))
 
 
-for x in range(AX - HALF, AX + HALF + 1):
-    d = x - AX
-    top = -467 + ridge(d)
-    lo = min(top, -467 + ridge(abs(d) + 1) + 1)  # down to the outer neighbour's top: no gaps in the slope
-    for z in range(370, FRONT + 1):
+def roof_at(z):
+    return -461 - round(2 * (min(max(z, BASE), TIP - 2) - BASE) / (TIP - 2 - BASE))
+
+
+for z in range(374, TIP + 1):
+    e, ahead = extent(z), extent(z + 1)
+    for d in range(-e, e + 1):
+        x, top = AX + d, roof_at(z)
         for y in range(-467, top + 1):
             f = face_cell(x, y)
             if f is not None and z <= f:
                 continue                        # inside the pyramid already
-            passage = abs(d) <= 4 and -467 < y < -463
-            if y == -467:
-                s_ = FLOOR if abs(d) <= 4 else PYR
-            elif abs(d) <= 4 and y < lo:
-                s_ = AIR if (z < FRONT or passage) else PYR
+            if y == -467 and z < BASE:
+                continue                        # the gutter behind the base is left as it is
+            door = abs(d) <= 1 and -467 < y < -463
+            shell = abs(d) == e or abs(d) > ahead   # the sides, and the south-facing step of each row
+            if y == top:
+                s_ = PYR
+            elif y == -467:
+                s_ = FLOOR if abs(d) < e or door else PYR
+            elif door or not shell:
+                s_ = AIR
             else:
                 s_ = PYR
-            if z < 383 and y == -467:
-                continue                        # the gutter behind is left as it is
             put(x, y, z, s_)
-for x, z in ((X0, 384), (X1, 384), (X0, 387), (X1, 387)):
+for x, z in ((AX - 2, 385), (AX + 2, 385), (AX, 389)):
     put(x, -467, z, LIGHT)
 # the opening in the face, and the inner landing (floor -467, z 380..382)
 for x in range(X0, X1 + 1):
@@ -204,20 +212,26 @@ for x in range(21, 89):
             if short(box[(x, -466, z)]) in PLANTS:
                 clear(x, -466, z)
 
-# ---- car park east of the door house, off the band: x 55..90, z 390..411
-CP0, CP1, CZ0, CZ1 = 55, 90, 390, 411
-for x in range(CP0, CP1 + 1):
-    for z in range(CZ0, CZ1 + 1):
-        if short(box[(x, -467, z)]) not in ('grass_block', 'dirt') or short(box[(x, -466, z)]) not in PLANTS:
-            continue
-        bay = CZ0 + 1 <= z <= CZ0 + 5 or CZ1 - 5 <= z <= CZ1 - 1
-        line = (bay and (x - CP0) % 3 == 0) or z in (CZ0, CZ1)
-        put(x, -467, z, LINE if line else ASPH)
-        clear(x, -466, z)
-for x, z in ((CP0, CZ0 + 7), (CP0, CZ1 - 7), (CP1, CZ0 + 7), (CP1, CZ1 - 7)):
-    for h in (-466, -465, -464):
-        put(x, h, z, 'minecraft:iron_bars')
-    put(x, -463, z, LIGHT)
+# ---- helipad east of the entrance, where the reference has its car park: a grey apron with two square pads, each
+# with a white edge, a white ring and a white H, lights flush at the corners and edge middles. map-buildings parks
+# the two helicopters on the pad centres (PADS), noses south.
+PADS = ((65, 402), (86, 402))
+R = 9
+for x in range(PADS[0][0] - R - 2, PADS[1][0] + R + 3):
+    for z in range(391, 414):
+        if short(box[(x, -467, z)]) in ('grass_block', 'dirt') and short(box[(x, -466, z)]) in PLANTS:
+            put(x, -467, z, ASPH)
+            clear(x, -466, z)
+H = {(dx, dz) for dz in range(-3, 4) for dx in (-2, 2)} | {(dx, 0) for dx in (-1, 0, 1)}
+for cx, cz in PADS:
+    for dx in range(-R, R + 1):
+        for dz in range(-R, R + 1):
+            r = (dx * dx + dz * dz) ** .5
+            edge = max(abs(dx), abs(dz)) == R
+            mark = edge or 5.6 <= r <= 6.6 or (dx, dz) in H
+            light = edge and (abs(dx), abs(dz)) in ((R, R), (R, 0), (0, R))
+            put(cx + dx, -467, cz + dz, LIGHT if light else LINE if mark else ASPH)
+            clear(cx + dx, -466, cz + dz)
 
 # ---- the marking: the big one goes back to panels; a small copy above the light band
 old = {}
@@ -233,8 +247,8 @@ for x in range(-30, 92):                    # every marking block on the south f
                 put(x, y, z, PYR)
 ox0, ox1 = min(x for x, _ in old), max(x for x, _ in old)
 oy0, oy1 = min(y for _, y in old), max(y for _, y in old)
-NW, NH = int(sys.argv[3]) if len(sys.argv) > 3 else 14, int(sys.argv[4]) if len(sys.argv) > 4 else 13
-nx0, ny0 = 30 - NW // 2, -404               # bottom row right on the light band; 14 x 13 is the most the triangle holds
+NW, NH = int(sys.argv[3]) if len(sys.argv) > 3 else 8, int(sys.argv[4]) if len(sys.argv) > 4 else 7
+nx0, ny0 = 30 - NW // 2, -403               # far-view base for the high-resolution plate laid over it
 sx, sy = (ox1 - ox0 + 1) / NW, (oy1 - oy0 + 1) / NH
 new = set()
 for i in range(NW):
