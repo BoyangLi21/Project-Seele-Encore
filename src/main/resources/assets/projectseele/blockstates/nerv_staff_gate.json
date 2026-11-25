@@ -1,0 +1,124 @@
+{
+ "variants": {
+  "card=true,facing=north,half=lower,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_lower_card_open"
+  },
+  "card=true,facing=north,half=upper,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_upper_open"
+  },
+  "card=false,facing=north,half=lower,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_lower_free_open"
+  },
+  "card=false,facing=north,half=upper,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_upper_open"
+  },
+  "card=true,facing=north,half=lower,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_lower_card_closed"
+  },
+  "card=true,facing=north,half=upper,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_upper_closed"
+  },
+  "card=false,facing=north,half=lower,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_lower_free_closed"
+  },
+  "card=false,facing=north,half=upper,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_upper_closed"
+  },
+  "card=true,facing=east,half=lower,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_lower_card_open",
+   "y": 90
+  },
+  "card=true,facing=east,half=upper,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_upper_open",
+   "y": 90
+  },
+  "card=false,facing=east,half=lower,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_lower_free_open",
+   "y": 90
+  },
+  "card=false,facing=east,half=upper,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_upper_open",
+   "y": 90
+  },
+  "card=true,facing=east,half=lower,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_lower_card_closed",
+   "y": 90
+  },
+  "card=true,facing=east,half=upper,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_upper_closed",
+   "y": 90
+  },
+  "card=false,facing=east,half=lower,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_lower_free_closed",
+   "y": 90
+  },
+  "card=false,facing=east,half=upper,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_upper_closed",
+   "y": 90
+  },
+  "card=true,facing=south,half=lower,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_lower_card_open",
+   "y": 180
+  },
+  "card=true,facing=south,half=upper,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_upper_open",
+   "y": 180
+  },
+  "card=false,facing=south,half=lower,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_lower_free_open",
+   "y": 180
+  },
+  "card=false,facing=south,half=upper,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_upper_open",
+   "y": 180
+  },
+  "card=true,facing=south,half=lower,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_lower_card_closed",
+   "y": 180
+  },
+  "card=true,facing=south,half=upper,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_upper_closed",
+   "y": 180
+  },
+  "card=false,facing=south,half=lower,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_lower_free_closed",
+   "y": 180
+  },
+  "card=false,facing=south,half=upper,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_upper_closed",
+   "y": 180
+  },
+  "card=true,facing=west,half=lower,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_lower_card_open",
+   "y": 270
+  },
+  "card=true,facing=west,half=upper,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_upper_open",
+   "y": 270
+  },
+  "card=false,facing=west,half=lower,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_lower_free_open",
+   "y": 270
+  },
+  "card=false,facing=west,half=upper,open=true": {
+   "model": "projectseele:block/nerv_staff_gate_upper_open",
+   "y": 270
+  },
+  "card=true,facing=west,half=lower,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_lower_card_closed",
+   "y": 270
+  },
+  "card=true,facing=west,half=upper,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_upper_closed",
+   "y": 270
+  },
+  "card=false,facing=west,half=lower,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_lower_free_closed",
+   "y": 270
+  },
+  "card=false,facing=west,half=upper,open=false": {
+   "model": "projectseele:block/nerv_staff_gate_upper_closed",
+   "y": 270
+  }
+ }
+}

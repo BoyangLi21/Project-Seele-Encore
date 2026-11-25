@@ -104,6 +104,8 @@ public final class ModBlocks
     public static final RegistryObject<Block> POWER_LINE=BLOCKS.register("power_line",()->new com.projectseele.world.StreetFurnitureR65.PowerLine(BlockBehaviour.Properties.copy(Blocks.CHAIN).strength(0.5F).noOcclusion().noCollission()));
     public static final RegistryObject<Block> TRAFFIC_SIGNAL=BLOCKS.register("traffic_signal",()->new com.projectseele.world.StreetFurnitureR65.Signal(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion().lightLevel(s->6)));
     public static final RegistryObject<Block> SIGNAL_POLE=BLOCKS.register("signal_pole",()->new com.projectseele.world.StreetFurnitureR65.SignalPole(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()));
+    // R65 feedback 2 item 3: NERV staff gate lane (cabinets, reader, full-height glass leaves)
+    public static final RegistryObject<Block> NERV_STAFF_GATE=BLOCKS.register("nerv_staff_gate",()->new com.projectseele.world.NervStaffGateR65(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(5F).noOcclusion().lightLevel(s->3)));
     public static final RegistryObject<Block> PERIOD_STATION_FLOOR=BLOCKS.register("period_station_floor",()->new Block(BlockBehaviour.Properties.copy(Blocks.SMOOTH_STONE)));
     public static final RegistryObject<Block> STATION_DRAIN=BLOCKS.register("station_drain",()->new Block(BlockBehaviour.Properties.copy(Blocks.SMOOTH_STONE)));
     public static final RegistryObject<Block> PERIOD_FIXTURE_PART=BLOCKS.register("period_fixture_part",()->new com.projectseele.world.PeriodFixturePartBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(2).noOcclusion().dynamicShape().noLootTable()));

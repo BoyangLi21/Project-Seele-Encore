@@ -54,6 +54,7 @@ public class ModItems
     public static final RegistryObject<Item> POWER_LINE=ITEMS.register("power_line",()->new BlockItem(ModBlocks.POWER_LINE.get(),new Item.Properties()));
     public static final RegistryObject<Item> TRAFFIC_SIGNAL=ITEMS.register("traffic_signal",()->new BlockItem(ModBlocks.TRAFFIC_SIGNAL.get(),new Item.Properties()));
     public static final RegistryObject<Item> SIGNAL_POLE=ITEMS.register("signal_pole",()->new BlockItem(ModBlocks.SIGNAL_POLE.get(),new Item.Properties()));
+    public static final RegistryObject<Item> NERV_STAFF_GATE=ITEMS.register("nerv_staff_gate",()->new BlockItem(ModBlocks.NERV_STAFF_GATE.get(),new Item.Properties()));
     public static final RegistryObject<Item> STATION_SEAT=ITEMS.register("station_seat",()->new BlockItem(ModBlocks.STATION_SEAT.get(),new Item.Properties()));
     public static final RegistryObject<Item> RESIDENTIAL_CHAIR=ITEMS.register("residential_chair",()->new BlockItem(ModBlocks.RESIDENTIAL_CHAIR.get(),new Item.Properties()));
     public static final RegistryObject<Item> MILITARY_SEAT=ITEMS.register("military_seat",()->new BlockItem(ModBlocks.MILITARY_SEAT.get(),new Item.Properties()));

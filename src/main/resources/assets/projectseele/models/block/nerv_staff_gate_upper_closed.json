@@ -1,0 +1,135 @@
+{
+ "parent": "minecraft:block/block",
+ "textures": {
+  "s": "projectseele:block/nerv_gate_steel",
+  "d": "projectseele:block/nerv_gate_dark",
+  "r": "projectseele:block/nerv_gate_red",
+  "g": "projectseele:block/nerv_gate_glass",
+  "lg": "projectseele:block/nerv_gate_lamp_green",
+  "lr": "projectseele:block/nerv_gate_lamp_red",
+  "p": "projectseele:block/nerv_gate_plate",
+  "particle": "projectseele:block/nerv_gate_steel"
+ },
+ "elements": [
+  {
+   "from": [
+    2.5,
+    0,
+    7.7
+   ],
+   "to": [
+    8,
+    12,
+    8.3
+   ],
+   "faces": {
+    "north": {
+     "texture": "#g"
+    },
+    "south": {
+     "texture": "#g"
+    },
+    "east": {
+     "texture": "#g"
+    },
+    "west": {
+     "texture": "#g"
+    },
+    "up": {
+     "texture": "#g"
+    },
+    "down": {
+     "texture": "#g"
+    }
+   }
+  },
+  {
+   "from": [
+    8,
+    0,
+    7.7
+   ],
+   "to": [
+    13.5,
+    12,
+    8.3
+   ],
+   "faces": {
+    "north": {
+     "texture": "#g"
+    },
+    "south": {
+     "texture": "#g"
+    },
+    "east": {
+     "texture": "#g"
+    },
+    "west": {
+     "texture": "#g"
+    },
+    "up": {
+     "texture": "#g"
+    },
+    "down": {
+     "texture": "#g"
+    }
+   }
+  },
+  {
+   "from": [
+    7.9,
+    0,
+    7.6
+   ],
+   "to": [
+    8.1,
+    12,
+    8.4
+   ],
+   "faces": {
+    "north": {
+     "texture": "#s"
+    },
+    "south": {
+     "texture": "#s"
+    },
+    "up": {
+     "texture": "#s"
+    }
+   }
+  },
+  {
+   "from": [
+    2.5,
+    11.5,
+    7.6
+   ],
+   "to": [
+    13.5,
+    12,
+    8.4
+   ],
+   "faces": {
+    "north": {
+     "texture": "#s"
+    },
+    "south": {
+     "texture": "#s"
+    },
+    "east": {
+     "texture": "#s"
+    },
+    "west": {
+     "texture": "#s"
+    },
+    "up": {
+     "texture": "#s"
+    },
+    "down": {
+     "texture": "#s"
+    }
+   }
+  }
+ ],
+ "render_type": "minecraft:translucent"
+}
