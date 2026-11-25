@@ -9,6 +9,8 @@ uniform float FogStart;
 uniform float FogEnd;
 uniform vec4 FogColor;
 uniform float Light;
+// rgb: the lake's colour under a shader pack; a = 1 to use it (water faces carry colour alpha 0.5)
+uniform vec4 Water;
 
 in vec2 tile;
 flat in vec4 rect;
@@ -22,7 +24,9 @@ void main() {
         discard;
     }
     vec3 c;
-    if (colour.a < 0.5) {
+    if (colour.a > 0.25 && colour.a < 0.75) {
+        c = Water.a > 0.5 ? Water.rgb : colour.rgb;
+    } else if (colour.a < 0.25) {
         c = colour.rgb;
     } else {
         vec2 size = rect.zw - rect.xy;

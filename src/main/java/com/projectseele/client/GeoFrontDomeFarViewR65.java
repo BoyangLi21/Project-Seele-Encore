@@ -71,11 +71,11 @@ import static org.lwjgl.opengl.GL13.GL_TEXTURE1;
  * distance calls for (one block near, coarser far), with the texture that side of that block shows (tinted faces with
  * the cavity biome's tint; mostly see-through blocks such as glass as their average colour), shaded by facing, fading
  * into the fog colour with distance. Nothing within the vanilla render distance (horizontally) is drawn, where the real
- * chunks are. Without a shader pack it is drawn right after the sky, then its depth is cleared so the real chunks draw
- * over it as over the sky; under a shader pack it is drawn after the pack's last pass into a target of its own and laid
- * only where nothing was drawn (afterLevel). Everything is plain GL with programs of its own: while a pack is in use,
- * Oculus turns colour and depth writes off whenever a mod's shader instance is applied, and swaps the vanilla shaders
- * for the pack's programs. Every piece of GL state touched is read first and put back as it was.
+ * chunks are. It is drawn after the level (under a shader pack, after the pack's last pass) into a multisampled target
+ * of its own, resolved and laid over the picture only where nothing was drawn: four samples a pixel keep the one-block
+ * seams between the dome's panels from flickering at a distance. Under a pack, water takes the lake's colour the pack
+ * gives it. Everything is plain GL with programs of its own: while a pack is in use, Oculus turns colour and depth
+ * writes off whenever a mod's shader instance is applied, and swaps the vanilla shaders for the pack's programs.
  * <p>
  * The mesh is a private build product installed into the pack's jar; without it nothing changes.
  */
@@ -87,10 +87,14 @@ public final class GeoFrontDomeFarViewR65
     private static final double CENTRE_X = 32, CENTRE_Z = 320, RADIUS = 1900, MIN_Y = -530, MAX_Y = 56;
     private static final float FAR = 6000F, NEAR = 8F, FOG_END = 5000F, FOG_STRENGTH = .6F;
     /** Horizontal distance to a cell's nearest point under which it is drawn block by block, then at two blocks. */
+    /** Horizontal distance to a cell's nearest point under which it is drawn block by block, then at two blocks. */
     private static final float FINE = 640F, MEDIUM = 1280F, KEEP = 192F;
+    /** Under a shader pack the far view is drawn after the pack's lighting; water takes the colour the pack gives the
+     *  lake (measured on the Distant Horizons far view of the same lake from the same place). */
+    private static final float[] SHADER_WATER = {27 / 255F, 36 / 255F, 47 / 255F};
     /** One instance (16 bytes) per quad: u16 x, y, z (blocks from the cell origin, on the face plane), u16 extents,
      *  u8 face, u8 unused, u16 look (palette entry * 6 + face), u16 unused; the vertex shader makes the corners. */
-    private static final int CELL = 128, INSTANCE = 16, UPLOADS_PER_FRAME = 3;
+    private static final int CELL = 128, BAND = 128, INSTANCE = 16, UPLOADS_PER_FRAME = 3;
     private static final long UPLOAD_NANOS = 4_000_000L;
 
     private record Tile(int x, int z, byte[][] quads, int[] counts) {}
@@ -245,7 +249,7 @@ public final class GeoFrontDomeFarViewR65
             int vao = glGetInteger(GL_VERTEX_ARRAY_BINDING), arrayBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
             try
             {
-                upload(mc, camX, camZ);
+                upload(mc, camX, camY, camZ);
             }
             finally
             {
@@ -253,17 +257,12 @@ public final class GeoFrontDomeFarViewR65
                 glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
                 BufferUploader.invalidate();
             }
-            if (com.projectseele.client.render.ShaderShadowPassR44.enabled())
-            {
-                // under a shader pack anything drawn now is lit by the pack as a surface it knows nothing about (black)
-                // or, with its depth cleared, painted over as sky; it is drawn after the pack's last pass instead
-                pendingView = view;
-                pendingProjection = projection;
-                pendingCamera = new float[]{camX, camY, camZ};
-                pendingFog = fog;
-                return;
-            }
-            drawWithState(mc, view, projection, new float[]{camX, camY, camZ}, fog, null);
+            // drawn after the level in both modes (under a shader pack, after its last pass, which would otherwise light it
+            // as a surface it knows nothing about or paint it over as sky), anti-aliased and laid where nothing was drawn
+            pendingView = view;
+            pendingProjection = projection;
+            pendingCamera = new float[]{camX, camY, camZ};
+            pendingFog = fog;
         }
         catch (IOException | RuntimeException problem)
         {
@@ -306,11 +305,14 @@ public final class GeoFrontDomeFarViewR65
         glGetBooleanv(GL_COLOR_WRITEMASK, mask);
         FloatBuffer clear = BufferUtils.createFloatBuffer(16);
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clear);
+        int blendSrc = glGetInteger(GL_BLEND_SRC_RGB), blendDst = glGetInteger(GL_BLEND_DST_RGB),
+                blendSrcA = glGetInteger(GL_BLEND_SRC_ALPHA), blendDstA = glGetInteger(GL_BLEND_DST_ALPHA);
         glActiveTexture(GL_TEXTURE0);
         int texture = glGetInteger(GL_TEXTURE_BINDING_2D);
         try
         {
             if (farProgram == 0) programs();
+            ensureMultisample(main.width, main.height);
             glColorMask(true, true, true, true);
             glDisable(GL_BLEND);
             glDisable(GL_CULL_FACE);
@@ -318,39 +320,38 @@ public final class GeoFrontDomeFarViewR65
             glEnable(GL_DEPTH_TEST);
             glDepthFunc(GL_LEQUAL);
             glDepthMask(true);
-            if (main != null)
-            {
-                target.bindWrite(true);
-                glClearColor(0F, 0F, 0F, 0F);
-                glClearDepth(1D);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            }
+            // Four samples a pixel: a seam between the dome's panels one block wide is under a pixel from the floor, and
+            // drawn with one sample it jumps from pixel to pixel as the camera moves; with four it is a steady soft line.
+            glBindFramebuffer(GL_FRAMEBUFFER, multisampleFbo);
+            glViewport(0, 0, main.width, main.height);
+            glClearColor(0F, 0F, 0F, 0F);
+            glClearDepth(1D);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             draw(mc, view, projection, camera, fog);
-            if (main != null)
-            {
-                main.bindWrite(true);
-                glDepthMask(false);
-                glUseProgram(blitProgram);
-                glUniform1i(glGetUniformLocation(blitProgram, "Sampler0"), 0);
-                glBindTexture(GL_TEXTURE_2D, target.getColorTextureId());
-                glBindVertexArray(screenVao);
-                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-            }
-            else
-            {
-                // the real chunks draw over the far view as over the sky
-                glClear(GL_DEPTH_BUFFER_BIT);
-            }
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, multisampleFbo);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target.frameBufferId);
+            glBlitFramebuffer(0, 0, main.width, main.height, 0, 0, main.width, main.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            main.bindWrite(true);
+            glDepthMask(false);
+            // the resolved colour is premultiplied (the cleared background is transparent black)
+            glEnable(GL_BLEND);
+            glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
+            glUseProgram(blitProgram);
+            glUniform1i(glGetUniformLocation(blitProgram, "Sampler0"), 0);
+            glBindTexture(GL_TEXTURE_2D, target.getColorTextureId());
+            glBindVertexArray(screenVao);
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
         }
         catch (IOException | RuntimeException problem)
         {
             failed = true;
             active = false;
             ProjectSeele.LOGGER.warn("GeoFront far view R65 off: {}", problem.toString(), problem);
-            if (main != null) main.bindWrite(true);
+            main.bindWrite(true);
         }
         finally
         {
+            org.lwjgl.opengl.GL14.glBlendFuncSeparate(blendSrc, blendDst, blendSrcA, blendDstA);
             glBindVertexArray(vao);
             glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
             BufferUploader.invalidate();
@@ -368,6 +369,36 @@ public final class GeoFrontDomeFarViewR65
         }
     }
 
+    private static int multisampleFbo, multisampleColour, multisampleDepth, multisampleWidth, multisampleHeight;
+
+    private static void ensureMultisample(int width, int height)
+    {
+        if (multisampleFbo != 0 && width == multisampleWidth && height == multisampleHeight) return;
+        if (multisampleFbo != 0)
+        {
+            glDeleteFramebuffers(multisampleFbo);
+            glDeleteRenderbuffers(multisampleColour);
+            glDeleteRenderbuffers(multisampleDepth);
+        }
+        int samples = Math.min(4, glGetInteger(GL_MAX_SAMPLES));
+        int previous = glGetInteger(GL_RENDERBUFFER_BINDING);
+        multisampleColour = glGenRenderbuffers();
+        glBindRenderbuffer(GL_RENDERBUFFER, multisampleColour);
+        glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, width, height);
+        multisampleDepth = glGenRenderbuffers();
+        glBindRenderbuffer(GL_RENDERBUFFER, multisampleDepth);
+        glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH_COMPONENT24, width, height);
+        glBindRenderbuffer(GL_RENDERBUFFER, previous);
+        multisampleFbo = glGenFramebuffers();
+        glBindFramebuffer(GL_FRAMEBUFFER, multisampleFbo);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, multisampleColour);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, multisampleDepth);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) throw new IllegalStateException("multisample target incomplete");
+        multisampleWidth = width;
+        multisampleHeight = height;
+        ProjectSeele.LOGGER.info("GeoFront far view R65: {}x{} target with {} samples", width, height, samples);
+    }
+
     private static void draw(Minecraft mc, Matrix4f view, Matrix4f projection, float[] camera, float[] fog)
     {
         float nearCut = mc.options.getEffectiveRenderDistance() * 16F - 8F;
@@ -376,6 +407,8 @@ public final class GeoFrontDomeFarViewR65
         glUniformMatrix4fv(glGetUniformLocation(farProgram, "ModelViewMat"), false, view.get(MATRIX));
         glUniformMatrix4fv(glGetUniformLocation(farProgram, "ProjMat"), false, projection.get(MATRIX));
         glUniform1f(glGetUniformLocation(farProgram, "Light"), light);
+        boolean pack = com.projectseele.client.render.ShaderShadowPassR44.enabled();
+        glUniform4f(glGetUniformLocation(farProgram, "Water"), SHADER_WATER[0], SHADER_WATER[1], SHADER_WATER[2], pack ? 1F : 0F);
         glUniform1f(glGetUniformLocation(farProgram, "FogStart"), nearCut);
         glUniform1f(glGetUniformLocation(farProgram, "FogEnd"), FOG_END);
         glUniform4f(glGetUniformLocation(farProgram, "FogColor"), fog[0], fog[1], fog[2], FOG_STRENGTH);
@@ -397,7 +430,7 @@ public final class GeoFrontDomeFarViewR65
             float far = farthest(cell, camera[0], camera[2]);
             if (far < nearCut) continue;
             if (!frustum.testAab(cell.x, cell.minY, cell.z, cell.x + CELL, cell.maxY, cell.z + CELL)) continue;
-            int want = wanted(nearest(cell, camera[0], camera[2]));
+            int want = wanted(nearest(cell, camera[0], camera[1], camera[2]));
             int level = -1;
             for (int l = want; l < levelCount; l++) if (cell.built[l]) { level = l; break; }
             if (level < 0) for (int l = want - 1; l >= 0; l--) if (cell.built[l]) { level = l; break; }
@@ -421,7 +454,7 @@ public final class GeoFrontDomeFarViewR65
         return Math.min(level, levelCount - 1);
     }
 
-    private static float nearest(Cell c, float x, float z)
+    private static float nearest(Cell c, float x, float y, float z)
     {
         float dx = Math.max(Math.max(c.x - x, x - (c.x + CELL)), 0), dz = Math.max(Math.max(c.z - z, z - (c.z + CELL)), 0);
         return (float) Math.sqrt(dx * dx + dz * dz);
@@ -438,7 +471,7 @@ public final class GeoFrontDomeFarViewR65
      * first frame, then the finer scales as the camera comes near. A finer scale is freed once the camera is well past
      * the distance that wanted it.
      */
-    private static void upload(Minecraft mc, float camX, float camZ)
+    private static void upload(Minecraft mc, float camX, float camY, float camZ)
     {
         long began = System.nanoTime();
         int coarsest = levelCount - 1;
@@ -462,7 +495,7 @@ public final class GeoFrontDomeFarViewR65
             float bestDistance = Float.MAX_VALUE;
             for (Cell cell : cells)
             {
-                float d = nearest(cell, camX, camZ);
+                float d = nearest(cell, camX, camY, camZ);
                 int want = wanted(d);
                 for (int l = 0; l < coarsest; l++)
                     if (cell.built[l] && l < want && d > (l == 0 ? FINE : MEDIUM) + KEEP) free(cell, l);
@@ -688,20 +721,46 @@ public final class GeoFrontDomeFarViewR65
                     in.readFully(quads[l]);
                     totalQuads += counts[l];
                 }
-                Tile t = new Tile(tx * 64, tz * 64, quads, counts);
-                int cx = (tx * 64) / CELL, cz = (tz * 64) / CELL;
-                Cell cell = byKey.computeIfAbsent(((long) cx << 32) ^ (cz & 0xffffffffL), k -> new Cell(cx * CELL, cz * CELL));
-                cell.tiles.add(t);
-                // the height band the cell's quads use, for the frustum test
-                ByteBuffer q = ByteBuffer.wrap(quads[levelCount - 1]).order(ByteOrder.LITTLE_ENDIAN);
-                int s = scales[levelCount - 1];
-                for (int k = 0; k < counts[levelCount - 1]; k++)
+                // the tile's quads by height band: a cell is 128 x 128 and 128 high, so the scale follows the true distance
+                // (the floor near, the dome far above)
+                int bands = (600 + BAND - 1) / BAND + 1;
+                java.io.ByteArrayOutputStream[][] split = new java.io.ByteArrayOutputStream[bands][levelCount];
+                int[][] splitCounts = new int[bands][levelCount];
+                float[] top = new float[bands];
+                for (int l = 0; l < levelCount; l++)
                 {
-                    int y = q.getShort(k * 11 + 1) & 0xFFFF;
-                    int face = q.get(k * 11 + 8) & 0xFF, extent = face / 2 == 0 ? q.getShort(k * 11 + 4) & 0xFFFF
-                            : face / 2 == 2 ? q.getShort(k * 11 + 6) & 0xFFFF : 1;
-                    cell.minY = Math.min(cell.minY, y * s);
-                    cell.maxY = Math.max(cell.maxY, (y + extent + 1) * s);
+                    int s = scales[l];
+                    for (int k = 0; k < counts[l]; k++)
+                    {
+                        int o = k * 11;
+                        int y = ((quads[l][o + 1] & 0xFF) | (quads[l][o + 2] & 0xFF) << 8) * s;
+                        int face = quads[l][o + 8] & 0xFF, axis = face / 2;
+                        int du = ((quads[l][o + 4] & 0xFF) | (quads[l][o + 5] & 0xFF) << 8) * s;
+                        int dv = ((quads[l][o + 6] & 0xFF) | (quads[l][o + 7] & 0xFF) << 8) * s;
+                        int band = Math.min(bands - 1, y / BAND);
+                        if (split[band][l] == null) split[band][l] = new java.io.ByteArrayOutputStream();
+                        split[band][l].write(quads[l], o, 11);
+                        splitCounts[band][l]++;
+                        top[band] = Math.max(top[band], y + (axis == 0 ? du : axis == 2 ? dv : s));
+                    }
+                }
+                int cx = (tx * 64) / CELL, cz = (tz * 64) / CELL;
+                for (int b = 0; b < bands; b++)
+                {
+                    int any = 0;
+                    byte[][] q = new byte[levelCount][];
+                    for (int l = 0; l < levelCount; l++)
+                    {
+                        q[l] = split[b][l] == null ? new byte[0] : split[b][l].toByteArray();
+                        any += splitCounts[b][l];
+                    }
+                    if (any == 0) continue;
+                    int band = b;
+                    long key = (((long) cx & 0xFFFFF) << 40) | (((long) cz & 0xFFFFF) << 20) | band;
+                    Cell cell = byKey.computeIfAbsent(key, k -> new Cell(cx * CELL, cz * CELL));
+                    cell.tiles.add(new Tile(tx * 64, tz * 64, q, splitCounts[b]));
+                    cell.minY = Math.min(cell.minY, band * BAND);
+                    cell.maxY = Math.max(cell.maxY, top[b]);
                 }
             }
             cells.clear();
@@ -769,7 +828,9 @@ public final class GeoFrontDomeFarViewR65
                 int tint = !tinted ? 0xFFFFFF : block == Blocks.WATER ? water
                         : block instanceof LeavesBlock || block == Blocks.VINE ? leafTint(block, foliage) : grass;
                 int base = (i * 6 + f) * 8;
-                boolean textured = look[0] >= 0 && look[1] == 0;
+                // water is drawn flat (its own colour without a pack, the pack's lake colour under one: Water)
+                boolean isWater = block == Blocks.WATER;
+                boolean textured = !isWater && look[0] >= 0 && look[1] == 0;
                 int rgb = textured ? tint : multiply(look[0] >= 0 ? look[0] : mapColour(block), tint);
                 looks[base] = sprite.getU0();
                 looks[base + 1] = sprite.getV0();
@@ -778,7 +839,7 @@ public final class GeoFrontDomeFarViewR65
                 looks[base + 4] = ((rgb >> 16) & 0xFF) / 255F;
                 looks[base + 5] = ((rgb >> 8) & 0xFF) / 255F;
                 looks[base + 6] = (rgb & 0xFF) / 255F;
-                looks[base + 7] = textured ? 1F : 0F;
+                looks[base + 7] = isWater ? .5F : textured ? 1F : 0F;
             }
         }
     }
