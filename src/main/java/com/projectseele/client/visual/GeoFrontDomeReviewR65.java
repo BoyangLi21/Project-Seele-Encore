@@ -147,6 +147,9 @@ public final class GeoFrontDomeReviewR65
             String name = String.format(Locale.ROOT, "projectseele_dome/%s/place%d_%s.png", batch, step % list.size() + 1, after ? "after" : "before");
             new java.io.File(mc.gameDirectory, "screenshots/projectseele_dome/" + batch).mkdirs();
             Screenshot.grab(mc.gameDirectory, name, mc.getMainRenderTarget(), ignored -> {});
+            var feet = mc.player.blockPosition();
+            ProjectSeele.LOGGER.info("dome_review place {} light at {} {} {}: block {} sky {}", step % list.size() + 1, feet.getX(), feet.getY(), feet.getZ(),
+                    mc.level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, feet), mc.level.getBrightness(net.minecraft.world.level.LightLayer.SKY, feet));
             ProjectSeele.LOGGER.info("dome_review place {} {} fps {} over {} s, far view active {}, screenshot {}, {}",
                     step % list.size() + 1, after ? "after" : "before",
                     fpsCount == 0 ? 0 : fpsSum / fpsCount, fpsCount,
