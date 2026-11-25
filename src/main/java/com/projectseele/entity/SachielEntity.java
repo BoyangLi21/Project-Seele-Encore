@@ -391,6 +391,9 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         }
         if (this.getHealth() <= this.getMaxHealth() * 0.14F)
         {
+            // R65: the finale's last chance before Sachiel destroys itself, as for a lethal blow.
+            if(!firstBattleUsed)for(var eva:this.level().getEntitiesOfClass(EvaUnit01Entity.class,this.getBoundingBox().inflate(48,80,48),e->e.getPilotEntity()!=null))
+                if(com.projectseele.event.FirstBattleDirector.tryStart(this,eva,false))return;
             rememberSelfDestructSource(getLastDamageSource());
             this.selfDestructTicks = 60;
             CombatFoleyR36.selfDestructWarning(this,60);
