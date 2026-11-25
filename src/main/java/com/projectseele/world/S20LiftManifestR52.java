@@ -49,52 +49,12 @@ public final class S20LiftManifestR52
         Set<BlockPos> allCalls=new HashSet<>();
         for(var value:root.getAsJsonArray("lifts"))
         {
-            var lift=value.getAsJsonObject();String id=lift.get("id").getAsString();require(!id.isBlank()&&ids.add(id),"Duplicate lift identity");
-            require(!id.equals(NervLiftPassengerSync.GATEWAY),"Independent regional gateway must not be duplicated in S20 manifest");
+            var lift=value.getAsJsonObject();String id=lift.get("id").getAsString();
             require(Set.of(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,
                     S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID,
                     FacilityLiftsR25.EAST,FacilityLiftsR25.OBSERVATION).contains(id),
                     "Only original lift identities may be migrated; no third headquarters-to-hangar lift");
-            Direction side=direction(lift,"controller_side"),facing=direction(lift,"controller_facing");require(side.getOpposite()==facing,"Controller must face its declared cabin");
-            var insideButton=point(lift.getAsJsonArray("inside_button_offset"));var insideDisplay=point(lift.getAsJsonArray("inside_display_offset"));
-            List<Floor> floors=new ArrayList<>();
-            for(var row:lift.getAsJsonArray("floors"))
-            {
-                var f=row.getAsJsonObject();BlockPos cabin=point(f.getAsJsonArray("cabin")),controller=point(f.getAsJsonArray("controller"));
-                int dx=controller.getX()-cabin.getX(),dz=controller.getZ()-cabin.getZ(),distance=dx*side.getStepX()+dz*side.getStepZ();
-                require(controller.getY()==cabin.getY()&&distance>0&&dx==side.getStepX()*distance&&dz==side.getStepZ()*distance,"Explicit controller is not on declared side");
-                require(allControllers.add(controller),"Controller assigned to multiple floors");
-                var doors=cells(f.getAsJsonArray("landing_doors"));var cabinDoors=cells(f.getAsJsonArray("cabin_doors"));
-                require(!doors.isEmpty()&&!cabinDoors.isEmpty(),"Explicit native door cells required");
-                require(!doors.containsKey(controller)&&!cabinDoors.containsKey(controller),"Door plane overlaps controller");
-                require(!f.has("call_aliases")&&!f.has("call_button")&&!f.has("call_display"),"Declare each actual call through calls[] with state and ownership");
-                List<Call> calls=new ArrayList<>();for(var rowCall:f.getAsJsonArray("calls"))
-                {
-                    var c=rowCall.getAsJsonObject();var kind=CallKind.valueOf(c.get("kind").getAsString().toUpperCase(Locale.ROOT));var pos=point(c.getAsJsonArray("position"));
-                    var target=point(c.getAsJsonArray("target_controller"));require(target.equals(controller),"Call must target this actual native floor controller");
-                    String state=c.get("state").getAsString();require(!state.isBlank()&&allCalls.add(pos),"Duplicate/empty actual call state");
-                    Display display=null;if(c.has("display")&&!c.get("display").isJsonNull())
-                    {var d=c.getAsJsonObject("display");display=new Display(point(d.getAsJsonArray("position")),d.get("state").getAsString());require(kind==CallKind.NATIVE_LINKED&&!display.state().isBlank()&&allCalls.add(display.position()),"Only native linked inputs own displays");}
-                    calls.add(new Call(kind,pos,state,direction(c,"facing"),target,display));
-                }
-                require(!calls.isEmpty(),"At least one measured call required per floor");
-                UUID visual=f.has("visual_door_uuid")?UUID.fromString(f.get("visual_door_uuid").getAsString()):null;
-                floors.add(new Floor(f.get("label").getAsString(),cabin,direction(f,"exit"),f.get("approach_y").getAsBigDecimal().intValueExact(),controller,
-                        List.copyOf(calls),
-                        f.get("restricted").getAsBoolean(),doors,cabinDoors,visual));
-            }
-            Binding binding=new Binding(id,side,facing,insideButton,insideDisplay,List.copyOf(floors));
-            binding.spec();
-            for(int i=1;i<floors.size();i++)require(floors.get(i-1).cabin().getY()<floors.get(i).cabin().getY(),"Native floors must be listed in ascending order");
-            var transfer=NervPersonnelTransferR53.parse(id,lift);
-            if(transfer==null)require(floors.stream().allMatch(f->f.controller().getX()==floors.get(0).controller().getX()&&f.controller().getZ()==floors.get(0).controller().getZ()),"Native controller group must share one axis");
-            else
-            {
-                require(floors.stream().allMatch(f->f.controller().equals(transfer.controller(f.controller().getY()))),"Each transferred floor must use its declared original or deep shaft");
-                require(floors.stream().noneMatch(f->f.controller().getY()==transfer.transferY()),"Horizontal transfer is an internal section, not a passenger stop");
-                require(floors.stream().anyMatch(f->f.controller().getY()>transfer.transferY())&&floors.stream().anyMatch(f->f.controller().getY()<transfer.transferY()),"Horizontal transfer must join both actual shafts");
-            }
-            lifts.add(binding);
+            lifts.add(binding(lift,ids,allControllers,allCalls));
         }
         require(!lifts.isEmpty(),"Root complete list cannot be empty");Office office=null;
         if(root.has("office_access"))
@@ -137,6 +97,80 @@ public final class S20LiftManifestR52
         for(var binding:lifts)for(var floor:binding.floors())for(var call:floor.calls())if(call.kind()==CallKind.SEELE_READER)
             require(office!=null&&office.liftId().equals(binding.id())&&office.readers().contains(call.position()),"Highest-card reader must belong to this actual office lift");
         return new Document(epoch,ready,List.copyOf(lifts),office,mainLifts);
+    }
+    /** One lift of a manifest: geometry, doors and calls, checked the same for headquarters and public lifts. */
+    private static Binding binding(JsonObject lift,Set<String> ids,Set<BlockPos> allControllers,Set<BlockPos> allCalls)
+    {
+        String id=lift.get("id").getAsString();require(!id.isBlank()&&ids.add(id),"Duplicate lift identity");
+        require(!id.equals(NervLiftPassengerSync.GATEWAY),"Independent regional gateway must not be duplicated in S20 manifest");
+        Direction side=direction(lift,"controller_side"),facing=direction(lift,"controller_facing");require(side.getOpposite()==facing,"Controller must face its declared cabin");
+        var insideButton=point(lift.getAsJsonArray("inside_button_offset"));var insideDisplay=point(lift.getAsJsonArray("inside_display_offset"));
+        List<Floor> floors=new ArrayList<>();
+        for(var row:lift.getAsJsonArray("floors"))
+        {
+            var f=row.getAsJsonObject();BlockPos cabin=point(f.getAsJsonArray("cabin")),controller=point(f.getAsJsonArray("controller"));
+            int dx=controller.getX()-cabin.getX(),dz=controller.getZ()-cabin.getZ(),distance=dx*side.getStepX()+dz*side.getStepZ();
+            require(controller.getY()==cabin.getY()&&distance>0&&dx==side.getStepX()*distance&&dz==side.getStepZ()*distance,"Explicit controller is not on declared side");
+            require(allControllers.add(controller),"Controller assigned to multiple floors");
+            var doors=cells(f.getAsJsonArray("landing_doors"));var cabinDoors=cells(f.getAsJsonArray("cabin_doors"));
+            require(!doors.isEmpty()&&!cabinDoors.isEmpty(),"Explicit native door cells required");
+            require(!doors.containsKey(controller)&&!cabinDoors.containsKey(controller),"Door plane overlaps controller");
+            require(!f.has("call_aliases")&&!f.has("call_button")&&!f.has("call_display"),"Declare each actual call through calls[] with state and ownership");
+            List<Call> calls=new ArrayList<>();for(var rowCall:f.getAsJsonArray("calls"))
+            {
+                var c=rowCall.getAsJsonObject();var kind=CallKind.valueOf(c.get("kind").getAsString().toUpperCase(Locale.ROOT));var pos=point(c.getAsJsonArray("position"));
+                var target=point(c.getAsJsonArray("target_controller"));require(target.equals(controller),"Call must target this actual native floor controller");
+                String state=c.get("state").getAsString();require(!state.isBlank()&&allCalls.add(pos),"Duplicate/empty actual call state");
+                Display display=null;if(c.has("display")&&!c.get("display").isJsonNull())
+                {var d=c.getAsJsonObject("display");display=new Display(point(d.getAsJsonArray("position")),d.get("state").getAsString());require(kind==CallKind.NATIVE_LINKED&&!display.state().isBlank()&&allCalls.add(display.position()),"Only native linked inputs own displays");}
+                calls.add(new Call(kind,pos,state,direction(c,"facing"),target,display));
+            }
+            require(!calls.isEmpty(),"At least one measured call required per floor");
+            UUID visual=f.has("visual_door_uuid")?UUID.fromString(f.get("visual_door_uuid").getAsString()):null;
+            floors.add(new Floor(f.get("label").getAsString(),cabin,direction(f,"exit"),f.get("approach_y").getAsBigDecimal().intValueExact(),controller,
+                    List.copyOf(calls),
+                    f.get("restricted").getAsBoolean(),doors,cabinDoors,visual));
+        }
+        Binding binding=new Binding(id,side,facing,insideButton,insideDisplay,List.copyOf(floors));
+        binding.spec();
+        for(int i=1;i<floors.size();i++)require(floors.get(i-1).cabin().getY()<floors.get(i).cabin().getY(),"Native floors must be listed in ascending order");
+        var transfer=NervPersonnelTransferR53.parse(id,lift);
+        if(transfer==null)require(floors.stream().allMatch(f->f.controller().getX()==floors.get(0).controller().getX()&&f.controller().getZ()==floors.get(0).controller().getZ()),"Native controller group must share one axis");
+        else
+        {
+            require(floors.stream().allMatch(f->f.controller().equals(transfer.controller(f.controller().getY()))),"Each transferred floor must use its declared original or deep shaft");
+            require(floors.stream().noneMatch(f->f.controller().getY()==transfer.transferY()),"Horizontal transfer is an internal section, not a passenger stop");
+            require(floors.stream().anyMatch(f->f.controller().getY()>transfer.transferY())&&floors.stream().anyMatch(f->f.controller().getY()<transfer.transferY()),"Horizontal transfer must join both actual shafts");
+        }
+        return binding;
+    }
+    public static final String PUBLIC_SCHEMA="projectseele.r65.public-lifts.v1";
+    public static final String PUBLIC_PREFIX="r65-public-";
+    /**
+     * The public lifts outside headquarters (R65: the south residential lift by the old staircase). A separate file, so a
+     * fault in it or a jar that does not know it never holds the headquarters lifts. Same geometry rules; no card floors,
+     * no office, no horizontal transfer, one controller axis, controllers apart from every headquarters one.
+     */
+    public static List<Binding> parsePublic(JsonObject root,Document headquarters)
+    {
+        require(PUBLIC_SCHEMA.equals(root.get("schema").getAsString()),"Public lift schema required");
+        List<Binding> lifts=new ArrayList<>();Set<String> ids=new HashSet<>();Set<BlockPos> allControllers=new HashSet<>();Set<BlockPos> allCalls=new HashSet<>();
+        if(headquarters!=null)for(var b:headquarters.lifts()){ids.add(b.id());for(var f:b.floors()){allControllers.add(f.controller());for(var c:f.calls())allCalls.add(c.position());}}
+        for(var value:root.getAsJsonArray("lifts"))
+        {
+            var lift=value.getAsJsonObject();String id=lift.get("id").getAsString();
+            require(id.startsWith(PUBLIC_PREFIX)&&id.length()>PUBLIC_PREFIX.length(),"Public lift identity must start with "+PUBLIC_PREFIX);
+            require(!lift.has("horizontal_transfer"),"Public lifts run in one shaft");
+            var binding=binding(lift,ids,allControllers,allCalls);
+            require(binding.floors().size()>=2,"A public lift needs two stops");
+            for(var floor:binding.floors())
+            {
+                require(!floor.restricted(),"Public lift floors are open to everyone");
+                require(floor.calls().stream().noneMatch(c->c.kind()==CallKind.SEELE_READER),"Public lift calls need no card");
+            }
+            lifts.add(binding);
+        }
+        return List.copyOf(lifts);
     }
     private static Binding lift(List<Binding> lifts,String id)
     {return lifts.stream().filter(lift->lift.id().equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("Declared main lift identity is missing: "+id));}

@@ -35,7 +35,13 @@ public final class S20LiftDirectoryR52
         final Map<String,BlockState> closed=new HashMap<>();
         final Map<String,Set<ChunkPos>> footprints=new HashMap<>();
         final Map<String,UUID> cabinVisuals=new HashMap<>();
+        // Public lifts (public_lifts_r65.json): parsed apart, so their faults never hold the headquarters lifts.
+        final NervManifestPollR52 publicPoll=new NervManifestPollR52();String publicFault="";
+        List<S20LiftManifestR52.Binding> publicBindings=List.of();List<S20PhysicalElevatorDirector.LiftSpec> publicSpecs=List.of();
+        List<S20PhysicalElevatorDirector.LiftSpec> allSpecs=List.of();
+        List<S20LiftManifestR52.Binding> allBindings(){var all=new ArrayList<>(document.lifts());all.addAll(publicBindings);return all;}
     }
+    static final String PUBLIC_FILE="public_lifts_r65.json";
     private S20LiftDirectoryR52() {}
     private static State state(ServerLevel level)
     {
@@ -44,7 +50,7 @@ public final class S20LiftDirectoryR52
         long epoch=NervRouteRuntimeR52.commissioningEpoch(level);
         boolean changed=!state.reference.equals(reference)||!state.fingerprint.equals(fingerprint)||state.epoch!=epoch;
         if(state.observed==tick&&!changed)return state;state.observed=tick;
-        if(changed){state.document=null;state.specs=List.of();state.closed.clear();state.footprints.clear();state.ready=false;state.nativeReady.clear();state.officeReady=false;state.reference=reference;state.fingerprint=fingerprint;state.epoch=epoch;state.modified=-1;state.poll.invalidate();SeeleConferenceAccessR47.invalidateR52(level);FacilityDoorControlsR49.invalidateR52(level);}
+        if(changed){state.document=null;state.specs=List.of();state.closed.clear();state.footprints.clear();state.ready=false;state.nativeReady.clear();state.officeReady=false;state.reference=reference;state.fingerprint=fingerprint;state.epoch=epoch;state.modified=-1;state.poll.invalidate();state.publicPoll.invalidate();state.publicBindings=List.of();state.publicSpecs=List.of();state.allSpecs=List.of();SeeleConferenceAccessR47.invalidateR52(level);FacilityDoorControlsR49.invalidateR52(level);}
         if(reference.isBlank()){state.ready=false;return state;}
         try
         {
@@ -63,15 +69,17 @@ public final class S20LiftDirectoryR52
                     var document=S20LiftManifestR52.parse(JsonParser.parseString(Files.readString(file)).getAsJsonObject());
                     if(document.epoch()!=epoch)throw new IllegalArgumentException("Lift manifest does not match Root world claim");
                     state.document=document;state.specs=document.lifts().stream().map(S20LiftManifestR52.Binding::spec).toList();state.closed.clear();state.footprints.clear();state.modified=modified;state.size=size;
+                    state.publicPoll.invalidate();
                 }
             }
             // A previously rejected unchanged file is a negative cache entry,
             // not another parse/exception or a reason to clear its fault.
             if(state.document==null)return state;
+            loadPublic(state,root,tick);
             state.ready=state.document!=null&&state.document.ready();state.nativeReady.clear();state.officeReady=false;
             if(state.ready)
             {
-                for(var binding:state.document.lifts())if(readback(level,state,binding))state.nativeReady.add(binding.id());
+                for(var binding:state.allBindings())if(readback(level,state,binding))state.nativeReady.add(binding.id());
                 var office=state.document.office();state.officeReady=office!=null&&state.nativeReady.contains(office.liftId())
                         &&officeLoaded(level,office)
                         &&office.readers().stream().allMatch(p->officeReaderValid(level,p))
@@ -85,8 +93,37 @@ public final class S20LiftDirectoryR52
         }
         return state;
     }
+    private static void loadPublic(State state,Path root,int tick)
+    {
+        try
+        {
+            var probe=state.publicPoll.probe(root.resolve(PUBLIC_FILE),tick);
+            if(probe.changed())
+            {
+                state.publicBindings=List.of();state.publicSpecs=List.of();
+                if(probe.available())
+                {
+                    if(probe.size()>1024*1024)throw new IllegalArgumentException("Bounded public lift manifest required");
+                    var bindings=S20LiftManifestR52.parsePublic(JsonParser.parseString(Files.readString(root.resolve(PUBLIC_FILE))).getAsJsonObject(),state.document);
+                    state.publicBindings=bindings;state.publicSpecs=bindings.stream().map(S20LiftManifestR52.Binding::spec).toList();
+                    for(var b:bindings)state.footprints.remove(b.id());
+                }
+                state.publicFault="";
+            }
+        }
+        catch(Exception failure)
+        {
+            state.publicBindings=List.of();state.publicSpecs=List.of();String fault=failure.toString();
+            if(!fault.equals(state.publicFault)){state.publicFault=fault;ProjectSeele.LOGGER.warn("R65 public lifts held, headquarters lifts unaffected: {}",fault);}
+        }
+        var all=new ArrayList<>(state.specs);all.addAll(state.publicSpecs);
+        if(!all.equals(state.allSpecs))state.allSpecs=List.copyOf(all);
+    }
+    /** Public lift identities currently declared (R65 public lift file). */
+    public static boolean publicLift(ServerLevel level,String id)
+    {if(!NervRouteRuntimeR52.claimed(level))return false;var state=state(level);return state.publicBindings.stream().anyMatch(b->b.id().equals(id));}
     private static void failed(State state,String fault,int tick)
-    {state.ready=false;state.document=null;state.specs=List.of();state.nativeReady.clear();state.officeReady=false;state.fault=fault;if(state.poll.warningDue(fault,tick))ProjectSeele.LOGGER.warn("R52 personnel lifts held; legacy coordinates remain disabled: {}",fault);}
+    {state.ready=false;state.document=null;state.specs=List.of();state.publicBindings=List.of();state.publicSpecs=List.of();state.allSpecs=List.of();state.nativeReady.clear();state.officeReady=false;state.fault=fault;if(state.poll.warningDue(fault,tick))ProjectSeele.LOGGER.warn("R52 personnel lifts held; legacy coordinates remain disabled: {}",fault);}
     /** Explicit installation/file replacement wakes a negative cache now. */
     public static void invalidate(ServerLevel level)
     {var state=STATES.get(level);if(state!=null){state.observed=Integer.MIN_VALUE;state.poll.invalidate();}}
@@ -107,7 +144,10 @@ public final class S20LiftDirectoryR52
                 var block=level.getBlockState(floor.controller());
                 if(!block.is(MovingElevators.elevator_block)||!block.hasProperty(ControllerBlock.FACING)||block.getValue(ControllerBlock.FACING)!=binding.controllerFacing()
                         ||!(level.getBlockEntity(floor.controller()) instanceof ControllerBlockEntity controller)||!controller.hasGroup())return false;
-                var group=controller.getGroup();var canonical=NervPersonnelTransferR53.canonicalController(level,floor.controller());
+                var group=controller.getGroup();
+                // A public lift's group is new: give it the headquarters 5x6x5 cage once, as the old installer did.
+                if(binding.id().startsWith(S20LiftManifestR52.PUBLIC_PREFIX))S20MovingElevatorsAdapter.configurePublicCage(binding.spec(),group);
+                var canonical=NervPersonnelTransferR53.canonicalController(level,floor.controller());
                 if(group.x!=canonical.getX()||group.z!=canonical.getZ()||group.facing!=binding.controllerFacing()||group.getFloorCount()!=binding.floors().size())return false;
                 moving|=group.isMoving();boolean present=S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,floor.cabin());if(present)cars++;
                 for(var call:floor.calls())if(!callValid(level,state,binding,call))return false;
@@ -216,10 +256,10 @@ public final class S20LiftDirectoryR52
         state.closed.put(text,block);return block;
     }
     public static List<S20PhysicalElevatorDirector.LiftSpec> specs(ServerLevel level)
-    {if(!NervRouteRuntimeR52.claimed(level))return List.of();var state=state(level);return state.ready?state.specs:List.of();}
+    {if(!NervRouteRuntimeR52.claimed(level))return List.of();var state=state(level);return state.ready?state.allSpecs:List.of();}
     public static boolean current(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec)
     {if(!NervRouteRuntimeR52.claimed(level))return false;var state=state(level);var office=state.document==null?null:state.document.office();return spec.r52()!=null&&state.ready&&state.nativeReady.contains(spec.id())
-            &&(office==null||!office.liftId().equals(spec.id())||state.officeReady)&&state.specs.stream().anyMatch(spec::equals);}
+            &&(office==null||!office.liftId().equals(spec.id())||state.officeReady)&&state.allSpecs.stream().anyMatch(spec::equals);}
     public static boolean ready(ServerLevel level){return NervRouteRuntimeR52.claimed(level)&&state(level).ready;}
     public static S20LiftManifestR52.Office office(ServerLevel level)
     {if(!NervRouteRuntimeR52.claimed(level))return null;var state=state(level);return state.officeReady&&state.document!=null?state.document.office():null;}
@@ -229,7 +269,7 @@ public final class S20LiftDirectoryR52
     {
         if(independentGateway(RegionalGatewayDirector.active(level),group.x,group.z,group.facing))return true;
         State state=state(level);if(!state.ready)return false;
-        for(var spec:state.specs){var p=spec.r52().floors().get(0).controller();if(group.x==p.getX()&&group.z==p.getZ()&&group.facing==spec.r52().controllerFacing())return current(level,spec);}
+        for(var spec:state.allSpecs){var p=spec.r52().floors().get(0).controller();if(group.x==p.getX()&&group.z==p.getZ()&&group.facing==spec.r52().controllerFacing())return current(level,spec);}
         return !retiredControllerAxis(group.x,group.z); // Independent player-owned groups remain outside this directory.
     }
     static boolean retiredControllerAxis(int x,int z)

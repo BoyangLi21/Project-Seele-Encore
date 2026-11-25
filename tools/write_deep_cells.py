@@ -6,7 +6,8 @@ checked, and the rewritten chunks are compared with those copies: every planned 
 hold its new state and no other block may differ.
 Rows: [x, y, z, before, after] with block states written as name[prop=value,...], optionally a sixth item
 giving the new block its block entity: {"id": "trafficcraft:colored_block_entity", "color": n} for road paint, or
-{"id": "mtr:<block>", "snbt": "{...}"} for an MTR station fitting (PIDS boards, station name signs) with its data.
+{"id": "mtr:<block>", "snbt": "{...}"} for an MTR station fitting (PIDS boards, station name signs) with its data, or
+{"id": "movingelevators:elevator_tile|button_tile|display_tile", "snbt": "{...}"} for a lift controller or cabin panel.
 """
 import argparse
 from collections import Counter, defaultdict
@@ -24,6 +25,10 @@ import numpy as np
 from install_r53_carrier_trays import stopped_world
 
 REGION = 'dimensions/projectseele/geofront/region'
+# Moving Elevators block entity -> its block. A lift's controllers, in-cabin button and display carry their links here.
+MOVING_ELEVATOR_ENTITIES = {'movingelevators:elevator_tile': 'movingelevators:elevator_block',
+                            'movingelevators:button_tile': 'movingelevators:button_block',
+                            'movingelevators:display_tile': 'movingelevators:display_block'}
 
 
 def state_name(entry):
@@ -198,10 +203,12 @@ def apply(a):
     for pos, e in given.items():
         if e.get('id') == 'trafficcraft:colored_block_entity':
             continue
-        if not (str(e.get('id', '')).startswith('mtr:') and isinstance(e.get('snbt'), str)):
-            raise SystemExit(f'{pos}: only trafficcraft:colored_block_entity or an mtr: entity with snbt can be given, not {e.get("id")}')
+        eid = str(e.get('id', ''))
+        if not ((eid.startswith('mtr:') or eid in MOVING_ELEVATOR_ENTITIES) and isinstance(e.get('snbt'), str)):
+            raise SystemExit(f'{pos}: only trafficcraft:colored_block_entity, an mtr: entity or a Moving Elevators entity with snbt '
+                             f'can be given, not {e.get("id")}')
         row = next(r for r in rows if (r[0], r[1], r[2]) == pos)
-        if row[4].split('[')[0] != e['id']:
+        if row[4].split('[')[0] != MOVING_ELEVATOR_ENTITIES.get(eid, eid):
             raise SystemExit(f'{pos}: entity {e["id"]} given for block {row[4]}')
         nbtlib.parse_nbt(e['snbt'])                     # refuse a malformed entity before anything is touched
     rows = [r[:5] for r in rows]
