@@ -554,6 +554,7 @@ public final class ScanMapIssuesR65
         static final int HEADROOM = Integer.getInteger("scan.headroom", 3);
         static int[] exclude; // x0 y0 z0 x1 y1 z1 (inclusive): left out of the dark scan
         static final List<long[]> darkCells = Collections.synchronizedList(new ArrayList<>());
+        static final List<long[]> gateCells = Collections.synchronizedList(new ArrayList<>());
         static final List<long[]> stationMarks = Collections.synchronizedList(new ArrayList<>());
         static final java.util.Set<String> STATION = java.util.Set.of("mtr:platform", "mtr:platform_slab", "mtr:apg_glass", "mtr:apg_door",
                 "mtr:escalator_step", "mtr:escalator_side", "mtr:ticket_barrier_entrance_1", "mtr:ticket_barrier_exit_1", "mtr:ticket_machine",
@@ -585,6 +586,7 @@ public final class ScanMapIssuesR65
             System.out.printf("dark walkable cells: %d%n", darkCells.size());
             write(out.resolve("machines.tsv"), "dim\tx\ty\tz\tmachine\tfacing\tfront\tverdict\tfront_cell\tback_cell", machines);
             write(out.resolve("machine_changes.tsv"), "dim\tx\ty\tz\tfrom\tto", machineChanges);
+            Gates.run(out);
             write(out.resolve("stairs.tsv"), "dim\tx\ty\tz\tstair\tfacing\trun_bottom\tobstruction\tkind\tbreaks_out", stairs);
             write(out.resolve("stair_clears.tsv"), "dim\tx\ty\tz\tfrom\tto\tbreaks_out", stairClears);
             if (dark) Dark.report(out);
@@ -614,13 +616,14 @@ public final class ScanMapIssuesR65
                     Section sec = c.sections[si];
                     if (sec == null) continue;
                     boolean any = false;
-                    for (int id : sec.palette) { State st = states.get(id); if (st.front >= 0 || st.stairs || STATION.contains(st.name)) { any = true; break; } }
+                    for (int id : sec.palette) { State st = states.get(id); if (st.front >= 0 || st.stairs || STATION.contains(st.name) || st.name.startsWith("mtr:ticket_barrier")) { any = true; break; } }
                     if (!any) continue;
                     int by = Y0 + si * 16;
                     for (int y = 0; y < 16; y++) for (int z = 0; z < 16; z++) for (int x = 0; x < 16; x++)
                     {
                         State st = states.get(sec.get(x, y, z));
                         if (STATION.contains(st.name) && ((bx + x) & 7) == 0 && ((bz + z) & 7) == 0) stationMarks.add(new long[]{bx + x, by + y, bz + z});
+                        if (st.name.startsWith("mtr:ticket_barrier")) gateCells.add(new long[]{bx + x, by + y, bz + z, sec.get(x, y, z)});
                         if (st.front >= 0) machine(st, bx + x, by + y, bz + z);
                         else if (st.stairs && st.prop("half").equals("bottom")) stair(st, bx + x, by + y, bz + z);
                     }
@@ -723,6 +726,111 @@ public final class ScanMapIssuesR65
      * stopped by opaque blocks), in 64-high slabs with a 15-block margin; then the walkable covered cells on a built floor
      * where both are 3 or less.
      */
+    /**
+     * MTR ticket barriers. A player passes from the side opposite `facing` and walks on in the `facing` direction (the arrow
+     * and the card reader sit on the side opposite `facing`; MTR opens the gate for a player on that side). So an entrance
+     * gate must face into the paid area and an exit gate out of it. The paid side is the one a walk from the gate reaches
+     * a platform from sooner without going through any barrier.
+     */
+    static final class Gates
+    {
+        static void run(Path out) throws IOException
+        {
+            List<String> rows = new ArrayList<>(), changes = new ArrayList<>();
+            int ok = 0, reversed = 0, unknown = 0;
+            for (long[] g : Scan.gateCells)
+            {
+                int x = (int) g[0], y = (int) g[1], z = (int) g[2];
+                State st = states.get((int) g[3]);
+                String facing = st.prop("facing");
+                int f = java.util.Arrays.asList(DIRS).indexOf(facing);
+                if (f < 0) continue;
+                boolean entrance = st.name.contains("entrance");
+                int ahead = walk(x + DX[f], y, z + DZ[f]), behind = walk(x - DX[f], y, z - DZ[f]);
+                String paid = ahead < behind ? "ahead" : behind < ahead ? "behind" : "unknown";
+                String verdict = paid.equals("unknown") ? "unknown" : (paid.equals("ahead") == entrance) ? "ok" : "reversed";
+                if (verdict.equals("ok")) ok++; else if (verdict.equals("reversed")) reversed++; else unknown++;
+                rows.add(Scan.dim + "	" + x + "	" + y + "	" + z + "	" + (entrance ? "entrance" : "exit") + "	" + facing + "	"
+                        + (ahead == Integer.MAX_VALUE ? "-" : ahead) + "	" + (behind == Integer.MAX_VALUE ? "-" : behind) + "	" + verdict);
+                if (verdict.equals("reversed"))
+                {
+                    String turned = DIRS[(f + 2) % 4];
+                    changes.add(Scan.dim + "	" + x + "	" + y + "	" + z + "	" + st.key + "	" + st.key.replace("facing=" + facing, "facing=" + turned));
+                }
+            }
+            System.out.printf("ticket barriers: %d ok, %d reversed, %d unknown%n", ok, reversed, unknown);
+            Scan.write(out.resolve("gates.tsv"), "dim	x	y	z	kind	facing	platform_ahead	platform_behind	verdict", rows);
+            Scan.write(out.resolve("gate_changes.tsv"), "dim	x	y	z	from	to", changes);
+        }
+
+        static boolean barrier(int x, int y, int z)
+        {
+            String n = states.get(block(x, y, z)).name;
+            return n.startsWith("mtr:ticket_barrier");
+        }
+
+        static boolean stand(int x, int y, int z)
+        {
+            return pass(x, y, z) && pass(x, y + 1, z) && !pass(x, y - 1, z) && !barrier(x, y, z) && !barrier(x, y + 1, z) && !tall(x, y - 1, z);
+        }
+
+        /** Blocks a player cannot step up onto (taller than a block, or a rail along the gate line). */
+        static boolean tall(int x, int y, int z)
+        {
+            String n = states.get(block(x, y, z)).name, local = n.substring(n.indexOf(':') + 1);
+            if (local.startsWith("ticket_barrier")) return true;
+            for (String w : new String[]{"fence", "_wall", "pane", "bars", "railing", "guard", "apg", "barrier", "gate", "post", "glass_door"})
+                if (local.contains(w)) return true;
+            return false;
+        }
+
+        static boolean platform(int x, int y, int z)
+        {
+            String n = states.get(block(x, y - 1, z)).name, h = states.get(block(x, y, z)).name;
+            if (n.equals("mtr:platform") || n.equals("mtr:platform_slab") || h.equals("mtr:platform_slab") || n.equals("projectseele:station_tactile_warning"))
+                return true;
+            // the edge of a platform behind platform screen doors
+            for (int d = 0; d < 4; d++) if (states.get(block(x + DX[d], y, z + DZ[d])).name.startsWith("mtr:apg")) return true;
+            return false;
+        }
+
+        /** Steps from a start cell to the nearest platform floor, walking (up one, down three), never through a barrier. */
+        static int walk(int sx, int sy, int sz)
+        {
+            int start = -99;
+            for (int dy = 1; dy >= -3; dy--) if (stand(sx, sy + dy, sz)) { start = sy + dy; break; }
+            if (start == -99) return Integer.MAX_VALUE;
+            Map<Long, Integer> seen = new HashMap<>();
+            java.util.ArrayDeque<int[]> q = new java.util.ArrayDeque<>();
+            q.add(new int[]{sx, start, sz, 0});
+            seen.put(pack3(sx, start, sz), 0);
+            while (!q.isEmpty() && seen.size() < 200000)
+            {
+                int[] c = q.poll();
+                if (platform(c[0], c[1], c[2])) return c[3];
+                if (Math.abs(c[0] - sx) > 160 || Math.abs(c[2] - sz) > 160 || Math.abs(c[1] - sy) > 40) continue;
+                for (int d = 0; d < 4; d++)
+                {
+                    int nx = c[0] + DX[d], nz = c[2] + DZ[d];
+                    for (int dy = 1; dy >= -3; dy--)
+                    {
+                        int ny = c[1] + dy;
+                        if (dy == 1 && !pass(c[0], c[1] + 2, c[2])) continue;
+                        if (!stand(nx, ny, nz)) continue;
+                        boolean clear = true;
+                        for (int k = ny + 1; k <= c[1] + 1 && clear; k++) if (!pass(nx, k, nz) || barrier(nx, k, nz)) clear = false;
+                        if (!clear) continue;
+                        if (seen.putIfAbsent(pack3(nx, ny, nz), c[3] + 1) == null) q.add(new int[]{nx, ny, nz, c[3] + 1});
+                        break;
+                    }
+                }
+            }
+            return Integer.MAX_VALUE;
+        }
+
+        static long pack3(int x, int y, int z) { return ((long) x & 0x3FFFFF) << 42 | ((long) (y + 2048) & 0xFFFFF) << 22 | ((long) z & 0x3FFFFF); }
+    }
+
     static final class Dark
     {
         static final int M = 15, SLAB = 64;
