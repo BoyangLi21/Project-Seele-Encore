@@ -1,20 +1,10 @@
 package com.projectseele.client;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.platform.NativeImage;
-import java.util.List;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.Direction;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.client.model.data.ModelData;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexBuffer;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferUploader;
 import com.projectseele.ProjectSeele;
 import com.projectseele.config.SeeleConfig;
 import com.projectseele.world.FacilitySchemaV2;
@@ -25,48 +15,67 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.ShaderInstance;
+import net.minecraft.client.renderer.BiomeColors;
+import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.commands.arguments.blocks.BlockStateParser;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.FoliageColor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
-import net.minecraft.world.level.FoliageColor;
-import net.minecraft.client.renderer.BiomeColors;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterShadersEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
+import net.minecraftforge.client.model.data.ModelData;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
-import java.nio.FloatBuffer;
 import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.GL11;
+import org.lwjgl.system.MemoryUtil;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_ACTIVE_TEXTURE;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.GL31.*;
+import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE1;
 
 /**
  * R65: the GeoFront cavity's far view. Distant Horizons cannot hold the cavity: with the vertical quality the pack
  * uses each column keeps too few spans, so the dome breaks up, and the hanging towers get no sky light underground
- * and come out black. Inside the cavity this draws a silhouette baked from the real blocks instead (the floor, the
- * lake, the dome's inner surface and the hanging city, tools/bake_geofront_dome.py) and holds Distant Horizons back
+ * and come out black. Inside the cavity this draws the cavity's own blocks instead and holds Distant Horizons back
  * (DhGeoFrontFarViewR65Mixin).
  * <p>
- * The silhouette is drawn right after the sky with a projection of its own reaching the far side of the cavity; the
- * depth it wrote is then cleared, so the real chunks draw over it as if it were sky. Under a shader pack it is drawn
- * after the pack's last pass instead, with GL programs of its own, and laid only where nothing was drawn (afterLevel).
- * Its shader drops everything within the vanilla render distance (horizontally), where the real chunks are, so the two
- * never overlap. Faces take their
- * block's texture colour for that side (as Distant Horizons colours its far view; tinted faces the cavity biome's tint),
- * shaded by facing, and fade into the fog colour with distance.
+ * The bake (tools/java/BakeGeoFrontFarViewR65.java) keeps every block face that looks into the cavity at one, two and
+ * four blocks, in 64x64 tiles. The client groups the tiles into 128x128 cells and draws each cell at the scale its
+ * distance calls for (one block near, coarser far), with the texture that side of that block shows (tinted faces with
+ * the cavity biome's tint; mostly see-through blocks such as glass as their average colour), shaded by facing, fading
+ * into the fog colour with distance. Nothing within the vanilla render distance (horizontally) is drawn, where the real
+ * chunks are. Without a shader pack it is drawn right after the sky, then its depth is cleared so the real chunks draw
+ * over it as over the sky; under a shader pack it is drawn after the pack's last pass into a target of its own and laid
+ * only where nothing was drawn (afterLevel). Everything is plain GL with programs of its own: while a pack is in use,
+ * Oculus turns colour and depth writes off whenever a mod's shader instance is applied, and swaps the vanilla shaders
+ * for the pack's programs. Every piece of GL state touched is read first and put back as it was.
  * <p>
  * The mesh is a private build product installed into the pack's jar; without it nothing changes.
  */
@@ -76,39 +85,60 @@ public final class GeoFrontDomeFarViewR65
     private static final ResourceLocation MESH = new ResourceLocation(ProjectSeele.MODID, "geofront/dome_far_r65.bin.gz");
     /** The cavity (the R64 area maps' measured rim), and the band from its floor to under its roof. */
     private static final double CENTRE_X = 32, CENTRE_Z = 320, RADIUS = 1900, MIN_Y = -530, MAX_Y = 56;
-    private static final float FAR = 6000F, NEAR = 8F, FOG_END = 5000F, FOG_STRENGTH = .7F;
+    private static final float FAR = 6000F, NEAR = 8F, FOG_END = 5000F, FOG_STRENGTH = .6F;
+    /** Horizontal distance to a cell's nearest point under which it is drawn block by block, then at two blocks. */
+    private static final float FINE = 640F, MEDIUM = 1280F, KEEP = 192F;
+    /** One instance (16 bytes) per quad: u16 x, y, z (blocks from the cell origin, on the face plane), u16 extents,
+     *  u8 face, u8 unused, u16 look (palette entry * 6 + face), u16 unused; the vertex shader makes the corners. */
+    private static final int CELL = 128, INSTANCE = 16, UPLOADS_PER_FRAME = 3;
+    private static final long UPLOAD_NANOS = 4_000_000L;
 
-    private static ShaderInstance shader;
-    private static VertexBuffer buffer;
-    private static boolean loaded, missing, failed;
-    private static int quads;
+    private record Tile(int x, int z, byte[][] quads, int[] counts) {}
+
+    private static final class Cell
+    {
+        final int x, z;
+        final List<Tile> tiles = new ArrayList<>();
+        final int[] vao = new int[3], vbo = new int[3], count = new int[3];
+        final boolean[] built = new boolean[3];
+        float minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
+
+        Cell(int x, int z) { this.x = x; this.z = z; }
+    }
+
+    private static boolean loaded, missing, failed, active;
+    private static java.util.concurrent.CompletableFuture<Void> loading;
+    private static int levelCount;
+    private static int[] scales;
+    private static final List<Cell> cells = new ArrayList<>();
     private static float originX, originY, originZ;
-    private static boolean active;
+    /** Per look (palette entry * 6 + face): sprite rectangle u0, v0, u1, v1, then colour RGB and 1 when textured. */
+    private static float[] looks;
+    private static int lookBuffer, lookTexture;
+    private static long totalQuads, vramBytes;
+    private static int drawnCells;
+    private static long drawnQuads;
+
     /** Under a shader pack: the frame's matrices, eye and fog colour from before the sky, drawn after the pack's passes. */
     private static Matrix4f pendingView, pendingProjection;
     private static float[] pendingCamera, pendingFog;
     private static TextureTarget target;
-    private static VertexBuffer screen;
-    private static int farProgram, blitProgram;
+    private static int screenVao, screenVbo, farProgram, blitProgram;
     private static final FloatBuffer MATRIX = BufferUtils.createFloatBuffer(16);
 
     private GeoFrontDomeFarViewR65() {}
 
-    @Mod.EventBusSubscriber(modid = ProjectSeele.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
-    public static final class Shaders
-    {
-        @SubscribeEvent
-        public static void register(RegisterShadersEvent event) throws IOException
-        {
-            event.registerShader(new ShaderInstance(event.getResourceProvider(), new ResourceLocation(ProjectSeele.MODID, "geofront_dome_far"),
-                    DefaultVertexFormat.POSITION_COLOR), instance -> shader = instance);
-        }
-    }
-
-    /** True while the camera is inside the cavity and the silhouette stands in for the Distant Horizons far view. */
+    /** True while the camera is inside the cavity and the far view stands in for the Distant Horizons far view. */
     public static boolean suppressDistantHorizons()
     {
         return active;
+    }
+
+    /** For the review log: cells and quads drawn last frame, and the far view's vertex memory. */
+    public static String stats()
+    {
+        return String.format(java.util.Locale.ROOT, "%d cells, %d quads drawn, %d MB of vertices on the GPU", drawnCells, drawnQuads,
+                vramBytes >> 20);
     }
 
     private static java.lang.invoke.MethodHandle dhInstance, dhTasks;
@@ -134,7 +164,7 @@ public final class GeoFrontDomeFarViewR65
         }
         catch (Throwable problem)
         {
-            // without them DH's far-view buffers pile up, so the silhouette gives way and DH draws again
+            // without them DH's far-view buffers pile up, so the far view gives way and DH draws again
             dhTasksMissing = true;
             failed = true;
             active = false;
@@ -165,8 +195,41 @@ public final class GeoFrontDomeFarViewR65
         if (com.projectseele.client.render.ShaderShadowPassR44.active()) return;
         try
         {
-            if (!loaded) load(mc);
-            if (buffer == null || shader == null)
+            if (!loaded)
+            {
+                // read and prepared off the render thread (about a second); Distant Horizons draws until it is ready
+                if (loading == null)
+                {
+                    var at = mc.gameRenderer.getMainCamera().getBlockPosition();
+                    int[] tints = {BiomeColors.getAverageFoliageColor(mc.level, at), BiomeColors.getAverageGrassColor(mc.level, at),
+                            BiomeColors.getAverageWaterColor(mc.level, at)};
+                    loading = java.util.concurrent.CompletableFuture.runAsync(() -> {
+                        try
+                        {
+                            load(mc, tints);
+                        }
+                        catch (IOException problem)
+                        {
+                            throw new java.io.UncheckedIOException(problem);
+                        }
+                    }, net.minecraft.Util.backgroundExecutor());
+                }
+                if (!loading.isDone())
+                {
+                    active = false;
+                    return;
+                }
+                loaded = true;
+                try
+                {
+                    loading.join();
+                }
+                catch (java.util.concurrent.CompletionException problem)
+                {
+                    throw new IOException(problem.getCause());
+                }
+            }
+            if (cells.isEmpty())
             {
                 active = false;
                 return;
@@ -178,6 +241,18 @@ public final class GeoFrontDomeFarViewR65
             Matrix4f projection = new Matrix4f(event.getProjectionMatrix());
             projection.m22((FAR + NEAR) / (NEAR - FAR));
             projection.m32(2F * FAR * NEAR / (NEAR - FAR));
+            float[] fog = RenderSystem.getShaderFogColor().clone();
+            int vao = glGetInteger(GL_VERTEX_ARRAY_BINDING), arrayBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
+            try
+            {
+                upload(mc, camX, camZ);
+            }
+            finally
+            {
+                glBindVertexArray(vao);
+                glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
+                BufferUploader.invalidate();
+            }
             if (com.projectseele.client.render.ShaderShadowPassR44.enabled())
             {
                 // under a shader pack anything drawn now is lit by the pack as a surface it knows nothing about (black)
@@ -185,12 +260,10 @@ public final class GeoFrontDomeFarViewR65
                 pendingView = view;
                 pendingProjection = projection;
                 pendingCamera = new float[]{camX, camY, camZ};
-                pendingFog = RenderSystem.getShaderFogColor().clone();
+                pendingFog = fog;
                 return;
             }
-            draw(mc, view, projection, camX, camY, camZ, RenderSystem.getShaderFogColor());
-            // the real chunks draw over the silhouette as over the sky
-            RenderSystem.clear(GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+            drawWithState(mc, view, projection, new float[]{camX, camY, camZ}, fog, null);
         }
         catch (IOException | RuntimeException problem)
         {
@@ -201,13 +274,9 @@ public final class GeoFrontDomeFarViewR65
     }
 
     /**
-     * Under a shader pack, right after the level (and the pack's composite and final passes) is drawn. The silhouette
-     * goes into a target of its own, with its own depth, and is laid onto the picture only where the depth buffer the pack
+     * Under a shader pack, right after the level (and the pack's composite and final passes) is drawn. The far view goes
+     * into a target of its own, with its own depth, and is laid onto the picture only where the depth buffer the pack
      * shares with the main target still holds the cleared value: where no real block, entity or hand was drawn.
-     * <p>
-     * Everything here is plain GL with programs of its own. While a pack is in use, Oculus turns colour and depth writes
-     * off whenever a shader of a mod is applied (MixinShaderInstance), and swaps the vanilla shaders for the pack's
-     * programs, so neither kind can draw this. Every piece of GL state touched is read first and put back as it was.
      */
     public static void afterLevel()
     {
@@ -217,13 +286,22 @@ public final class GeoFrontDomeFarViewR65
         pendingProjection = null;
         pendingCamera = null;
         pendingFog = null;
-        if (view == null || failed || buffer == null) return;
+        if (view == null || failed || cells.isEmpty()) return;
         Minecraft mc = Minecraft.getInstance();
         if (EvaCommandFeedClient.captureTargetOverride() != null) return;
         RenderTarget main = mc.getMainRenderTarget();
+        if (target == null) target = new TextureTarget(main.width, main.height, true, Minecraft.ON_OSX);
+        else if (target.width != main.width || target.height != main.height) target.resize(main.width, main.height, Minecraft.ON_OSX);
+        drawWithState(mc, view, projection, camera, fog, main);
+    }
+
+    /** Reads the GL state touched, draws (into the main target, or through the far view's own target onto it), restores. */
+    private static void drawWithState(Minecraft mc, Matrix4f view, Matrix4f projection, float[] camera, float[] fog, RenderTarget main)
+    {
         boolean depthTest = glIsEnabled(GL_DEPTH_TEST), blend = glIsEnabled(GL_BLEND), cull = glIsEnabled(GL_CULL_FACE),
                 scissor = glIsEnabled(GL_SCISSOR_TEST), depthMask = glGetBoolean(GL_DEPTH_WRITEMASK);
         int depthFunc = glGetInteger(GL_DEPTH_FUNC), program = glGetInteger(GL_CURRENT_PROGRAM), unit = glGetInteger(GL_ACTIVE_TEXTURE);
+        int vao = glGetInteger(GL_VERTEX_ARRAY_BINDING), arrayBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
         ByteBuffer mask = BufferUtils.createByteBuffer(16);
         glGetBooleanv(GL_COLOR_WRITEMASK, mask);
         FloatBuffer clear = BufferUtils.createFloatBuffer(16);
@@ -232,24 +310,7 @@ public final class GeoFrontDomeFarViewR65
         int texture = glGetInteger(GL_TEXTURE_BINDING_2D);
         try
         {
-            if (farProgram == 0)
-            {
-                farProgram = link("geofront_dome_far", "Color");
-                blitProgram = link("geofront_dome_blit", "UV0");
-                BufferBuilder quad = new BufferBuilder(256);
-                quad.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-                quad.vertex(-1, -1, 1).uv(0, 0).endVertex();
-                quad.vertex(1, -1, 1).uv(1, 0).endVertex();
-                quad.vertex(1, 1, 1).uv(1, 1).endVertex();
-                quad.vertex(-1, 1, 1).uv(0, 1).endVertex();
-                screen = new VertexBuffer(VertexBuffer.Usage.STATIC);
-                screen.bind();
-                screen.upload(quad.end());
-                VertexBuffer.unbind();
-            }
-            if (target == null) target = new TextureTarget(main.width, main.height, true, Minecraft.ON_OSX);
-            else if (target.width != main.width || target.height != main.height)
-                target.resize(main.width, main.height, Minecraft.ON_OSX);
+            if (farProgram == 0) programs();
             glColorMask(true, true, true, true);
             glDisable(GL_BLEND);
             glDisable(GL_CULL_FACE);
@@ -257,42 +318,42 @@ public final class GeoFrontDomeFarViewR65
             glEnable(GL_DEPTH_TEST);
             glDepthFunc(GL_LEQUAL);
             glDepthMask(true);
-            target.bindWrite(true);
-            glClearColor(0F, 0F, 0F, 0F);
-            glClearDepth(1D);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            float nearCut = mc.options.getEffectiveRenderDistance() * 16F - 8F;
-            float light = (float) (double) SeeleConfig.GEOFRONT_FAR_LIGHT.get();
-            glUseProgram(farProgram);
-            glUniformMatrix4fv(glGetUniformLocation(farProgram, "ModelViewMat"), false, view.get(MATRIX));
-            glUniformMatrix4fv(glGetUniformLocation(farProgram, "ProjMat"), false, projection.get(MATRIX));
-            glUniform4f(glGetUniformLocation(farProgram, "ColorModulator"), light, light, light, 1F);
-            glUniform1f(glGetUniformLocation(farProgram, "FogStart"), nearCut);
-            glUniform1f(glGetUniformLocation(farProgram, "FogEnd"), FOG_END);
-            glUniform4f(glGetUniformLocation(farProgram, "FogColor"), fog[0], fog[1], fog[2], FOG_STRENGTH);
-            glUniform3f(glGetUniformLocation(farProgram, "Camera"), camera[0], camera[1], camera[2]);
-            glUniform1f(glGetUniformLocation(farProgram, "NearCut"), nearCut);
-            buffer.bind();
-            buffer.draw();
-            main.bindWrite(true);
-            glDepthMask(false);
-            glUseProgram(blitProgram);
-            glUniform1i(glGetUniformLocation(blitProgram, "Sampler0"), 0);
-            glBindTexture(GL_TEXTURE_2D, target.getColorTextureId());
-            screen.bind();
-            screen.draw();
-            VertexBuffer.unbind();
+            if (main != null)
+            {
+                target.bindWrite(true);
+                glClearColor(0F, 0F, 0F, 0F);
+                glClearDepth(1D);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            }
+            draw(mc, view, projection, camera, fog);
+            if (main != null)
+            {
+                main.bindWrite(true);
+                glDepthMask(false);
+                glUseProgram(blitProgram);
+                glUniform1i(glGetUniformLocation(blitProgram, "Sampler0"), 0);
+                glBindTexture(GL_TEXTURE_2D, target.getColorTextureId());
+                glBindVertexArray(screenVao);
+                glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+            }
+            else
+            {
+                // the real chunks draw over the far view as over the sky
+                glClear(GL_DEPTH_BUFFER_BIT);
+            }
         }
         catch (IOException | RuntimeException problem)
         {
             failed = true;
             active = false;
             ProjectSeele.LOGGER.warn("GeoFront far view R65 off: {}", problem.toString(), problem);
-            VertexBuffer.unbind();
-            main.bindWrite(true);
+            if (main != null) main.bindWrite(true);
         }
         finally
         {
+            glBindVertexArray(vao);
+            glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
+            BufferUploader.invalidate();
             glBindTexture(GL_TEXTURE_2D, texture);
             glActiveTexture(unit);
             glUseProgram(program);
@@ -307,21 +368,242 @@ public final class GeoFrontDomeFarViewR65
         }
     }
 
+    private static void draw(Minecraft mc, Matrix4f view, Matrix4f projection, float[] camera, float[] fog)
+    {
+        float nearCut = mc.options.getEffectiveRenderDistance() * 16F - 8F;
+        float light = (float) (double) SeeleConfig.GEOFRONT_FAR_LIGHT.get();
+        glUseProgram(farProgram);
+        glUniformMatrix4fv(glGetUniformLocation(farProgram, "ModelViewMat"), false, view.get(MATRIX));
+        glUniformMatrix4fv(glGetUniformLocation(farProgram, "ProjMat"), false, projection.get(MATRIX));
+        glUniform1f(glGetUniformLocation(farProgram, "Light"), light);
+        glUniform1f(glGetUniformLocation(farProgram, "FogStart"), nearCut);
+        glUniform1f(glGetUniformLocation(farProgram, "FogEnd"), FOG_END);
+        glUniform4f(glGetUniformLocation(farProgram, "FogColor"), fog[0], fog[1], fog[2], FOG_STRENGTH);
+        glUniform3f(glGetUniformLocation(farProgram, "Camera"), camera[0], camera[1], camera[2]);
+        glUniform1f(glGetUniformLocation(farProgram, "NearCut"), nearCut);
+        glUniform1i(glGetUniformLocation(farProgram, "Sampler0"), 0);
+        glUniform1i(glGetUniformLocation(farProgram, "Looks"), 1);
+        int origin = glGetUniformLocation(farProgram, "CellOrigin");
+        glBindTexture(GL_TEXTURE_2D, mc.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS).getId());
+        glActiveTexture(GL_TEXTURE1);
+        int buffer = glGetInteger(GL_TEXTURE_BINDING_BUFFER);
+        glBindTexture(GL_TEXTURE_BUFFER, lookTexture);
+        glActiveTexture(GL_TEXTURE0);
+        FrustumIntersection frustum = new FrustumIntersection(new Matrix4f(projection).mul(view));
+        int cellsDrawn = 0;
+        long quadsDrawn = 0;
+        for (Cell cell : cells)
+        {
+            float far = farthest(cell, camera[0], camera[2]);
+            if (far < nearCut) continue;
+            if (!frustum.testAab(cell.x, cell.minY, cell.z, cell.x + CELL, cell.maxY, cell.z + CELL)) continue;
+            int want = wanted(nearest(cell, camera[0], camera[2]));
+            int level = -1;
+            for (int l = want; l < levelCount; l++) if (cell.built[l]) { level = l; break; }
+            if (level < 0) for (int l = want - 1; l >= 0; l--) if (cell.built[l]) { level = l; break; }
+            if (level < 0 || cell.count[level] == 0) continue;
+            glUniform3f(origin, cell.x, 0F, cell.z);
+            glBindVertexArray(cell.vao[level]);
+            glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, cell.count[level]);
+            cellsDrawn++;
+            quadsDrawn += cell.count[level];
+        }
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_BUFFER, buffer);
+        glActiveTexture(GL_TEXTURE0);
+        drawnCells = cellsDrawn;
+        drawnQuads = quadsDrawn;
+    }
+
+    private static int wanted(float distance)
+    {
+        int level = distance < FINE ? 0 : distance < MEDIUM ? 1 : 2;
+        return Math.min(level, levelCount - 1);
+    }
+
+    private static float nearest(Cell c, float x, float z)
+    {
+        float dx = Math.max(Math.max(c.x - x, x - (c.x + CELL)), 0), dz = Math.max(Math.max(c.z - z, z - (c.z + CELL)), 0);
+        return (float) Math.sqrt(dx * dx + dz * dz);
+    }
+
+    private static float farthest(Cell c, float x, float z)
+    {
+        float dx = Math.max(Math.abs(c.x - x), Math.abs(c.x + CELL - x)), dz = Math.max(Math.abs(c.z - z), Math.abs(c.z + CELL - z));
+        return (float) Math.sqrt(dx * dx + dz * dz);
+    }
+
+    /**
+     * Builds the GPU buffers the camera needs, nearest first, a few a frame: every cell at its coarsest scale on the
+     * first frame, then the finer scales as the camera comes near. A finer scale is freed once the camera is well past
+     * the distance that wanted it.
+     */
+    private static void upload(Minecraft mc, float camX, float camZ)
+    {
+        long began = System.nanoTime();
+        int coarsest = levelCount - 1;
+        boolean first = false;
+        for (Cell cell : cells)
+            if (!cell.built[coarsest])
+            {
+                build(cell, coarsest);
+                first = true;
+            }
+        if (first) ProjectSeele.LOGGER.info("GeoFront far view R65: coarsest scale of {} cells ready in {} ms", cells.size(),
+                (System.nanoTime() - began) / 1_000_000);
+        // cells wholly inside the vanilla render distance are never seen (the real chunks are there)
+        float nearCut = mc.options.getEffectiveRenderDistance() * 16F - 8F;
+        int done = 0;
+        Cell best = null;
+        while (done < UPLOADS_PER_FRAME && System.nanoTime() - began < UPLOAD_NANOS)
+        {
+            best = null;
+            int bestLevel = -1;
+            float bestDistance = Float.MAX_VALUE;
+            for (Cell cell : cells)
+            {
+                float d = nearest(cell, camX, camZ);
+                int want = wanted(d);
+                for (int l = 0; l < coarsest; l++)
+                    if (cell.built[l] && l < want && d > (l == 0 ? FINE : MEDIUM) + KEEP) free(cell, l);
+                if (!cell.built[want] && d < bestDistance && farthest(cell, camX, camZ) >= nearCut)
+                {
+                    best = cell;
+                    bestLevel = want;
+                    bestDistance = d;
+                }
+            }
+            if (best == null) break;
+            build(best, bestLevel);
+            done++;
+        }
+    }
+
+    private static void free(Cell cell, int level)
+    {
+        glDeleteVertexArrays(cell.vao[level]);
+        glDeleteBuffers(cell.vbo[level]);
+        vramBytes -= (long) cell.count[level] * INSTANCE;
+        cell.vao[level] = cell.vbo[level] = 0;
+        cell.built[level] = false;
+    }
+
+    /** One cell at one scale: its quads as instances in a buffer. */
+    private static void build(Cell cell, int level)
+    {
+        int scale = scales[level], quads = 0;
+        for (Tile t : cell.tiles) quads += t.counts[level];
+        cell.built[level] = true;
+        cell.count[level] = quads;
+        if (quads == 0) return;
+        ByteBuffer out = MemoryUtil.memAlloc(quads * INSTANCE).order(ByteOrder.nativeOrder());
+        try
+        {
+            for (Tile t : cell.tiles)
+            {
+                ByteBuffer in = ByteBuffer.wrap(t.quads[level]).order(ByteOrder.LITTLE_ENDIAN);
+                int ox = t.x - cell.x, oz = t.z - cell.z;
+                for (int i = 0; i < t.counts[level]; i++)
+                {
+                    int x = in.get() & 0xFF, y = in.getShort() & 0xFFFF, z = in.get() & 0xFF;
+                    int du = in.getShort() & 0xFFFF, dv = in.getShort() & 0xFFFF, face = in.get() & 0xFF, pal = in.getShort() & 0xFFFF;
+                    int bx = ox + x * scale, by = y * scale, bz = oz + z * scale;
+                    // the face's own plane: a positive face lies on the far side of its cell
+                    if (face == 1) bx += scale;
+                    else if (face == 3) by += scale;
+                    else if (face == 5) bz += scale;
+                    out.putShort((short) bx).putShort((short) by).putShort((short) bz);
+                    out.putShort((short) (du * scale)).putShort((short) (dv * scale));
+                    out.put((byte) face).put((byte) 0).putShort((short) (pal * 6 + face)).putShort((short) 0);
+                }
+            }
+            out.flip();
+            int vao = glGenVertexArrays(), vbo = glGenBuffers();
+            glBindVertexArray(vao);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, out, GL_STATIC_DRAW);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_UNSIGNED_SHORT, false, INSTANCE, 0L);
+            glVertexAttribDivisor(0, 1);
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 2, GL_UNSIGNED_SHORT, false, INSTANCE, 6L);
+            glVertexAttribDivisor(1, 1);
+            glEnableVertexAttribArray(2);
+            glVertexAttribIPointer(2, 1, GL_UNSIGNED_BYTE, INSTANCE, 10L);
+            glVertexAttribDivisor(2, 1);
+            glEnableVertexAttribArray(3);
+            glVertexAttribIPointer(3, 1, GL_UNSIGNED_SHORT, INSTANCE, 12L);
+            glVertexAttribDivisor(3, 1);
+            glBindVertexArray(0);
+            cell.vao[level] = vao;
+            cell.vbo[level] = vbo;
+            vramBytes += (long) quads * INSTANCE;
+        }
+        finally
+        {
+            MemoryUtil.memFree(out);
+        }
+    }
+
+    // ------------------------------------------------------------------ programs
+
+    private static void programs() throws IOException
+    {
+        farProgram = link("geofront_dome_far", "Base", "Extent", "Face", "Look");
+        blitProgram = link("geofront_dome_blit", "Position");
+        FloatBuffer table = MemoryUtil.memAllocFloat(looks.length);
+        try
+        {
+            table.put(looks).flip();
+            lookBuffer = glGenBuffers();
+            glBindBuffer(GL_TEXTURE_BUFFER, lookBuffer);
+            glBufferData(GL_TEXTURE_BUFFER, table, GL_STATIC_DRAW);
+            glBindBuffer(GL_TEXTURE_BUFFER, 0);
+            lookTexture = glGenTextures();
+            glActiveTexture(GL_TEXTURE1);
+            int previous = glGetInteger(GL_TEXTURE_BINDING_BUFFER);
+            glBindTexture(GL_TEXTURE_BUFFER, lookTexture);
+            glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, lookBuffer);
+            glBindTexture(GL_TEXTURE_BUFFER, previous);
+            glActiveTexture(GL_TEXTURE0);
+        }
+        finally
+        {
+            MemoryUtil.memFree(table);
+        }
+        FloatBuffer corners = MemoryUtil.memAllocFloat(8);
+        try
+        {
+            corners.put(new float[]{-1, -1, 1, -1, -1, 1, 1, 1}).flip();
+            screenVao = glGenVertexArrays();
+            screenVbo = glGenBuffers();
+            glBindVertexArray(screenVao);
+            glBindBuffer(GL_ARRAY_BUFFER, screenVbo);
+            glBufferData(GL_ARRAY_BUFFER, corners, GL_STATIC_DRAW);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 2, GL_FLOAT, false, 8, 0L);
+            glBindVertexArray(0);
+        }
+        finally
+        {
+            MemoryUtil.memFree(corners);
+        }
+    }
+
     private static void set(int capability, boolean on)
     {
         if (on) glEnable(capability);
         else glDisable(capability);
     }
 
-    /** A program from shaders/core/<name>.vsh and .fsh, Position at attribute 0 and the second element at 1. */
-    private static int link(String name, String second) throws IOException
+    /** A program from shaders/core/<name>.vsh and .fsh with the given attributes at locations 0, 1, ... */
+    private static int link(String name, String... attributes) throws IOException
     {
         int vertex = compile(GL_VERTEX_SHADER, name + ".vsh"), fragment = compile(GL_FRAGMENT_SHADER, name + ".fsh");
         int linked = glCreateProgram();
         glAttachShader(linked, vertex);
         glAttachShader(linked, fragment);
-        glBindAttribLocation(linked, 0, "Position");
-        glBindAttribLocation(linked, 1, second);
+        for (int i = 0; i < attributes.length; i++) glBindAttribLocation(linked, i, attributes[i]);
         glLinkProgram(linked);
         glDeleteShader(vertex);
         glDeleteShader(fragment);
@@ -348,42 +630,10 @@ public final class GeoFrontDomeFarViewR65
         }
     }
 
-    private static void draw(Minecraft mc, Matrix4f view, Matrix4f projection, float camX, float camY, float camZ, float[] fog)
-    {
-        float nearCut = mc.options.getEffectiveRenderDistance() * 16F - 8F;
-        float light = (float) (double) SeeleConfig.GEOFRONT_FAR_LIGHT.get();
-        float fogStart = RenderSystem.getShaderFogStart(), fogEnd = RenderSystem.getShaderFogEnd();
-        float[] fogColour = RenderSystem.getShaderFogColor().clone();
-        shader.safeGetUniform("Camera").set(camX, camY, camZ);
-        shader.safeGetUniform("NearCut").set(nearCut);
-        RenderSystem.setShaderFogStart(nearCut);
-        RenderSystem.setShaderFogEnd(FOG_END);
-        RenderSystem.setShaderFogColor(fog[0], fog[1], fog[2], FOG_STRENGTH);
-        RenderSystem.setShaderColor(light, light, light, 1F);
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthFunc(GL11.GL_LEQUAL);
-        RenderSystem.depthMask(true);
-        RenderSystem.disableCull();
-        RenderSystem.disableBlend();
-        try
-        {
-            buffer.bind();
-            buffer.drawWithShader(view, projection, shader);
-            VertexBuffer.unbind();
-        }
-        finally
-        {
-            RenderSystem.setShaderColor(1F, 1F, 1F, 1F);
-            RenderSystem.setShaderFogStart(fogStart);
-            RenderSystem.setShaderFogEnd(fogEnd);
-            RenderSystem.setShaderFogColor(fogColour[0], fogColour[1], fogColour[2], fogColour[3]);
-            RenderSystem.enableCull();
-        }
-    }
+    // ------------------------------------------------------------------ loading
 
-    private static void load(Minecraft mc) throws IOException
+    private static void load(Minecraft mc, int[] tints) throws IOException
     {
-        loaded = true;
         var resource = mc.getResourceManager().getResource(MESH);
         if (resource.isEmpty())
         {
@@ -393,61 +643,80 @@ public final class GeoFrontDomeFarViewR65
         }
         long began = System.nanoTime();
         try (InputStream raw = resource.get().open();
-             DataInputStream in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(raw), 1 << 16)))
+             DataInputStream in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(raw, 1 << 16), 1 << 16)))
         {
             byte[] magic = new byte[4];
             in.readFully(magic);
             if (!"SGDM".equals(new String(magic, StandardCharsets.US_ASCII))) throw new IOException("not a GeoFront far-view mesh");
-            ByteBuffer head = little(in, 2 + 12 + 2);
-            int version = head.get() & 0xFF, cell = head.get() & 0xFF;
-            if (version != 1 || cell <= 0) throw new IOException("unknown mesh version " + version);
+            int version = in.readUnsignedByte(), tile = in.readUnsignedByte();
+            if (version != 2 || tile != 64) throw new IOException("unknown mesh version " + version);
+            ByteBuffer head = little(in, 12 + 6 + 1);
             originX = head.getInt();
             originY = head.getInt();
             originZ = head.getInt();
-            int names = head.getShort() & 0xFFFF;
-            // the cavity is one biome; its tints are read where the camera is, inside it
-            var at = mc.gameRenderer.getMainCamera().getBlockPosition();
-            int foliage = BiomeColors.getAverageFoliageColor(mc.level, at);
-            int grass = BiomeColors.getAverageGrassColor(mc.level, at);
-            int water = BiomeColors.getAverageWaterColor(mc.level, at);
-            // per block: the colour of its top, its bottom and its sides
-            int[][] colours = new int[3][names];
+            head.getShort();
+            head.getShort();
+            head.getShort();
+            levelCount = head.get() & 0xFF;
+            if (levelCount < 1 || levelCount > 3) throw new IOException("unknown level count " + levelCount);
+            scales = new int[levelCount];
+            for (int l = 0; l < levelCount; l++) scales[l] = in.readUnsignedByte();
+            int names = little(in, 4).getInt();
+            if (names < 0 || names > 65535) throw new IOException("bad palette " + names);
+            List<String> palette = new ArrayList<>(names);
             for (int i = 0; i < names; i++)
             {
-                int length = little(in, 2).getShort() & 0xFFFF;
-                byte[] text = new byte[length];
+                byte[] text = new byte[little(in, 2).getShort() & 0xFFFF];
                 in.readFully(text);
-                int[] three = colours(mc, new String(text, StandardCharsets.UTF_8), foliage, grass, water);
-                for (int k = 0; k < 3; k++) colours[k][i] = three[k];
+                palette.add(new String(text, StandardCharsets.UTF_8));
             }
-            quads = little(in, 4).getInt();
-            // the bake keeps to 250,000 (16 MB of vertices); anything far past that is not a mesh this was made for
-            if (quads < 0 || quads > 400_000) throw new IOException("too many quads " + quads);
-            // a builder of its own: the shared one left half-built by a bad file broke every later draw that used it
-            BufferBuilder builder = new BufferBuilder(quads * 4 * DefaultVertexFormat.POSITION_COLOR.getVertexSize() + 256);
-            builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-            ByteBuffer quad = ByteBuffer.allocate(13).order(ByteOrder.LITTLE_ENDIAN);
-            for (int i = 0; i < quads; i++)
+            resolve(mc, palette, tints);
+            int tileCount = little(in, 4).getInt();
+            Map<Long, Cell> byKey = new HashMap<>();
+            totalQuads = 0;
+            for (int i = 0; i < tileCount; i++)
             {
-                quad.clear();
-                in.readFully(quad.array());
-                int x = quad.getShort(), y = quad.getShort(), z = quad.getShort();
-                int du = quad.getShort() & 0xFFFF, dv = quad.getShort() & 0xFFFF, face = quad.get() & 0xFF;
-                int index = quad.getShort() & 0xFFFF;
-                int which = face == 3 ? 0 : face == 2 ? 1 : 2;
-                emit(builder, face, x * cell, y * cell, z * cell, du * cell, dv * cell, cell, index < names ? colours[which][index] : 0x808080);
+                ByteBuffer id = little(in, 4);
+                int tx = id.getShort() & 0xFFFF, tz = id.getShort() & 0xFFFF;
+                byte[][] quads = new byte[levelCount][];
+                int[] counts = new int[levelCount];
+                for (int l = 0; l < levelCount; l++)
+                {
+                    counts[l] = little(in, 4).getInt();
+                    if (counts[l] < 0 || counts[l] > 4_000_000) throw new IOException("bad tile " + counts[l]);
+                    quads[l] = new byte[counts[l] * 11];
+                    in.readFully(quads[l]);
+                    totalQuads += counts[l];
+                }
+                Tile t = new Tile(tx * 64, tz * 64, quads, counts);
+                int cx = (tx * 64) / CELL, cz = (tz * 64) / CELL;
+                Cell cell = byKey.computeIfAbsent(((long) cx << 32) ^ (cz & 0xffffffffL), k -> new Cell(cx * CELL, cz * CELL));
+                cell.tiles.add(t);
+                // the height band the cell's quads use, for the frustum test
+                ByteBuffer q = ByteBuffer.wrap(quads[levelCount - 1]).order(ByteOrder.LITTLE_ENDIAN);
+                int s = scales[levelCount - 1];
+                for (int k = 0; k < counts[levelCount - 1]; k++)
+                {
+                    int y = q.getShort(k * 11 + 1) & 0xFFFF;
+                    int face = q.get(k * 11 + 8) & 0xFF, extent = face / 2 == 0 ? q.getShort(k * 11 + 4) & 0xFFFF
+                            : face / 2 == 2 ? q.getShort(k * 11 + 6) & 0xFFFF : 1;
+                    cell.minY = Math.min(cell.minY, y * s);
+                    cell.maxY = Math.max(cell.maxY, (y + extent + 1) * s);
+                }
             }
-            buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
-            buffer.bind();
-            buffer.upload(builder.end());
-            VertexBuffer.unbind();
+            cells.clear();
+            for (Cell c : byKey.values())
+            {
+                if (c.minY > c.maxY) { c.minY = 0; c.maxY = 600; }
+                cells.add(c);
+            }
         }
         catch (EOFException truncated)
         {
             throw new IOException("truncated GeoFront far-view mesh", truncated);
         }
-        ProjectSeele.LOGGER.info("GeoFront far view R65: {} quads ({} MB of vertices) ready in {} ms", quads,
-                quads * 4L * DefaultVertexFormat.POSITION_COLOR.getVertexSize() / (1 << 20), (System.nanoTime() - began) / 1_000_000);
+        ProjectSeele.LOGGER.info("GeoFront far view R65: {} cells, {} quads over {} scales, read in {} ms", cells.size(), totalQuads,
+                levelCount, (System.nanoTime() - began) / 1_000_000);
     }
 
     private static ByteBuffer little(DataInputStream in, int length) throws IOException
@@ -457,40 +726,75 @@ public final class GeoFrontDomeFarViewR65
         return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
     }
 
+    private static final Direction[] FACES = {Direction.WEST, Direction.EAST, Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH};
+
     /**
-     * The block's colours as its own textures show them (the average of the texture each side of its model uses, as
-     * Distant Horizons colours its far view, so the silhouette meets the real blocks at the render distance without a
-     * change of colour); faces the biome tints take the cavity's tint. Water has no model: its still texture and the
-     * water tint. Anything unreadable falls back to the block's map colour.
+     * Per block state and face: the sprite that side shows in the block atlas, its tint, and whether it is drawn with
+     * its texture (mostly see-through sprites such as glass are drawn as their average colour instead: the far view
+     * has nothing behind a window).
      */
-    private static int[] colours(Minecraft mc, String id, int foliage, int grass, int water)
+    private static void resolve(Minecraft mc, List<String> palette, int[] tints)
     {
-        ResourceLocation key = ResourceLocation.tryParse(id);
-        Block block = key == null ? Blocks.AIR : BuiltInRegistries.BLOCK.get(key);
-        if (block == Blocks.WATER)
-        {
-            int c = tint(average(mc, new ResourceLocation("minecraft", "block/water_still")), water);
-            return new int[]{c, c, c};
-        }
-        BlockState state = block.defaultBlockState();
-        int fallback = mapColour(block);
-        int[] out = new int[3];
-        Direction[] sides = {Direction.UP, Direction.DOWN, Direction.NORTH};
-        var model = mc.getBlockRenderer().getBlockModel(state);
+        int n = palette.size();
+        looks = new float[n * 6 * 8];
+        int foliage = tints[0], grass = tints[1], water = tints[2];
+        TextureAtlas atlas = (TextureAtlas) mc.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
+        Map<ResourceLocation, int[]> sprites = new HashMap<>();
         RandomSource random = RandomSource.create(42L);
-        for (int k = 0; k < 3; k++)
+        for (int i = 0; i < n; i++)
         {
-            List<BakedQuad> quads = model.getQuads(state, sides[k], random, ModelData.EMPTY, null);
-            if (quads.isEmpty()) quads = model.getQuads(state, null, random, ModelData.EMPTY, null);
-            BakedQuad quad = quads.isEmpty() ? null : quads.get(0);
-            TextureAtlasSprite sprite = quad != null ? quad.getSprite() : model.getParticleIcon(ModelData.EMPTY);
-            int c = average(mc, sprite.contents().name());
-            if (c < 0) c = fallback;
-            else if (quad != null && quad.isTinted())
-                c = tint(c, block instanceof LeavesBlock || block == Blocks.VINE ? leafTint(block, foliage) : grass);
-            out[k] = c;
+            BlockState state = parse(palette.get(i));
+            Block block = state.getBlock();
+            var model = mc.getBlockRenderer().getBlockModel(state);
+            for (int f = 0; f < 6; f++)
+            {
+                TextureAtlasSprite sprite;
+                boolean tinted;
+                if (block == Blocks.WATER || block == Blocks.LAVA)
+                {
+                    sprite = atlas.getSprite(new ResourceLocation("minecraft", block == Blocks.WATER ? "block/water_still" : "block/lava_still"));
+                    tinted = block == Blocks.WATER;
+                }
+                else
+                {
+                    List<BakedQuad> quads = model.getQuads(state, FACES[f], random, ModelData.EMPTY, null);
+                    BakedQuad quad = quads.isEmpty() ? null : quads.get(0);
+                    if (quad == null)
+                        for (BakedQuad q : model.getQuads(state, null, random, ModelData.EMPTY, null))
+                            if (quad == null || q.getDirection() == FACES[f]) quad = q;
+                    sprite = quad != null ? quad.getSprite() : model.getParticleIcon(ModelData.EMPTY);
+                    tinted = quad != null && quad.isTinted();
+                }
+                int[] look = sprites.computeIfAbsent(sprite.contents().name(), name -> look(mc, name));
+                int tint = !tinted ? 0xFFFFFF : block == Blocks.WATER ? water
+                        : block instanceof LeavesBlock || block == Blocks.VINE ? leafTint(block, foliage) : grass;
+                int base = (i * 6 + f) * 8;
+                boolean textured = look[0] >= 0 && look[1] == 0;
+                int rgb = textured ? tint : multiply(look[0] >= 0 ? look[0] : mapColour(block), tint);
+                looks[base] = sprite.getU0();
+                looks[base + 1] = sprite.getV0();
+                looks[base + 2] = sprite.getU1();
+                looks[base + 3] = sprite.getV1();
+                looks[base + 4] = ((rgb >> 16) & 0xFF) / 255F;
+                looks[base + 5] = ((rgb >> 8) & 0xFF) / 255F;
+                looks[base + 6] = (rgb & 0xFF) / 255F;
+                looks[base + 7] = textured ? 1F : 0F;
+            }
         }
-        return out;
+    }
+
+    private static BlockState parse(String key)
+    {
+        try
+        {
+            return BlockStateParser.parseForBlock(BuiltInRegistries.BLOCK.asLookup(), key, false).blockState();
+        }
+        catch (Exception unknown)
+        {
+            int bracket = key.indexOf('[');
+            ResourceLocation id = ResourceLocation.tryParse(bracket < 0 ? key : key.substring(0, bracket));
+            return (id == null ? Blocks.STONE : BuiltInRegistries.BLOCK.get(id)).defaultBlockState();
+        }
     }
 
     private static int leafTint(Block block, int foliage)
@@ -502,13 +806,12 @@ public final class GeoFrontDomeFarViewR65
 
     private static int mapColour(Block block)
     {
-        MapColor colour = block.defaultMapColor();
-        if (colour == null || colour == MapColor.NONE || colour.col == 0) return 0x8C9CA4;
-        return scale(colour.col, 220F / 255F);
+        MapColor c = block.defaultMapColor();
+        return c == null || c == MapColor.NONE || c.col == 0 ? 0x8C9CA4 : c.col;
     }
 
-    /** The mean colour of a texture's opaque pixels (first frame of an animated one), or -1 when it cannot be read. */
-    private static int average(Minecraft mc, ResourceLocation sprite)
+    /** {average colour of the opaque pixels (or -1), 1 when most of the sprite is see-through} for a sprite's texture. */
+    private static int[] look(Minecraft mc, ResourceLocation sprite)
     {
         ResourceLocation file = new ResourceLocation(sprite.getNamespace(), "textures/" + sprite.getPath() + ".png");
         try (InputStream in = mc.getResourceManager().open(file); NativeImage image = NativeImage.read(in))
@@ -525,64 +828,19 @@ public final class GeoFrontDomeFarViewR65
                     b += (abgr >> 16) & 0xFF;
                     n++;
                 }
-            if (n == 0) return -1;
-            return (int) (r / n) << 16 | (int) (g / n) << 8 | (int) (b / n);
+            if (n == 0) return new int[]{-1, 1};
+            int avg = (int) (r / n) << 16 | (int) (g / n) << 8 | (int) (b / n);
+            return new int[]{avg, n * 2 < (long) w * h ? 1 : 0};
         }
         catch (IOException | RuntimeException unreadable)
         {
-            return -1;
+            return new int[]{-1, 0};
         }
     }
 
-    private static int tint(int rgb, int tint)
+    private static int multiply(int rgb, int tint)
     {
-        if (rgb < 0) return tint;
         return (((rgb >> 16) & 0xFF) * ((tint >> 16) & 0xFF) / 255) << 16 | (((rgb >> 8) & 0xFF) * ((tint >> 8) & 0xFF) / 255) << 8
                 | ((rgb & 0xFF) * (tint & 0xFF) / 255);
-    }
-
-    private static int scale(int rgb, float f)
-    {
-        return ((int) (((rgb >> 16) & 0xFF) * f) << 16) | ((int) (((rgb >> 8) & 0xFF) * f) << 8) | (int) ((rgb & 0xFF) * f);
-    }
-
-    /** One face: x, y, z the solid cell's corner in blocks, du and dv its extent along the face's in-plane axes. */
-    private static void emit(BufferBuilder out, int face, int x, int y, int z, int du, int dv, int cell, int rgb)
-    {
-        // facing shade, as the world's own blocks: lit from above, darker underneath and on the sides
-        float shade = switch (face) { case 3 -> 1F; case 2 -> .62F; case 0, 1 -> .8F; default -> .72F; };
-        int r = (int) (((rgb >> 16) & 0xFF) * shade), g = (int) (((rgb >> 8) & 0xFF) * shade), b = (int) ((rgb & 0xFF) * shade);
-        switch (face)
-        {
-            case 0, 1 ->
-            {
-                float px = face == 1 ? x + cell : x;
-                vertex(out, px, y, z, r, g, b);
-                vertex(out, px, y + du, z, r, g, b);
-                vertex(out, px, y + du, z + dv, r, g, b);
-                vertex(out, px, y, z + dv, r, g, b);
-            }
-            case 2, 3 ->
-            {
-                float py = face == 3 ? y + cell : y;
-                vertex(out, x, py, z, r, g, b);
-                vertex(out, x, py, z + dv, r, g, b);
-                vertex(out, x + du, py, z + dv, r, g, b);
-                vertex(out, x + du, py, z, r, g, b);
-            }
-            default ->
-            {
-                float pz = face == 5 ? z + cell : z;
-                vertex(out, x, y, pz, r, g, b);
-                vertex(out, x + du, y, pz, r, g, b);
-                vertex(out, x + du, y + dv, pz, r, g, b);
-                vertex(out, x, y + dv, pz, r, g, b);
-            }
-        }
-    }
-
-    private static void vertex(BufferBuilder out, float x, float y, float z, int r, int g, int b)
-    {
-        out.vertex(x, y, z).color(r, g, b, 255).endVertex();
     }
 }
