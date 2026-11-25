@@ -25,7 +25,7 @@ public final class StreetFurnitureR65
 {
     public enum PolePart implements StringRepresentable
     {
-        SHAFT("shaft"), TOP("top"), LAMP("lamp"), TRANSFORMER("transformer");
+        SHAFT("shaft"), TOP("top"), LAMP("lamp"), TRANSFORMER("transformer"), STREET("street");
         private final String name;
 
         PolePart(String name)
@@ -45,7 +45,8 @@ public final class StreetFurnitureR65
 
     /**
      * Round concrete utility pole. The top segment carries the crossarm across the street (along facing, which points
-     * at the roadway); lamp adds a street lamp bracket reaching over the road, transformer a pole-mounted can behind.
+     * at the roadway); lamp adds a street lamp bracket reaching over the road, transformer a pole-mounted can behind,
+     * street is a lamp pole without crossarm for roads that carry no overhead line.
      */
     public static final class UtilityPole extends HorizontalDirectionalBlock
     {

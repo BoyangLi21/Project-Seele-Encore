@@ -98,6 +98,8 @@ model('utility_pole_top', top, {k: T[k] for k in 'csi'})
 lamp_arm = [box((7.5, 6, -10), (8.5, 7, 6), 'g'), box((7.5, 6, 5), (8.5, 10, 6), 'g'),
             box((6.5, 4.5, -14), (9.5, 6.5, -8), {'north': 'g', 'south': 'g', 'east': 'g', 'west': 'g', 'up': 'g', 'down': 'l'})]
 model('utility_pole_lamp', top + lamp_arm, {k: T[k] for k in 'csigl'})
+# a lamp pole for roads without an overhead line: the same pole and lamp bracket, capped, no crossarm
+model('utility_pole_street', shaft(0, 16) + [box((5, 15.5, 5), (11, 16.5, 11), 'c')] + lamp_arm, {k: T[k] for k in 'csgl'})
 can = [box((11, 1, 4.5), (17, 11, 11.5), 't'), box((10.5, 11, 5), (17.5, 12, 11), 't'), box((10.5, 2, 7.5), (11.5, 3, 8.5), 's'),
        box((10.5, 9, 7.5), (11.5, 10, 8.5), 's'), box((13.5, 12, 7.5), (14.5, 14, 8.5), 'i')]
 model('utility_pole_transformer', shaft(0, 16) + [box((7.5, 1, 11), (8.5, 2, 12), 's')] + [dict(e) for e in can], {k: T[k] for k in 'csti'})
@@ -124,7 +126,7 @@ model('traffic_signal', head, H)
 # blockstates
 rot = {'north': 0, 'east': 90, 'south': 180, 'west': 270}
 st = {f'facing={f},part={p}': {'model': f'projectseele:block/utility_pole_{p}', 'y': r} for f, r in rot.items()
-      for p in ('shaft', 'top', 'lamp', 'transformer')}
+      for p in ('shaft', 'top', 'lamp', 'transformer', 'street')}
 for k, v in st.items():
     if v['y'] == 0:
         del v['y']

@@ -12,6 +12,9 @@
   "facing=north,part=transformer": {
    "model": "projectseele:block/utility_pole_transformer"
   },
+  "facing=north,part=street": {
+   "model": "projectseele:block/utility_pole_street"
+  },
   "facing=east,part=shaft": {
    "model": "projectseele:block/utility_pole_shaft",
    "y": 90
@@ -26,6 +29,10 @@
   },
   "facing=east,part=transformer": {
    "model": "projectseele:block/utility_pole_transformer",
+   "y": 90
+  },
+  "facing=east,part=street": {
+   "model": "projectseele:block/utility_pole_street",
    "y": 90
   },
   "facing=south,part=shaft": {
@@ -44,6 +51,10 @@
    "model": "projectseele:block/utility_pole_transformer",
    "y": 180
   },
+  "facing=south,part=street": {
+   "model": "projectseele:block/utility_pole_street",
+   "y": 180
+  },
   "facing=west,part=shaft": {
    "model": "projectseele:block/utility_pole_shaft",
    "y": 270
@@ -58,6 +69,10 @@
   },
   "facing=west,part=transformer": {
    "model": "projectseele:block/utility_pole_transformer",
+   "y": 270
+  },
+  "facing=west,part=street": {
+   "model": "projectseele:block/utility_pole_street",
    "y": 270
   }
  }
