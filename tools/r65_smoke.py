@@ -238,16 +238,20 @@ def start(out, receipts, purpose):
     with (out / 'server.stdout').open('ab') as o:
         sp = subprocess.Popen([str(JAVA / 'java.exe'), '-jar', 'server.jar', 'nogui'], cwd=server, stdin=subprocess.PIPE,
                               stdout=o, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW)
+    receipts['_server'] = sp
     receipts['boot'] = wait(sp, server / 'logs/latest.log', r'^.*Done \([0-9.,]+s\)!.*$', 600)
     slot('r63-pack-cli', 'R65 packaged client (6G, muted): ' + purpose, True); receipts['_slots'].append('r63-pack-cli')
     with (out / 'client.stdout').open('ab') as o:
         cp = subprocess.Popen([str(JAVA / 'javaw.exe'), '@' + str(out / 'client.args')], cwd=client, stdout=o,
                               stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW)
+    receipts['_client'] = cp
     receipts['login'] = wait(sp, server / 'logs/latest.log', r'^.*' + NAME + r' joined the game.*$', 600)
     return sp, cp
 
 
-def stop(out, sp, cp, receipts):
+def stop(out, receipts):
+    # A boot or login timeout can interrupt start() before it returns the process handles.
+    sp, cp = receipts.pop('_server', None), receipts.pop('_client', None)
     logS = out / 'server/logs/latest.log'
     if cp and cp.poll() is None:
         close_window(cp)
@@ -276,7 +280,6 @@ def run(a):
     out = a.out; server, client = out / 'server', out / 'client'
     logS, logC = server / 'logs/latest.log', client / 'logs/latest.log'
     r = {'start': stamp(), 'mods_sha256': zips(a)[2]['sha256']}
-    sp = cp = None
     r21_before = r21_saved(server / 'SEELE_R53_WORLD')
     try:
         sp, cp = start(out, r, 'join test')
@@ -324,7 +327,7 @@ def run(a):
     except Exception as e:
         r['ok'] = False; r['error'] = repr(e)
     finally:
-        stop(out, sp, cp, r)
+        stop(out, r)
         if r.get('ok'):
             before = json.loads((out / 'minimap_before.json').read_text('utf8')); after = minimap_census(client)
             key = 'Multiplayer_' + IP + '/projectseele$geofront/mw$default'
@@ -341,7 +344,6 @@ def lower(a):
     out = a.out; server, client = out / 'server', out / 'client'
     logS, logC = server / 'logs/latest.log', client / 'logs/latest.log'
     r = {'start': stamp()}
-    sp = cp = None
     lines_after = lambda log, mark, pattern: [l for l in read(log).splitlines()[mark:] if re.search(pattern, l)]
     count = lambda log: len(read(log).splitlines())
     try:
@@ -382,7 +384,7 @@ def lower(a):
     except Exception as e:
         r['ok'] = False; r['error'] = repr(e)
     finally:
-        stop(out, sp, cp, r)
+        stop(out, r)
         (out / 'lower-receipt.json').write_text(json.dumps(r, ensure_ascii=False, indent=1), 'utf8')
     print(json.dumps({k: r.get(k) for k in ('ok', 'error', 'cover', 'cover_seconds', 'server_exit', 'client_exit')}, ensure_ascii=False, indent=1))
     return r
