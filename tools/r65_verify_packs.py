@@ -59,8 +59,11 @@ def main():
     p.add_argument('--lod', type=Path, required=True)
     p.add_argument('--area', type=Path, required=True)
     p.add_argument('--xaero', type=Path, required=True, help='the packer --xaero-map source folder')
+    p.add_argument('--client-mod', type=Path, action='append', default=[],
+                   help='a client-only mod the client pack must carry and the server pack must not (repeatable)')
     p.add_argument('--out', type=Path, default=Path('F:/eva/.claude/r63-pack-work'))
     a = p.parse_args()
+    client_mods = {'mods/' + m.name: sha_file(m) for m in a.client_mod}
     client_zip = a.delivery / f'Project_SEELE_Encore_R65_{a.date}_Client_PCL.zip'
     server_zip = a.delivery / f'Project_SEELE_Encore_R65_{a.date}_Server.zip'
     out, fails = {}, []
@@ -131,12 +134,20 @@ def main():
                 entry['xaero_region_zips'] = dict(surface=sum('/caves/' not in n for n in xa), caves=sum('/caves/' in n for n in xa))
                 check(entry['xaero_region_zips'] == xaero_count, 'minimap region count differs from the hand-over')
                 check(not any(n.startswith('overrides/saves/') for n in names), 'client contains a save')
+                for inner, want in client_mods.items():
+                    present = 'overrides/' + inner in names
+                    check(present, 'client mod missing: ' + inner)
+                    if present:
+                        with z.open('overrides/' + inner) as f:
+                            check(sha_stream(f) == want, 'client mod differs from its source: ' + inner)
+                entry['client_mods'] = sorted(client_mods)
             else:
                 check('SEELE_R53_WORLD/level.dat' in names and 'server.jar' in names, 'server world or launcher missing')
                 props = z.read('server.properties').decode('utf8')
                 entry['view_distance'] = line_value(props, 'view-distance=')
                 check(entry['view_distance'] == FAR_VIEW, 'server view-distance is %r' % entry['view_distance'])
                 check(not any(n.startswith('mods/xaero') and 'lib' not in n for n in names), 'Xaero map mod on the server')
+                check(not any(inner in names for inner in client_mods), 'a client-only mod is in the server pack')
                 local = MAIN / 'projectseele-local-maps'
                 want_maps = {('projectseele-local-maps/' + q.relative_to(local).as_posix()): sha_file(q) for q in local.rglob('*') if q.is_file()}
                 have = {}

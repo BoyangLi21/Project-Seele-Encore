@@ -638,6 +638,18 @@ def build_inputs(a, work):
     current = {p.relative_to(client).as_posix(): p for tree in CLIENT_TREES for p in files(client / tree)}
     # Client and server ship the same jar: the installed one, or that plus files baked at pack time.
     current[MAIN_JAR] = shipped_jar
+    # R65: client-only mods the main client does not run (Codex's pyramid paint): client pack only, never the server,
+    # whose mods come from the server template.
+    client_mods = {}
+    for mod in a.client_mod or ():
+        if not gate(mod.is_file() and mod.suffix == '.jar', 'Client mod missing or not a jar: ' + str(mod)):
+            continue
+        name, digest = 'mods/' + mod.name, file_sha256(mod)
+        installed = name in current
+        # The main client may already run it; then it must be this very file.
+        if gate(not installed or file_sha256(current[name]) == digest, 'The main client runs a different ' + mod.name):
+            current[name] = mod
+            client_mods[name] = dict(source=str(mod), bytes=mod.stat().st_size, sha256=digest, already_in_main_client=installed)
     for name in list(current):
         inactive_shader = name.startswith('shaderpacks/') and Path(name).name not in {SHADER, SHADER + '.txt'}
         if inactive_shader or name == 'config/projectseele-private-visuals-r46.json':
@@ -754,7 +766,8 @@ def build_inputs(a, work):
         gate(not absent, ('Payload file missing', absent[:10]))
     regions = sum(1 for n in minimap if n.endswith('.zip') and '/caves/' not in n)
     return dict(world=world, template=template, bootstrap=bootstrap, server=server, pcl=pcl, lod=lod_details, dh_key=seed,
-                dh_source=provenance, server_mods=sorted(server_mods), jar=jar, config=config, minimap_region_zips=regions)
+                dh_source=provenance, server_mods=sorted(server_mods), jar=jar, config=config, minimap_region_zips=regions,
+                client_mods=client_mods)
 
 
 def package(target, payload, level, template=None, bootstrap=()):
@@ -814,6 +827,8 @@ def main():
                    help='World the outer ring was copied from as it is, with its minimap: such regions pass if every chunk equals it')
     p.add_argument('--xaero-ring-digests', type=Path,
                    help='JSON {"regions": {"x_z": region_digest}} of a world the minimap was proved to match; such regions pass')
+    p.add_argument('--client-mod', type=Path, action='append',
+                   help='A client-only mod jar for the client pack alone (repeatable)')
     p.add_argument('--world-lods', type=Path, help='World folder whose DH databases stand in for those --world lacks (not the GeoFront one)')
     p.add_argument('--jar-add', action='append', metavar='INNER=SOURCE',
                    help='Bake a file into the shipped mod jar at INNER (added, or replacing that entry); both packs get the same jar')
@@ -848,7 +863,7 @@ def main():
         report = dict(version=VERSION, date=a.date, pack_written=False, actual_world=str(d['world']), manifest_name=NAME,
                       server_world_directory=SERVER_WORLD, map_state=a.map_note, dh=d['lod'], dh_key=d['dh_key'],
                       dh_identifier_source=d['dh_source'], server_mods=d['server_mods'], client_contains_save=False,
-                      main_jar=d['jar'], release_source=str(a.release_source.resolve()), config=d['config'], minimap_region_zips=d['minimap_region_zips'],
+                      main_jar=d['jar'], release_source=str(a.release_source.resolve()), config=d['config'], minimap_region_zips=d['minimap_region_zips'], client_mods=d['client_mods'],
                       raw_bytes=dict(server=size(d['server']), client=size(d['pcl'])), jit_directive=JVM,
                       compression='Already compressed media stored; everything else DEFLATE, client level 9, server level 3')
         print(json.dumps({k: report[k] for k in ('dh', 'dh_key', 'raw_bytes', 'minimap_region_zips')}, ensure_ascii=False), flush=True)
