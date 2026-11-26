@@ -315,6 +315,12 @@ def set_line(raw, prefix, value, name):
     return '\n'.join(lines).encode('utf8')
 
 
+# R65 second playtest (map-edges, items 7/21): the minimap's shading and the extra cave zoom off, so the GeoFront
+# cave layer reads flat and at the zoom the player chose.
+XAERO_MINIMAP_PROFILE = 'config/xaero/minimap/profiles/default.cfg'
+XAERO_MINIMAP = {'minimap_lighting': 'false', 'minimap_cave_mode_extra_zoom': '0'}
+
+
 # R65 owner: clients get a 6 GB heap by default.
 CLIENT_HEAP_GB = 6
 
@@ -638,6 +644,11 @@ def build_inputs(a, work):
     current = {p.relative_to(client).as_posix(): p for tree in CLIENT_TREES for p in files(client / tree)}
     # Client and server ship the same jar: the installed one, or that plus files baked at pack time.
     current[MAIN_JAR] = shipped_jar
+    if gate(XAERO_MINIMAP_PROFILE in current, 'The client has no ' + XAERO_MINIMAP_PROFILE):
+        profile = current[XAERO_MINIMAP_PROFILE].read_bytes()
+        for key, value in XAERO_MINIMAP.items():
+            profile = set_line(profile, key + ' = ', value, XAERO_MINIMAP_PROFILE)
+        current[XAERO_MINIMAP_PROFILE] = profile
     # R65: client-only mods the main client does not run (Codex's pyramid paint): client pack only, never the server,
     # whose mods come from the server template.
     client_mods = {}

@@ -23,6 +23,7 @@ WANT_CLIENT_DH = {'enableDistantGeneration': 'true', 'distantGeneratorMode': '"P
 WANT_SERVER_DH = {'enableDistantGeneration': 'true', 'distantGeneratorMode': '"PRE_EXISTING_ONLY"', 'numberOfThreads': '2',
                   'dataCompression': '"LZ4"'}
 FAR_VIEW = '20'
+XAERO_MINIMAP = {'minimap_lighting': 'false', 'minimap_cave_mode_extra_zoom': '0'}
 
 
 def sha_stream(f):
@@ -122,6 +123,9 @@ def main():
                         check('overrides/resourcepacks/' + pack[5:] in names, 'enabled pack missing: ' + pack)
                 with z.open('overrides/resourcepacks/SEELE_GeoFront_Area_Maps.zip') as f:
                     check(sha_stream(f) == area_sha, 'area-map pack differs from the hand-over')
+                profile = z.read('overrides/config/xaero/minimap/profiles/default.cfg').decode('utf8')
+                entry['xaero_minimap'] = {k: line_value(profile, k + ' = ') for k in XAERO_MINIMAP}
+                check(entry['xaero_minimap'] == XAERO_MINIMAP, 'Xaero minimap profile: %r' % entry['xaero_minimap'])
                 setup = z.read('overrides/PCL/Setup.ini').decode('utf8')
                 check('VersionRamType:1' in setup and 'VersionRamCustom:21' in setup, 'PCL Setup.ini lacks the 6 GB heap')
                 lods = [n for n in names if n.startswith('overrides/Distant_Horizons_server_data/') and 'geofront' in n and n.endswith('.sqlite')]
