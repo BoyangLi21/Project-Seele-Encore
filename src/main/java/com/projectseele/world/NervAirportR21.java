@@ -34,12 +34,15 @@ public final class NervAirportR21
         ServerLevel level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return;
         var file=event.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_airport_r21.json");if(!Files.isRegularFile(file))return;
         State state=level.getDataStorage().computeIfAbsent(State::load,State::new,"projectseele_nerv_airport_r21");
-        // R65 (owner's feedback 2, item 46): aircraft already standing in the world get their ammunition once, when loaded.
+        // R65 (owner's feedback 2, items 46 and 45): aircraft already standing in the world get their ammunition once,
+        // when loaded; the J-16s get their engine every time they are loaded.
         for(var placed:state.aircraft.entrySet())
         {
             Entity existing=level.getEntity(placed.getValue());
-            if(existing!=null&&!existing.getTags().contains(AMMUNITION_TAG)&&stockAmmunition(existing))
+            if(existing==null)continue;
+            if(!existing.getTags().contains(AMMUNITION_TAG)&&stockAmmunition(existing))
                 ProjectSeele.LOGGER.info("R65 NERV aircraft {} ammunition stocked",placed.getKey());
+            tuneEngine(existing);
         }
         try
         {
@@ -63,6 +66,38 @@ public final class NervAirportR21
         }
         catch(Exception e){throw new IllegalStateException("R21 aircraft commissioning",e);}
     }
+    /**
+     * R65 (owner's feedback 2, item 45): the NERV J-16s' own engine, through superbwarfare's per-vehicle override, so
+     * one takes off within the GeoFront apron (27 blocks of roll instead of 108) and climbs the transport shaft even
+     * without boost (thrust 0.047 x 1.5 against gravity 0.06). Against the mod's J-16: Increment 1 -> 2.5,
+     * SpeedRate 1 -> 1.5, LiftSpeed 1 -> 1.5. The override replaces the whole block, so the rest is the mod's own.
+     * J-16s elsewhere keep the mod's data.
+     */
+    static final String J16_ENGINE="{\"EngineInfo\":{\"EnergyCostRate\":256,\"Increment\":2.5,\"Decrement\":1,\"PitchSpeed\":1,\"YawSpeed\":1,"
+        +"\"RollSpeed\":1,\"LiftSpeed\":1.5,\"SpeedRate\":1.5,\"GearRotateAngle\":85,\"EngineStartSound\":\"superbwarfare:a_10a_engine_start\",\"EngineSoundVolume\":0.8}}";
+    private static final java.util.Set<Entity> TUNED=java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>());
+
+    /**
+     * superbwarfare reads a vehicle's engine block on its first move and keeps it, and applies the override only once
+     * the vehicle is initialised; so the block is cleared, to be read again, once the J-16 has ticked, once a session.
+     */
+    static void tuneEngine(Entity aircraft)
+    {
+        if(aircraft.tickCount<5||TUNED.contains(aircraft)||!"superbwarfare:j_16".equals(String.valueOf(BuiltInRegistries.ENTITY_TYPE.getKey(aircraft.getType()))))return;
+        TUNED.add(aircraft);
+        try
+        {
+            if(!J16_ENGINE.equals(aircraft.getClass().getMethod("getOverride").invoke(aircraft)))
+                aircraft.getClass().getMethod("setOverride",String.class).invoke(aircraft,J16_ENGINE);
+            for(var method:aircraft.getClass().getMethods())
+                if(method.getName().equals("setEngineInfo")&&method.getParameterCount()==1){method.invoke(aircraft,(Object)null);break;}
+        }
+        catch(ReflectiveOperationException|RuntimeException failed)
+        {
+            ProjectSeele.LOGGER.warn("R65 NERV J-16 {}: engine left as the mod has it ({})",aircraft.getUUID(),failed.toString());
+        }
+    }
+
     /** Marks an aircraft whose ammunition was stocked, so a box taken out of it is not put back again. */
     static final String AMMUNITION_TAG="seele_r65_ammunition";
 
