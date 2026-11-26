@@ -8,58 +8,36 @@ import org.joml.Quaternionf;
 
 public final class PilotMountViewTest {
     public static void main(String[] args) {
-        for (int step = 0; step <= 72; step++) {
-            float angle = (float) Math.toRadians(step * 5);
-            var transform = RigidTransform.of(new Vec3(1,2,3), new Quaternionf().rotateY(angle).rotateZ(angle / 2));
-            var seat = PilotMountView.angles(transform, 0, 0, 0, -53, 42, 168);
-            Vec3 expected = transform.transformVector(EntryPlugKinematics.PILOT_VIEW_FORWARD_P);
-            if (expected.distanceToSqr(Vec3.directionFromRotation(seat.pitch(),seat.yaw())) > 1e-6)
-                throw new AssertionError("Stationary pilot did not rotate with the plug at step " + step);
-            Vec3 seatUp = transform.transformVector(EntryPlugKinematics.PILOT_EYE_P.subtract(EntryPlugKinematics.PILOT_SEAT_P).normalize());
-            double az = Math.toRadians(seat.yaw()), bank = Math.toRadians(seat.roll());
-            Vec3 left = new Vec3(Math.cos(az), 0, Math.sin(az));
-            Vec3 cameraUp = expected.cross(left).scale(Math.cos(bank)).subtract(left.scale(Math.sin(bank)));
-            if (cameraUp.distanceToSqr(seatUp) > 1e-6) throw new AssertionError("Capsule horizon lost its roll");
-            var optics = PilotMountView.angles(transform, 0, 0, 1, -53, 80, 168);
-            if (Math.abs(Mth.wrapDegrees(optics.yaw() - 233)) > .001
-                    || Math.abs(optics.pitch() - 60) > .001 || Math.abs(optics.roll()) > .001)
-                throw new AssertionError("Handoff must end at the fixed EVA's clamped view");
-        }
-        if (PilotMountView.yaw(-179,179) != 181 || PilotMountView.pitch(-89) != -55)
-            throw new AssertionError("Fixed view wrap or vertical limit");
-        // R65 (feedback 2, item 15): climbing in, the look goes on from where the pilot looked; no turn by itself.
-        int boarded = 0;
-        for (int step = 0; step < 72; step++) {
-            float angle = (float) Math.toRadians(step * 5);
-            var transform = RigidTransform.of(new Vec3(4, -9, 2), new Quaternionf().rotateY(angle).rotateX(angle / 3));
-            for (float yaw = -60; yaw <= 60; yaw += 20) for (float pitch = -50; pitch <= 55; pitch += 15) {
-                var view = PilotMountView.angles(transform, yaw, pitch, 0, 0, 0, 0);
-                float[] look = PilotMountView.local(transform, view.yaw(), view.pitch());
-                // Within a tenth of a degree (Minecraft's table sine, worse near the vertical); the fault was tens of degrees.
-                if (Math.abs(look[0] - yaw) > .1 || Math.abs(look[1] - pitch) > .1)
-                    throw new AssertionError("Seat look " + yaw + "/" + pitch + " came back as " + look[0] + "/" + look[1] + " at step " + step);
-                var again = PilotMountView.angles(transform, look[0], look[1], 0, 0, 0, 0);
-                // Minecraft's sine is a table: angles come back to about 0.006 degrees.
-                if (Vec3.directionFromRotation(again.pitch(), again.yaw()).distanceToSqr(Vec3.directionFromRotation(view.pitch(), view.yaw())) > 1e-6)
-                    throw new AssertionError("The first picture in the seat turned from where the pilot looked");
-                boarded++;
+        for (int heading = -180; heading < 180; heading += 15) {
+            var dock = EntryPlugKinematics.dockTransform(new Vec3(30, -1015, 311), heading);
+            for (float yaw : new float[]{-65, 0, 65}) for (float pitch : new float[]{-55, 0, 60}) {
+                var view = PilotMountView.angles(dock, yaw, pitch, 0, heading);
+                if (Math.abs(Mth.wrapDegrees(view.yaw() - heading - yaw)) > .001
+                        || Math.abs(view.pitch() - pitch) > .001 || Math.abs(view.roll()) > .001)
+                    throw new AssertionError("Docked sight or horizon off at " + heading + "/" + yaw + "/" + pitch);
             }
-            // A look further round than the seat's own range is read as it is (the boarding keeps it, not the seat's edge).
-            Vec3 forward = transform.transformVector(EntryPlugKinematics.PILOT_VIEW_FORWARD_P);
-            var behind = PilotMountView.angles(transform, 120, 0, 0, 0, 0, 0);
-            float[] edge = PilotMountView.local(transform, behind.yaw(), behind.pitch());
-            if (Math.abs(edge[0] - 120) > .1) throw new AssertionError("A look past the seat's range was not read as it is: " + edge[0]);
-            if (forward.lengthSqr() < .5) throw new AssertionError("Seat frame lost");
         }
-        // The boarding look settles to the seat's straight ahead: none of it goes in a frame of no time, 95% in about 1.4 s
-        // of frames at any rate, and a stalled frame counts as a tenth of a second (no jump after a hitch).
-        if (PilotMountView.settle(0) != 1F) throw new AssertionError("A frame of no time moved the look");
-        for (float fps : new float[]{30, 60, 144}) {
-            float left = 1;
-            for (int i = 0; i < Math.round(1.4F * fps); i++) left *= PilotMountView.settle(1 / fps);
-            if (left > .05F || left < .03F) throw new AssertionError("Settle at " + fps + " fps left " + left + " after 1.4 s");
+        // Drive a full socket turn. Both the direction and the horizon must follow the physical cabin.
+        Vec3 forward = EntryPlugKinematics.CABIN_VIEW_FORWARD_P;
+        Vec3 up = new Vec3(0, -forward.z, forward.y);
+        for (int step = 0; step <= 72; step++) {
+            float turn = (float) Math.toRadians(step * 5);
+            var frame = RigidTransform.of(new Vec3(1, 2, 3), new Quaternionf().rotateY(1.1F).rotateX(-1.05F).rotateZ(turn));
+            var view = PilotMountView.angles(frame, 0, 0, 0, 168);
+            Vec3 direction = Vec3.directionFromRotation(view.pitch(), view.yaw());
+            if (frame.transformVector(forward).distanceToSqr(direction) > 1e-6)
+                throw new AssertionError("Cabin front lost at socket turn " + step);
+            double yaw = Math.toRadians(view.yaw()), roll = Math.toRadians(view.roll());
+            Vec3 left = new Vec3(Math.cos(yaw), 0, Math.sin(yaw));
+            Vec3 cameraUp = direction.cross(left).scale(Math.cos(roll)).subtract(left.scale(Math.sin(roll)));
+            if (cameraUp.distanceToSqr(frame.transformVector(up)) > 1e-6)
+                throw new AssertionError("Cabin horizon lost at socket turn " + step);
+            var optics = PilotMountView.angles(frame, 32, -17, 1, 168);
+            if (Math.abs(Mth.wrapDegrees(optics.yaw() - 200)) > .001
+                    || Math.abs(optics.pitch() + 17) > .001 || Math.abs(optics.roll()) > .001)
+                throw new AssertionError("EVA optics lost the pilot's look relative to the cabin front");
         }
-        if (PilotMountView.settle(5F) < PilotMountView.settle(.1F) - 1e-6F) throw new AssertionError("A stalled frame jumped the look");
-        System.out.println("PilotMountViewTest: " + boarded + " boarding looks kept");
+        if (PilotMountView.yaw(-179, 179) != 181 || PilotMountView.pitch(-89) != -55)
+            throw new AssertionError("Fixed view wrap or vertical limit");
     }
 }

@@ -1,4 +1,8 @@
 {
+  "elevator_motor": {
+    "subtitle": "subtitles.projectseele.elevator_motor",
+    "sounds": ["projectseele:elevator_motor"]
+  },
   "ropeway_ride": {
     "subtitle": "subtitles.projectseele.ropeway_ride",
     "sounds": [

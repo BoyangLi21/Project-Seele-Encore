@@ -85,6 +85,8 @@ public final class EntryPlugKinematics
     private static final double DOCK_REAR_AXIS =
             0.9659258262890683D;
     private static final double DOCK_UP_AXIS = 0.25881904510252074D;
+    /** Along the cabin towards the controls, level in the bridge cradle. The same local axis follows the socket turn. */
+    public static final Vec3 CABIN_VIEW_FORWARD_P = new Vec3(0, DOCK_UP_AXIS, -DOCK_REAR_AXIS);
     /**
      * The production socket is vertical-dominant, not mathematically vertical.
      * A thirty-degree rearward rake follows the reviewed dorsal guide line.

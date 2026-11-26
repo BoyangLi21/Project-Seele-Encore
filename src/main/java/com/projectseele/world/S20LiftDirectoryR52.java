@@ -35,6 +35,7 @@ public final class S20LiftDirectoryR52
         final Map<String,BlockState> closed=new HashMap<>();
         final Map<String,Set<ChunkPos>> footprints=new HashMap<>();
         final Map<String,UUID> cabinVisuals=new HashMap<>();
+        final Map<String,List<CabinFace>> cabinFaces=new HashMap<>();
         // Public lifts (public_lifts_r65.json): parsed apart, so their faults never hold the headquarters lifts.
         final NervManifestPollR52 publicPoll=new NervManifestPollR52();String publicFault="";
         List<S20LiftManifestR52.Binding> publicBindings=List.of();List<S20PhysicalElevatorDirector.LiftSpec> publicSpecs=List.of();
@@ -50,7 +51,7 @@ public final class S20LiftDirectoryR52
         long epoch=NervRouteRuntimeR52.commissioningEpoch(level);
         boolean changed=!state.reference.equals(reference)||!state.fingerprint.equals(fingerprint)||state.epoch!=epoch;
         if(state.observed==tick&&!changed)return state;state.observed=tick;
-        if(changed){state.document=null;state.specs=List.of();state.closed.clear();state.footprints.clear();state.ready=false;state.nativeReady.clear();state.officeReady=false;state.reference=reference;state.fingerprint=fingerprint;state.epoch=epoch;state.modified=-1;state.poll.invalidate();state.publicPoll.invalidate();state.publicBindings=List.of();state.publicSpecs=List.of();state.allSpecs=List.of();SeeleConferenceAccessR47.invalidateR52(level);FacilityDoorControlsR49.invalidateR52(level);}
+        if(changed){state.document=null;state.specs=List.of();state.closed.clear();state.footprints.clear();state.cabinFaces.clear();state.ready=false;state.nativeReady.clear();state.officeReady=false;state.reference=reference;state.fingerprint=fingerprint;state.epoch=epoch;state.modified=-1;state.poll.invalidate();state.publicPoll.invalidate();state.publicBindings=List.of();state.publicSpecs=List.of();state.allSpecs=List.of();SeeleConferenceAccessR47.invalidateR52(level);FacilityDoorControlsR49.invalidateR52(level);}
         if(reference.isBlank()){state.ready=false;return state;}
         try
         {
@@ -68,7 +69,7 @@ public final class S20LiftDirectoryR52
                     SeeleConferenceAccessR47.invalidateR52(level);FacilityDoorControlsR49.invalidateR52(level);
                     var document=S20LiftManifestR52.parse(JsonParser.parseString(Files.readString(file)).getAsJsonObject());
                     if(document.epoch()!=epoch)throw new IllegalArgumentException("Lift manifest does not match Root world claim");
-                    state.document=document;state.specs=document.lifts().stream().map(S20LiftManifestR52.Binding::spec).toList();state.closed.clear();state.footprints.clear();state.modified=modified;state.size=size;
+                    state.document=document;state.specs=document.lifts().stream().map(S20LiftManifestR52.Binding::spec).toList();state.closed.clear();state.footprints.clear();state.cabinFaces.clear();state.modified=modified;state.size=size;
                     state.publicPoll.invalidate();
                 }
             }
@@ -106,7 +107,7 @@ public final class S20LiftDirectoryR52
                     if(probe.size()>1024*1024)throw new IllegalArgumentException("Bounded public lift manifest required");
                     var bindings=S20LiftManifestR52.parsePublic(JsonParser.parseString(Files.readString(root.resolve(PUBLIC_FILE))).getAsJsonObject(),state.document);
                     state.publicBindings=bindings;state.publicSpecs=bindings.stream().map(S20LiftManifestR52.Binding::spec).toList();
-                    for(var b:bindings)state.footprints.remove(b.id());
+                    for(var b:bindings){state.footprints.remove(b.id());state.cabinFaces.remove(b.id());}
                 }
                 state.publicFault="";
             }
@@ -300,50 +301,89 @@ public final class S20LiftDirectoryR52
             if(S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,floor.cabin()))writeDoors(level,state,floor.cabinDoors(),open);
         }
         var reference=spec.r52().floors().get(0);
-        if(!reference.cabinDoors().isEmpty()&&level.getBlockEntity(reference.controller()) instanceof ControllerBlockEntity controller&&controller.hasGroup())
+        if (!(level.getBlockEntity(reference.controller()) instanceof ControllerBlockEntity controller) || !controller.hasGroup()) return;
+        var group=controller.getGroup();
+        // Departure closes the interlocks before the native cage actually starts to move.
+        var parked=car;
+        if (!group.isMoving() && parked==null)
+            for (var floor:spec.r52().floors())
+                if (S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,floor.cabin())) { parked=floor; break; }
+        if (!group.isMoving() && parked==null) return;
+        var faces=state.cabinFaces.computeIfAbsent(spec.id(), id->cabinFaces(spec.r52()));
+        var initial=group.getCageAnchorBlockPos(reference.controller().getY());
+        for (int i=0; i<faces.size(); i++)
         {
-            var group=controller.getGroup();
-            int minX=Integer.MAX_VALUE,minY=minX,minZ=minX,maxX=Integer.MIN_VALUE,maxY=maxX,maxZ=maxX;
-            for(var p:reference.cabinDoors().keySet()){minX=Math.min(minX,p.getX());minY=Math.min(minY,p.getY());minZ=Math.min(minZ,p.getZ());maxX=Math.max(maxX,p.getX());maxY=Math.max(maxY,p.getY());maxZ=Math.max(maxZ,p.getZ());}
-            var initial=group.getCageAnchorBlockPos(reference.controller().getY());
-            var localCentre=new net.minecraft.world.phys.Vec3(
-                    (minX+maxX+1)*.5-initial.getX(),minY-initial.getY(),
-                    (minZ+maxZ+1)*.5-initial.getZ());
-            net.minecraft.world.phys.Vec3 centre;
-            if(group.isMoving())
-                centre=group.getCageAnchorPos(group.getCurrentY()).add((minX+maxX+1)*.5-initial.getX(),minY-initial.getY(),(minZ+maxZ+1)*.5-initial.getZ());
-            else
-            {
-                // Native currentY is not an absolute world position while idle.
-                // The landed cage, including its horizontal offset, owns this door.
-                S20LiftManifestR52.Floor stopped=car;
-                if(stopped==null)for(var floor:spec.r52().floors())
-                    if(S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,floor.cabin())){stopped=floor;break;}
-                if(stopped==null||stopped.cabinDoors().isEmpty())return;
-                minX=Integer.MAX_VALUE;minY=minX;minZ=minX;maxX=Integer.MIN_VALUE;maxY=maxX;maxZ=maxX;
-                for(var p:stopped.cabinDoors().keySet()){minX=Math.min(minX,p.getX());minY=Math.min(minY,p.getY());minZ=Math.min(minZ,p.getZ());maxX=Math.max(maxX,p.getX());maxY=Math.max(maxY,p.getY());maxZ=Math.max(maxZ,p.getZ());}
-                centre=new net.minecraft.world.phys.Vec3((minX+maxX+1)*.5,minY,(minZ+maxZ+1)*.5);
-            }
-            var id=state.cabinVisuals.get(spec.id());
-            var visual=id==null?null:level.getEntity(id);
-            NervLiftDoorEntity door;
-            if(visual instanceof NervLiftDoorEntity existing){door=existing;door.setPos(centre.x,centre.y,centre.z);}
-            else{door=NervLiftDoorEntity.reconcile(level,Objects.hash(spec.id(),"moving_cabin"),maxX-minX>=maxZ-minZ,Math.max(maxX-minX,maxZ-minZ)+1,maxY-minY+1,NervLiftDoorEntity.STYLE_GLASS,centre);if(door!=null)state.cabinVisuals.put(spec.id(),door.getUUID());}
-            if(door!=null)
-            {
-                door.bindCage(group.x,group.z,group.facing,localCentre);
-                boolean open=car!=null&&!moving;var office=state.document.office();
-                if(open&&office!=null&&office.liftId().equals(spec.id())&&car.cabin().getY()==office.middleY())open=SeeleConferenceAccessR47.canOpenLanding(level);
-                door.setOpen(open);
-            }
+            var face=faces.get(i);
+            var local=face.offset().add(reference.cabin().getX()-initial.getX(),
+                    reference.cabin().getY()-initial.getY(),reference.cabin().getZ()-initial.getZ());
+            var centre=group.isMoving() ? group.getCageAnchorPos(group.getCurrentY()).add(local)
+                    : face.offset().add(parked.cabin().getX(),parked.cabin().getY(),parked.cabin().getZ());
+            // Existing single-sided lifts keep their original persisted primary leaf identity.
+            String key=i==0 ? spec.id() : spec.id()+"#"+face.min()+"/"+face.max();
+            var uuid=state.cabinVisuals.get(key);
+            var existing=uuid==null ? null : level.getEntity(uuid);
+            var door=existing instanceof NervLiftDoorEntity d ? d : NervLiftDoorEntity.reconcile(
+                    level,Objects.hash(key,"moving_cabin"),face.axisX(),face.width(),face.height(),
+                    NervLiftDoorEntity.STYLE_GLASS,centre);
+            if (door==null) continue;
+            state.cabinVisuals.put(key,door.getUUID());
+            door.setPos(centre.x,centre.y,centre.z);
+            door.bindCage(group.x,group.z,group.facing,local);
+            boolean atExit=parked!=null && face.floors().contains(parked.cabin());
+            boolean open=car!=null && !moving && atExit;
+            var office=state.document.office();
+            if (open && office!=null && office.liftId().equals(spec.id()) && car.cabin().getY()==office.middleY())
+                open=SeeleConferenceAccessR47.canOpenLanding(level);
+            door.setOpen(open);
+            if (!group.isMoving() && !atExit)
+                for (var cell:face.cells().entrySet())
+                    writeDoor(level,state,parked.cabin().offset(cell.getKey()),cell.getValue(),false);
         }
+    }
+
+    // A cage can have doors on more than one face. Each translated aperture travels with the same cage.
+    record CabinFace(BlockPos min,BlockPos max,Map<BlockPos,String> cells,Set<BlockPos> floors)
+    {
+        boolean axisX(){return max.getX()-min.getX()>=max.getZ()-min.getZ();}
+        int width(){return Math.max(max.getX()-min.getX(),max.getZ()-min.getZ())+1;}
+        int height(){return max.getY()-min.getY()+1;}
+        net.minecraft.world.phys.Vec3 offset(){return new net.minecraft.world.phys.Vec3(
+                (min.getX()+max.getX()+1)*.5,min.getY(),(min.getZ()+max.getZ()+1)*.5);}
+    }
+
+    static List<CabinFace> cabinFaces(S20LiftManifestR52.Binding binding)
+    {
+        var stops=new LinkedHashMap<Map<BlockPos,String>,Set<BlockPos>>();
+        for (var floor:binding.floors())
+        {
+            var relative=new HashMap<BlockPos,String>();
+            floor.cabinDoors().forEach((pos,state)->relative.put(pos.subtract(floor.cabin()),state));
+            if (!relative.isEmpty()) stops.computeIfAbsent(relative,key->new HashSet<>()).add(floor.cabin());
+        }
+        var faces=new ArrayList<CabinFace>();
+        stops.forEach((cells,floors)->{
+            var first=cells.keySet().iterator().next();
+            int x=first.getX(),y=first.getY(),z=first.getZ(),X=x,Y=y,Z=z;
+            for (var p:cells.keySet())
+            {
+                x=Math.min(x,p.getX()); y=Math.min(y,p.getY()); z=Math.min(z,p.getZ());
+                X=Math.max(X,p.getX()); Y=Math.max(Y,p.getY()); Z=Math.max(Z,p.getZ());
+            }
+            faces.add(new CabinFace(new BlockPos(x,y,z),new BlockPos(X,Y,Z),Map.copyOf(cells),Set.copyOf(floors)));
+        });
+        return List.copyOf(faces);
     }
     private static void writeDoors(ServerLevel level,State state,Map<BlockPos,String> cells,boolean open)
     {
-        for(var cell:cells.entrySet())try
+        for (var cell:cells.entrySet()) writeDoor(level,state,cell.getKey(),cell.getValue(),open);
+    }
+
+    private static void writeDoor(ServerLevel level,State state,BlockPos pos,String material,boolean open)
+    {
+        try
         {
-            var before=level.getBlockState(cell.getKey());var closed=closed(state,cell.getValue());var interlock=com.projectseele.registry.ModBlocks.LIFT_DOOR_INTERLOCK_R53.get().defaultBlockState();if(level.getBlockEntity(cell.getKey())!=null||!before.isAir()&&!before.equals(closed)&&!before.equals(interlock))continue;
-            var target=open?Blocks.AIR.defaultBlockState():interlock;if(!before.equals(target))level.setBlock(cell.getKey(),target,Block.UPDATE_CLIENTS|Block.UPDATE_KNOWN_SHAPE);
+            var before=level.getBlockState(pos);var closed=closed(state,material);var interlock=com.projectseele.registry.ModBlocks.LIFT_DOOR_INTERLOCK_R53.get().defaultBlockState();if(level.getBlockEntity(pos)!=null||!before.isAir()&&!before.equals(closed)&&!before.equals(interlock))return;
+            var target=open?Blocks.AIR.defaultBlockState():interlock;if(!before.equals(target))level.setBlock(pos,target,Block.UPDATE_CLIENTS|Block.UPDATE_KNOWN_SHAPE);
         }
         catch(Exception failure){state.ready=false;ProjectSeele.LOGGER.error("Root native lift door state rejected",failure);return;}
     }

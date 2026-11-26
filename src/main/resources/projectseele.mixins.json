@@ -74,6 +74,7 @@
     "client.GeoFrontMissionSunR54Mixin",
     "client.RamielDistantProjectionR52Mixin",
     "client.SbwPhantomLoadR24Mixin",
+    "client.SbwGroundClearanceR65Mixin",
     "client.ChunkSkySourceR24Mixin",
     "client.NervChestFinishR24Mixin",
     "client.NativeImagePixelsAccessor",

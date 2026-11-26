@@ -38,6 +38,7 @@ R10 负责人授权下载的九份 Battle Orchestra 模型与纹理仅放在 `ex
 | `sounds/drill.ogg` | 二阶段钻击 | R63 重做：同上的 `v2_rotor_continuous`（55 Hz 奇次谐波、转子起伏和研磨噪声，一整段 4 秒，每次钻击只播一次） |
 | `sounds/ramiel_hum.ogg` | 拉米尔环境音 | 同上（110/164.6Hz 拍频） |
 | `sounds/ropeway_ride.ogg` | 坐箱根缆车时的车厢声（16 秒循环） | 原创：`tools/build_ropeway_audio_r63.py` 数学合成（电机嗡鸣、钢缆低频、窗外风声、过支架滑轮的咔哒声），无采样 |
+| `sounds/elevator_motor.ogg` | 客梯运行时的曳引电机低鸣（8 秒循环） | 原创，由 `tools/build_elevator_motor.py` 合成 |
 | `sounds/rifle_fire.ogg` | EVA 帕雷特步枪 | 原创合成：机械枪机、爆音噪声与低频尾响，不含影视或现实枪械采样 |
 | `sounds/cannon_visor.ogg` | 阳电子炮瞄准器落下、升起（只在驾驶员耳边） | 原创：`tools/build_cannon_sight_audio_r64.py` 固定种子数学合成（小伺服电机的升速和齿轮噪声，末尾一声卡锁），无采样 |
 | `sounds/cannon_sight_tick.ogg` | 瞄准标记收拢时的滴答，越接近重合越快越高 | 原创：`tools/build_cannon_sight_audio_r64.py` 固定种子数学合成（1320 Hz 短音加一点起音噪声），无采样 |

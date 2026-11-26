@@ -283,6 +283,10 @@ def comfort17(b, x0, y0, z0):
             b.put(x, y + 1, zP, M('light_gray_concrete'))                      # corridor parapet
         for z in ((z0 - 1, z0) if k else (z0,)):
             b.put(x0, y + 1, z, M('light_gray_concrete')); b.put(x0 + C17_L - 1, y + 1, z, M('light_gray_concrete'))
+        if k:  # The open-air corridor continues two blocks beyond both end walls.
+            for x in (x0, x0 + C17_L - 1):
+                for z in (zC, zC + 1):
+                    b.put(x, y + 1, z, M('light_gray_concrete'))
         for name, u0, u1 in C17_UNITS:
             for x in range(u0 + 1, u1):                                        # big windows to the balcony
                 for dy in (1, 2):
@@ -591,9 +595,13 @@ def plan(site, out):
         return any(a <= x <= c and bz <= z <= d for a, bz, c, d in demolish_boxes)
     for (x, y, z), want in b.c.items():
         cur = w.get(x, y, z)
-        if cur is None or cur == want:
+        name = want.split('[', 1)[0]
+        furniture = 'minecraft:bed' if name.endswith('_bed') else 'minecraft:furnace' if name == 'minecraft:furnace' else None
+        existing_entity = w.block_entity(x, y, z) if furniture else None
+        missing_entity = furniture and cur == want and existing_entity is None
+        if cur is None or (cur == want and not missing_entity):
             continue
-        if not writable(cur, in_demolition(x, z)):
+        if not missing_entity and not writable(cur, in_demolition(x, z)):
             refused['occupied'] += 1; refused_at.append([x, y, z, cur, want]); continue
         try:
             for g in gs:
@@ -602,7 +610,10 @@ def plan(site, out):
             refused['protected'] += 1; refused_at.append([x, y, z, cur, want, 'protected']); continue
         if w.block_entity(x, y, z) and not in_demolition(x, z):
             refused['block entity'] += 1; refused_at.append([x, y, z, cur, want, 'be']); continue
-        rows.append([x, y, z, cur, want])
+        row = [x, y, z, cur, want]
+        if furniture:
+            row.append({'id': furniture, 'snbt': '{}'})
+        rows.append(row)
     written = {(r[0], r[1], r[2]) for r in rows}
     signs = [s for s in b.signs if tuple(s['pos']) in written or w.get(*s['pos']) == b.c[tuple(s['pos'])]]
     Path(out).mkdir(parents=True, exist_ok=True)

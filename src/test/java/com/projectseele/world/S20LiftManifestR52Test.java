@@ -68,8 +68,42 @@ public final class S20LiftManifestR52Test
                                          {"lower":[-31,-630,311],"facing":"north","hinge":"right","approach_feet":[[-30.5,-630,310.5],[-30.5,-630,312.5]]}]}}
                 """));return root;
     }
+    private static void mixedCabinFaces()
+    {
+        var publicLift=lift("r65-public-test",153,768,150,81,95,106,161);
+        for(var item:publicLift.getAsJsonArray("floors"))
+        {
+            var floor=item.getAsJsonObject();
+            int y=floor.get("approach_y").getAsInt();
+            boolean south=y==161;
+            floor.addProperty("exit",south?"south":"east");
+            for(String key:new String[]{"cabin_doors","landing_doors"})
+            {
+                int outward=key.equals("cabin_doors")?2:3;
+                var cells=new JsonArray();
+                for(int across=-1;across<=1;across++)for(int dy=0;dy<3;dy++)
+                {
+                    var cell=new JsonObject();
+                    cell.add("pos",array(153+(south?across:outward),y+dy,768+(south?outward:across)));
+                    cell.addProperty("closed_state","minecraft:gray_stained_glass");cells.add(cell);
+                }
+                floor.add(key,cells);
+            }
+        }
+        var wrapper=new JsonObject();wrapper.addProperty("schema",S20LiftManifestR52.PUBLIC_SCHEMA);
+        var lifts=new JsonArray();lifts.add(publicLift);wrapper.add("lifts",lifts);
+        var binding=S20LiftManifestR52.parsePublic(wrapper,null).get(0);
+        var faces=S20LiftDirectoryR52.cabinFaces(binding);
+        check(faces.size()==2,"Cabin must carry its east and south leaves through all four stops");
+        var east=faces.get(0);var south=faces.get(1);
+        check(!east.axisX()&&east.width()==3&&east.height()==3&&east.offset().x==2.5&&east.offset().z==.5
+                &&east.floors().size()==3,"East-side public car leaf rotated, misplaced or assigned to the wrong stop");
+        check(south.axisX()&&south.width()==3&&south.height()==3&&south.offset().x==.5&&south.offset().z==2.5
+                &&south.floors().equals(java.util.Set.of(new BlockPos(153,161,768))),"South leaf must align only at the hilltop");
+    }
     public static void main(String[] args)throws Exception
     {
+        mixedCabinFaces();
         var source=candidate();var document=S20LiftManifestR52.parse(source);
         check(document.ready()&&document.mainLifts().commandRear().terminalFloor()==-846,"Two original main-lift roles lost");
         check(document.lifts().size()==3,"Parser invented additional groups beyond two main lifts and the retained office");

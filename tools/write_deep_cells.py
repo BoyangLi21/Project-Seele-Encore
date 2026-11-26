@@ -250,6 +250,14 @@ def preflight(folder, grouped, allow_block_entities):
 # Project block entities a row may give (the block's own state machine, no data needed): the NERV staff gate's lower
 # half ticks its lane from its block entity, so a gate written without one would never open.
 PROJECT_ENTITIES = {'projectseele:nerv_staff_gate'}
+# These blocks use a different registry ID for the entity holding their renderer or display data.
+FURNISHING_ENTITIES = {
+    'minecraft:bed': {'minecraft:' + color + '_bed' for color in
+                      'white orange magenta light_blue yellow lime pink gray light_gray cyan purple blue brown green red black'.split()},
+    'minecraft:furnace': {'minecraft:furnace'},
+    'minecraft:sign': {'minecraft:oak_wall_sign'},
+    'projectseele:station_departure_board': {'projectseele:nerv_direction_panel'},
+}
 
 
 def apply(a):
@@ -260,11 +268,11 @@ def apply(a):
         if e.get('id') == 'trafficcraft:colored_block_entity':
             continue
         eid = str(e.get('id', ''))
-        if not ((eid.startswith('mtr:') or eid in MOVING_ELEVATOR_ENTITIES or eid in PROJECT_ENTITIES) and isinstance(e.get('snbt'), str)):
+        if not ((eid.startswith('mtr:') or eid in MOVING_ELEVATOR_ENTITIES or eid in PROJECT_ENTITIES or eid in FURNISHING_ENTITIES) and isinstance(e.get('snbt'), str)):
             raise SystemExit(f'{pos}: only trafficcraft:colored_block_entity, an mtr: entity, a Moving Elevators entity or '
-                             f'{sorted(PROJECT_ENTITIES)} with snbt can be given, not {e.get("id")}')
+                             f'{sorted(PROJECT_ENTITIES | FURNISHING_ENTITIES.keys())} with snbt can be given, not {e.get("id")}')
         row = next(r for r in rows if (r[0], r[1], r[2]) == pos)
-        if row[4].split('[')[0] != MOVING_ELEVATOR_ENTITIES.get(eid, eid):
+        if row[4].split('[')[0] not in FURNISHING_ENTITIES.get(eid, {MOVING_ELEVATOR_ENTITIES.get(eid, eid)}):
             raise SystemExit(f'{pos}: entity {e["id"]} given for block {row[4]}')
         nbtlib.parse_nbt(e['snbt'])                     # refuse a malformed entity before anything is touched
     rows = [r[:5] for r in rows]
