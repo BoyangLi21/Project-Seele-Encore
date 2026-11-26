@@ -81,6 +81,7 @@ final class GeoFrontSurfaceCoverR65
             else if (block == Blocks.GRASS_BLOCK || block == Blocks.GRASS || block == Blocks.TALL_GRASS) colour = darken(grass, .76F);
             else if (block == Blocks.WATER) colour = darken(water, .72F);
             colours[i] = (colour >> 8 & 0xf800) | (colour >> 5 & 0x07e0) | (colour >> 3 & 31);
+            if (block instanceof LeavesBlock) colours[i] |= 0x10000;
         }
         ByteBuffer data = MemoryUtil.memAlloc(w * h * 4);
         try
@@ -93,6 +94,9 @@ final class GeoFrontSurfaceCoverR65
                 {
                     int id = (row[offset + 2] & 255) * 256 + (row[offset + 3] & 255);
                     if (id >= colours.length) throw new IOException("Invalid surface material");
+                    // Height uses fewer than 15 bits in this dimension. Keep a canopy flag
+                    // beside it so the shader can verify an impossible DH forest depth.
+                    if ((colours[id] & 0x10000) != 0) row[offset] |= (byte)0x80;
                     row[offset + 2] = (byte)(colours[id] >> 8);
                     row[offset + 3] = (byte)colours[id];
                 }

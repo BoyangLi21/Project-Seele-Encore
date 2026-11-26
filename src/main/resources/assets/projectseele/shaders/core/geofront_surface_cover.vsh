@@ -8,12 +8,14 @@ uniform vec3 Eye;
 out vec3 relative;
 out vec3 colour;
 out float valid;
+out float canopy;
 
 void main() {
     ivec2 cell = Tile + ivec2(gl_VertexID % 65, gl_VertexID / 65);
     ivec2 bounds = textureSize(Survey, 0);
     uvec4 s = texelFetch(Survey, min(cell, bounds - 1), 0);
-    uint top = s.r * 256u + s.g;
+    uint top = (s.r & 127u) * 256u + s.g;
+    canopy = s.r >= 128u ? 1.0 : 0.0;
     valid = top > 0u && all(lessThan(cell, bounds)) ? 1.0 : 0.0;
     uint rgb = s.b * 256u + s.a;
     colour = vec3(rgb >> 11u, (rgb >> 5u) & 63u, rgb & 31u) / vec3(31, 63, 31);
