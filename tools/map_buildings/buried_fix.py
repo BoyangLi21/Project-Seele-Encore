@@ -3,7 +3,7 @@
   python buried_fix.py <out dir> [--houses | --shaft]
 
 --houses: only the two houses; --shaft: only the shaft (its wall cells in city lift original96/66's space go to
-held.json, written with write_deep_cells --original96-66-shaft-wall).
+held.json; superseded by hanging_city_lift.py, item 42).
 
 Reads BUILDINGS_WORLD. Writes rows.json and report.json.
 
@@ -220,14 +220,13 @@ def shaft(plan, report):
     report.append(dict(shaft=SHAFT, cover_y=CAP_Y, graded=dict(graded)))
 
 
-def trees(plan):
-    """Trees standing in reshaped columns. A tree is its 26-connected logs plus every leaf whose nearest log (within 4) is
-    one of them. If its trunk base no longer sits on the ground top, the whole tree moves down (or up) onto the new
+def trees(plan, ylo=40, yhi=110):
+    """Trees standing in reshaped columns. A tree is its 26-connected logs plus the leaves flooded from them (see below). If its trunk base no longer sits on the ground top, the whole tree moves down (or up) onto the new
     ground; a tree touching the house, its setback or the shaft goes whole. Unchanged trees stay as they are."""
     w = plan.w
     logs = set()
     for x, z in plan.zone:
-        for y in range(40, 110):
+        for y in range(ylo, yhi):
             if is_log(w.get(x, y, z)):
                 logs.add((x, y, z))
     comps, owner = [], {}
@@ -251,30 +250,28 @@ def trees(plan):
         comps.append(comp)
         for p in comp:
             owner[p] = i
-    R = 4
+    # leaves: flooded outward from every trunk at once through touching leaves (up to 8 steps), so each leaf goes with
+    # the trunk nearest along its canopy; a leaf touching some other tree's log stays with that tree
     leaves = [set() for _ in comps]
-    cand = set()
-    for x, y, z in owner:
-        for dx in range(-R, R + 1):
-            for dy in range(-R, R + 1):
-                for dz in range(-R, R + 1):
-                    cand.add((x + dx, y + dy, z + dz))
-    for x, y, z in cand:
-        if not is_leaf(w.get(x, y, z)):
+    claimed, queue = {}, deque()
+    for p, i in owner.items():
+        queue.append((p, i, 0))
+    N26 = [(dx, dy, dz) for dx in (-1, 0, 1) for dy in (-1, 0, 1) for dz in (-1, 0, 1) if dx or dy or dz]
+    while queue:
+        (x, y, z), i, d = queue.popleft()
+        if d >= 8:
             continue
-        for r in range(1, R + 1):
-            hit = None
-            for dx in range(-r, r + 1):
-                for dy in range(-r, r + 1):
-                    for dz in range(-r, r + 1):
-                        if max(abs(dx), abs(dy), abs(dz)) == r and hit is None:
-                            q = (x + dx, y + dy, z + dz)
-                            if is_log(w.get(*q)):
-                                hit = q
-            if hit is not None:
-                if hit in owner:
-                    leaves[owner[hit]].add((x, y, z))
-                break
+        for dx, dy, dz in N26:
+            q = (x + dx, y + dy, z + dz)
+            if q in claimed or q in owner or not is_leaf(w.get(*q)):
+                continue
+            if any(is_log(w.get(q[0] + ex, q[1] + ey, q[2] + ez)) and (q[0] + ex, q[1] + ey, q[2] + ez) not in owner
+                   for ex, ey, ez in N26):
+                claimed[q] = -1
+                continue
+            claimed[q] = i
+            leaves[i].add(q)
+            queue.append((q, i, d + 1))
     clears, places, stat = set(), {}, Counter()
     for i, comp in enumerate(comps):
         base = min(comp, key=lambda p: (p[1], p[0], p[2]))
@@ -282,7 +279,7 @@ def trees(plan):
         ground = top_solid(plan, bx, bz, by + 6, by - 30)
         dy = ground + 1 - by
         cols = {(x, z) for x, y, z in comp}
-        if dy == 0 and not (cols & plan.footprint):
+        if dy == 0 and not (cols & plan.keepout):
             stat['unchanged'] += 1
             continue
         body = comp | leaves[i]
@@ -297,6 +294,8 @@ def trees(plan):
                 continue
             places[q] = w.get(*p)
     for p in clears:
+        if p in plan.want and not is_air(plan.want[p]):
+            continue                      # already rebuilt by the work itself (a runway, a floor): keep that
         plan.put(p, AIR, 'trees')
     placed = 0
     for q, state in places.items():

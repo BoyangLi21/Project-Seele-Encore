@@ -26,12 +26,20 @@ import numpy as np
 from install_r53_carrier_trays import stopped_world
 
 REGION = 'dimensions/projectseele/geofront/region'
+# R65 item 42: the old glass stair shaft (x -191..-175, z 81..97) and two floating slabs stand partly in city lift
+# spaces (original96/66 lowered, raised and hatch; original96/2 raised). Inside those spaces these boxes may only be
+# cleared, and only from these blocks (--item42-city-lift-obstructions).
+CITY_LIFT_OBSTRUCTIONS = (((-179, -175), (-8, 85), (91, 97)), ((-162, -142), (82, 83), (80, 107)),
+                          ((-144, -120), (83, 84), (129, 155)))
+CITY_LIFT_OBSTRUCTION_BLOCKS = {'minecraft:' + n for n in ('light_gray_concrete', 'gray_stained_glass', 'polished_deepslate',
+                                                          'iron_bars', 'smooth_stone', 'oak_stairs', 'stone_brick_stairs')}
+
+
+def city_lift_obstruction(x, y, z):
+    return any(xa <= x <= xb and ya <= y <= yb and za <= z <= zb for (xa, xb), (ya, yb), (za, zb) in CITY_LIFT_OBSTRUCTIONS)
+
+
 # Moving Elevators block entity -> its block. A lift's controllers, in-cabin button and display carry their links here.
-# The old glass stair shaft's wall where it stands in city lift original96/66's raised space: the east wall x -175 at
-# z 91..97 and the south wall z 97 at x -179..-176, y 80..85 (66 cells, 2026-11-25).
-SHAFT_WALL_96_66 = frozenset((x, y, z) for y in range(80, 86)
-                             for x, z in [(-175, z) for z in range(91, 98)] + [(x, 97) for x in range(-179, -175)])
-SHAFT_WALL_BLOCKS = {'minecraft:light_gray_concrete', 'minecraft:gray_stained_glass'}
 MOVING_ELEVATOR_ENTITIES = {'movingelevators:elevator_tile': 'movingelevators:elevator_block',
                             'movingelevators:button_tile': 'movingelevators:button_block',
                             'movingelevators:display_tile': 'movingelevators:display_block'}
@@ -245,15 +253,14 @@ def apply(a):
         from map_pipeline.city_protection import load as city_protection
         city = city_protection(a.world)
         checked = positions
-        if a.original96_66_shaft_wall:
-            # The old glass stair shaft at x -191..-175, z 81..97 stands with its south-east corner in the raised
-            # space of city lift original96/66. Only those wall cells may go, only from wall block to air.
+        if a.item42_city_lift_obstructions:
+            # The old glass stair shaft and two floating slabs in city lift spaces: only their cells, only cleared.
             inside = city.inside(positions)
             for x, y, z, before, after in rows:
                 if (x, y, z) not in inside:
                     continue
-                if (x, y, z) not in SHAFT_WALL_96_66 or before.split('[')[0] not in SHAFT_WALL_BLOCKS or after != 'minecraft:air':
-                    raise SystemExit(f'{(x, y, z)}: inside the city lift space and not a shaft wall cell cleared to air ({before} -> {after})')
+                if not city_lift_obstruction(x, y, z) or before.split('[')[0] not in CITY_LIFT_OBSTRUCTION_BLOCKS or after != 'minecraft:air':
+                    raise SystemExit(f'{(x, y, z)}: inside the city lift space and not an old shaft or scrap cell cleared to air ({before} -> {after})')
             if any(tuple(sign['pos']) in inside for sign in signs):
                 raise SystemExit('a sign inside the city lift space')
             checked = [p for p in positions if p not in inside]
@@ -480,7 +487,7 @@ if __name__ == '__main__':
     parser.add_argument('--bank2-exterior', action='store_true', help='install the measured exterior cladding of the second launch bank')
     parser.add_argument('--dogma-hall-doorway', action='store_true',
                         help='open the declared EVA doorway to the Central Dogma shaft in the hangar hall (plan_r66_dogma_doorway); nothing else in the launch reservation')
-    parser.add_argument('--original96-66-shaft-wall', action='store_true',
-                        help='clear the old stair shaft wall standing in city lift original96/66 (66 listed cells, wall block to air only); every other cell of the city lift space is still refused')
+    parser.add_argument('--item42-city-lift-obstructions', action='store_true',
+                        help='clear the old glass stair shaft and two floating slabs where they stand in city lift spaces (listed boxes, listed blocks, to air only); every other cell of a city lift space is still refused')
     parser.add_argument('--refresh-heightmaps', action='store_true', help='drop the stored heightmaps of touched chunks, for terrain cut or raised')
     apply(parser.parse_args())
