@@ -308,7 +308,7 @@ def run(a):
         # Inside the GeoFront cavity the client draws the baked dome silhouette and logs its quads.
         send(sp, 'gamemode spectator ' + NAME)
         send(sp, 'execute in projectseele:geofront run teleport ' + NAME + ' 32 -300 320')
-        r['dome_far_view'] = wait(cp, logC, r'^.*GeoFront far view R65: \d+ quads.*$', 120)
+        r['dome_far_view'] = wait(cp, logC, r'^.*GeoFront far view R65: (?:[1-9]\d* cells, )?[1-9]\d* quads\b.*$', 120)
         off = [l for l in read(logC).splitlines() if 'GeoFront far view R65 off' in l]
         if off:
             raise RuntimeError(('GeoFront far view switched itself off', off[:3]))
