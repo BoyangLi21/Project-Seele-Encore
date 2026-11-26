@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "projectseele:block/nerv_storage_panel",
+    "north": "projectseele:block/nerv_storage_panel",
+    "south": "projectseele:block/nerv_storage_panel",
+    "east": "projectseele:block/nerv_structural_panel_side",
+    "west": "projectseele:block/nerv_structural_panel_side",
+    "up": "projectseele:block/nerv_hazard_paving",
+    "down": "projectseele:block/nerv_structural_panel_top"
+  }
+}

@@ -24,6 +24,9 @@ public class ModItems
     public static final RegistryObject<Item> UN_SATELLITE_PHONE=ITEMS.register("un_satellite_phone",
             ()->new com.projectseele.item.UNSatellitePhoneItem(new Item.Properties().stacksTo(1)));
 
+    public static final RegistryObject<Item> NERV_16_BOX = ITEMS.register("nerv_16_box",
+            () -> new com.projectseele.item.Nerv16BoxItem(new Item.Properties().stacksTo(1)));
+
     public static final RegistryObject<Item> CORE_FRAGMENT = ITEMS.register("core_fragment",
             () -> new Item(new Item.Properties()));
     public static final RegistryObject<Item> NERV_WORKSTATION = ITEMS.register("nerv_workstation",

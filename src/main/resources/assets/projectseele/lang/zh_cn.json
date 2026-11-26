@@ -1,4 +1,7 @@
 {
+  "entity.projectseele.nerv_16": "NERV-16特别战斗机",
+  "item.projectseele.nerv_16_box": "NERV-16特别战斗机生成盒",
+  "message.projectseele.nerv16_requires_sbw": "此生成盒需要卓越武器的载具系统。",
   "hud.projectseele.plug.extraction_interlock": "插入栓脱离条件未满足，请保持原位并联系整备部。",
   "hud.projectseele.plug.offline": "电源停止",
   "hud.projectseele.plug.external": "外部电源",

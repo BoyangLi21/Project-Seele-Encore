@@ -1,4 +1,7 @@
 {
+  "entity.projectseele.nerv_16": "NERV-16 Special Fighter",
+  "item.projectseele.nerv_16_box": "NERV-16 Special Fighter Crate",
+  "message.projectseele.nerv16_requires_sbw": "This crate requires the Superb Warfare vehicle system.",
   "hud.projectseele.plug.extraction_interlock": "Entry plug interlocked. Hold position and contact maintenance.",
   "hud.projectseele.plug.offline": "POWER OFFLINE",
   "hud.projectseele.plug.external": "EXTERNAL POWER",
