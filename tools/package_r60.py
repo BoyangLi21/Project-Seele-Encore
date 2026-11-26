@@ -293,8 +293,32 @@ def client_dh_config(text):
     # Two threads at half duty leave the preinstalled terrain filling in for a minute after joining.
     # R65: distant generation on, as on map-edges' render client (the same file otherwise). With it off a client only
     # rebuilds sections near it and its private memory climbed about 1 GB a minute in the R65 render runs.
-    return dh_config(text, {'numberOfThreads': '4', 'threadRunTimeRatio': '"1.0"', 'enableDistantGeneration': 'true',
-                            'distantGeneratorMode': '"PRE_EXISTING_ONLY"', **DH_COMPRESSION})
+    # R65 second playtest (owner, perf's measurements 11-24): HIGH draws the database's 1- and 2-block levels out to
+    # 563 and 1239 blocks instead of 384 and 768, at about the same frame rate; 8 threads refine a new view sooner.
+    return dh_config(text, {'numberOfThreads': '8', 'threadRunTimeRatio': '"1.0"', 'enableDistantGeneration': 'true',
+                            'distantGeneratorMode': '"PRE_EXISTING_ONLY"', 'horizontalQuality': '"HIGH"', **DH_COMPRESSION})
+
+
+# R65 second playtest: 1.20.1 sends every player the server's view distance and a client draws the smaller of its own
+# render distance and that, so both move together; 20 measured 97 fps against 116 at 12 (perf, 2026-11-24).
+FAR_VIEW_CHUNKS = 20
+
+
+def set_line(raw, prefix, value, name):
+    """The one line starting with prefix gets value; any other count fails the gate (a renamed key would be skipped)."""
+    lines = raw.decode('utf8').split('\n')
+    hits = [i for i, line in enumerate(lines) if line.startswith(prefix)]
+    if not gate(len(hits) == 1, '%s has %d "%s" lines, expected one' % (name, len(hits), prefix)):
+        return raw
+    ending = '\r' if lines[hits[0]].endswith('\r') else ''
+    lines[hits[0]] = prefix + value + ending
+    return '\n'.join(lines).encode('utf8')
+
+
+# R65 second playtest (map-edges, items 7/21): the minimap's shading and the extra cave zoom off, so the GeoFront
+# cave layer reads flat and at the zoom the player chose.
+XAERO_MINIMAP_PROFILE = 'config/xaero/minimap/profiles/default.cfg'
+XAERO_MINIMAP = {'minimap_lighting': 'false', 'minimap_cave_mode_extra_zoom': '0'}
 
 
 # R65 owner: clients get a 6 GB heap by default.
@@ -366,7 +390,16 @@ def region_chunks(path):
     return chunks
 
 
-def xaero_map(source, world, address, ring_source=None):
+def region_digest(path):
+    """sha256 of an .mca file's chunk records alone (index, compression type, compressed bytes): unchanged when the
+    region file is rewritten with the same chunks, unlike its mtime or its sector layout."""
+    digest = hashlib.sha256()
+    for index, (kind, body) in sorted(region_chunks(path).items()):
+        digest.update(index.to_bytes(2, 'big') + bytes([kind]) + len(body).to_bytes(4, 'big') + body)
+    return digest.hexdigest()
+
+
+def xaero_map(source, world, address, ring_source=None, ring_digests=None):
     """The baked world map, moved to where Xaero looks for it on this server.
 
     A multiplayer client only lists regions that have an N_M.zip in the map folder, so tile
@@ -404,6 +437,16 @@ def xaero_map(source, world, address, ring_source=None):
                 held.append(item)
         print('Minimap regions older than their region file but equal, chunk by chunk, to %s: %d of %d'
               % (ring_source, len(held), len(stale)), flush=True)
+        stale = [item for item in stale if item not in held]
+    if ring_digests and stale:
+        # R65 second round: the playtest world is gone, so the outer ring's maps are held against the chunk digests of
+        # the world they were proved equal to in the 11-24 pack (tools: region_digest over that world's regions).
+        recorded = json.loads(Path(ring_digests).read_text('utf8'))['regions']
+        regions_dir = world / 'dimensions/projectseele/geofront/region'
+        held = [item for item in stale for r in [region_name(item[0])]
+                if r in recorded and region_digest(regions_dir / f'r.{r.replace("_", ".")}.mca') == recorded[r]]
+        print('Minimap regions older than their region file but with the recorded chunk digest (%s): %d of %d'
+              % (ring_digests, len(held), len(stale)), flush=True)
         stale = [item for item in stale if item not in held]
     gate(not stale, ('The world changed after these map regions were baked (zip, baked, region saved); bake them again', stale[:5]))
     # Cave mode type 2 ("full") makes Xaero use the one baked cave layer everywhere in the GeoFront.
@@ -601,6 +644,23 @@ def build_inputs(a, work):
     current = {p.relative_to(client).as_posix(): p for tree in CLIENT_TREES for p in files(client / tree)}
     # Client and server ship the same jar: the installed one, or that plus files baked at pack time.
     current[MAIN_JAR] = shipped_jar
+    if gate(XAERO_MINIMAP_PROFILE in current, 'The client has no ' + XAERO_MINIMAP_PROFILE):
+        profile = current[XAERO_MINIMAP_PROFILE].read_bytes()
+        for key, value in XAERO_MINIMAP.items():
+            profile = set_line(profile, key + ' = ', value, XAERO_MINIMAP_PROFILE)
+        current[XAERO_MINIMAP_PROFILE] = profile
+    # R65: client-only mods the main client does not run (Codex's pyramid paint): client pack only, never the server,
+    # whose mods come from the server template.
+    client_mods = {}
+    for mod in a.client_mod or ():
+        if not gate(mod.is_file() and mod.suffix == '.jar', 'Client mod missing or not a jar: ' + str(mod)):
+            continue
+        name, digest = 'mods/' + mod.name, file_sha256(mod)
+        installed = name in current
+        # The main client may already run it; then it must be this very file.
+        if gate(not installed or file_sha256(current[name]) == digest, 'The main client runs a different ' + mod.name):
+            current[name] = mod
+            client_mods[name] = dict(source=str(mod), bytes=mod.stat().st_size, sha256=digest, already_in_main_client=installed)
     for name in list(current):
         inactive_shader = name.startswith('shaderpacks/') and Path(name).name not in {SHADER, SHADER + '.txt'}
         if inactive_shader or name == 'config/projectseele-private-visuals-r46.json':
@@ -626,7 +686,7 @@ def build_inputs(a, work):
             packs.append('file/' + GRASS_PACK)
         raw_options = raw_options.replace(pack_line.encode('utf8'),
                                           ('resourcePacks:' + json.dumps(packs, separators=(',', ':'))).encode('utf8'), 1)
-    current['options.txt'] = raw_options
+    current['options.txt'] = set_line(raw_options, 'renderDistance:', str(FAR_VIEW_CHUNKS), 'options.txt')
     current['resourcepacks/' + GRASS_PACK] = grass_pack()
     required = ['resourcepacks/' + n.removeprefix('file/') for n in packs if n.startswith('file/')]
     gate(all(n in current for n in required), ('Enabled resource pack missing', [n for n in required if n not in current]))
@@ -676,6 +736,7 @@ def build_inputs(a, work):
         icon = z.read('server-icon.png')
     props = '\n'.join('motd=' + property_value(MOTD) if l.startswith('motd=') else l for l in props.splitlines())
     gate('level-name=' + SERVER_WORLD in props, 'Template server.properties does not name ' + SERVER_WORLD)
+    props = set_line(props.encode('utf8'), 'view-distance=', str(FAR_VIEW_CHUNKS), 'server.properties').decode('utf8')
     server = {n: p for n, p in current.items() if n.startswith(('projectseele-local-maps/', 'config/', 'defaultconfigs/', 'licenses/')) or n in server_mods}
     xaero = server_xaerolib(client, current)
     server.update(xaero)
@@ -694,7 +755,8 @@ def build_inputs(a, work):
         manifest = json.loads(z.read('manifest.json'))
     assert not manifest.get('files')
     manifest.update(name=NAME, version=VERSION + '-' + a.date)
-    minimap = xaero_map(a.xaero_map.resolve(), world, a.server_address, a.xaero_ring_source and a.xaero_ring_source.resolve()) if a.xaero_map else {}
+    minimap = xaero_map(a.xaero_map.resolve(), world, a.server_address, a.xaero_ring_source and a.xaero_ring_source.resolve(),
+                        a.xaero_ring_digests and a.xaero_ring_digests.resolve()) if a.xaero_map else {}
     gate(a.xaero_map, 'No --xaero-map given: bake the minimap with tools/rebake_r63.py xaero')
     pcl = {'overrides/' + n: p for n, p in (current | client_lod | minimap).items()}
     pcl['overrides/servers.dat'] = servers_dat('SEELE', a.server_address)
@@ -715,7 +777,8 @@ def build_inputs(a, work):
         gate(not absent, ('Payload file missing', absent[:10]))
     regions = sum(1 for n in minimap if n.endswith('.zip') and '/caves/' not in n)
     return dict(world=world, template=template, bootstrap=bootstrap, server=server, pcl=pcl, lod=lod_details, dh_key=seed,
-                dh_source=provenance, server_mods=sorted(server_mods), jar=jar, config=config, minimap_region_zips=regions)
+                dh_source=provenance, server_mods=sorted(server_mods), jar=jar, config=config, minimap_region_zips=regions,
+                client_mods=client_mods)
 
 
 def package(target, payload, level, template=None, bootstrap=()):
@@ -773,6 +836,10 @@ def main():
     p.add_argument('--geofront-lod', type=Path, help='GeoFront DistantHorizons.sqlite from tools/rebake_r63.py (WORK/out/geofront_lod.sqlite)')
     p.add_argument('--xaero-ring-source', type=Path,
                    help='World the outer ring was copied from as it is, with its minimap: such regions pass if every chunk equals it')
+    p.add_argument('--xaero-ring-digests', type=Path,
+                   help='JSON {"regions": {"x_z": region_digest}} of a world the minimap was proved to match; such regions pass')
+    p.add_argument('--client-mod', type=Path, action='append',
+                   help='A client-only mod jar for the client pack alone (repeatable)')
     p.add_argument('--world-lods', type=Path, help='World folder whose DH databases stand in for those --world lacks (not the GeoFront one)')
     p.add_argument('--jar-add', action='append', metavar='INNER=SOURCE',
                    help='Bake a file into the shipped mod jar at INNER (added, or replacing that entry); both packs get the same jar')
@@ -807,7 +874,7 @@ def main():
         report = dict(version=VERSION, date=a.date, pack_written=False, actual_world=str(d['world']), manifest_name=NAME,
                       server_world_directory=SERVER_WORLD, map_state=a.map_note, dh=d['lod'], dh_key=d['dh_key'],
                       dh_identifier_source=d['dh_source'], server_mods=d['server_mods'], client_contains_save=False,
-                      main_jar=d['jar'], release_source=str(a.release_source.resolve()), config=d['config'], minimap_region_zips=d['minimap_region_zips'],
+                      main_jar=d['jar'], release_source=str(a.release_source.resolve()), config=d['config'], minimap_region_zips=d['minimap_region_zips'], client_mods=d['client_mods'],
                       raw_bytes=dict(server=size(d['server']), client=size(d['pcl'])), jit_directive=JVM,
                       compression='Already compressed media stored; everything else DEFLATE, client level 9, server level 3')
         print(json.dumps({k: report[k] for k in ('dh', 'dh_key', 'raw_bytes', 'minimap_region_zips')}, ensure_ascii=False), flush=True)
