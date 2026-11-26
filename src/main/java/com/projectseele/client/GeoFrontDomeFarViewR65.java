@@ -70,7 +70,7 @@ import static org.lwjgl.opengl.GL13.GL_TEXTURE1;
  * four blocks, in 64x64 tiles. The client groups the tiles into 128x128 cells and draws each cell at the scale its
  * distance calls for (one block near, coarser far), with the texture that side of that block shows (tinted faces with
  * the cavity biome's tint; mostly see-through blocks such as glass as their average colour), shaded by facing, fading
- * into the fog colour with distance. Nothing within the vanilla render distance (horizontally) is drawn, where the real
+ * into the fog colour with distance. Nothing within the vanilla render distance (in 3D) is drawn, where the real
  * chunks are. It is drawn after the level (under a shader pack, after the pack's last pass) into a multisampled target
  * of its own, resolved and laid over the picture only where nothing was drawn: four samples a pixel keep the one-block
  * seams between the dome's panels from flickering at a distance. Under a pack, water takes the lake's colour the pack
@@ -427,7 +427,7 @@ public final class GeoFrontDomeFarViewR65
         long quadsDrawn = 0;
         for (Cell cell : cells)
         {
-            float far = farthest(cell, camera[0], camera[2]);
+            float far = farthest(cell, camera[0], camera[1], camera[2]);
             if (far < nearCut) continue;
             if (!frustum.testAab(cell.x, cell.minY, cell.z, cell.x + CELL, cell.maxY, cell.z + CELL)) continue;
             int want = wanted(nearest(cell, camera[0], camera[1], camera[2]));
@@ -457,13 +457,16 @@ public final class GeoFrontDomeFarViewR65
     private static float nearest(Cell c, float x, float y, float z)
     {
         float dx = Math.max(Math.max(c.x - x, x - (c.x + CELL)), 0), dz = Math.max(Math.max(c.z - z, z - (c.z + CELL)), 0);
-        return (float) Math.sqrt(dx * dx + dz * dz);
+        float dy = Math.max(Math.max(c.minY - y, y - c.maxY), 0);
+        return (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
-    private static float farthest(Cell c, float x, float z)
+    /** The farthest corner of a cell's box, in 3D: a cell is left out only when all of it lies within the real chunks' reach. */
+    private static float farthest(Cell c, float x, float y, float z)
     {
         float dx = Math.max(Math.abs(c.x - x), Math.abs(c.x + CELL - x)), dz = Math.max(Math.abs(c.z - z), Math.abs(c.z + CELL - z));
-        return (float) Math.sqrt(dx * dx + dz * dz);
+        float dy = Math.max(Math.abs(c.minY - y), Math.abs(c.maxY - y));
+        return (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
     /**
@@ -499,7 +502,7 @@ public final class GeoFrontDomeFarViewR65
                 int want = wanted(d);
                 for (int l = 0; l < coarsest; l++)
                     if (cell.built[l] && l < want && d > (l == 0 ? FINE : MEDIUM) + KEEP) free(cell, l);
-                if (!cell.built[want] && d < bestDistance && farthest(cell, camX, camZ) >= nearCut)
+                if (!cell.built[want] && d < bestDistance && farthest(cell, camX, camY, camZ) >= nearCut)
                 {
                     best = cell;
                     bestLevel = want;

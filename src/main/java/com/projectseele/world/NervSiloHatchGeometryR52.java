@@ -48,16 +48,31 @@ public final class NervSiloHatchGeometryR52
     {return load(bytes,spec,false);}
     private static NervSiloHatchGeometryR52 load(EvaOriginalMeshGeometryR52.ByteSource bytes,Spec spec,boolean retiredServiceLeaves)throws IOException
     {
-        byte[] raw=bytes.read(SOURCE);
-        var data=JsonParser.parseString(new String(raw,StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("parts");var parts=new HashMap<String,NervAirframeGeometryR52.Part>();for(String name:List.of("hatch_frame","hatch_cassette","hatch_panel")){var a=data.getAsJsonArray(name);var v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsFloat();parts.put(name,new NervAirframeGeometryR52.Part(name,v));}return new NervSiloHatchGeometryR52(spec,parts,retiredServiceLeaves);
+        return new NervSiloHatchGeometryR52(spec,sourceParts(bytes.read(SOURCE)),retiredServiceLeaves);
     }
+    private static Map<String,NervAirframeGeometryR52.Part> sourceParts(byte[] raw)
+    {
+        var data=JsonParser.parseString(new String(raw,StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("parts");var parts=new HashMap<String,NervAirframeGeometryR52.Part>();for(String name:List.of("hatch_frame","hatch_cassette","hatch_panel")){var a=data.getAsJsonArray(name);var v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsFloat();parts.put(name,new NervAirframeGeometryR52.Part(name,v));}return Map.copyOf(parts);
+    }
+    /** The three hatch parts of the facility source, read once: reading parses the whole source (a few hundred MB of
+     * garbage), and every hatch spec used to read it again, so a launch rider met hatches still being read and drawn
+     * as nothing (R65 feedback 2, item 38). Parts never change (their vertices are copied out). */
+    private static volatile Map<String,NervAirframeGeometryR52.Part> classpathPartsR65;
+    private static final Object PARTS_LOCK_R65=new Object();
+    private static Map<String,NervAirframeGeometryR52.Part> classpathPartsR65()throws IOException
+    {
+        var known=classpathPartsR65;if(known!=null)return known;
+        synchronized(PARTS_LOCK_R65){if(classpathPartsR65==null)classpathPartsR65=sourceParts(EvaOriginalMeshGeometryR52.classpathBytes(SOURCE));return classpathPartsR65;}
+    }
+    private static NervSiloHatchGeometryR52 loadFromClasspathR65(Spec spec,boolean retiredServiceLeaves)throws IOException
+    {return new NervSiloHatchGeometryR52(spec,classpathPartsR65(),retiredServiceLeaves);}
     public static synchronized NervSiloHatchGeometryR52 loadClasspath(Spec spec)throws IOException
-    {var result=CACHE.get(spec);if(result==null){result=load(EvaOriginalMeshGeometryR52::classpathBytes,spec);CACHE.put(spec,result);}return result;}
+    {var result=CACHE.get(spec);if(result==null){result=loadFromClasspathR65(spec,false);CACHE.put(spec,result);}return result;}
     public static synchronized NervSiloHatchGeometryR52 loadRetiredServiceClasspathR53(Spec spec)throws IOException
     {
         if(spec==null||!spec.serviceColumnPorts()||spec.uprightGuidePorts()||spec.separationSign()!=-1||spec.openingX()!=33||spec.openingZ()!=33)
             throw new IllegalArgumentException("Original service-hatch source required");
-        var known=RETIRED_SERVICE_CACHE.get(spec);if(known==null){known=load(EvaOriginalMeshGeometryR52::classpathBytes,spec,true);RETIRED_SERVICE_CACHE.put(spec,known);}return known;
+        var known=RETIRED_SERVICE_CACHE.get(spec);if(known==null){known=loadFromClasspathR65(spec,true);RETIRED_SERVICE_CACHE.put(spec,known);}return known;
     }
     private record PendingR65(Spec spec,boolean retired){}
     private static final java.util.Set<PendingR65> PENDING_R65=new java.util.HashSet<>();
@@ -78,8 +93,10 @@ public final class NervSiloHatchGeometryR52
         {
             try
             {
-                var loaded=load(EvaOriginalMeshGeometryR52::classpathBytes,spec,retiredService);
+                long began=System.nanoTime();
+                var loaded=loadFromClasspathR65(spec,retiredService);
                 synchronized(NervSiloHatchGeometryR52.class){(retiredService?RETIRED_SERVICE_CACHE:CACHE).putIfAbsent(spec,loaded);PENDING_R65.remove(key);}
+                com.projectseele.ProjectSeele.LOGGER.info("Declared hatch geometry ready in {} ms ({} {}x{})",(System.nanoTime()-began)/1_000_000,retiredService?"retired service":"hatch",spec.openingX(),spec.openingZ());
             }
             catch(IOException|RuntimeException failure){com.projectseele.ProjectSeele.LOGGER.error("Declared hatch exact source unreadable",failure);}
         });

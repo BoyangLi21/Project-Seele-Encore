@@ -1,6 +1,8 @@
 #version 150
 
-// Only beyond the vanilla render distance (NearCut, horizontal): nearer, the real chunks are drawn and win.
+// Only beyond the vanilla render distance (NearCut) in three dimensions: the terrain renderer leaves out sections past its
+// fog distance in 3D too, so the floor far below a camera high in the cavity is not drawn though it lies within the
+// horizontal render distance (R65 feedback 2, item 37). Wherever the real chunks are drawn, they win.
 // Textured faces repeat their sprite once per block (Tile counts blocks across the face); the mip level comes from the
 // tiling coordinate's own derivatives, so the wrap at each block edge does not show. Colour alpha 0 = a flat colour.
 uniform sampler2D Sampler0;
@@ -20,7 +22,7 @@ in vec3 relative;
 out vec4 fragColor;
 
 void main() {
-    if (length(relative.xz) < NearCut) {
+    if (length(relative) < NearCut) {
         discard;
     }
     vec3 c;

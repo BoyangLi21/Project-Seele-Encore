@@ -45,7 +45,7 @@ public final class NervSiloDoorRenderer
         var declared=door.declaredSpecR52();
         // The declared geometry is read off the render thread; until it is ready this hatch is not drawn (R65).
         var geometry=declared==null?null:door.declaredGeometryIfLoadedR65();
-        if(declared!=null&&geometry==null)return;
+        if(declared!=null&&geometry==null){skippedUnread(door);return;}
         if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&declared!=null
                 &&declared.serviceColumnPorts()&&declared.separationSign()<0&&!geometry.retiredServiceLeavesR53())return;
         float open = door.getOpenProgress(partialTick);
@@ -61,6 +61,20 @@ public final class NervSiloDoorRenderer
         else if(!door.isTvBulkhead())renderSplitLogo(poses, buffers, open,spec);
         poses.popPose();
         super.render(door, yaw, partialTick, poses, buffers, packedLight);
+    }
+
+    private static long unreadSince = -1;
+    private static int unreadFrames;
+
+    /** A hatch on screen but not drawn (its geometry not read yet) is a hole in the shaft; say so, every 5 s at most. */
+    private static void skippedUnread(NervSiloDoorEntity door)
+    {
+        unreadFrames++;
+        long now = System.currentTimeMillis();
+        if (unreadSince >= 0 && now - unreadSince < 5000) return;
+        com.projectseele.ProjectSeele.LOGGER.info("Silo hatch at {} {} {} not drawn: geometry not read yet ({} skipped draws)",
+                (int) door.getX(), (int) door.getY(), (int) door.getZ(), unreadFrames);
+        unreadSince = now;
     }
 
     private static void renderSplitLogo(PoseStack poses,

@@ -74,6 +74,7 @@ public final class NervSiloDoorEntity extends Entity
     private int clockStepR52,clockDurationR52;private float clockStartR52,clockGoalR52=Float.NaN;
     private float clientOpen;
     private float clientOpenO;
+    private boolean geometryReadyR65;
     private int openingDelay;
 
     public NervSiloDoorEntity(EntityType<? extends NervSiloDoorEntity> type,
@@ -128,6 +129,10 @@ public final class NervSiloDoorEntity extends Entity
         {
             this.clientOpenO = this.clientOpen;
             this.clientOpen = this.entityData.get(DATA_OPEN);
+            // Ask for the declared geometry as soon as the hatch is tracked, not when it first comes on screen: a
+            // launch rider reaches hatches far below or above within seconds, and an unread hatch is drawn as nothing.
+            if (!this.geometryReadyR65 && !declaredGeometryMissingR52() && declaredSpecR52() != null)
+                this.geometryReadyR65 = declaredGeometryIfLoadedR65() != null;
             return;
         }
         if(declaredClockR52)return;
