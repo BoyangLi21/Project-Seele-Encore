@@ -70,6 +70,16 @@ public final class NervStaffDialogue
     public static boolean authorized(ServerPlayer player)
     {
         if(!player.isSpectator()&&com.projectseele.config.SeeleConfig.ALL_PLAYERS_AUTHORIZED.get())return true;
+        return carriesCard(player);
+    }
+    /**
+     * The card lanes of nerv_staff_gate and the MTR barriers marked "pass": "nerv_card" check the card itself: an
+     * operator, or a NERV employee or Dogma card in the inventory or offhand. allPlayersAuthorized opens NERV's services
+     * to every player but not these gates (R65 owner: only the gates and the lifts ask for a card; the HQ card lifts
+     * already take the swiped Dogma card in hand). Everything else keeps authorized().
+     */
+    public static boolean carriesCard(ServerPlayer player)
+    {
         return player.createCommandSourceStack().hasPermission(2)||java.util.stream.Stream.concat(player.getInventory().items.stream(),player.getInventory().offhand.stream()).anyMatch(s->s.is(ModItems.NERV_EMPLOYEE_CARD.get())||s.is(ModItems.TERMINAL_DOGMA_ACCESS_CARD.get()));
     }
     public static int converse(ServerPlayer player,NervStaffEntity npc,String text)
