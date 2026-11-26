@@ -124,6 +124,7 @@ public final class GeoFrontDomeFarViewR65
 
     /** Capture the camera at the sky pass and use the same projection to compare against terrain depth. */
     private static Matrix4f pendingView, pendingProjection, sceneProjection;
+    private static boolean pendingSurface;
     private static float[] pendingCamera, pendingFog;
     private static TextureTarget target;
     private static int screenVao, screenVbo, farProgram, blitProgram;
@@ -208,16 +209,31 @@ public final class GeoFrontDomeFarViewR65
             return;
         }
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_SKY) return;
+        if (com.projectseele.client.render.ShaderShadowPassR44.active()) return;
         Minecraft mc = Minecraft.getInstance();
         var camera = event.getCamera().getPosition();
+        pendingView = null;
+        pendingSurface = false;
         boolean wanted = !failed && !missing && SeeleConfig.CLIENT_SPEC.isLoaded() && SeeleConfig.GEOFRONT_FAR_VIEW.get()
                 && inCavity(mc, camera.x, camera.y, camera.z);
         if (!wanted)
         {
             active = false;
+            if (mc.level != null && mc.level.dimension().equals(FacilitySchemaV2.DIMENSION)
+                    && SeeleConfig.CLIENT_SPEC.isLoaded() && SeeleConfig.GEOFRONT_FAR_VIEW.get()
+                    && mc.level.canSeeSky(event.getCamera().getBlockPosition())
+                    && GeoFrontSurfaceCoverR65.ready(mc, event.getCamera().getBlockPosition()))
+            {
+                pendingSurface = true;
+                pendingCamera = new float[]{(float) camera.x, (float) camera.y, (float) camera.z};
+                pendingView = new Matrix4f(event.getPoseStack().last().pose())
+                        .translate(-pendingCamera[0], -pendingCamera[1], -pendingCamera[2]);
+                sceneProjection = new Matrix4f(event.getProjectionMatrix());
+                pendingProjection = farProjection(sceneProjection);
+                pendingFog = RenderSystem.getShaderFogColor().clone();
+            }
             return;
         }
-        if (com.projectseele.client.render.ShaderShadowPassR44.active()) return;
         try
         {
             if (!loaded)
@@ -264,9 +280,7 @@ public final class GeoFrontDomeFarViewR65
             Matrix4f view = new Matrix4f(event.getPoseStack().last().pose()).translate(-camX, -camY, -camZ);
             // the frame's own projection (field of view, bobbing) with a depth range that reaches across the cavity
             sceneProjection = new Matrix4f(event.getProjectionMatrix());
-            Matrix4f projection = new Matrix4f(sceneProjection);
-            projection.m22((FAR + NEAR) / (NEAR - FAR));
-            projection.m32(2F * FAR * NEAR / (NEAR - FAR));
+            Matrix4f projection = farProjection(sceneProjection);
             float[] fog = RenderSystem.getShaderFogColor().clone();
             int vao = glGetInteger(GL_VERTEX_ARRAY_BINDING), arrayBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
             try
@@ -294,7 +308,12 @@ public final class GeoFrontDomeFarViewR65
 
     public static boolean hasPendingFarView()
     {
-        return pendingView != null && !failed;
+        return pendingView != null && (pendingSurface || !failed);
+    }
+
+    private static Matrix4f farProjection(Matrix4f scene)
+    {
+        return new Matrix4f(scene).m22((FAR + NEAR) / (NEAR - FAR)).m32(2F * FAR * NEAR / (NEAR - FAR));
     }
 
     public static void afterLevel()
@@ -307,19 +326,22 @@ public final class GeoFrontDomeFarViewR65
     {
         Matrix4f view = pendingView, projection = pendingProjection;
         float[] camera = pendingCamera, fog = pendingFog;
+        boolean surface = pendingSurface;
+        pendingSurface = false;
         pendingView = null;
         pendingProjection = null;
         pendingCamera = null;
         pendingFog = null;
-        if (view == null || failed || cells.isEmpty()) return;
+        if (view == null || (!surface && (failed || cells.isEmpty()))) return;
         Minecraft mc = Minecraft.getInstance();
         if (EvaCommandFeedClient.captureTargetOverride() != null) return;
         RenderTarget main = mc.getMainRenderTarget();
-        drawWithState(mc, view, projection, camera, fog, main, framebuffer);
+        drawWithState(mc, view, projection, camera, fog, main, framebuffer, surface);
     }
 
     /** Preserve the caller's framebuffer and render state across the offscreen draw and composite. */
-    private static void drawWithState(Minecraft mc, Matrix4f view, Matrix4f projection, float[] camera, float[] fog, RenderTarget main, int framebuffer)
+    private static void drawWithState(Minecraft mc, Matrix4f view, Matrix4f projection, float[] camera, float[] fog,
+                                      RenderTarget main, int framebuffer, boolean surface)
     {
         boolean depthTest = glIsEnabled(GL_DEPTH_TEST), blend = glIsEnabled(GL_BLEND), cull = glIsEnabled(GL_CULL_FACE),
                 scissor = glIsEnabled(GL_SCISSOR_TEST), depthMask = glGetBoolean(GL_DEPTH_WRITEMASK);
@@ -350,8 +372,21 @@ public final class GeoFrontDomeFarViewR65
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, main.width, main.height,
                         0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 0L);
             }
-            if (farProgram == 0) programs();
-            ensureMultisample(main.width, main.height);
+            if (blitProgram == 0) screenProgram();
+            int sceneDepth = 0;
+            if (surface)
+            {
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+                if (glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE) != GL_TEXTURE) return;
+                sceneDepth = glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                        GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+            }
+            else
+            {
+                if (farProgram == 0) cavernProgram();
+                ensureMultisample(main.width, main.height);
+            }
             glColorMask(true, true, true, true);
             glDisable(GL_BLEND);
             glDisable(GL_CULL_FACE);
@@ -361,17 +396,25 @@ public final class GeoFrontDomeFarViewR65
             glDepthMask(true);
             // Four samples a pixel: a seam between the dome's panels one block wide is under a pixel from the floor, and
             // drawn with one sample it jumps from pixel to pixel as the camera moves; with four it is a steady soft line.
-            glBindFramebuffer(GL_FRAMEBUFFER, multisampleFbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, surface ? target.frameBufferId : multisampleFbo);
             glViewport(0, 0, main.width, main.height);
             glClearColor(0F, 0F, 0F, 0F);
             glClearDepth(1D);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            glBindSampler(0, atlasSampler);
-            draw(mc, view, projection, camera, fog);
-            glBindSampler(0, 0);
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, multisampleFbo);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target.frameBufferId);
-            glBlitFramebuffer(0, 0, main.width, main.height, 0, 0, main.width, main.height, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            if (surface)
+            {
+                var dh = RamielTerrainDepthR64.sample(sceneProjection);
+                GeoFrontSurfaceCoverR65.draw(view, projection, sceneProjection, camera, fog, sceneDepth, dh);
+            }
+            else
+            {
+                glBindSampler(0, atlasSampler);
+                draw(mc, view, projection, camera, fog);
+                glBindSampler(0, 0);
+                glBindFramebuffer(GL_READ_FRAMEBUFFER, multisampleFbo);
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target.frameBufferId);
+                glBlitFramebuffer(0, 0, main.width, main.height, 0, 0, main.width, main.height, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            }
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
             // Later entities and glass must also test against the same visible cavern surface.
             glDepthMask(true);
@@ -394,9 +437,13 @@ public final class GeoFrontDomeFarViewR65
         }
         catch (IOException | RuntimeException problem)
         {
-            failed = true;
-            active = false;
-            ProjectSeele.LOGGER.warn("GeoFront far view R65 off: {}", problem.toString(), problem);
+            if (surface) GeoFrontSurfaceCoverR65.disable(problem);
+            else
+            {
+                failed = true;
+                active = false;
+                ProjectSeele.LOGGER.warn("GeoFront far view R65 off: {}", problem.toString(), problem);
+            }
         }
         finally
         {
@@ -640,10 +687,9 @@ public final class GeoFrontDomeFarViewR65
 
     // ------------------------------------------------------------------ programs
 
-    private static void programs() throws IOException
+    private static void cavernProgram() throws IOException
     {
         farProgram = link("geofront_dome_far", "Base", "Extent", "Face", "Look");
-        blitProgram = link("geofront_dome_blit", "Position");
         // The block atlas normally changes its filtering between opaque and cutout passes. Far terrain always
         // shrinks its repeating sprites, independently of the sampler left on the unit by Minecraft or Oculus.
         atlasSampler = glGenSamplers();
@@ -669,6 +715,11 @@ public final class GeoFrontDomeFarViewR65
         {
             MemoryUtil.memFree(table);
         }
+    }
+
+    private static void screenProgram() throws IOException
+    {
+        blitProgram = link("geofront_dome_blit", "Position");
         FloatBuffer corners = MemoryUtil.memAllocFloat(8);
         try
         {
@@ -695,7 +746,7 @@ public final class GeoFrontDomeFarViewR65
     }
 
     /** A program from shaders/core/<name>.vsh and .fsh with the given attributes at locations 0, 1, ... */
-    private static int link(String name, String... attributes) throws IOException
+    static int link(String name, String... attributes) throws IOException
     {
         int vertex = compile(GL_VERTEX_SHADER, name + ".vsh"), fragment = compile(GL_FRAGMENT_SHADER, name + ".fsh");
         int linked = glCreateProgram();
@@ -928,7 +979,7 @@ public final class GeoFrontDomeFarViewR65
         }
     }
 
-    private static int leafTint(Block block, int foliage)
+    static int leafTint(Block block, int foliage)
     {
         if (block == Blocks.SPRUCE_LEAVES) return FoliageColor.getEvergreenColor();
         if (block == Blocks.BIRCH_LEAVES) return FoliageColor.getBirchColor();

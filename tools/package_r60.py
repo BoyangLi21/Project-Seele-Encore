@@ -255,6 +255,32 @@ def shader_payload(path):
         text = patched.get(cover.MEMBER, source.read(cover.MEMBER).decode('utf8'))
         if cover.patch_text(text) != text:
             patched[cover.MEMBER] = cover.patch_text(text)
+        # A suppressed DH pass leaves both last frame's depth textures allocated. Surface
+        # lighting, water and entity programs must all see empty DH depth inside the dome.
+        uniforms = 'shaders/lib/uniforms.glsl'
+        text = patched.get(uniforms, source.read(uniforms).decode('utf8'))
+        if 'uniform int seeleCavernOwnsDepth;' not in text:
+            old = 'uniform float viewWidth;'
+            gate(text.count(old) == 1, 'Missing shared display uniforms in shader pack')
+            patched[uniforms] = text.replace(old, old + '\n    uniform int seeleCavernOwnsDepth;')
+        sample = re.compile(r'(?:texelFetch\(dhDepthTex1?,\s*texelCoord,\s*0\)|texture\(dhDepthTex1?,\s*seeleUv\))\.r')
+        for member in source.namelist():
+            if not member.endswith('.glsl') or member == uniforms:
+                continue
+            text = patched.get(member, source.read(member).decode('utf8'))
+            if 'dhDepthTex' in text and 'seeleCavernOwnsDepth' not in text:
+                fixed, changes = sample.subn(r'(seeleCavernOwnsDepth != 0 ? 1.0 : \g<0>)', text)
+                gate(changes > 0, 'Unrecognized DH depth read in ' + member)
+                patched[member] = fixed
+        # The roof blocks sunlight. Projecting the exterior shadow map through the cavern
+        # volume leaves building-shaped shadows floating in front of its own opaque walls.
+        composite = 'shaders/program/composite.glsl'
+        text = patched.get(composite, source.read(composite).decode('utf8'))
+        old = 'volumetricEffect = GetVolumetricLight('
+        new = 'if (seeleCavernOwnsDepth == 0) ' + old
+        if new not in text:
+            gate(text.count(old) == 1, 'Missing volumetric sunlight pass')
+            patched[composite] = text.replace(old, new)
         if not patched:
             return path
         output = io.BytesIO()

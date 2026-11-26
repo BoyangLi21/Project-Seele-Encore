@@ -42,6 +42,8 @@ public final class CommandShaderLightR39
                 holder.getMethod("uniform1i",frequency,String.class,IntSupplier.class).invoke(uniforms,perFrame,"seeleHeadquarters"+"XYZ".charAt(axis),(IntSupplier)()->headquartersOffset(component));
             }
             holder.getMethod("uniform1f",frequency,String.class,java.util.function.DoubleSupplier.class).invoke(uniforms,perFrame,"seeleDhNearFill",(java.util.function.DoubleSupplier)DhNearFillR61::current);
+            holder.getMethod("uniform1i",frequency,String.class,IntSupplier.class).invoke(uniforms,perFrame,"seeleCavernOwnsDepth",
+                    (IntSupplier)()->GeoFrontDomeFarViewR65.suppressDistantHorizons() ? 1 : 0);
         }
         catch(ReflectiveOperationException failure){throw new IllegalStateException("Pinned Oculus command-light binding changed",failure);}
     }

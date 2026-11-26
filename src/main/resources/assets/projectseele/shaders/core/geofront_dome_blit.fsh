@@ -18,6 +18,8 @@ void main() {
     float meshZ = -FarProjectionZ.y / (ndc + FarProjectionZ.x);
     vec4 point = SceneProjection * vec4(0.0, 0.0, meshZ, 1.0);
     // Permit coincident terrain faces to replace their fogged colour within two D24 depth units.
-    gl_FragDepth = clamp(0.5 * point.z / point.w + 0.5 - 2.0 / 16777215.0, 0.0, 1.0);
+    // A resolved opaque face beyond the native far plane still covers the sky. Leave
+    // depth 1 exclusively for a cleared pixel, including in later shader-pack passes.
+    gl_FragDepth = clamp(0.5 * point.z / point.w + 0.5 - 2.0 / 16777215.0, 0.0, 1.0 - 1.0 / 16777215.0);
     fragColor = color;
 }
