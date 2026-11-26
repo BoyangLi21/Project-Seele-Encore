@@ -133,9 +133,10 @@ public final class PublicStationGatesR44
         {
             if (actor instanceof net.minecraft.server.level.ServerPlayer player
                     && CARD_GATES.getOrDefault(level.getServer(), Set.of()).contains(position)
-                    && !NervStaffDialogue.authorized(player))
+                    && !NervStaffDialogue.carriesCard(player))
             {
-                // Card gate: stays shut for anyone without a NERV card (operators pass), says so at most every 2 s.
+                // Card gate: stays shut for anyone without a NERV card (operators pass), whatever allPlayersAuthorized
+                // says; says so at most every 2 s. Exit barriers carry no "pass" row and stay free.
                 long now = level.getGameTime();
                 Long last = REFUSED_AT.get(player.getUUID());
                 if (last == null || now - last > 40)

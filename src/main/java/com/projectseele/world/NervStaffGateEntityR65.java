@@ -65,7 +65,8 @@ public final class NervStaffGateEntityR65 extends BlockEntity
             {
                 continue;
             }
-            if (!card || e instanceof NervStaffEntity || NervStaffDialogue.authorized((ServerPlayer) e))
+            // the card itself, not authorized(): allPlayersAuthorized must not open a card lane; free (exit) lanes stay free
+            if (!card || e instanceof NervStaffEntity || NervStaffDialogue.carriesCard((ServerPlayer) e))
             {
                 admitted = true;
             }
