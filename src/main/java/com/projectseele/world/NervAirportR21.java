@@ -31,6 +31,16 @@ public final class NervAirportR21
     private static final String FIGHTER_TAG = "projectseele_nerv16";
     private static final Set<Entity> pendingFighters = Collections.newSetFromMap(new WeakHashMap<>());
 
+    public static CompoundTag commissioningData(Entity aircraft) throws ReflectiveOperationException {
+        var tag = aircraft.saveWithoutId(new CompoundTag());
+        tag.putBoolean("GearUp", false);
+        tag.putInt("Energy", ((Number)aircraft.getClass().getMethod("getMaxEnergy").invoke(aircraft)).intValue());
+        // Missing health fields tell Superb Warfare to take each component's initial health from its definition.
+        for (String part : new String[]{"Health", "TurretHealth", "LeftWheelHealth", "RightWheelHealth", "MainEngineHealth", "SubEngineHealth"})
+            tag.remove(part);
+        return tag;
+    }
+
     public static void identifyFighter(Entity aircraft) {
         if (!com.projectseele.item.Nerv16BoxItem.AIRFRAME.equals(BuiltInRegistries.ENTITY_TYPE.getKey(aircraft.getType()))) return;
         if (!aircraft.getTags().contains(FIGHTER_TAG)) {
@@ -48,7 +58,7 @@ public final class NervAirportR21
 
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
-        if(event.phase!=TickEvent.Phase.END)return;
+        if(event.phase!=TickEvent.Phase.END || !net.minecraftforge.fml.ModList.get().isLoaded("superbwarfare"))return;
         pendingFighters.removeIf(aircraft -> {
             if (aircraft.isRemoved()) return true;
             if (aircraft.tickCount < 5) return false;
@@ -82,9 +92,8 @@ public final class NervAirportR21
                 level.getChunk(pad);if(level.getBlockState(pad.below()).isAir())throw new IllegalStateException("Missing airport apron "+pad);
                 var type=BuiltInRegistries.ENTITY_TYPE.get(new ResourceLocation(spec.get("id").getAsString()));Entity aircraft=type.create(level);
                 if(aircraft==null)throw new IllegalStateException("Unavailable installed aircraft "+spec);
-                CompoundTag tag=aircraft.saveWithoutId(new CompoundTag());tag.putBoolean("GearUp",false);tag.putFloat("ServerYaw",spec.get("yaw").getAsFloat());
-                for(String field:new String[]{"Health","TurretHealth","LeftWheelHealth","RightWheelHealth","MainEngineHealth","SubEngineHealth"})tag.remove(field);
-                tag.putInt("Energy",((Number)aircraft.getClass().getMethod("getMaxEnergy").invoke(aircraft)).intValue());
+                CompoundTag tag=commissioningData(aircraft);
+                tag.putFloat("ServerYaw",spec.get("yaw").getAsFloat());
                 aircraft.load(tag);aircraft.moveTo(pos.get(0).getAsDouble(),pos.get(1).getAsDouble(),pos.get(2).getAsDouble(),spec.get("yaw").getAsFloat(),0);aircraft.addTag("seele_r21_nerv_aircraft");
                 identifyFighter(aircraft);
                 stockAmmunition(aircraft);

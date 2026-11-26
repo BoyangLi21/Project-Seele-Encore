@@ -5,7 +5,7 @@ import json
 import zipfile
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps
 
 TEXTURE = 'assets/superbwarfare/textures/bedrock/vehicle/j_16.png'
 MODEL = 'assets/superbwarfare/models/bedrock/vehicle/j_16.geo.json'

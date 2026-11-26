@@ -30,6 +30,12 @@ public final class Nerv16BoxItem extends Item {
     }
 
     @Override
+    public void appendHoverText(ItemStack stack, net.minecraft.world.level.Level level, java.util.List<Component> lines,
+                                net.minecraft.world.item.TooltipFlag flag) {
+        lines.add(Component.translatable("tooltip.projectseele.nerv_16_box"));
+    }
+
+    @Override
     public InteractionResult useOn(UseOnContext context) {
         var player = context.getPlayer();
         if (player == null) return InteractionResult.PASS;
@@ -45,17 +51,14 @@ public final class Nerv16BoxItem extends Item {
             var jet = ForgeRegistries.ENTITY_TYPES.getValue(AIRFRAME).create(level);
             if (jet == null) return InteractionResult.FAIL;
             NervAirportR21.identifyFighter(jet);
-            var vehicle = jet.saveWithoutId(new CompoundTag());
-            vehicle.remove("UUID");
             try {
-                vehicle.putInt("Energy", ((Number)jet.getClass().getMethod("getMaxEnergy").invoke(jet)).intValue());
+                var vehicle = NervAirportR21.commissioningData(jet);
+                vehicle.remove("UUID");
+                data.put("Entity", vehicle);
             } catch (ReflectiveOperationException e) {
                 com.projectseele.ProjectSeele.LOGGER.warn("NERV-16 crate cannot read Superb Warfare airframe energy", e);
                 return InteractionResult.FAIL;
             }
-            // Superb Warfare derives initial component health from the vehicle definition on load.
-            for (String key : new String[]{"Health", "TurretHealth", "LeftWheelHealth", "RightWheelHealth", "MainEngineHealth", "SubEngineHealth"}) vehicle.remove(key);
-            data.put("Entity", vehicle);
         }
         BlockItem.setBlockEntityData(nativeStack, ForgeRegistries.BLOCK_ENTITY_TYPES.getValue(CONTAINER), data);
         var hit = new BlockHitResult(context.getClickLocation(), context.getClickedFace(), context.getClickedPos(), context.isInside());
