@@ -9,6 +9,7 @@ uniform vec3 Haze;
 uniform usampler2D Survey;
 uniform ivec4 Grid;
 uniform vec3 Eye;
+uniform float HandoffRange;
 in vec3 relative;
 in vec3 colour;
 in float valid;
@@ -19,7 +20,8 @@ out vec4 fragColor;
 // forest. Verify the hit against the highest surveyed neighbour, leaving water,
 // structures, unsurveyed areas, and real native foreground to their own passes.
 bool aboveCanopy(vec3 hit) {
-    if (canopy < 0.999) return false;
+    vec2 offset = abs(hit.xz - Eye.xz);
+    if (canopy < 0.999 || max(offset.x, offset.y) >= HandoffRange) return false;
     ivec2 cell = ivec2(floor((hit.xz - vec2(Grid.xy)) / float(Grid.z)));
     ivec2 size = textureSize(Survey, 0);
     if (any(lessThan(cell, ivec2(1))) || any(greaterThanEqual(cell + 1, size))) return false;

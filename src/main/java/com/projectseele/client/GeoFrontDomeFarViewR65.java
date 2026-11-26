@@ -232,8 +232,10 @@ public final class GeoFrontDomeFarViewR65
                 pendingProjection = farProjection(sceneProjection);
                 pendingFog = RenderSystem.getShaderFogColor().clone();
             }
+            else GeoFrontSurfaceCoverR65.leftSurface();
             return;
         }
+        GeoFrontSurfaceCoverR65.leftSurface();
         try
         {
             if (!loaded)

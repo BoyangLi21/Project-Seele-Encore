@@ -4,11 +4,13 @@ import com.projectseele.ProjectSeele;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.zip.GZIPInputStream;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -34,6 +36,9 @@ final class GeoFrontSurfaceCoverR65
     private static Survey survey;
     private static boolean disabled;
     private static int program, vao, texture;
+    private static long motionSampleAt = -1, handoffUntil;
+    private static float sampleX, sampleY, sampleZ;
+    private static WeakReference<ClientLevel> sampleLevel = new WeakReference<>(null);
 
     private record Survey(int x, int z, int width, int height, int step, int floor, ByteBuffer data) {}
 
@@ -119,6 +124,37 @@ final class GeoFrontSurfaceCoverR65
         return (int)(((rgb >> 16) & 255) * factor) << 16 | (int)(((rgb >> 8) & 255) * factor) << 8 | (int)((rgb & 255) * factor);
     }
 
+    static void leftSurface()
+    {
+        motionSampleAt = -1;
+    }
+
+    private static float handoffRange(float[] camera)
+    {
+        Minecraft mc = Minecraft.getInstance();
+        if (sampleLevel.get() != mc.level)
+        {
+            sampleLevel = new WeakReference<>(mc.level);
+            leftSurface();
+        }
+        long now = net.minecraft.Util.getMillis();
+        float dx = camera[0] - sampleX, dy = camera[1] - sampleY, dz = camera[2] - sampleZ;
+        double travel = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        long elapsed = now - motionSampleAt;
+        if (motionSampleAt < 0 || elapsed >= 100 || travel > 16)
+        {
+            // A fast flight or dimension arrival can leave the receiving native sections
+            // unmeshed. Ordinary walking, turning, and a settled distant skyline keep DH.
+            if (motionSampleAt < 0 || travel > Math.max(4.0, Math.min(16.0, elapsed * .020)))
+                handoffUntil = now + 1600;
+            motionSampleAt = now;
+            sampleX = camera[0];
+            sampleY = camera[1];
+            sampleZ = camera[2];
+        }
+        return now < handoffUntil ? mc.options.getEffectiveRenderDistance() * 16F : 0F;
+    }
+
     static void draw(Matrix4f view, Matrix4f projection, Matrix4f sceneProjection, float[] camera, float[] fog,
                      int sceneDepth, RamielTerrainDepthR64.DepthSample dh) throws IOException
     {
@@ -140,6 +176,7 @@ final class GeoFrontSurfaceCoverR65
             glUniform1i(glGetUniformLocation(program, "HasDh"), dh != null ? 1 : 0);
             glUniform2f(glGetUniformLocation(program, "DhToScene"), dh == null ? 1 : dh.scale(), dh == null ? 0 : dh.offset());
             glUniform2f(glGetUniformLocation(program, "SceneZ"), sceneProjection.m22(), sceneProjection.m32());
+            glUniform1f(glGetUniformLocation(program, "HandoffRange"), handoffRange(camera));
             Matrix4f clip = new Matrix4f(projection).mul(view);
             glUniformMatrix4fv(glGetUniformLocation(program, "Clip"), false, clip.get(MATRIX));
             glUniform3f(glGetUniformLocation(program, "Eye"), camera[0], camera[1], camera[2]);
