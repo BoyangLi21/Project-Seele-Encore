@@ -70,18 +70,42 @@ public final class NervAirportR21
      * One creative ammunition box in the aircraft's own hold: superbwarfare then counts every weapon's reserve as
      * endless (shells, rockets, missiles, flares), and magazines reload from it. The box was written into the save as
      * "Items", but a vehicle that already carries an "Inventory" (every saved one does) reads only that, so it was
-     * never there. The hold is the vehicle's item handler; a full hold is left alone.
+     * never there. The hold is the vehicle's item handler; a full hold is left alone. The magazines are then loaded
+     * from it, so the first sortie does not open with a reload (the J-16's missiles take 10 s).
      */
     static boolean stockAmmunition(Entity aircraft)
     {
         var box=BuiltInRegistries.ITEM.get(new ResourceLocation("superbwarfare:creative_ammo_box"));
         var handler=aircraft.getCapability(ForgeCapabilities.ITEM_HANDLER).orElse(null);
         if(handler==null||box==net.minecraft.world.item.Items.AIR)return false;
-        for(int slot=0;slot<handler.getSlots();slot++)if(handler.getStackInSlot(slot).is(box)){aircraft.addTag(AMMUNITION_TAG);return true;}
-        for(int slot=0;slot<handler.getSlots();slot++)
-            if(handler.getStackInSlot(slot).isEmpty()&&handler.insertItem(slot,new ItemStack(box),false).isEmpty()){aircraft.addTag(AMMUNITION_TAG);return true;}
-        ProjectSeele.LOGGER.warn("R65 NERV aircraft {} hold is full; no ammunition box added",aircraft.getUUID());
-        return false;
+        boolean held=false;
+        for(int slot=0;!held&&slot<handler.getSlots();slot++)held=handler.getStackInSlot(slot).is(box);
+        for(int slot=0;!held&&slot<handler.getSlots();slot++)
+            held=handler.getStackInSlot(slot).isEmpty()&&handler.insertItem(slot,new ItemStack(box),false).isEmpty();
+        if(!held){ProjectSeele.LOGGER.warn("R65 NERV aircraft {} hold is full; no ammunition box added",aircraft.getUUID());return false;}
+        loadMagazines(aircraft);
+        aircraft.addTag(AMMUNITION_TAG);
+        return true;
+    }
+
+    /** superbwarfare is not on the compile path: its own (unobfuscated) methods are reached by name. */
+    static void loadMagazines(Entity aircraft)
+    {
+        try
+        {
+            var guns=(java.util.Map<?,?>)aircraft.getClass().getMethod("getGunDataMap").invoke(aircraft);
+            var modify=aircraft.getClass().getMethod("modifyGunData",String.class,java.util.function.Consumer.class);
+            for(Object name:guns.keySet())
+                modify.invoke(aircraft,name,(java.util.function.Consumer<Object>)gun->
+                {
+                    try{gun.getClass().getMethod("reloadAmmo",Entity.class,boolean.class).invoke(gun,aircraft,false);}
+                    catch(ReflectiveOperationException failed){throw new IllegalStateException(failed);}
+                });
+        }
+        catch(ReflectiveOperationException|RuntimeException failed)
+        {
+            ProjectSeele.LOGGER.warn("R65 NERV aircraft {}: magazines left as they were ({})",aircraft.getUUID(),failed.toString());
+        }
     }
 
     private NervAirportR21(){}
