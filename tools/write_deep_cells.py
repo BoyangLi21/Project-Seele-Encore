@@ -27,16 +27,53 @@ from install_r53_carrier_trays import stopped_world
 
 REGION = 'dimensions/projectseele/geofront/region'
 # R65 item 42: the old glass stair shaft (x -191..-175, z 81..97) and two floating slabs stand partly in city lift
-# spaces (original96/66 lowered, raised and hatch; original96/2 raised). Inside those spaces these boxes may only be
-# cleared, and only from these blocks (--item42-city-lift-obstructions).
-CITY_LIFT_OBSTRUCTIONS = (((-179, -175), (-8, 85), (91, 97)), ((-162, -142), (82, 83), (80, 107)),
-                          ((-144, -120), (83, 84), (129, 155)))
-CITY_LIFT_OBSTRUCTION_BLOCKS = {'minecraft:' + n for n in ('light_gray_concrete', 'gray_stained_glass', 'polished_deepslate',
-                                                          'iron_bars', 'smooth_stone', 'oak_stairs', 'stone_brick_stairs')}
+# spaces (original96/66 lowered, raised and hatch; original96/2 raised). These 528 cells, written out as (x, z, y from,
+# y to) columns, are the only ones there that may be cleared, and only from these blocks (--item42-city-lift-obstructions).
+ITEM42_COLUMNS = (
+    (-179, 91, -8, -8), (-179, 91, 8, 8), (-179, 97, -8, 22), (-179, 97, 80, 85), (-178, 91, -7, -7), (-178, 91, 9, 9),
+    (-178, 97, -8, 22), (-178, 97, 80, 85), (-177, 97, -8, 22), (-177, 97, 80, 85), (-176, 97, -8, 22),
+    (-176, 97, 80, 85), (-175, 91, -8, 22), (-175, 91, 80, 85), (-175, 92, -8, 22), (-175, 92, 80, 85),
+    (-175, 93, -8, 22), (-175, 93, 80, 85), (-175, 94, -8, 22), (-175, 94, 80, 85), (-175, 95, -8, 22),
+    (-175, 95, 80, 85), (-175, 96, -8, 22), (-175, 96, 80, 85), (-175, 97, -8, 22), (-175, 97, 80, 85),
+    (-162, 93, 82, 82), (-162, 94, 82, 82), (-162, 95, 82, 82), (-161, 93, 82, 82), (-161, 94, 82, 82),
+    (-161, 95, 82, 82), (-139, 139, 83, 83), (-139, 140, 83, 83), (-139, 141, 83, 83), (-138, 139, 83, 83),
+    (-138, 140, 83, 83), (-138, 141, 83, 83), (-137, 139, 83, 83), (-137, 140, 83, 83), (-137, 141, 83, 83),
+    (-136, 139, 83, 83), (-136, 140, 83, 83), (-136, 141, 83, 83), (-135, 139, 83, 83), (-135, 140, 83, 83),
+    (-135, 141, 83, 83), (-134, 139, 83, 83), (-134, 140, 83, 83), (-134, 141, 83, 83), (-133, 137, 84, 84),
+    (-133, 139, 83, 83), (-133, 140, 83, 83), (-133, 141, 83, 83), (-132, 137, 84, 84), (-132, 139, 83, 83),
+    (-132, 140, 83, 83), (-132, 141, 83, 83), (-131, 131, 83, 83), (-131, 132, 83, 83), (-131, 133, 83, 83),
+    (-131, 134, 83, 83), (-131, 135, 83, 83), (-131, 136, 83, 83), (-131, 137, 83, 84), (-131, 138, 83, 83),
+    (-131, 139, 83, 83), (-131, 140, 83, 83), (-131, 141, 83, 83), (-131, 142, 83, 83), (-131, 143, 83, 83),
+    (-131, 144, 83, 83), (-131, 145, 83, 83), (-131, 146, 83, 83), (-131, 147, 83, 83), (-131, 148, 83, 83),
+    (-131, 149, 83, 83), (-130, 131, 83, 83), (-130, 132, 83, 83), (-130, 133, 83, 83), (-130, 134, 83, 83),
+    (-130, 135, 83, 83), (-130, 136, 83, 83), (-130, 137, 83, 83), (-130, 138, 83, 83), (-130, 139, 83, 83),
+    (-130, 140, 83, 83), (-130, 141, 83, 83), (-130, 142, 83, 83), (-130, 143, 83, 83), (-130, 144, 83, 83),
+    (-130, 145, 83, 83), (-130, 146, 83, 83), (-130, 147, 83, 83), (-130, 148, 83, 83), (-130, 149, 83, 83),
+    (-129, 131, 83, 83), (-129, 132, 83, 83), (-129, 133, 83, 83), (-129, 134, 83, 83), (-129, 135, 83, 83),
+    (-129, 136, 83, 83), (-129, 137, 83, 84), (-129, 138, 83, 83), (-129, 139, 83, 83), (-129, 140, 83, 83),
+    (-129, 141, 83, 83), (-129, 142, 83, 83), (-129, 143, 83, 83), (-129, 144, 83, 83), (-129, 145, 83, 83),
+    (-129, 146, 83, 83), (-129, 147, 83, 83), (-129, 148, 83, 83), (-129, 149, 83, 83), (-128, 137, 84, 84),
+    (-128, 139, 83, 83), (-128, 140, 83, 83), (-128, 141, 83, 83), (-127, 137, 84, 84), (-127, 139, 83, 83),
+    (-127, 140, 83, 83), (-127, 141, 83, 83), (-126, 139, 83, 83), (-126, 140, 83, 83), (-126, 141, 83, 83),
+    (-125, 139, 83, 83), (-125, 140, 83, 83), (-125, 141, 83, 83), (-124, 139, 83, 83), (-124, 140, 83, 83),
+    (-124, 141, 83, 83), (-123, 139, 83, 83), (-123, 140, 83, 83), (-123, 141, 83, 83), (-122, 139, 83, 83),
+    (-122, 140, 83, 83), (-122, 141, 83, 83), (-121, 139, 83, 83), (-121, 140, 83, 83), (-121, 141, 83, 83),
+)
+ITEM42_CELLS = frozenset((x, y, z) for x, z, y0, y1 in ITEM42_COLUMNS for y in range(y0, y1 + 1))
+ITEM42_BLOCKS = {'minecraft:' + n for n in ('light_gray_concrete', 'gray_stained_glass', 'polished_deepslate', 'iron_bars',
+                                            'smooth_stone', 'oak_stairs', 'stone_brick_stairs')}
 
 
-def city_lift_obstruction(x, y, z):
-    return any(xa <= x <= xb and ya <= y <= yb and za <= z <= zb for (xa, xb), (ya, yb), (za, zb) in CITY_LIFT_OBSTRUCTIONS)
+def item42_refusal(rows, inside):
+    """The first row inside a city lift space that the item 42 switch does not allow, as a message; None if all pass."""
+    for x, y, z, before, after in rows:
+        if (x, y, z) not in inside:
+            continue
+        if (x, y, z) not in ITEM42_CELLS:
+            return f'{(x, y, z)}: inside a city lift space and not one of the 528 listed cells'
+        if before.split('[')[0] not in ITEM42_BLOCKS or after != 'minecraft:air':
+            return f'{(x, y, z)}: a listed cell may only be cleared from an old shaft or scrap block ({before} -> {after})'
+    return None
 
 
 # Moving Elevators block entity -> its block. A lift's controllers, in-cabin button and display carry their links here.
@@ -254,13 +291,11 @@ def apply(a):
         city = city_protection(a.world)
         checked = positions
         if a.item42_city_lift_obstructions:
-            # The old glass stair shaft and two floating slabs in city lift spaces: only their cells, only cleared.
+            # The old glass stair shaft and two floating slabs in city lift spaces: only the listed cells, only cleared.
             inside = city.inside(positions)
-            for x, y, z, before, after in rows:
-                if (x, y, z) not in inside:
-                    continue
-                if not city_lift_obstruction(x, y, z) or before.split('[')[0] not in CITY_LIFT_OBSTRUCTION_BLOCKS or after != 'minecraft:air':
-                    raise SystemExit(f'{(x, y, z)}: inside the city lift space and not an old shaft or scrap cell cleared to air ({before} -> {after})')
+            refusal = item42_refusal(rows, inside)
+            if refusal:
+                raise SystemExit(refusal)
             if any(tuple(sign['pos']) in inside for sign in signs):
                 raise SystemExit('a sign inside the city lift space')
             checked = [p for p in positions if p not in inside]
@@ -488,6 +523,6 @@ if __name__ == '__main__':
     parser.add_argument('--dogma-hall-doorway', action='store_true',
                         help='open the declared EVA doorway to the Central Dogma shaft in the hangar hall (plan_r66_dogma_doorway); nothing else in the launch reservation')
     parser.add_argument('--item42-city-lift-obstructions', action='store_true',
-                        help='clear the old glass stair shaft and two floating slabs where they stand in city lift spaces (listed boxes, listed blocks, to air only); every other cell of a city lift space is still refused')
+                        help='clear the old glass stair shaft and two floating slabs where they stand in city lift spaces (528 listed cells, listed blocks, to air only); every other cell of a city lift space is still refused')
     parser.add_argument('--refresh-heightmaps', action='store_true', help='drop the stored heightmaps of touched chunks, for terrain cut or raised')
     apply(parser.parse_args())

@@ -12,11 +12,15 @@ rock and the roof armour each cell takes the material the rock beside the shaft 
 the ground is rebuilt to the height of the ground round it (grass on top). The short walkway stub that led into the old
 shaft from the west goes too and the walkway's rail is closed there.
 
-The new lift is an ordinary public lift (public_lifts_r65.json), two stops, both opening north:
+The new lift is an ordinary public lift (public_lifts_r65.json), three stops (the middle one added by the owner for
+map-edges' glass bridge to building 7 of the hanging city):
 - shaft x -186..-180, z 82..88 (7 x 7, light grey concrete with grey glass bands where it is seen), car x -185..-181,
   z 83..87, controllers in x -186, z 85 facing east; pit floor y -113, cap y 74;
-- stop y 69 on the surface and y -111 at the walkway; at each a hall x -187..-179, z 79..81 in front of the landing
-  doors (x -184..-182 in the shaft's north wall z 82), the call button beside them;
+- stop y 69 on the surface and y -111 at the walkway, both opening north: a hall x -187..-179, z 79..81 in front of
+  the landing doors (x -184..-182 in the shaft's north wall z 82), the call button beside them;
+- stop y -54 (floor y -55, the bridge's height) opening east: landing doors z 84..86 in the east wall x -180, a hall
+  x -179..-176, z 83..87, its east wall x -175 the gate line (card lane z 84 in, free lane z 86 out) where the bridge
+  begins at x -174;
 - the hall's north wall z 78 holds two NERV staff gate lanes: x -184 a card lane into the hall, x -182 a free lane out,
   so nobody without a card reaches the call button and nobody is shut in. Below, that wall stands in the walkway's south
   rail.
@@ -47,7 +51,7 @@ CAR_ROOF = 'minecraft:smooth_quartz'
 LANDING_DOOR = 'minecraft:gray_stained_glass'
 CABIN_DOOR = 'minecraft:light_gray_stained_glass'
 CONTROLLER = 'movingelevators:elevator_block[facing=east]'
-BUTTON = 'minecraft:polished_blackstone_button[face=wall,facing=north,powered=false]'
+BUTTON_AT = 'minecraft:polished_blackstone_button[face=wall,facing={},powered=false]'
 GATE = 'projectseele:nerv_staff_gate[card={card},facing={facing},half={half},open=false]'
 
 OLD = (-191, -175, 81, 97)
@@ -59,25 +63,20 @@ PIT_Y, CAP_Y = -113, 74
 HALL = (-187, -179, 79, 81)               # inside; walls x -188 / -178, gate wall z 78, roof over all
 DOOR_X = (-184, -183, -182)
 CARD_LANE, EXIT_LANE = -184, -182
-STOPS = [dict(y=-111, label='倒挂城市 空中走廊', color=1), dict(y=69, label='地面 (旧玻璃井)', color=3)]
+STOPS = [dict(y=-111, label='倒挂城市 空中走廊', color=1, exit='north'),
+         dict(y=-54, label='倒挂城市 作战基地天桥', color=1, exit='east'),
+         dict(y=69, label='地面 (旧玻璃井)', color=3, exit='north')]
+DOOR_Z = (84, 85, 86)
+EAST_HALL = (-179, -176, 83, 87)            # inside; walls z 82 / z 88, gate wall x -175 (map-edges' bridge starts at x -174)
+EAST_CARD, EAST_EXIT = 84, 86
 LIFT_ID = 'r65-public-hanging-city'
 CALLS = []
+CABIN_SIDES = []
 STUB = (-196, -192, 79, 86)                # walkway spur into the old shaft
 SCRAPS = [((-195, -194), (0, 114), (74, 80)),            # slab deck + deepslate wall
           ((-162, -142), (80, 107), (82, 83)),           # floating L slab, benches
           ((-144, -120), (129, 155), (83, 84))]          # floating cross slab, benches
 ROAD_STUB = ((-221, -194), (116, 124), 80)
-# the old shaft's south-east corner and two of the scraps stand in city lift spaces (original96/66 lowered, raised and
-# hatch; original96/2 raised); these cells may only be cleared, and only from these blocks
-OBSTRUCTIONS = [((-179, -175), (-8, 85), (91, 97)), ((-162, -142), (82, 83), (80, 107)), ((-144, -120), (83, 84), (129, 155))]
-OBSTRUCTION_BLOCKS = {'light_gray_concrete', 'gray_stained_glass', 'polished_deepslate', 'iron_bars', 'smooth_stone',
-                      'oak_stairs', 'stone_brick_stairs'}
-
-
-def in_obstruction(x, y, z):
-    return any(xa <= x <= xb and ya <= y <= yb and za <= z <= zb for (xa, xb), (ya, yb), (za, zb) in OBSTRUCTIONS)
-
-
 def inside(box, x, z):
     return box[0] <= x <= box[1] and box[2] <= z <= box[3]
 
@@ -206,14 +205,21 @@ def shaft(plan, entities):
         entities[ctrl] = {'id': 'movingelevators:elevator_tile',
                           'snbt': '{data: {camoState: {Name: "minecraft:black_concrete"}, showButtons: 0b, hasName: 1b, '
                                   f'color: {s["color"]}, name: "{s["label"]}", facing: 3, redstone: 0b}}}}'}
-        landing = [(x, y + dy, z0) for dy in range(3) for x in DOOR_X]
-        cabin = [(x, y + dy, CAR[2]) for dy in range(3) for x in DOOR_X]
+        if s['exit'] == 'north':
+            landing = [(x, y + dy, z0) for dy in range(3) for x in DOOR_X]
+            cabin = [(x, y + dy, CAR[2]) for dy in range(3) for x in DOOR_X]
+            call, facing = (DOOR_X[0] - 1, y + 1, z0 - 1), 'north'
+        else:
+            landing = [(x1, y + dy, z) for dy in range(3) for z in DOOR_Z]
+            cabin = [(CAR[1], y + dy, z) for dy in range(3) for z in DOOR_Z]
+            call, facing = (x1 + 1, y + 1, DOOR_Z[0] - 1), 'east'
         for p in landing:
             plan.put(p, LANDING_DOOR, 'lift shaft')
-        call = (DOOR_X[0] - 1, y + 1, z0 - 1)
-        CALLS.append(call)                     # placed after the hall is built (halls() clears its inside)
-        floors.append(dict(label=s['label'], cabin=[CX, y, CZ], exit='north', approach_y=y, controller=list(ctrl),
-                           calls=[dict(kind='vanilla_button', position=list(call), state=BUTTON, facing='north',
+        state = BUTTON_AT.format(facing)
+        CALLS.append((call, state))            # placed after the hall is built (halls() clears its inside)
+        CABIN_SIDES.append([(p[0], p[1] - y, p[2]) for p in cabin])
+        floors.append(dict(label=s['label'], cabin=[CX, y, CZ], exit=s['exit'], approach_y=y, controller=list(ctrl),
+                           calls=[dict(kind='vanilla_button', position=list(call), state=state, facing=facing,
                                        target_controller=list(ctrl))],
                            restricted=False,
                            landing_doors=[dict(pos=list(p), closed_state=LANDING_DOOR) for p in landing],
@@ -227,9 +233,9 @@ def shaft(plan, entities):
             e = x in (CAR[0], CAR[1]) or z in (CAR[2], CAR[3])
             for y in range(y0, y0 + 4):
                 plan.put((x, y, z), CAR_WALL if e else AIR, 'lift car')
-    for x in DOOR_X:
-        for dy in range(3):
-            plan.put((x, y0 + dy, CAR[2]), CABIN_DOOR, 'lift car')
+    for side in CABIN_SIDES:                   # every stop's cabin doors travel with the car
+        for x, dy, z in side:
+            plan.put((x, y0 + dy, z), CABIN_DOOR, 'lift car')
     button, display = (CX - 2, y0 + 1, CZ), (CX - 2, y0 + 2, CZ)
     plan.put(button, 'movingelevators:button_block', 'lift car')
     plan.put(display, 'movingelevators:display_block', 'lift car')
@@ -245,6 +251,9 @@ def shaft(plan, entities):
 def halls(plan, entities):
     hx0, hx1, hz0, hz1 = HALL
     for s in STOPS:
+        if s['exit'] == 'east':
+            east_hall(plan, entities, s['y'])
+            continue
         y = s['y']
         fl, roof = y - 1, y + 3
         surface_stop = y > 0
@@ -284,6 +293,29 @@ def halls(plan, entities):
                     plan.put((x, yy, z), DIRT, 'hall approach')
 
 
+def east_hall(plan, entities, y):
+    """The middle stop: a hall east of the shaft, its east wall x -175 the gate line where the bridge to building 7 starts."""
+    ex0, ex1, ez0, ez1 = EAST_HALL
+    fl, roof = y - 1, y + 3
+    for x in range(ex0, ex1 + 2):
+        for z in range(ez0 - 1, ez1 + 2):
+            plan.put((x, fl, z), HALL_FLOOR, 'lift hall')
+            plan.put((x, roof, z), LAMP if (x, z) == (ex0 + 1, CZ) else WALL, 'lift hall')
+            wall = x == ex1 + 1 or z in (ez0 - 1, ez1 + 1)
+            for yy in range(y, roof):
+                if not wall:
+                    plan.put((x, yy, z), AIR, 'lift hall')
+                elif x == ex1 + 1 and z in (EAST_CARD, EAST_EXIT) and yy < y + 2:
+                    card = 'true' if z == EAST_CARD else 'false'
+                    facing = 'west' if z == EAST_CARD else 'east'
+                    half = 'lower' if yy == y else 'upper'
+                    plan.put((x, yy, z), GATE.format(card=card, facing=facing, half=half), 'staff gates')
+                    if half == 'lower':
+                        entities[(x, yy, z)] = {'id': 'projectseele:nerv_staff_gate', 'snbt': '{}'}
+                else:
+                    plan.put((x, yy, z), WALL if yy == y else BAND, 'lift hall')
+
+
 def grade_surface(plan, w):
     """Ground round the surface hall and its pad eased to the hall floor: at distance d its top lies within floor +- d."""
     y_floor = STOPS[-1]['y'] - 1
@@ -314,8 +346,8 @@ def grade_surface(plan, w):
                 for y in range(lo + 1, lo + 3):
                     if B.name(plan.get(x, y, z)) in B.PLANTS:
                         plan.put((x, y, z), AIR, 'hall grading')
-    for call in CALLS:
-        plan.put(call, BUTTON, 'lift hall')
+    for call, state in CALLS:
+        plan.put(call, state, 'lift hall')
 
 
 def scraps(plan, w):
@@ -364,12 +396,13 @@ def main(out):
     for g in guards():
         if hasattr(g, 'inside'):
             protected |= g.inside([tuple(r[:3]) for r in rows])
-    # cells in a city lift's space: only old shaft and scrap blocks going to air (write_deep_cells
-    # --item42-city-lift-obstructions checks the same boxes and blocks); anything else there stops the run
+    # cells in a city lift's space: only the 528 listed in write_deep_cells (--item42-city-lift-obstructions), only old
+    # shaft and scrap blocks going to air; anything else there stops the run
     held = [r for r in rows if tuple(r[:3]) in protected]
-    bad = [r for r in held if not (in_obstruction(*r[:3]) and B.name(r[3]) in OBSTRUCTION_BLOCKS and r[4] == AIR)]
-    if bad:
-        raise SystemExit(f'{len(bad)} rows change a city lift space beyond the old shaft and scraps: {bad[:3]}')
+    from write_deep_cells import item42_refusal
+    refusal = item42_refusal([tuple(r[:5]) for r in held], protected)
+    if refusal:
+        raise SystemExit(refusal)
     for g in guards():
         g.assert_positions([tuple(r[:3]) for r in rows if tuple(r[:3]) not in protected])
     from mca import WORLD
