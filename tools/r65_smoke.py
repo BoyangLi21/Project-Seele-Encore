@@ -355,7 +355,7 @@ def lower(a):
         r['lower_reply'] = lines_after(logS, mark, r'/INFO\]')[-3:]
         began = time.monotonic(); cover = None
         while time.monotonic() - began < 45 * 60:
-            found = lines_after(logS, 0, r'R21 BATTLEFIELD (COVERED|RESTORED)')
+            found = lines_after(logS, mark, r'R21 BATTLEFIELD COVERED\b')
             if found:
                 cover = found[-1]; break
             if sp.poll() is not None or 'This crash report has been saved' in read(logS):
