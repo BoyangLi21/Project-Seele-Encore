@@ -57,7 +57,7 @@ import static org.lwjgl.opengl.GL15.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.GL31.*;
-import static org.lwjgl.opengl.GL33.glVertexAttribDivisor;
+import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE1;
 
 /**
@@ -70,11 +70,11 @@ import static org.lwjgl.opengl.GL13.GL_TEXTURE1;
  * four blocks, in 64x64 tiles. The client groups the tiles into 128x128 cells and draws each cell at the scale its
  * distance calls for (one block near, coarser far), with the texture that side of that block shows (tinted faces with
  * the cavity biome's tint; mostly see-through blocks such as glass as their average colour), shaded by facing, fading
- * into the fog colour with distance. Nothing within the vanilla render distance (in 3D) is drawn, where the real
- * chunks are. It is drawn after the level (under a shader pack, after the pack's last pass) into a multisampled target
- * of its own, resolved and laid over the picture only where nothing was drawn: four samples a pixel keep the one-block
- * seams between the dome's panels from flickering at a distance. Under a pack, water takes the lake's colour the pack
- * gives it. Everything is plain GL with programs of its own: while a pack is in use, Oculus turns colour and depth
+ * into the fog colour with distance. Nearby terrain uses real chunks. Far faces overlap the fog transition
+ * and contribute only at their actual projected depth. The geometry is resolved from a four-sample target
+ * into the scene's opaque colour and depth. Glass and water then blend into this background. Under Oculus the destination is the shader
+ * pack's colour buffer after its deferred lighting pass. Water takes the lake's colour from the pack.
+ * Everything is plain GL with programs of its own: while a pack is in use, Oculus turns colour and depth
  * writes off whenever a mod's shader instance is applied, and swaps the vanilla shaders for the pack's programs.
  * <p>
  * The mesh is a private build product installed into the pack's jar; without it nothing changes.
@@ -86,8 +86,7 @@ public final class GeoFrontDomeFarViewR65
     /** The cavity (the R64 area maps' measured rim), and the band from its floor to under its roof. */
     private static final double CENTRE_X = 32, CENTRE_Z = 320, RADIUS = 1900, MIN_Y = -530, MAX_Y = 56;
     private static final float FAR = 6000F, NEAR = 8F, FOG_END = 5000F, FOG_STRENGTH = .6F;
-    /** Horizontal distance to a cell's nearest point under which it is drawn block by block, then at two blocks. */
-    /** Horizontal distance to a cell's nearest point under which it is drawn block by block, then at two blocks. */
+    /** Distance to a cell's nearest point under which it is drawn block by block, then at two blocks. */
     private static final float FINE = 640F, MEDIUM = 1280F, KEEP = 192F;
     /** Under a shader pack the far view is drawn after the pack's lighting; water takes the colour the pack gives the
      *  lake (measured on the Distant Horizons far view of the same lake from the same place). */
@@ -116,15 +115,15 @@ public final class GeoFrontDomeFarViewR65
     private static int[] scales;
     private static final List<Cell> cells = new ArrayList<>();
     private static float originX, originY, originZ;
-    /** Per look (palette entry * 6 + face): sprite rectangle u0, v0, u1, v1, then colour RGB and 1 when textured. */
+    /** Each face stores its sprite bounds, tint/texture mode and mean opaque texel colour. */
     private static float[] looks;
-    private static int lookBuffer, lookTexture;
+    private static int lookBuffer, lookTexture, atlasSampler;
     private static long totalQuads, vramBytes;
     private static int drawnCells;
     private static long drawnQuads;
 
-    /** Under a shader pack: the frame's matrices, eye and fog colour from before the sky, drawn after the pack's passes. */
-    private static Matrix4f pendingView, pendingProjection;
+    /** Capture the camera at the sky pass and use the same projection to compare against terrain depth. */
+    private static Matrix4f pendingView, pendingProjection, sceneProjection;
     private static float[] pendingCamera, pendingFog;
     private static TextureTarget target;
     private static int screenVao, screenVbo, farProgram, blitProgram;
@@ -183,9 +182,31 @@ public final class GeoFrontDomeFarViewR65
         return y >= MIN_Y && y <= MAX_Y && dx * dx + dz * dz <= RADIUS * RADIUS;
     }
 
+    /** Real chunks remain visible until the cavern far-view fog takes over. Fluid and status-effect fog retain
+     *  their shorter ranges, as does fog from a launch tunnel or another local effect. */
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOW)
+    public static void terrainFog(net.minecraftforge.client.event.ViewportEvent.RenderFog event)
+    {
+        if (!active || event.getMode() != net.minecraft.client.renderer.FogRenderer.FogMode.FOG_TERRAIN
+                || event.getType() != net.minecraft.world.level.material.FogType.NONE) return;
+        var mc = Minecraft.getInstance();
+        var eye = event.getCamera().getPosition();
+        float reach = mc.options.getEffectiveRenderDistance() * 16F;
+        if (!inCavity(mc, eye.x, eye.y, eye.z) || event.getFarPlaneDistance() < reach - 1F) return;
+        event.setNearPlaneDistance(Math.max(event.getNearPlaneDistance(), reach));
+        event.setFarPlaneDistance(Math.max(event.getFarPlaneDistance(), FOG_END));
+        event.setCanceled(true);
+    }
+
     @SubscribeEvent
     public static void render(RenderLevelStageEvent event)
     {
+        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS
+                && pendingView != null && !com.projectseele.client.render.ShaderShadowPassR44.enabled())
+        {
+            afterLevel();
+            return;
+        }
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_SKY) return;
         Minecraft mc = Minecraft.getInstance();
         var camera = event.getCamera().getPosition();
@@ -242,7 +263,8 @@ public final class GeoFrontDomeFarViewR65
             float camX = (float) (camera.x - originX), camY = (float) (camera.y - originY), camZ = (float) (camera.z - originZ);
             Matrix4f view = new Matrix4f(event.getPoseStack().last().pose()).translate(-camX, -camY, -camZ);
             // the frame's own projection (field of view, bobbing) with a depth range that reaches across the cavity
-            Matrix4f projection = new Matrix4f(event.getProjectionMatrix());
+            sceneProjection = new Matrix4f(event.getProjectionMatrix());
+            Matrix4f projection = new Matrix4f(sceneProjection);
             projection.m22((FAR + NEAR) / (NEAR - FAR));
             projection.m32(2F * FAR * NEAR / (NEAR - FAR));
             float[] fog = RenderSystem.getShaderFogColor().clone();
@@ -257,8 +279,6 @@ public final class GeoFrontDomeFarViewR65
                 glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
                 BufferUploader.invalidate();
             }
-            // drawn after the level in both modes (under a shader pack, after its last pass, which would otherwise light it
-            // as a surface it knows nothing about or paint it over as sky), anti-aliased and laid where nothing was drawn
             pendingView = view;
             pendingProjection = projection;
             pendingCamera = new float[]{camX, camY, camZ};
@@ -272,12 +292,18 @@ public final class GeoFrontDomeFarViewR65
         }
     }
 
-    /**
-     * Under a shader pack, right after the level (and the pack's composite and final passes) is drawn. The far view goes
-     * into a target of its own, with its own depth, and is laid onto the picture only where the depth buffer the pack
-     * shares with the main target still holds the cleared value: where no real block, entity or hand was drawn.
-     */
+    public static boolean hasPendingFarView()
+    {
+        return pendingView != null && !failed;
+    }
+
     public static void afterLevel()
+    {
+        if (hasPendingFarView()) composite(Minecraft.getInstance().getMainRenderTarget().frameBufferId);
+    }
+
+    /** Write the resolved background into the colour target used by subsequent terrain passes. */
+    public static void composite(int framebuffer)
     {
         Matrix4f view = pendingView, projection = pendingProjection;
         float[] camera = pendingCamera, fog = pendingFog;
@@ -289,17 +315,18 @@ public final class GeoFrontDomeFarViewR65
         Minecraft mc = Minecraft.getInstance();
         if (EvaCommandFeedClient.captureTargetOverride() != null) return;
         RenderTarget main = mc.getMainRenderTarget();
-        if (target == null) target = new TextureTarget(main.width, main.height, true, Minecraft.ON_OSX);
-        else if (target.width != main.width || target.height != main.height) target.resize(main.width, main.height, Minecraft.ON_OSX);
-        drawWithState(mc, view, projection, camera, fog, main);
+        drawWithState(mc, view, projection, camera, fog, main, framebuffer);
     }
 
-    /** Reads the GL state touched, draws (into the main target, or through the far view's own target onto it), restores. */
-    private static void drawWithState(Minecraft mc, Matrix4f view, Matrix4f projection, float[] camera, float[] fog, RenderTarget main)
+    /** Preserve the caller's framebuffer and render state across the offscreen draw and composite. */
+    private static void drawWithState(Minecraft mc, Matrix4f view, Matrix4f projection, float[] camera, float[] fog, RenderTarget main, int framebuffer)
     {
         boolean depthTest = glIsEnabled(GL_DEPTH_TEST), blend = glIsEnabled(GL_BLEND), cull = glIsEnabled(GL_CULL_FACE),
                 scissor = glIsEnabled(GL_SCISSOR_TEST), depthMask = glGetBoolean(GL_DEPTH_WRITEMASK);
         int depthFunc = glGetInteger(GL_DEPTH_FUNC), program = glGetInteger(GL_CURRENT_PROGRAM), unit = glGetInteger(GL_ACTIVE_TEXTURE);
+        int readTarget = glGetInteger(GL_READ_FRAMEBUFFER_BINDING), drawTarget = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+        int[] viewport = new int[4];
+        glGetIntegerv(GL_VIEWPORT, viewport);
         int vao = glGetInteger(GL_VERTEX_ARRAY_BINDING), arrayBuffer = glGetInteger(GL_ARRAY_BUFFER_BINDING);
         ByteBuffer mask = BufferUtils.createByteBuffer(16);
         glGetBooleanv(GL_COLOR_WRITEMASK, mask);
@@ -308,9 +335,21 @@ public final class GeoFrontDomeFarViewR65
         int blendSrc = glGetInteger(GL_BLEND_SRC_RGB), blendDst = glGetInteger(GL_BLEND_DST_RGB),
                 blendSrcA = glGetInteger(GL_BLEND_SRC_ALPHA), blendDstA = glGetInteger(GL_BLEND_DST_ALPHA);
         glActiveTexture(GL_TEXTURE0);
-        int texture = glGetInteger(GL_TEXTURE_BINDING_2D);
+        int texture = glGetInteger(GL_TEXTURE_BINDING_2D), sampler = glGetInteger(GL_SAMPLER_BINDING);
+        glActiveTexture(GL_TEXTURE1);
+        int depthTexture = glGetInteger(GL_TEXTURE_BINDING_2D), depthSampler = glGetInteger(GL_SAMPLER_BINDING);
+        glActiveTexture(GL_TEXTURE0);
         try
         {
+            if (target == null || target.width != main.width || target.height != main.height)
+            {
+                if (target == null) target = new TextureTarget(main.width, main.height, true, Minecraft.ON_OSX);
+                else target.resize(main.width, main.height, Minecraft.ON_OSX);
+                // Both buffers need the same sized format for the multisample depth resolve.
+                glBindTexture(GL_TEXTURE_2D, target.getDepthTextureId());
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, main.width, main.height,
+                        0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 0L);
+            }
             if (farProgram == 0) programs();
             ensureMultisample(main.width, main.height);
             glColorMask(true, true, true, true);
@@ -327,17 +366,28 @@ public final class GeoFrontDomeFarViewR65
             glClearColor(0F, 0F, 0F, 0F);
             glClearDepth(1D);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glBindSampler(0, atlasSampler);
             draw(mc, view, projection, camera, fog);
+            glBindSampler(0, 0);
             glBindFramebuffer(GL_READ_FRAMEBUFFER, multisampleFbo);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, target.frameBufferId);
-            glBlitFramebuffer(0, 0, main.width, main.height, 0, 0, main.width, main.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-            main.bindWrite(true);
-            glDepthMask(false);
+            glBlitFramebuffer(0, 0, main.width, main.height, 0, 0, main.width, main.height, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+            // Later entities and glass must also test against the same visible cavern surface.
+            glDepthMask(true);
             // the resolved colour is premultiplied (the cleared background is transparent black)
             glEnable(GL_BLEND);
             glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
             glUseProgram(blitProgram);
             glUniform1i(glGetUniformLocation(blitProgram, "Sampler0"), 0);
+            glUniform1i(glGetUniformLocation(blitProgram, "FarDepth"), 1);
+            glUniform2f(glGetUniformLocation(blitProgram, "FarProjectionZ"), projection.m22(), projection.m32());
+            glActiveTexture(GL_TEXTURE1);
+            glBindSampler(1, 0);
+            glBindTexture(GL_TEXTURE_2D, target.getDepthTextureId());
+            glActiveTexture(GL_TEXTURE0);
+            glUniformMatrix4fv(glGetUniformLocation(blitProgram, "SceneProjection"), false, sceneProjection.get(MATRIX));
+
             glBindTexture(GL_TEXTURE_2D, target.getColorTextureId());
             glBindVertexArray(screenVao);
             glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -347,15 +397,22 @@ public final class GeoFrontDomeFarViewR65
             failed = true;
             active = false;
             ProjectSeele.LOGGER.warn("GeoFront far view R65 off: {}", problem.toString(), problem);
-            main.bindWrite(true);
         }
         finally
         {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, readTarget);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, drawTarget);
+            glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
             org.lwjgl.opengl.GL14.glBlendFuncSeparate(blendSrc, blendDst, blendSrcA, blendDstA);
             glBindVertexArray(vao);
             glBindBuffer(GL_ARRAY_BUFFER, arrayBuffer);
             BufferUploader.invalidate();
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, depthTexture);
+            glBindSampler(1, depthSampler);
+            glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, texture);
+            glBindSampler(0, sampler);
             glActiveTexture(unit);
             glUseProgram(program);
             glClearColor(clear.get(0), clear.get(1), clear.get(2), clear.get(3));
@@ -401,7 +458,7 @@ public final class GeoFrontDomeFarViewR65
 
     private static void draw(Minecraft mc, Matrix4f view, Matrix4f projection, float[] camera, float[] fog)
     {
-        float nearCut = mc.options.getEffectiveRenderDistance() * 16F - 8F;
+        float nearCut = mc.options.getEffectiveRenderDistance() * 16F * .55F;
         float light = (float) (double) SeeleConfig.GEOFRONT_FAR_LIGHT.get();
         glUseProgram(farProgram);
         glUniformMatrix4fv(glGetUniformLocation(farProgram, "ModelViewMat"), false, view.get(MATRIX));
@@ -409,7 +466,7 @@ public final class GeoFrontDomeFarViewR65
         glUniform1f(glGetUniformLocation(farProgram, "Light"), light);
         boolean pack = com.projectseele.client.render.ShaderShadowPassR44.enabled();
         glUniform4f(glGetUniformLocation(farProgram, "Water"), SHADER_WATER[0], SHADER_WATER[1], SHADER_WATER[2], pack ? 1F : 0F);
-        glUniform1f(glGetUniformLocation(farProgram, "FogStart"), nearCut);
+        glUniform1f(glGetUniformLocation(farProgram, "FogStart"), mc.options.getEffectiveRenderDistance() * 16F);
         glUniform1f(glGetUniformLocation(farProgram, "FogEnd"), FOG_END);
         glUniform4f(glGetUniformLocation(farProgram, "FogColor"), fog[0], fog[1], fog[2], FOG_STRENGTH);
         glUniform3f(glGetUniformLocation(farProgram, "Camera"), camera[0], camera[1], camera[2]);
@@ -488,7 +545,7 @@ public final class GeoFrontDomeFarViewR65
         if (first) ProjectSeele.LOGGER.info("GeoFront far view R65: coarsest scale of {} cells ready in {} ms", cells.size(),
                 (System.nanoTime() - began) / 1_000_000);
         // cells wholly inside the vanilla render distance are never seen (the real chunks are there)
-        float nearCut = mc.options.getEffectiveRenderDistance() * 16F - 8F;
+        float nearCut = mc.options.getEffectiveRenderDistance() * 16F * .55F;
         int done = 0;
         Cell best = null;
         while (done < UPLOADS_PER_FRAME && System.nanoTime() - began < UPLOAD_NANOS)
@@ -587,6 +644,11 @@ public final class GeoFrontDomeFarViewR65
     {
         farProgram = link("geofront_dome_far", "Base", "Extent", "Face", "Look");
         blitProgram = link("geofront_dome_blit", "Position");
+        // The block atlas normally changes its filtering between opaque and cutout passes. Far terrain always
+        // shrinks its repeating sprites, independently of the sampler left on the unit by Minecraft or Oculus.
+        atlasSampler = glGenSamplers();
+        glSamplerParameteri(atlasSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glSamplerParameteri(atlasSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         FloatBuffer table = MemoryUtil.memAllocFloat(looks.length);
         try
         {
@@ -692,7 +754,9 @@ public final class GeoFrontDomeFarViewR65
             originZ = head.getInt();
             head.getShort();
             head.getShort();
-            head.getShort();
+            int height = Short.toUnsignedInt(head.getShort());
+            if (height == 0) throw new IOException("empty mesh height");
+            int bands = (height + BAND - 1) / BAND;
             levelCount = head.get() & 0xFF;
             if (levelCount < 1 || levelCount > 3) throw new IOException("unknown level count " + levelCount);
             scales = new int[levelCount];
@@ -726,7 +790,6 @@ public final class GeoFrontDomeFarViewR65
                 }
                 // the tile's quads by height band: a cell is 128 x 128 and 128 high, so the scale follows the true distance
                 // (the floor near, the dome far above)
-                int bands = (600 + BAND - 1) / BAND + 1;
                 java.io.ByteArrayOutputStream[][] split = new java.io.ByteArrayOutputStream[bands][levelCount];
                 int[][] splitCounts = new int[bands][levelCount];
                 float[] top = new float[bands];
@@ -798,7 +861,7 @@ public final class GeoFrontDomeFarViewR65
     private static void resolve(Minecraft mc, List<String> palette, int[] tints)
     {
         int n = palette.size();
-        looks = new float[n * 6 * 8];
+        looks = new float[n * 6 * 12];
         int foliage = tints[0], grass = tints[1], water = tints[2];
         TextureAtlas atlas = (TextureAtlas) mc.getTextureManager().getTexture(TextureAtlas.LOCATION_BLOCKS);
         Map<ResourceLocation, int[]> sprites = new HashMap<>();
@@ -830,7 +893,7 @@ public final class GeoFrontDomeFarViewR65
                 int[] look = sprites.computeIfAbsent(sprite.contents().name(), name -> look(mc, name));
                 int tint = !tinted ? 0xFFFFFF : block == Blocks.WATER ? water
                         : block instanceof LeavesBlock || block == Blocks.VINE ? leafTint(block, foliage) : grass;
-                int base = (i * 6 + f) * 8;
+                int base = (i * 6 + f) * 12;
                 // water is drawn flat (its own colour without a pack, the pack's lake colour under one: Water)
                 boolean isWater = block == Blocks.WATER;
                 boolean textured = !isWater && look[0] >= 0 && look[1] == 0;
@@ -843,6 +906,10 @@ public final class GeoFrontDomeFarViewR65
                 looks[base + 5] = ((rgb >> 8) & 0xFF) / 255F;
                 looks[base + 6] = (rgb & 0xFF) / 255F;
                 looks[base + 7] = isWater ? .5F : textured ? 1F : 0F;
+                int mean = look[0] >= 0 ? look[0] : mapColour(block);
+                looks[base + 8] = ((mean >> 16) & 0xFF) / 255F;
+                looks[base + 9] = ((mean >> 8) & 0xFF) / 255F;
+                looks[base + 10] = (mean & 0xFF) / 255F;
             }
         }
     }

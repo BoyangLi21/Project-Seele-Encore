@@ -8,10 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * R65: a shader pack finishes its picture (composite and final passes) as LevelRenderer.renderLevel returns, after every
- * render-stage event; the GeoFront far view is laid onto that picture here, before the hand clears the depth.
- */
+/** Fallback for shader pipelines without the pre-translucent hook. Runs before the hand clears world depth. */
 @Mixin(GameRenderer.class)
 public abstract class GameRendererGeoFrontFarViewR65Mixin
 {

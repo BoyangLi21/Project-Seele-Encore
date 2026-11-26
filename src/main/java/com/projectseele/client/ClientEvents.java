@@ -52,7 +52,7 @@ public class ClientEvents
             ItemBlockRenderTypes.setRenderLayer(ModFluids.FLOWING_LCL.get(),
                     RenderType.translucent());
             ItemBlockRenderTypes.setRenderLayer(ModBlocks.CLEAR_GLASS.get(),
-                    RenderType.translucent());
+                    RenderType.cutout());
             ItemBlockRenderTypes.setRenderLayer(ModBlocks.ONE_WAY_GLASS.get(),
                     RenderType.cutout());
             // Cutout avoids sorting millions of translucent shell faces while

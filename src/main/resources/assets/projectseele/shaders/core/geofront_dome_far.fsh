@@ -1,10 +1,7 @@
 #version 150
 
-// Only beyond the vanilla render distance (NearCut) in three dimensions: the terrain renderer leaves out sections past its
-// fog distance in 3D too, so the floor far below a camera high in the cavity is not drawn though it lies within the
-// horizontal render distance (R65 feedback 2, item 37). Wherever the real chunks are drawn, they win.
-// Textured faces repeat their sprite once per block (Tile counts blocks across the face); the mip level comes from the
-// tiling coordinate's own derivatives, so the wrap at each block edge does not show. Colour alpha 0 = a flat colour.
+// Far faces overlap the outer portion of the real terrain. The resolved depth selects the visible surface.
+// Textures repeat once per block, using the unwrapped tiling coordinate to choose the mip level.
 uniform sampler2D Sampler0;
 uniform float NearCut;
 uniform float FogStart;
@@ -17,6 +14,7 @@ uniform vec4 Water;
 in vec2 tile;
 flat in vec4 rect;
 flat in vec4 colour;
+flat in vec3 meanTexel;
 in vec3 relative;
 
 out vec4 fragColor;
@@ -32,11 +30,14 @@ void main() {
         c = colour.rgb;
     } else {
         vec2 size = rect.zw - rect.xy;
-        vec4 t = textureGrad(Sampler0, rect.xy + fract(tile) * size, dFdx(tile) * size, dFdy(tile) * size);
-        if (t.a < 0.1) {
-            discard;
-        }
-        c = t.rgb * colour.rgb;
+        vec2 dx = dFdx(tile), dy = dFdy(tile);
+        float footprint = max(length(dx), length(dy));
+        // At a one-block pixel footprint the last atlas mip borders adjacent sprites. Converge on the actual
+        // sprite's opaque texel mean and retain the baked silhouette as its cutout detail becomes subpixel.
+        float meanWeight = smoothstep(0.25, 1.0, footprint);
+        vec4 texel = textureGrad(Sampler0, rect.xy + fract(tile) * size, dx * size, dy * size);
+        if (mix(texel.a, 1.0, meanWeight) < 0.1) discard;
+        c = mix(texel.rgb, meanTexel, meanWeight) * colour.rgb;
     }
     c *= Light;
     float fog = smoothstep(FogStart, FogEnd, length(relative));

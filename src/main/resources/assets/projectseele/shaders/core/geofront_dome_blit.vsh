@@ -1,8 +1,6 @@
 #version 150
 
-// R65 GeoFront far view under a shader pack: the far view's own target laid over the screen at the far plane.
 in vec2 Position;
-
 out vec2 texCoord;
 
 void main() {

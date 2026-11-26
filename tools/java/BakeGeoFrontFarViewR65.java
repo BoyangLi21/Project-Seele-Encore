@@ -32,8 +32,8 @@ import java.util.zip.InflaterInputStream;
  * Every block face that looks into the cavity's own air is kept at full resolution (one block), and again at two and
  * four blocks (a coarse cell is solid when any block in it is; its faces show the block most often seen on the cell's
  * surface), so the client can draw near ground block by block and coarsen with distance. Faces keep the full block
- * state, so the client can give each face the real texture that side of that block shows. The cavity is the largest
- * connected air at four-block cells (a cell with four or more solid blocks counts as solid); a block face counts when
+ * state, so the client can give each face the real texture that side of that block shows. The cavity is the connected
+ * air containing the open GeoFront reference point at four-block cells (a cell with four or more solid blocks counts as solid); a block face counts when
  * the air in front of it lies in that cavity or one coarse cell from it, so thin walls and roofs are never lost.
  * Neighbouring faces of the same block state in a plane are merged; nothing crosses a 64x64 tile.
  *
@@ -49,7 +49,7 @@ import java.util.zip.InflaterInputStream;
  */
 public final class BakeGeoFrontFarViewR65
 {
-    static final int X0 = -1888, X1 = 1952, Z0 = -1600, Z1 = 2240, Y0 = -528, Y1 = 64, H = Y1 - Y0;
+    static final int X0 = -1888, X1 = 1952, Z0 = -1600, Z1 = 2240, Y0 = -1344, Y1 = 64, H = Y1 - Y0;
     static final int TILE = 64, COARSE = 4, EDGE = 4;
     static final int[] LEVELS = {1, 2, 4};
     static final int GX0 = Math.floorDiv(X0, TILE) * TILE, GZ0 = Math.floorDiv(Z0, TILE) * TILE;
@@ -273,7 +273,7 @@ public final class BakeGeoFrontFarViewR65
         for (Future<?> f : jobs) f.get();
         jobs.clear();
         System.out.printf("pass 1: %d regions, %d block states in %.0f s%n", regions.size(), names.size(), secs(began));
-        cavity = largestAir();
+        cavity = connectedCavity();
         System.out.printf("cavity found in %.0f s%n", secs(began));
 
         Map<Long, byte[][]> tiles = new ConcurrentHashMap<>();
@@ -338,43 +338,33 @@ public final class BakeGeoFrontFarViewR65
         return s;
     }
 
-    static boolean[] largestAir()
+    static boolean[] connectedCavity()
     {
+        // Below the city, the deep shaft walls remain visible from the main cavern. The largest air component in
+        // the whole dimension can instead be the void below bedrock. Seed the flood in measured open cavern air.
         int n = cnx * cny * cnz;
-        int[] label = new int[n];
+        int seed = (((0 - GX0) / COARSE) * cny + (-240 - Y0) / COARSE) * cnz + (320 - GZ0) / COARSE;
+        if (coarseSolid[seed]) throw new IllegalStateException("GeoFront cavity seed (0,-240,320) is blocked");
+        boolean[] seen = new boolean[n];
         int[] queue = new int[n];
-        int best = 0, bestSize = 0, next = 0;
-        for (int start = 0; start < n; start++)
+        int head = 0, tail = 0;
+        queue[tail++] = seed;
+        seen[seed] = true;
+        while (head < tail)
         {
-            if (coarseSolid[start] || label[start] != 0) continue;
-            next++;
-            int head = 0, tail = 0, size = 0;
-            queue[tail++] = start;
-            label[start] = next;
-            while (head < tail)
-            {
-                int c = queue[head++];
-                size++;
-                int z = c % cnz, y = (c / cnz) % cny, x = c / (cnz * cny);
-                int[] nb = {x > 0 ? c - cny * cnz : -1, x < cnx - 1 ? c + cny * cnz : -1, y > 0 ? c - cnz : -1,
-                        y < cny - 1 ? c + cnz : -1, z > 0 ? c - 1 : -1, z < cnz - 1 ? c + 1 : -1};
-                for (int m : nb)
-                    if (m >= 0 && !coarseSolid[m] && label[m] == 0)
-                    {
-                        label[m] = next;
-                        queue[tail++] = m;
-                    }
-            }
-            if (size > bestSize)
-            {
-                bestSize = size;
-                best = next;
-            }
+            int cell = queue[head++];
+            int z = cell % cnz, y = (cell / cnz) % cny, x = cell / (cnz * cny);
+            if (x > 0) tail = enqueue(cell - cny * cnz, seen, queue, tail);
+            if (x + 1 < cnx) tail = enqueue(cell + cny * cnz, seen, queue, tail);
+            if (y > 0) tail = enqueue(cell - cnz, seen, queue, tail);
+            if (y + 1 < cny) tail = enqueue(cell + cnz, seen, queue, tail);
+            if (z > 0) tail = enqueue(cell - 1, seen, queue, tail);
+            if (z + 1 < cnz) tail = enqueue(cell + 1, seen, queue, tail);
         }
         boolean[] out = new boolean[n];
-        for (int c = 0; c < n; c++)
+        for (int i = 0; i < tail; i++)
         {
-            if (label[c] != best) continue;
+            int c = queue[i];
             int z = c % cnz, y = (c / cnz) % cny, x = c / (cnz * cny);
             for (int dx = -1; dx <= 1; dx++)
                 for (int dy = -1; dy <= 1; dy++)
@@ -384,8 +374,18 @@ public final class BakeGeoFrontFarViewR65
                         if (ax >= 0 && ax < cnx && ay >= 0 && ay < cny && az >= 0 && az < cnz) out[(ax * cny + ay) * cnz + az] = true;
                     }
         }
-        System.out.printf("cavity: %d coarse cells of %d (%d air pieces)%n", bestSize, n, next);
+        System.out.printf("cavity: %d connected coarse cells of %d%n", tail, n);
         return out;
+    }
+
+    private static int enqueue(int cell, boolean[] seen, int[] queue, int tail)
+    {
+        if (!seen[cell] && !coarseSolid[cell])
+        {
+            seen[cell] = true;
+            queue[tail++] = cell;
+        }
+        return tail;
     }
 
     // ------------------------------------------------------------------ pass 2

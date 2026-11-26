@@ -18,6 +18,7 @@ uniform samplerBuffer Looks;
 out vec2 tile;
 flat out vec4 rect;
 flat out vec4 colour;
+flat out vec3 meanTexel;
 out vec3 relative;
 
 void main() {
@@ -40,8 +41,9 @@ void main() {
     }
     gl_Position = ProjMat * ModelViewMat * vec4(p, 1.0);
     tile = t;
-    rect = texelFetch(Looks, Look * 2);
-    vec4 look = texelFetch(Looks, Look * 2 + 1);
+    rect = texelFetch(Looks, Look * 3);
+    vec4 look = texelFetch(Looks, Look * 3 + 1);
+    meanTexel = texelFetch(Looks, Look * 3 + 2).rgb;
     float shade = Face == 3 ? 1.0 : Face == 2 ? 0.55 : axis == 0 ? 0.8 : 0.68;
     colour = vec4(look.rgb * shade, look.a);
     relative = p - Camera;
