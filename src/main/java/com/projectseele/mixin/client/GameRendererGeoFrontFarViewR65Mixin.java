@@ -2,6 +2,7 @@ package com.projectseele.mixin.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.projectseele.client.GeoFrontDomeFarViewR65;
+import com.projectseele.client.CitySkylineR66;
 import net.minecraft.client.renderer.GameRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,5 +18,6 @@ public abstract class GameRendererGeoFrontFarViewR65Mixin
     private void projectseele$geofrontFarViewAfterShaders(float partial, long finishTime, PoseStack pose, CallbackInfo callback)
     {
         GeoFrontDomeFarViewR65.afterLevel();
+        CitySkylineR66.afterLevel();
     }
 }

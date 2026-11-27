@@ -267,7 +267,7 @@ public final class YashimaBlackoutR64
      * cannot, all at once from its stored data (DhApi.Delayed.renderProxy.clearRenderDataCache), which leaves the
      * far view blank for some seconds.
      */
-    private static void rebuildFarView()
+    static void rebuildFarView()
     {
         FarView[] trees;
         synchronized (FAR_VIEWS) { trees = FAR_VIEWS.toArray(new FarView[0]); }

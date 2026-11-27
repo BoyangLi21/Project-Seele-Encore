@@ -730,6 +730,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private double clientVisualHorizontalSpeed;
     private double clientVisualVerticalSpeed;
     private boolean clientVisualMoving;
+    private int dogmaGripRequestR66 = Integer.MIN_VALUE;
+    private long dogmaGripHintR66;
     private boolean clientVisualAirborne;
     private boolean clientVisualAscending;
     private int clientVisualGroundTicks;
@@ -789,6 +791,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     protected void defineSynchedData()
     {
         super.defineSynchedData();
+        EvaDogmaClimbR66.define(this.entityData);
         FIRST_BATTLE.define(this.entityData);
         EvaDorsalMechanism.define(this.entityData);
         EvaTerrainSupport.define(this.entityData);
@@ -1263,6 +1266,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private static final EntityDataAccessor<Long> BERSERK_TRANSITION = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Long> RECOVERY_END = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Long> SHOCK_END = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.LONG);
+    static final EntityDataAccessor<Boolean> DOGMA_GRIP_R66 = SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.BOOLEAN);
     private static final float LEGACY_SYNC = -2F;
     private float oldCarrierRiseR26;
     public void setRecoveryRackR39(boolean active){this.entityData.set(DATA_RECOVERY_RACK_R39,active);}
@@ -5053,6 +5057,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void pilotJump(ServerPlayer pilot)
     {
         if(CombatFeelR31.restrained(this)||EvaCombatR31.active(this))return;
+        if (EvaDogmaClimbR66.toggle(this,pilot)) { this.jumpBufferTicks=0; return; }
         if (this.getControllingPassenger() != pilot || this.isPilotProne()
                 ||this.rifleStanceLevel(0)>1.05F||EvaCapturedLocomotionR44.ownsMultiContactPoseR45(this))
         {
@@ -5067,6 +5072,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void pilotJump(ServerPlayer pilot, int requestId)
     {
         if(CombatFeelR31.restrained(this)||EvaCombatR31.active(this))return;
+        if (requestId == this.dogmaGripRequestR66) return;
+        if (requestId != this.lastJumpRequestId && EvaDogmaClimbR66.toggle(this,pilot))
+        {
+            this.lastJumpRequestId=requestId;
+            this.dogmaGripRequestR66=requestId;
+            this.jumpBufferTicks=0;
+            return;
+        }
         if (requestId == this.lastJumpRequestId)
         {
             // A request that arrived during a transient false ground reading
@@ -6168,6 +6181,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public void aiStep()
     {
+        if (!this.level().isClientSide && this.tickCount % 20 == 0 && this.tickCount >= this.dogmaGripHintR66
+                && EvaDogmaClimbR66.hint(this)) this.dogmaGripHintR66=this.tickCount+400;
         if(!this.level().isClientSide)this.expireLegacyRecoveryR51();
         this.refreshTvPersonnelClockHoldR44();
         EvaBayRepairR33.tick(this);
@@ -8127,6 +8142,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         return pilot != null ? pilot : super.getControllingPassenger();
     }
 
+    /** The shaft currently owns the position of the piloted chassis. */
+    public boolean isGrippingDogmaWall()
+    {
+        return EvaDogmaClimbR66.active(this);
+    }
+
     /**
      * Carrier rails and launch machinery own the chassis transform while their
      * locks are active. Leaving local vehicle authority enabled made the pilot
@@ -8138,6 +8159,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public boolean isControlledByLocalInstance()
     {
+        if (EvaDogmaClimbR66.active(this)) return !this.level().isClientSide;
         if(this.fixedCannonOperatingR52())return !this.level().isClientSide;
         if(this.level().isClientSide&&EvaMechanicalFrameR52.active(this))return false;
         if(EvaMechanicalFrameR52.ballisticCustodyR52(this))return !this.level().isClientSide;
@@ -8154,6 +8176,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     protected void tickRidden(Player player, Vec3 input)
     {
+        if (EvaDogmaClimbR66.active(this)) return;
         if(this.level().isClientSide&&com.projectseele.physics.CombatBodyDynamics.ownsGroundAction(this))return;
         if (!this.level().isClientSide)
         {
@@ -8366,6 +8389,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public void travel(Vec3 input)
     {
+        if (EvaDogmaClimbR66.travel(this)) return;
         if(CombatFeelR31.travel(this))return;
         if(!this.level().isClientSide&&this.getPilotEntity() instanceof TrainingPilotEntity
                 &&com.projectseele.world.NervPilotCombatR30.controls(this)&&this.autonomousInputAtR30!=Long.MIN_VALUE&&this.level().getGameTime()-this.autonomousInputAtR30<=2)

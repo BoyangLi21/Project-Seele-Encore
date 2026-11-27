@@ -43,7 +43,8 @@ public abstract class PhysicalBodyVehiclePackets
     {
         if(!player.serverLevel().getServer().isSameThread())return;
         var controlled=com.projectseele.world.EvaPilotResolver.controlTarget(player);
-        if(controlled!=null&&(controlled.fixedCannonOperatingR52()||EvaMechanicalFrameR52.active(controlled)))
+        if(controlled!=null&&(controlled.fixedCannonOperatingR52()||controlled.isGrippingDogmaWall()
+                ||EvaMechanicalFrameR52.active(controlled)))
         {
             // During insertion the root vehicle can still be the capsule.
             // The original airframe owns both forms of the passenger chain.

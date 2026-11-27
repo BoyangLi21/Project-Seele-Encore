@@ -22,6 +22,8 @@ public final class HeavensDoor
     // leaf's red inner edge once it is fully retracted (the door's own geometry puts that edge at x 17 and 43).
     private static final int POCKET_WEST = WEST - 2, POCKET_EAST = EAST + 2;
     private static final int BOTTOM = -1230, TOP = -1202, NORTH = 258, SOUTH = 260;
+    private static final int EVA_BOTTOM = -1264;
+    private static final BlockPos EXTENSION = new BlockPos(16,-1265,258);
     private static int width, target;
     private static boolean moving;
     private static final int HINT_EVERY = 1200;
@@ -34,7 +36,7 @@ public final class HeavensDoor
     {
         if (!level.dimension().equals(FacilitySchemaV2.DIMENSION)
                 || hit.getX() < WEST - 2 || hit.getX() > EAST + 2
-                || hit.getY() < BOTTOM || hit.getY() > TOP + 3
+                || hit.getY() < bottom(level) || hit.getY() > TOP + 3
                 || hit.getZ() < NORTH - 1 || hit.getZ() > SOUTH + 1) return false;
         return hit.getZ() >= NORTH && hit.getZ() <= SOUTH || hit.getX() == 30 && hit.getY() == TOP + 3;
     }
@@ -70,6 +72,27 @@ public final class HeavensDoor
     public static void tick(ServerLevel level)
     {
         if (level.getGameTime() % 40 == 0) hint(level);
+        if (level.getGameTime() % 10 == 0 && loaded(level) && bottom(level)==EVA_BOTTOM && (!moving || target==0))
+        {
+            var pilots=level.getEntitiesOfClass(com.projectseele.entity.EvaUnit01Entity.class,
+                    new AABB(WEST,EVA_BOTTOM-3,NORTH-12,EAST+1,TOP+1,SOUTH+13),
+                    eva -> eva.getControllingPassenger() instanceof net.minecraft.world.entity.player.Player);
+            if (!pilots.isEmpty())
+            {
+                if (!moving)
+                {
+                    width=0;
+                    for (int x=WEST;x<=EAST;x++)
+                        if (level.getBlockState(new BlockPos(x,TOP,NORTH)).isAir()) width++;
+                }
+                if (width<WIDTH)
+                {
+                    target=WIDTH;
+                    moving=true;
+                    sound(level,ModSounds.SURFACE_BULKHEAD_MOTION_R48.get());
+                }
+            }
+        }
         if (!moving || level.getGameTime() % 3 != 0) return;
         if (!loaded(level)) { moving = false; return; }
         int next = width + Integer.signum(target - width) * Math.min(2, Math.abs(target - width));
@@ -78,7 +101,7 @@ public final class HeavensDoor
         if (next < width && width > 0)
         {
             int left = 30 - (width + 1) / 2, right = 31 + width / 2;
-            if (!level.getEntities((Entity)null, new AABB(left + 1, BOTTOM, NORTH - 1, right, TOP + 1, SOUTH + 2),
+            if (!level.getEntities((Entity)null, new AABB(left + 1, bottom(level), NORTH - 1, right, TOP + 1, SOUTH + 2),
                     e -> !e.isSpectator() && e.isPickable()).isEmpty())
             {
                 target = WIDTH;
@@ -90,7 +113,7 @@ public final class HeavensDoor
         // Check the entire moving face before writing a step. A player modification leaves its surroundings intact.
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int x = POCKET_WEST; x <= POCKET_EAST; x++)
-            for (int y = BOTTOM; y <= TOP; y++)
+            for (int y = bottom(level); y <= TOP; y++)
                 for (int z = NORTH; z <= SOUTH; z++)
                     if (!level.getBlockState(pos.set(x, y, z)).is(material(x, y, z, width)))
                     {
@@ -98,7 +121,7 @@ public final class HeavensDoor
                         return;
                     }
         for (int x = POCKET_WEST; x <= POCKET_EAST; x++)
-            for (int y = BOTTOM; y <= TOP; y++)
+            for (int y = bottom(level); y <= TOP; y++)
                 for (int z = NORTH; z <= SOUTH; z++)
                 {
                     Block to = material(x, y, z, next);
@@ -130,14 +153,21 @@ public final class HeavensDoor
         return level.hasChunkAt(new BlockPos(POCKET_WEST, TOP, NORTH)) && level.hasChunkAt(new BlockPos(POCKET_EAST, TOP, SOUTH));
     }
 
+    private static int bottom(Level level)
+    {
+        return level.hasChunkAt(EXTENSION) && level.getBlockState(EXTENSION).is(Blocks.CHISELED_POLISHED_BLACKSTONE)
+                ? EVA_BOTTOM : BOTTOM;
+    }
+
     private static Block material(int x, int y, int z, int opening)
     {
+        if (y==-1231 && x>=18 && x<=20) return ModBlocks.NERV_FLOOR_PANEL.get();
         int left = 30 - (opening + 1) / 2, right = 31 + opening / 2;
         if (x > left && x < right) return Blocks.AIR;
         int templateX = x <= left ? x + 26 - left : x + 34 - right;
         if (templateX == 26 || templateX == 34) return Blocks.RED_CONCRETE;
-        if (y >= -1217 && y <= -1215) return Blocks.BLACK_CONCRETE;
-        if ((z == NORTH || z == SOUTH) && (y == -1227 || y == -1206)
+        if (y >= -1217 && y <= -1215 || y >= -1249 && y <= -1247) return Blocks.BLACK_CONCRETE;
+        if ((z == NORTH || z == SOUTH) && (y == -1227 || y == -1206 || y == -1261 || y == -1241)
                 && (templateX == 20 || templateX == 24 || templateX == 36 || templateX == 40)) return Blocks.IRON_BLOCK;
         return ModBlocks.NERV_STRUCTURAL_PANEL.get();
     }

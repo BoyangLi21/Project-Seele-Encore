@@ -75,4 +75,6 @@ forge*changelog.txt
 
 # R65 GeoFront far-view mesh: baked from the map, a private build product installed into the pack jar
 src/main/resources/assets/projectseele/geofront/dome_far_r65.bin.gz
+# R66 far city surveys are supplied only by the authorised private map pack.
+src/main/resources/assets/projectseele/city/city_shells_r66.bin.gz
 src/main/resources/assets/projectseele/geofront/surface_cover_r65.bin.gz

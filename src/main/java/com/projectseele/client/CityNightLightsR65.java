@@ -41,6 +41,7 @@ public final class CityNightLightsR65
         boolean newWorld=level!=world || !city;
         city=offsets.length!=0;
         world=level;
+        CitySkylineR66.bind(level,city);
         if (!city) return;
         interpolate(level.getGameTime());
         for (int i=0;i<OWNERS;i++)
@@ -58,10 +59,18 @@ public final class CityNightLightsR65
     {
         if (e.phase==net.minecraftforge.event.TickEvent.Phase.END && world!=Minecraft.getInstance().level)
         {
+            CitySkylineR66.bind(null,false);
             world=null;
             city=false;
             reported=false;
         }
+    }
+
+    static float[] skylineOffsets(ClientLevel level, double tick)
+    {
+        if (level != world || !city) return null;
+        interpolate(tick);
+        return shown;
     }
 
     private static void interpolate(double tick)
@@ -272,7 +281,7 @@ public final class CityNightLightsR65
         }
     }
 
-    private static int link(String vertexFile,String fragmentFile) throws IOException
+    static int link(String vertexFile,String fragmentFile) throws IOException
     {
         int vertex=shader(GL_VERTEX_SHADER,vertexFile), fragment=shader(GL_FRAGMENT_SHADER,fragmentFile);
         int linked=glCreateProgram();
@@ -296,7 +305,7 @@ public final class CityNightLightsR65
     }
     private static int uniform(String name) {return glGetUniformLocation(program,name);}
 
-    private static void blend(int rgbEq,int alphaEq,int rgbSrc,int rgbDst,int alphaSrc,int alphaDst)
+    static void blend(int rgbEq,int alphaEq,int rgbSrc,int rgbDst,int alphaSrc,int alphaDst)
     {
         var caps=GL.getCapabilities();
         if(caps.OpenGL40) {
@@ -311,7 +320,7 @@ public final class CityNightLightsR65
         }
     }
 
-    private static final class RenderState implements AutoCloseable
+    static final class RenderState implements AutoCloseable
     {
         final int shader=glGetInteger(GL_CURRENT_PROGRAM),vao=glGetInteger(GL_VERTEX_ARRAY_BINDING),vbo=glGetInteger(GL_ARRAY_BUFFER_BINDING);
         final int draw=glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);

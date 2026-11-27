@@ -2982,5 +2982,8 @@
   "message.projectseele.heavens_door.opening": "天堂之门 开启中",
   "message.projectseele.heavens_door.closing": "天堂之门 关闭中",
   "message.projectseele.heavens_door.held": "门洞有人，天堂之门重新开启",
+  "block.projectseele.dummy_tank_figure": "复制槽内人形",
+  "message.projectseele.dogma_climb.grip": "中央主轴：靠近东侧发光井壁，按 %s 抓壁。",
+  "message.projectseele.dogma_climb.controls": "已抓稳。按住 %1$s 上攀，按住 %2$s 下降，按 %3$s 松手。",
   "message.projectseele.heavens_door.hint": "右键门扇、门框或门牌：开关天堂之门"
 }

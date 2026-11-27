@@ -652,6 +652,11 @@ public final class EvaGameplayMotionR32
     }
     private static EvaBodyPose.Sample applyAction(EvaUnit01Entity e,EvaBodyPose.Sample base,float partial,boolean capturedBase,boolean[] movementOwner)
     {
+        if (EvaDogmaClimbR66.active(e))
+        {
+            movementOwner[0]=false;
+            return EvaDogmaClimbR66.pose(e,base,partial);
+        }
         if(!owns(e,partial)){movementOwner[0]=capturedBase&&EvaCapturedLocomotionR44.SUPPORT_OWNERSHIP_CANDIDATE;return base;}
         if(EvaFieldActionsR45.active(e))
         {

@@ -165,15 +165,27 @@ public final class CityCreateDistrictR45
                     .map(district -> new byte[]{(byte)(district.depth() == 0 ? 0 : 254)}).orElseGet(() -> new byte[0]);
         if (!active.state.worldTouched || active.state.phase.equals("IDLE"))
             return new byte[]{(byte)(active.state.depth == 0 ? 0 : 254)};
-        if (active.loadingPlans || active.plans.size() != 100 || active.towers.size() != 100) return new byte[0];
+        if (active.loadingPlans || active.plans.size() != 100 || active.towers.size() != 100)
+            return new byte[]{(byte)(active.state.depth == 0 ? 0 : 254)};
         byte[] offsets = new byte[active.towers.size()];
         java.util.Arrays.fill(offsets, (byte)255);
         for (Plan plan : active.plans)
         {
             Entity owner = level.getEntity(plan.owner);
-            if (owner == null || !owner.isAlive() || !owner.getPersistentData().hasUUID("R45CityJourney")
-                    || !owner.getPersistentData().getUUID("R45CityJourney").equals(active.state.journey)) continue;
-            double f = (plan.spec.centre().getY() - owner.getY()) / (plan.spec.centre().getY() - plan.spec.retractedY());
+            double poseY;
+            if (owner != null && owner.isAlive() && owner.getPersistentData().hasUUID("R45CityJourney")
+                    && owner.getPersistentData().getUUID("R45CityJourney").equals(active.state.journey)) poseY = owner.getY();
+            else {
+                // The mechanical clock survives removal of a cargo entity and server restarts.
+                String phase = active.state.phase.equals("FAULT") ? active.state.faultPhase : active.state.phase;
+                poseY = switch (phase) {
+                    case "PLACE", "COVER", "FLUSH", "COMMIT", "RECONCILE" -> active.state.rollback ? plan.sourceY : plan.targetY;
+                    case "MOVE", "SPAWN", "READY" -> plan.sourceY + (plan.targetY-plan.sourceY)
+                            * motionFraction(plan, active.state.motionTick, active.state.motionProfile, active.origin);
+                    default -> plan.sourceY;
+                };
+            }
+            double f = (plan.spec.centre().getY() - poseY) / (plan.spec.centre().getY() - plan.spec.retractedY());
             if (Double.isFinite(f)) offsets[plan.spec.index()] = (byte)Math.round(254 * Math.max(0, Math.min(1, f)));
         }
         return offsets;

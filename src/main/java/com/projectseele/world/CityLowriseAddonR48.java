@@ -20,6 +20,22 @@ public final class CityLowriseAddonR48
             "r48_launch_control_ne", "r48_launch_control_se");
     private CityLowriseAddonR48() { }
 
+    /** Only the two surveyed R66 landmark crowns enlarge their original vertical envelopes. */
+    static boolean retainsTowerFrame(int index, CompoundTag original, CompoundTag current)
+    {
+        if (!current.contains("R66CrownHeight")) return CityRigidTopologyR45.retainsOriginalFrame(original, current);
+        if (index != 37 && index != 43) return false;
+        boolean west = index == 37;
+        int height = west ? 130 : 153;
+        if (original.getLong("Centre") != new BlockPos(west ? 70 : 110, 80, 100).asLong()
+                || original.getInt("Height") != (west ? 104 : 120)
+                || current.getInt("Height") != height || current.getInt("R66CrownHeight") != height) return false;
+        CompoundTag restored = current.copy();
+        restored.remove("R66CrownHeight");
+        restored.putInt("Height", original.getInt("Height"));
+        return CityRigidTopologyR45.retainsOriginalFrame(original, restored);
+    }
+
     /** No marker preserves the original exactly-96 contract; arbitrary counts never become valid. */
     public static void validate(CompoundTag topology, List<CityRigidTopologyR45.Tower> parsed)
     {
@@ -43,7 +59,7 @@ public final class CityLowriseAddonR48
         BlockPos origin = BlockPos.of(topology.getLong("Origin"));
         for (int i=0; i<ORIGINAL_COUNT; i++)
         {
-            require(CityRigidTopologyR45.retainsOriginalFrame(originals.getCompound(i), rows.getCompound(i)), "An original96 identity/frame was changed beyond translation");
+            require(retainsTowerFrame(i, originals.getCompound(i), rows.getCompound(i)), "An original96 identity/frame was changed beyond its installed scope");
             require(owners.add(parsed.get(i).owner(topology.getString("WorldUUID"), origin)), "Duplicate original city owner");
         }
         for (int i=0; i<CENTRES.size(); i++)

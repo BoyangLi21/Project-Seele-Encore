@@ -2,6 +2,11 @@
   "sources": [
     {
       "type": "minecraft:single",
+      "resource": "projectseele:entity/training_pilot_rei",
+      "sprite": "projectseele:entity/training_pilot_rei"
+    },
+    {
+      "type": "minecraft:single",
       "resource": "projectseele:entity/yashima_shield",
       "sprite": "projectseele:entity/yashima_shield"
     },

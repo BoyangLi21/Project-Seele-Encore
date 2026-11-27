@@ -1,0 +1,42 @@
+{
+  "variants": {
+    "facing=south": [
+      {
+        "model": "projectseele:block/dummy_tank_figure_0"
+      },
+      {
+        "model": "projectseele:block/dummy_tank_figure_1"
+      }
+    ],
+    "facing=west": [
+      {
+        "model": "projectseele:block/dummy_tank_figure_0",
+        "y": 90
+      },
+      {
+        "model": "projectseele:block/dummy_tank_figure_1",
+        "y": 90
+      }
+    ],
+    "facing=north": [
+      {
+        "model": "projectseele:block/dummy_tank_figure_0",
+        "y": 180
+      },
+      {
+        "model": "projectseele:block/dummy_tank_figure_1",
+        "y": 180
+      }
+    ],
+    "facing=east": [
+      {
+        "model": "projectseele:block/dummy_tank_figure_0",
+        "y": 270
+      },
+      {
+        "model": "projectseele:block/dummy_tank_figure_1",
+        "y": 270
+      }
+    ]
+  }
+}

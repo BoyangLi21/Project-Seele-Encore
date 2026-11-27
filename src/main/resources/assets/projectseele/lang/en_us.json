@@ -2982,5 +2982,8 @@
   "message.projectseele.heavens_door.opening": "Heaven's Door opening",
   "message.projectseele.heavens_door.closing": "Heaven's Door closing",
   "message.projectseele.heavens_door.held": "Someone is in the doorway: Heaven's Door opens again",
+  "block.projectseele.dummy_tank_figure": "Dummy Plant Figure",
+  "message.projectseele.dogma_climb.grip": "Main shaft. Press %s beside the striped east wall to grip the rungs.",
+  "message.projectseele.dogma_climb.controls": "Wall gripped. Hold %1$s to climb or %2$s to descend. Press %3$s to release.",
   "message.projectseele.heavens_door.hint": "Right-click a leaf, the frame or a plate to open or close Heaven's Door"
 }
