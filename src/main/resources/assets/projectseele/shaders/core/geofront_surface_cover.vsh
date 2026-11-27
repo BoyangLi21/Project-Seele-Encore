@@ -14,7 +14,7 @@ void main() {
     ivec2 cell = Tile + ivec2(gl_VertexID % 65, gl_VertexID / 65);
     ivec2 bounds = textureSize(Survey, 0);
     uvec4 s = texelFetch(Survey, min(cell, bounds - 1), 0);
-    uint top = (s.r & 127u) * 256u + s.g;
+    uint top = (s.r & 31u) * 256u + s.g;
     canopy = s.r >= 128u ? 1.0 : 0.0;
     valid = top > 0u && all(lessThan(cell, bounds)) ? 1.0 : 0.0;
     uint rgb = s.b * 256u + s.a;

@@ -4,6 +4,7 @@ import com.projectseele.ProjectSeele;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL;
 import static org.lwjgl.opengl.GL33C.*;
 
@@ -18,7 +19,16 @@ public final class RamielTerrainDepthR64
     private static int before, after, width, height, worldDepth, dhDepth;
     private static float scale, offset;
 
-    public static void newFrame() { terrainPass = null; }
+    private static float shaderProjectionA, shaderProjectionB;
+    public static void newFrame() { terrainPass = null; shaderProjectionB = 0; }
+    public static void observeShaderProjection(Matrix4fc actual)
+    {
+        if (actual.m23() == -1F && !com.projectseele.client.render.ShaderShadowPassR44.active()) {
+            shaderProjectionA = actual.m22();
+            shaderProjectionB = actual.m32();
+        }
+    }
+
     public static void observe(Object parameters) { terrainPass = parameters; }
 
     static DepthSample sample(Matrix4f worldProjection)
@@ -33,7 +43,11 @@ public final class RamielTerrainDepthR64
                         .getMethod("getActiveDepthTextureId");
             }
             Object dh = projection.get(terrainPass);
-            float dhA = m22.getFloat(dh), dhB = m23.getFloat(dh);
+            // Oculus 1.8 rebuilds the projection from the event clip distances.
+            // DH 2.3.4-b can clamp only the matrix near plane to 7.5 blocks. Use
+            // the projection supplied to the program that actually wrote this depth.
+            float dhA = shaderProjectionB < 0F ? shaderProjectionA : m22.getFloat(dh);
+            float dhB = shaderProjectionB < 0F ? shaderProjectionB : m23.getFloat(dh);
             if (!(dhB < 0 && worldProjection.m32() < 0 && worldProjection.m23() == -1)) return null;
             int dhDepth = (int) depthTexture.invoke(null);
             if (dhDepth <= 0) return null;

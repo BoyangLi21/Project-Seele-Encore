@@ -123,6 +123,7 @@
     "client.DhArrivalQueueMixin",
     "client.DhDispatchQueueR65Mixin",
     "client.DhTerrainDepthMixin",
+    "client.OculusDhDepthProjectionR65Mixin",
     "client.DhGeoFrontFarViewR65Mixin",
     "client.OculusDhReloadR53Mixin",
     "client.OculusDhRenderPassR54Mixin",

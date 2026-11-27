@@ -135,6 +135,12 @@ public final class AreaMapAtlas extends SimplePreparableReloadListener<List<Area
         if (!prepared.isEmpty()) ProjectSeele.LOGGER.info("Loaded {} GeoFront area map layers", prepared.size());
     }
 
+    /** The authored surface atlas, including its surveyed lower terrain envelope. */
+    public static AreaMapLayer surface()
+    {
+        return layers.stream().filter(layer -> layer.id().equals("surface")).findFirst().orElse(null);
+    }
+
     public static AreaMapLayer current(ResourceKey<Level> viewedDimension)
     {
         Minecraft mc = Minecraft.getInstance();
