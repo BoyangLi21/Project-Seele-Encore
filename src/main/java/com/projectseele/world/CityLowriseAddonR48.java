@@ -23,6 +23,28 @@ public final class CityLowriseAddonR48
     /** Only the two surveyed R66 landmark crowns enlarge their original vertical envelopes. */
     static boolean retainsTowerFrame(int index, CompoundTag original, CompoundTag current)
     {
+        if (current.contains("DistrictCrownHeight")) {
+            int[] frame = switch (index) {
+                case 65 -> new int[] {-250, 340, 20, 56};
+                case 66 -> new int[] {-210, 220, 27, 68};
+                case 70 -> new int[] {-170, 260, 20, 48};
+                case 71 -> new int[] {-170, 300, 27, 62};
+                case 77 -> new int[] {30, 180, 20, 60};
+                case 78 -> new int[] {-10, 500, 27, 63};
+                case 83 -> new int[] {30, 20, 20, 55};
+                case 84 -> new int[] {30, 420, 27, 67};
+                case 89 -> new int[] {270, 340, 20, 54};
+                case 90 -> new int[] {70, 460, 27, 58};
+                default -> null;
+            };
+            if (frame == null || current.getLong("Centre") != new BlockPos(frame[0], 80, frame[1]).asLong()
+                    || original.getInt("Height") != frame[2] || current.getInt("Height") != frame[3]
+                    || current.getInt("DistrictCrownHeight") != frame[3]) return false;
+            CompoundTag restored = current.copy();
+            restored.remove("DistrictCrownHeight");
+            restored.putInt("Height", frame[2]);
+            return CityRigidTopologyR45.retainsOriginalFrame(original, restored);
+        }
         if (!current.contains("R66CrownHeight")) return CityRigidTopologyR45.retainsOriginalFrame(original, current);
         if (index != 37 && index != 43) return false;
         boolean west = index == 37;

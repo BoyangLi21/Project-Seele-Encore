@@ -1,0 +1,22 @@
+{
+  "variants": {
+    "kind=eyeglass_cabinet": {
+      "model": "projectseele:block/rei_eyeglass_cabinet"
+    },
+    "kind=medicine_fridge": {
+      "model": "projectseele:block/rei_medicine_fridge"
+    },
+    "kind=entrance_sink": {
+      "model": "projectseele:block/rei_entrance_sink"
+    },
+    "kind=folding_chair": {
+      "model": "projectseele:block/rei_folding_chair"
+    },
+    "kind=blind_top": {
+      "model": "projectseele:block/rei_blind_top"
+    },
+    "kind=blind_bottom": {
+      "model": "projectseele:block/rei_blind_bottom"
+    }
+  }
+}

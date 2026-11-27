@@ -107,8 +107,9 @@ def inspect(world):
                 ids[(y & 15) * 256 + (z & 15) * 16 + (x & 15)] = names.index(material)
         apply_gate(3)
         # Keep the older geometry test available for worlds without the dogleg.
-        revised = w.get(16,-1256,340) == "projectseele:nerv_floor_panel"
-        new_target = {"lower_dogleg_end": (16,-1255,340)} if revised else {
+        front_arm = w.get(37,-1256,331) == "projectseele:nerv_floor_panel"
+        revised = front_arm or w.get(16,-1256,340) == "projectseele:nerv_floor_panel"
+        new_target = {"lower_dogleg_end": (37,-1255,331) if front_arm else (16,-1255,340)} if revised else {
             "inspection_bridge_end": (31,-1230,343)}
         if revised:
             west, east = -31, 91
@@ -127,8 +128,9 @@ def inspect(world):
                 return all(w.get(*p) != "minecraft:iron_block" for p in [*iron,(8,-1225,261)])
             gallery_checks["normal_centre_open"] = retired_span_clear()
             gallery_checks["normal_right_jamb_clear"] = jamb_clear()
+            guard_posts = ((5,329),(11,321),(39,331),(30,329),(30,334)) if front_arm else ((5,330),(11,330),(18,340),(16,337),(16,342))
             gallery_checks["lower_turn_guard"] = all("nerv_edge_rail" in w.get(x,-1255,z)
-                for x,z in ((5,330),(11,330),(18,340),(16,337),(16,342)))
+                for x,z in guard_posts)
         normal_walk = check_walk(w, (-42,-1230,259), {
             'first_lab': (-23,-1230,197), 'tank_console': (-11,-1230,119),
             'graveyard': (-32,-1230,164), 'central_door': (31,-1230,257),
@@ -136,6 +138,11 @@ def inspect(world):
         }, open_door=True, central_deck=True)
         apply_gate(4)
         if revised:
+            if front_arm:
+                gallery_checks["arm_retracted"] = all(chassis_clear(w.get(x,y,z))
+                    for x in range(20,40) for z in range(329,335) for y in range(-1257,-1254))
+                gallery_checks["retracted_edge_guarded"] = all("nerv_edge_rail" in w.get(19,-1255,z)
+                    for z in range(329,335))
             gallery_checks["emergency_centre_open"] = retired_span_clear()
             gallery_checks["emergency_right_jamb_clear"] = jamb_clear()
     opening=sum(w.get(x,-1202,258)==AIR for x in range(18,43))
@@ -198,7 +205,7 @@ def inspect(world):
             'western_door_bridge':(19,-1230,256),'lake_view':(18,-1230,279),'lower_lake_overlook':(10,-1255,311)}
     if normal_walk:
         if gallery_checks:
-            points["lower_dogleg_end"] = (16,-1255,340)
+            points["lower_dogleg_end"] = (17,-1255,331) if front_arm else (16,-1255,340)
         points.update(old_room=(-23,-1230,197), dummy_core=(-11,-1230,119))
     walk=check_walk(w,(-42,-1230,259),points)
     upon_open=walk if opening==25 else check_walk(w,(-42,-1230,259),points,True)

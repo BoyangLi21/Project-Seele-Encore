@@ -20,6 +20,10 @@ public final class ModBlocks
 {
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(
             ForgeRegistries.BLOCKS, ProjectSeele.MODID);
+    public static final RegistryObject<Block> SCHOOL_DESK = BLOCKS.register("school_desk",
+            () -> new com.projectseele.world.SchoolDeskBlock(BlockBehaviour.Properties.copy(Blocks.OAK_PLANKS).noOcclusion()));
+    public static final RegistryObject<Block> COLLECTOR_STRUCTURE = BLOCKS.register("collector_structure",
+            () -> new com.projectseele.world.CollectorStructureBlock());
     public static final RegistryObject<Block> DUMMY_TANK_FIGURE=BLOCKS.register("dummy_tank_figure",
             ()->new DummyTankFigureBlock(BlockBehaviour.Properties.copy(Blocks.GLASS)
                     .noCollission().noOcclusion().noLootTable().lightLevel(state->4)));
@@ -121,6 +125,8 @@ public final class ModBlocks
     public static final RegistryObject<Block> MILITARY_SEAT=BLOCKS.register("military_seat",()->new com.projectseele.world.NervOfficeChairBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()));
     public static final RegistryObject<Block> STATION_DEPARTURE_BOARD=BLOCKS.register("station_departure_board",()->new com.projectseele.world.StationDepartureBoardBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()));
     public static final RegistryObject<Block> NERV_DIRECTION_PANEL=BLOCKS.register("nerv_direction_panel",()->new com.projectseele.world.StationDepartureBoardBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion(),true));
+    public static final RegistryObject<Block> REI_ROOM_FIXTURE = BLOCKS.register("rei_room_fixture",
+            () -> new com.projectseele.world.ReiRoomFixture(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()));
     public static final RegistryObject<Block> PERIOD_FIXTURE=BLOCKS.register("period_fixture",()->new com.projectseele.world.PeriodFixtureBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()));
     public static final RegistryObject<Block> WALL_ARTWORK=BLOCKS.register("wall_artwork",()->new com.projectseele.world.WallArtworkBlock(BlockBehaviour.Properties.copy(Blocks.OAK_SIGN).noOcclusion().noCollission().noLootTable()));
     public static final RegistryObject<Block> NERV_BRIEFING_TILE=BLOCKS.register("nerv_briefing_tile",()->new com.projectseele.world.NervBriefingTileBlock(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).lightLevel(s->6)));

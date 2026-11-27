@@ -762,11 +762,11 @@
       "siding": "HA-siding",
       "cars": [
         {
-          "id": "dark_oak_boat_medium_two_level",
-          "length": 5,
-          "width": 2,
-          "bogie1": -1,
-          "bogie2": 1,
+          "id": "projectseele_ashi_excursion",
+          "length": 19,
+          "width": 6.1,
+          "bogie1": -5,
+          "bogie2": 5,
           "padding1": 0,
           "padding2": 0
         }

@@ -239,7 +239,18 @@ def graveyard(dae):
             * size
         )
 
+    # Physical inner faces of the rectangular LCL tank are x=-82/-36 and z=128/186.
+    # Keep each specimen together, including its eyes and all independently capped ribs.
     parts = []
+
+    def immerse(group):
+        points = np.vstack([surface.points for surface in group])
+        low, high = points.min(axis=0), points.max(axis=0)
+        offset = np.maximum([0., 0., 0.], np.array([-79.75, -1245.25, 130.25]) - low)
+        offset[[0, 2]] -= np.maximum(0., (high + offset)[[0, 2]] - [-38.25, 183.75])
+        for surface in group:
+            parts.append(Surface(surface.points + offset, surface.normals, surface.colours, surface.faces))
+
     # Variation in tilt and immersion leaves some eye ridges above the fluid while other specimens
     # and the severed necks remain visible under it from the adjacent raised inspection gallery.
     for x, y, z, angle, tilt, roll, size in [
@@ -250,12 +261,8 @@ def graveyard(dae):
         (-46, -1237.4, 134, 59, 48, 58, 4.9),
         (-77, -1237.3, 138, -28, 62, -56, 5.1),
     ]:
-        for part in [skull, *eyes]:
-            parts.append(
-                part.transform(
-                    pose(angle, tilt, roll, size), [x, y, z], [0, 0.88, 0.56]
-                )
-            )
+        frame = pose(angle, tilt, roll, size)
+        immerse([part.transform(frame, [x, y, z], [0, 0.88, 0.56]) for part in [skull, *eyes]])
     for part, x, y, z, angle, roll, scale, origin in [
         (torso, -62, -1239.4, 153, 78, -36, 4.1, [0, -1.25, 0.1]),
         (torso, -49, -1239.3, 174, 111, 28, 3.5, [0, -1.25, 0.1]),
@@ -263,15 +270,19 @@ def graveyard(dae):
         (arm, -59, -1239, 132, -42, 56, 3.6, [-1, -2, 0.3]),
         (leg, -75, -1240, 176, 47, -11, 3.8, [0.6, -5.25, 0.2]),
     ]:
-        parts.append(part.transform(pose(angle, 58, roll, scale), [x, y, z], origin))
+        immerse([part.transform(pose(angle, 58, roll, scale), [x, y, z], origin)])
     for x, y, z, yaw, factor, missing in [
         (-48, -1239.6, 150, 22, 1.20, {(2, 1), (3, 1)}),
         (-65, -1238.4, 168, -40, 1.34, {(4, -1), (7, 1), (9, 1)}),
         (-62, -1239.4, 139, 38, 1.02, {(1, 1), (2, 1), (7, -1)}),
     ]:
         bones, frame = bone_rack(yaw, missing)
-        parts.extend(b.transform(frame * factor, [x, y, z], np.zeros(3)) for b in bones)
+        immerse([b.transform(frame * factor, [x, y, z], np.zeros(3)) for b in bones])
     return parts
+
+
+COLLECTOR_POSES = ((-493, 1040, -18), (-433, 1056, 6), (-369, 1049, 29))
+COLLECTOR_SCALE = 24.8
 
 
 def collectors(harvester):
@@ -284,14 +295,14 @@ def collectors(harvester):
     for i, colour in enumerate(palette):
         mesh = Surface(p @ frame.T, n @ frame.T, np.tile(colour, (len(p), 1)), f)
         source.append(mesh.section(m == i))
-    for x, z, angle in [(-479, 1018, -18), (-452, 1027, 6), (-425, 1035, 29)]:
-        a = math.radians(angle + 180)
+    for x, z, angle in COLLECTOR_POSES:
+        a = math.radians(angle)
         rotation = np.array(
             [[math.cos(a), 0, -math.sin(a)], [0, 1, 0], [math.sin(a), 0, math.cos(a)]]
         )
         # The original circular foundation sits partly in the water alongside the inspection quay.
         yield [
-            part.transform(rotation * 9.3, [x + 0.5, 101.4, z + 0.5], np.zeros(3))
+            part.transform(rotation * COLLECTOR_SCALE, [x + 0.5, 100.2, z + 0.5], np.zeros(3))
             for part in source
         ]
 

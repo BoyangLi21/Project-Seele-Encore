@@ -30,7 +30,8 @@ def material_ids(blob, names):
         name = blob[at + 2:at + 2 + length].decode().split('_DH-BSW_')[1].split('_STATE_')[0]
         at += 2 + length
         if name in ('AIR', 'minecraft:air', 'minecraft:cave_air', 'minecraft:void_air',
-                    'minecraft:light', 'minecraft:barrier', 'minecraft:structure_void'):
+                    'minecraft:light', 'minecraft:barrier', 'minecraft:structure_void',
+                    'projectseele:collector_structure'):
             ids.append(0)
         else:
             ids.append(names.setdefault(name, len(names) + 1))
