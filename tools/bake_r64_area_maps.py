@@ -301,7 +301,7 @@ def catalogue(world):
         Facility("experimental",(-58,-307,216,140),(-487,-426),numbered("experimental",experimental),"experimental"),
         Facility("airport",(-540,-361,-334,-177),(-485,-461),
                  (floor("airport_underground","地下运输机场 · 停机坪",-475),),"apron"),
-        Facility("spiral",(-606,861,-477,995),(-478,-456),
+        Facility("spiral",(-763,861,-477,1007),(-478,-456),
                  (floor("spiral_station","GS 螺旋线 · GeoFront 港口站",-467),),"station"),
     ]
     # UN surface ground can be below world zero. Each hangar selector follows
@@ -318,6 +318,8 @@ def catalogue(world):
 def read_facility(world, facility):
     x0,z0,x1,z1=facility.bounds
     y0=facility.interval[0]-12
+    if facility.key=="terminal":
+        y0=min(y0,facility.floors[0].feet-64)
     y1=facility.interval[1]+12
     blocks=np.full((y1-y0,z1-z0,x1-x0),ROCK,np.uint8)
     # Use real block names for the thin sloping pyramid shell. This height
@@ -484,6 +486,14 @@ def render_floor(out, facility, floor, band, blocks, y0, shell, points, landings
     wall=show & ~air & (blocks[fy+1]!=ROCK)
     wall_colour=((COLOURS[blocks[fy+1]].astype(np.float32)*.43)+[15,18,19]).clip(0,255).astype(np.uint8)
     pic[wall]=wall_colour[wall]
+    if floor.id=="terminal_lake":
+        # The pool surface remains level. Its measured contiguous fluid depth distinguishes
+        # the shallow sill, the sloped basin and the channels cut into the lake floor.
+        liquid=(blocks[:fy][::-1]==17)
+        depth=np.logical_and.accumulate(liquid,axis=0).sum(axis=0)
+        covered=scope & air & (depth>0)
+        shade=np.clip(1.08-depth[covered]/80,.48,1.0)
+        pic[covered]=(COLOURS[17]*shade[:,None]).astype(np.uint8)
     divider=wall & ndimage.binary_dilation(walk) & np.isin(blocks[fy+1],[10,19,20])
     pic[divider]=COLOURS[blocks[fy+1][divider]]
     native_doors=(blocks[fy]==20)|(blocks[fy+1]==20)
@@ -517,6 +527,23 @@ def render_floor(out, facility, floor, band, blocks, y0, shell, points, landings
                     gate_cells+=1
     if not sel.any():
         raise ValueError("Empty footprint for "+floor.id)
+    if floor.id=="spiral_station":
+        # The western side is the open port at lake level. Draw its two piers, decks
+        # and office from their top blocks; the platform retains its interior floor plan.
+        west=xx+x0 < -606
+        zone=west & (xx+x0 >= -747) & (zz+z0 >= 910) & (zz+z0 <= 997)
+        band_blocks=blocks[max(0,fy-12):min(len(blocks),fy+9)]
+        solid=band_blocks!=AIR
+        surface_y=len(band_blocks)-1-np.argmax(solid[::-1],axis=0)
+        top=band_blocks[surface_y,zz,xx]
+        surveyed=solid.any(axis=0)
+        visible=surveyed & (~show | west)
+        pic[visible]=COLOURS[top[visible]]
+        pic[visible & (top==4)]=[53,94,166]
+        show|=surveyed
+        water_below=band_blocks[np.maximum(surface_y-2,0),zz,xx]==4
+        piers=(top==5) & ndimage.maximum_filter(water_below,size=3)
+        sel|=zone & surveyed & (piers | ~np.isin(top,[ROCK,2,3,4,5]))
     zs,xs=np.where(show)
     az,bz=max(0,int(zs.min())-5),min(z1-z0,int(zs.max())+6)
     ax,bx=max(0,int(xs.min())-5),min(x1-x0,int(xs.max())+6)
