@@ -1,6 +1,6 @@
 """Bake the R65 Lilith gallery materials from the installed, licensed local mesh.
 
-The input geometry, UVs and textures stay in the installation. Only the three
+The input geometry, UVs and textures stay in the installation. Only the
 derived resources need to be overlaid on the local client and its matching pack.
 """
 import argparse
@@ -38,6 +38,55 @@ def soften_body(vertices):
             if length > 1e-6:
                 corner[5:8] = weighted / length
     return result.reshape(-1, 8)
+
+
+def regrown_body(vertices):
+    """Keep the crucified pose and the small growths at the tops of the thighs.
+
+    The sealed mesh has a complete flexed leg attached to the right of the
+    lower torso. Trace its welded surface from its outer toe so that the adult
+    legs inherit the same feet, muscles and UVs as the rest of the model.
+    """
+    positions, inverse = np.unique(vertices[:, :3], axis=0, return_inverse=True)
+    triangles = inverse.reshape(-1, 3)
+    neighbours = [set() for _ in positions]
+    for a, b, c in triangles:
+        neighbours[a].update((b, c))
+        neighbours[b].update((c, a))
+        neighbours[c].update((a, b))
+    toe = np.array([77.6029, 32.09387, 57.82505])
+    first = int(np.argmin(np.linalg.norm(positions - toe, axis=1)))
+    if np.linalg.norm(positions[first] - toe) > .1:
+        raise ValueError("Missing source leg in the local Lilith mesh")
+    seen = {first}
+    pending = [first]
+    while pending:
+        for index in neighbours[pending.pop()] - seen:
+            seen.add(index)
+            pending.append(index)
+    leg = vertices.reshape(-1, 3, 8)[np.isin(triangles[:, 0], list(seen))].copy()
+    upper = vertices.copy()
+    # Gather the existing small legs around the hips. Apply the same continuous
+    # transform to their attachment points and the lower belly.
+    below = upper[:, 1] < 235
+    upper[below, 1] = 235 + (upper[below, 1] - 235) * .60
+    upper[below, 6] /= .60
+    upper[below, 5:8] /= np.linalg.norm(upper[below, 5:8], axis=1)[:, None]
+    halves = [upper]
+    # Correct the outward tilt as the small flexed limb grows. Its knees still
+    # bend forward and both feet reach below the LCL surface.
+    transform = np.array([[3.35, .68, 0], [0, 3.8, 0], [0, .62, 3.25]])
+    for side in (1, -1):
+        matrix = transform.copy()
+        matrix[0] *= side
+        grown = leg.copy()
+        grown[:, :, :3] = (leg[:, :, :3] - [50, 108, 30]) @ matrix.T + [side*36, 181, 5]
+        normals = leg[:, :, 5:8] @ np.linalg.inv(matrix)
+        grown[:, :, 5:8] = normals / np.linalg.norm(normals, axis=2, keepdims=True)
+        if side < 0:
+            grown = grown[:, ::-1]
+        halves.append(grown.reshape(-1, 8))
+    return np.concatenate(halves)
 
 
 def bake_face(mask, eyes, original):
@@ -99,11 +148,16 @@ def bake(source,out):
         data=vertices(mask)
         image=bake_face(data,vertices(eyes),texture)
         mask['parts']['root']['vertices']=data.round(6).ravel().tolist()
-        body['parts']['root']['vertices']=soften_body(vertices(body)).round(6).ravel().tolist()
+        smooth = soften_body(vertices(body))
+        body['parts']['root']['vertices'] = smooth.round(6).ravel().tolist()
+        grown = regrown_body(smooth)
+        regrown = dict(body, triangle_count=len(grown)//3, parts={
+            'root': dict(body['parts']['root'], vertices=grown.round(6).ravel().tolist())
+        })
     dest=out/ROOT
     (dest/'mesh').mkdir(parents=True,exist_ok=True)
     (dest/'textures/entity').mkdir(parents=True,exist_ok=True)
-    for name,d in [('body',body),('mask',mask)]:
+    for name,d in [('body',body),('mask',mask),('regrown',regrown)]:
         (dest/f'mesh/lilith_{name}.mesh.json').write_text(json.dumps(d,separators=(',',':')),'utf8')
     image.save(dest/'textures/entity/lilith_mask.png')
 

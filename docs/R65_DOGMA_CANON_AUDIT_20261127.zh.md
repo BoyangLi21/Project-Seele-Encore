@@ -10,6 +10,8 @@
 
 天堂之门、红十字架、被钉住双手的白色巨人和下方的 LCL 湖是最深封印室的定位标志。第 24 话和旧剧场版都把这处空间直接与莉莉丝联系起来。紫色面具的七只眼沿两列排列，面具有倒三角刻痕；朗基努斯枪的状态随剧情改变。TV 版和 1997 年旧剧场版作为本项目复原基准。《新剧场版：破》把另一套 Dummy System 的运抵与 Golgotha Base 联系起来，不能据此给 TV 本部增设同名楼层。[莉莉丝画面与设定索引](https://wiki.evageeks.org/Lilith) · [旧剧场版终章场景记录](https://www.evaotaku.com/html/sincerely.html) · [《破》关于设备运抵的对白](https://www.springfieldspringfield.co.uk/movie_script.php?movie=evangelion-2-0-you-can-not-advance)
 
+第 22 话导演剪辑版补画了拔枪后下半身长回的镜头。游戏沿用已有的剧情开关。封印时，小腿状突起集中在躯干底部。零号机取枪后，莉莉丝在十字架上长出双腿，大腿上保留细小突起，双足没入 LCL。观景廊、十字架和手腕的位置在两个阶段相同。[第 22 话镜头索引](https://evangelion.fandom.com/wiki/Episode%3A22) · [莉莉丝外观资料](https://evangelion.fandom.com/wiki/Lilith)
+
 ## 正式世界第 749 批的可见内容
 
 本次对照读取正式存档的交通目录、总部框架、人员电梯楼层清单、莉莉丝实体和实际方块。另在总部及深层主体周围（区块 X −14 至 18、Z −20 至 37、Y 低于 −370 的已扫描区域）查得 85 种非空牌面文字。下表中的“未定位”表示在这些证据及项目设施实现里还没有找出对应的可参观房间。未命名的小房间仍可能有相似陈设。
