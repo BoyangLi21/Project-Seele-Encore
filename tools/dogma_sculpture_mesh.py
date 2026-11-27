@@ -290,7 +290,7 @@ def collectors(harvester):
         p, n, f, m = (data[k] for k in ("v", "n", "f", "m"))
     frame = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]])
     # FBX materials identify the recessed mirror, frame, rotating mechanism and anchor separately.
-    palette = [(107, 102, 95), (190, 183, 169), (173, 202, 214), (116, 122, 124)]
+    palette = [(205, 209, 211), (245, 245, 242), (237, 243, 246), (219, 224, 226)]
     source = []
     for i, colour in enumerate(palette):
         mesh = Surface(p @ frame.T, n @ frame.T, np.tile(colour, (len(p), 1)), f)

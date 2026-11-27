@@ -27,6 +27,10 @@ def restore_site(b, survey):
         for z in range(301, 381):
             if x < 200 and not (342 <= z <= 372):
                 continue
+            # R752 already cleared the original R66 blade here. The older terrain
+            # survey still contains its east jamb and would restore it a second time.
+            if x <= 173 and z <= 365:
+                continue
             for y in range(-498 if x >= 200 else -481, -279 if x >= 230 else -365):
                 s = survey.get(x, y, z)
                 if s is None:
@@ -38,8 +42,22 @@ def restore_site(b, survey):
                     b.tags[x, y, z] = source_entity(survey, (x, y, z))
 
 
+def cladding(i, j, h):
+    # Give each side of the blade one continuous finish. The three diagonal light bands
+    # follow the survey geometry and remain visible from the pyramid.
+    front = i < 53
+    if (
+        front
+        and h > 48
+        and 17 < j < 107
+        and any(abs(h - 0.23 * (j - 61) - level) < 0.60 for level in (72, 117, 159))
+    ):
+        return "pearlescent_froglight[axis=y]"
+    return "smooth_quartz" if front else "white_concrete"
+
+
 def shell(b, raster):
-    m, c = raster["m"].astype(bool), raster["c"]
+    m = raster["m"].astype(bool)
     pad = set(zip(*(axis.tolist() for axis in np.nonzero(m.any(2)))))
     for i in range(21, 57):
         for j in range(39, 84):
@@ -78,32 +96,7 @@ def shell(b, raster):
             b.put(x, GROUND, z, "polished_andesite")
     for i, j, k in zip(*np.nonzero(m)):
         i, j, k = int(i), int(j), int(k)
-        r, g, blue = map(int, c[i, j, k])
-        l = 0.27 * r + 0.63 * g + 0.10 * blue
-        s = (
-            "smooth_sandstone"
-            if l > 219
-            else "cut_sandstone"
-            if l > 195
-            else "white_terracotta"
-            if l > 158
-            else "light_gray_terracotta"
-            if l > 122
-            else "polished_andesite"
-            if l > 82
-            else "polished_deepslate"
-        )
-        # Collector's structural back is deeper bronze; the front lens has inset horizontal status slots.
-        if i >= 50 and j in range(27, 97) and c[i, j, k, 2] < 107 and k > 19:
-            s = "cut_copper"
-        if (
-            k > 48
-            and i < 53
-            and 17 < j < 107
-            and min(abs(k - 0.23 * (j - 61) - t) for t in (72, 117, 159)) < 0.60
-        ):
-            s = "ochre_froglight[axis=y]"
-        b.put(X + i, GROUND + k, Z + j, s)
+        b.put(X + i, GROUND + k, Z + j, cladding(i, j, k))
     b.reports["fbx_shell"] = {
         "triangles": 1964,
         "occupied_shell_cells": int(m.sum()),
@@ -129,7 +122,7 @@ def interiors(b):
                         "gray_stained_glass"
                         if (2 <= h <= 5 or 10 <= h <= 15 or 20 <= h <= 22)
                         and (j % 8 != 0 if i == left else i % 8 != 0)
-                        else "white_terracotta"
+                        else "smooth_quartz"
                     )
                 else:
                     s = AIR
@@ -316,12 +309,4 @@ def skin(b):
                 p = x, GROUND + h, z
                 if b.get(*p) != "minecraft:light_gray_concrete":
                     continue
-                # Follow the surrounding lens's three diagonal luminous strips, including across the shaft.
-                s = "smooth_sandstone" if x <= LIFT_X else "cut_copper"
-                if (
-                    x <= LIFT_X
-                    and min(abs(h - 0.23 * (z - 395) - k) for k in (72, 117, 159))
-                    < 0.60
-                ):
-                    s = "ochre_froglight[axis=y]"
-                b.put(*p, s)
+                b.put(*p, cladding(x - X, z - Z, h))

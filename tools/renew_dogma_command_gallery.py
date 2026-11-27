@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "map_buildings"))
 
 from dogma_apartment_402 import ROOMS, furnish
 from dogma_observation_arm import LANDING, lower_arm
+from dogma_terminal_finish import clear_entrance
 from dogma_recommission import Works
 from dogma_surface_command import (
     ENTRY,
@@ -48,6 +49,7 @@ def commission(world, original_world, original_gallery, output):
     walk(builder)
     elevator(builder)
     skin(builder)
+    clear_entrance(builder)
     lower_arm(builder, World(original_gallery / REGION), cursor)
     furnish(builder)
     arrivals = {
