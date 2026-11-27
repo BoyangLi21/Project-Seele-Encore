@@ -2985,5 +2985,12 @@
   "block.projectseele.dummy_tank_figure": "复制槽内人形",
   "message.projectseele.dogma_climb.grip": "中央主轴：靠近东侧发光井壁，按 %s 抓壁。",
   "message.projectseele.dogma_climb.controls": "已抓稳。按住 %1$s 上攀，按住 %2$s 下降，按 %3$s 松手。",
-  "message.projectseele.heavens_door.hint": "右键门扇、门框或门牌：开关天堂之门"
+  "message.projectseele.heavens_door.hint": "右键门扇、门框或门牌：开关天堂之门",
+  "screen.projectseele.dogma.open": "开放紧急攀爬通道",
+  "screen.projectseele.dogma.close": "封闭紧急攀爬通道",
+  "ops.projectseele.dogma.open": "准予开放。机库闸门与伪装盖开启后收回步行平台。",
+  "ops.projectseele.dogma.close": "恢复常态。先归位步行平台，再封闭井口。",
+  "ops.projectseele.dogma.unavailable": "本设施未安装紧急闸门。",
+  "ops.projectseele.dogma.deputy": "请接通冬月副司令。",
+  "block.projectseele.dummy_tank_remains": "复制槽内失活人形"
 }

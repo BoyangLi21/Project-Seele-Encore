@@ -162,6 +162,14 @@ public final class StaffConversationR24
             return;
         }
         session.lastAction = tick;
+        if (request.equals("DOGMA:open") || request.equals("DOGMA:close"))
+        {
+            if (!npc.skin().equals("fuyutsuki") || session.pilotContact>=0 || !NervStaffDialogue.authorized(player))
+                session.reply="ops.projectseele.dogma.deputy";
+            else session.reply=DogmaInterlocks.order(session.level,request.equals("DOGMA:open"));
+            send(player,npc,session,false);
+            return;
+        }
         if (request.startsWith("CONTACT:"))
         { contact(player, request.substring(8)); return; }
         if(request.startsWith("COORD:"))
@@ -373,12 +381,17 @@ public final class StaffConversationR24
     }
     private static boolean connect(ServerPlayer player,String skin,ServerLevel level)
     {
-        var station = NervStaffDirector.roster(level).stream().filter(post -> post.skin().equals(skin)).findFirst().orElse(null);
+        boolean claimed = NervRouteRuntimeR52.claimed(level);
+        // During the bounded mechanical startup, the deputy is already posted in the save.
+        // Address that same persisted actor until the installation publishes its full roster.
+        boolean restoringDeputy = claimed && skin.equals("fuyutsuki") && !NervOriginalActorsR52.mappedPersonnel(level);
+        var roster = restoringDeputy ? NervStaffDirector.recordedStations(level) : NervStaffDirector.roster(level);
+        var station = roster.stream().filter(post -> post.skin().equals(skin)).findFirst().orElse(null);
         if (station == null) return false;
-        UUID id = NervRouteRuntimeR52.claimed(level)?NervOriginalActorsR52.staffIdentity(level,station.id())
-                :NervStaffSavedData.get(level).identity(station.id());
-        if(id==null)return false;
-        if (level.getEntity(id) instanceof NervStaffEntity npc&&npc.isAlive())
+        UUID id = claimed && !restoringDeputy ? NervOriginalActorsR52.staffIdentity(level, station.id())
+                : NervStaffSavedData.get(level).identity(station.id());
+        if (id == null) return false;
+        if (level.getEntity(id) instanceof NervStaffEntity npc && npc.isAlive() && npc.skin().equals(skin))
         { load(level,npc.blockPosition()); open(player, npc); return true; }
         load(level, station.feet());
         return false;

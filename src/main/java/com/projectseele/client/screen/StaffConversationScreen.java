@@ -121,6 +121,11 @@ public final class StaffConversationScreen extends Screen
             addButton(I18n.get("screen.projectseele.phone.assign_pilots"),x+16+half,controlsY,half,()->switchTab(9),denial("board"));
             addButton(I18n.get("screen.projectseele.phone.weapons_and_silos"),x+12,controlsY+22,half,()->switchTab(10),denial("weapons"));
             addButton(I18n.get("screen.projectseele.phone.raise_or_lower_city"),x+16+half,controlsY+22,half,()->{switchTab(5);send("TOPIC:city");},denial("city_rise"));
+            if(view.skin().equals("fuyutsuki"))
+            {
+                addButton(I18n.get("screen.projectseele.dogma.open"),x+12,controlsY+44,half,()->send("DOGMA:open"),command);
+                addButton(I18n.get("screen.projectseele.dogma.close"),x+16+half,controlsY+44,half,()->send("DOGMA:close"),command);
+            }
         }
         else if (tab == 8)
         {

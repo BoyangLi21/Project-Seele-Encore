@@ -60,20 +60,22 @@ def connect(a,b):
     return [tuple(round(a[i]+(b[i]-a[i])*t/max(steps,1)) for i in range(3)) for t in range(steps+1)]
 
 
-def check_walk(w,start,targets,open_door=False):
+def check_walk(w,start,targets,open_door=False,central_deck=False):
     def open_at(x,y,z):
-        if open_door and 16<=x<=44 and LOW<y<=-1202 and 258<=z<=260:
+        if central_deck and open_door and 18<=x<=42 and 258<=z<=260 and -1230<=y<=-1202:
+            return True
+        if open_door and not central_deck and 16<=x<=44 and LOW<y<=-1202 and 258<=z<=260:
             block='projectseele:nerv_floor_panel' if y==-1231 and 18<=x<=20 else door_block(x,y,z,25)
         else:
             block=w.get(x,y,z) or ''
-        return chassis_clear(block) or 'wall_sign' in block or '_wall_torch' in block
+        return chassis_clear(block) or 'wall_sign' in block or '_wall_torch' in block or '_door[' in block or '_button[' in block or '_pressure_plate[' in block
     queue=deque([start]);seen={start}
     while queue:
         x,y,z=queue.popleft()
         for dx,dz in ((-1,0),(1,0),(0,-1),(0,1)):
             for dy in (0,-1,1):
                 q=(x+dx,y+dy,z+dz)
-                if q in seen or not (-88<=q[0]<=47 and -1261<=q[1]<=-1227 and 93<=q[2]<=317): continue
+                if q in seen or not (-88<=q[0]<=47 and -1261<=q[1]<=-1227 and 93<=q[2]<=344): continue
                 a,b,c=q
                 if open_at(a,b,c) and open_at(a,b+1,c) and not open_at(a,b-1,c):
                     seen.add(q);queue.append(q)
@@ -83,6 +85,30 @@ def check_walk(w,start,targets,open_door=False):
 
 def inspect(world):
     w=World(world/REGION)
+    normal_walk = {}
+    manifest = world / 'r52/dogma_interlocks.nbt'
+    if manifest.is_file():
+        import nbtlib
+        # Exercise the personnel deck and released chassis routes as separate configurations.
+        # Mutate only the decoded in-memory sections of this survey reader.
+        gate = nbtlib.load(manifest)
+        palette = list(map(str, gate['Palette']))
+        rows = gate['Cells'].reshape(-1, 5).tolist()
+        def apply_gate(column):
+            for row in rows:
+                x, y, z = row[:3]
+                ids, names = w.chunk(x >> 4, z >> 4)[0][y >> 4]
+                material = palette[row[column]]
+                if material not in names:
+                    names.append(material)
+                ids[(y & 15) * 256 + (z & 15) * 16 + (x & 15)] = names.index(material)
+        apply_gate(3)
+        normal_walk = check_walk(w, (-42,-1230,259), {
+            'first_lab': (-23,-1230,197), 'tank_console': (-11,-1230,119),
+            'graveyard': (-32,-1230,164), 'central_door': (31,-1230,257),
+            'inspection_bridge_end': (31,-1230,343)
+        }, open_door=True, central_deck=True)
+        apply_gate(4)
     opening=sum(w.get(x,-1202,258)==AIR for x in range(18,43))
     solid=Occupancy(w,opening<25)
     routes={}
@@ -141,6 +167,8 @@ def inspect(world):
                 if w.get(x,y,z)!=expected: mismatch.append((x,y,z,w.get(x,y,z),expected))
     points={'old_room':(-21,-1230,200),'graveyard':(-32,-1230,143),'dummy_core':(3,-1230,122),
             'western_door_bridge':(19,-1230,256),'lake_view':(18,-1230,279),'lower_lake_overlook':(10,-1255,311)}
+    if normal_walk:
+        points.update(old_room=(-23,-1230,197), dummy_core=(-11,-1230,119))
     walk=check_walk(w,(-42,-1230,259),points)
     upon_open=walk if opening==25 else check_walk(w,(-42,-1230,259),points,True)
     outside=('old_room','graveyard','dummy_core','western_door_bridge')
@@ -167,7 +195,8 @@ def inspect(world):
             'personnel_B_lift_walk_at_saved_width':walk,
             'personnel_B_lift_walk_after_full_open':upon_open,
             'personnel_full_open_evidence':'sampled native saved blocks' if opening==25 else 'evaluated animated door cells only; all surrounding terrain sampled from native save',
-            'all_ok':not mismatch and all(not v['missing'] and not v['pose_collision_count'] for v in grips.values()) and all(walk[k] for k in outside) and all(upon_open.values())
+            'normal_personnel_walk_after_door_access': normal_walk,
+            'all_ok':all(normal_walk.values()) and not mismatch and all(not v['missing'] and not v['pose_collision_count'] for v in grips.values()) and all(walk[k] for k in outside) and all(upon_open.values())
                      and all(not v['blocked'] and not v['unsupported_floor_samples'] for v in result.values())}
 
 

@@ -34,7 +34,8 @@ final class EvaDogmaClimbR66
 
     private static boolean installed(EvaUnit01Entity eva,Wall wall)
     {
-        return wall!=null && eva.level().dimension().equals(FacilitySchemaV2.DIMENSION)
+        return wall!=null && eva.level() instanceof net.minecraft.server.level.ServerLevel server
+                && com.projectseele.world.DogmaInterlocks.released(server) && eva.level().dimension().equals(FacilitySchemaV2.DIMENSION)
                 && eva.level().hasChunkAt(wall.marker)
                 && eva.level().getBlockState(wall.marker).is(Blocks.CHISELED_POLISHED_BLACKSTONE);
     }

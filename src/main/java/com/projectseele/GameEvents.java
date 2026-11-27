@@ -198,6 +198,7 @@ public class GameEvents
             if (geoFront != null)
             {
                 CommandRoomSlidingDoorDirector.tick(geoFront);
+                com.projectseele.world.DogmaInterlocks.tick(geoFront);
                 com.projectseele.world.HeavensDoor.tick(geoFront);
                 if (!r52Declared&&!terminalDogmaSpecimenChecked
                         && event.getServer().getTickCount() % 100 == 0)

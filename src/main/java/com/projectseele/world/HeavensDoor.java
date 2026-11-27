@@ -155,8 +155,19 @@ public final class HeavensDoor
 
     private static int bottom(Level level)
     {
-        return level.hasChunkAt(EXTENSION) && level.getBlockState(EXTENSION).is(Blocks.CHISELED_POLISHED_BLACKSTONE)
+        return (!(level instanceof ServerLevel server) || DogmaInterlocks.released(server))
+                && level.hasChunkAt(EXTENSION) && level.getBlockState(EXTENSION).is(Blocks.CHISELED_POLISHED_BLACKSTONE)
                 ? EVA_BOTTOM : BOTTOM;
+    }
+
+    static void alignLowerLeaves(ServerLevel level)
+    {
+        int opening=0;
+        for(int x=WEST;x<=EAST;x++) if(level.getBlockState(new BlockPos(x,TOP,NORTH)).isAir()) opening++;
+        for(int x=POCKET_WEST;x<=POCKET_EAST;x++)
+            for(int y=EVA_BOTTOM;y<BOTTOM;y++)
+                for(int z=NORTH;z<=SOUTH;z++)
+                    level.setBlock(new BlockPos(x,y,z),material(x,y,z,opening).defaultBlockState(),2);
     }
 
     private static Block material(int x, int y, int z, int opening)

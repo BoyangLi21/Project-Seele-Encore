@@ -29,6 +29,11 @@ public final class NervStaffDirector
     private static List<Station> allStations(ServerLevel level)
     {
         if(NervRouteRuntimeR52.claimed(level))return NervOriginalActorsR52.roster(level);
+        return recordedStations(level);
+    }
+
+    static List<Station> recordedStations(ServerLevel level)
+    {
         return ROSTERS.computeIfAbsent(level,key->{
             var path=level.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_staff_r15.json");if(!Files.isRegularFile(path))return List.of();
             try

@@ -591,3 +591,7 @@ GeoFront 倒挂城市的楼群布局，以及后续的湖面和螺旋路线，�
 被替换的 13 个 R65 文件（`eva_foot_concrete_r65_0..5`、`eva_foot_soil_r65_0..5`、`facility_alarm_loop_r65`）没有发布过，已从仓库删除。
 
 R65 第二轮试玩（第 13 项，机库里使徒死后警报还在响）：`facility_siren` 改回 R21 的 `facility_siren.ogg`，也就是负责人在 R21 定下的短促 660 Hz 双鸣（本项目合成，见上文 R21 一节）。这个声音也用作机库里笼架、轨道和发射转运时的设备警示，每 4 秒响一次。R65 换成防空警报式的升降警笛 `facility_siren_r65` 以后，使徒死后机体回库的整段转运听起来就像警报没停。`facility_siren_r65` 已删除；现在只有全局使徒警报（`facility_alarm_dry_r65b` / `facility_alarm_city_r65b`）是警笛，它在使徒死亡确认后由服务端停止。
+
+## EVA 墓场残骸
+
+[Evo No Armor as a marble sculpture](https://sketchfab.com/3d-models/evo-no-armor-as-a-marble-sculpture-3139cbd2727b4297b12f8648ec397a86) 由 [SmileyMan10000](https://sketchfab.com/SmileyMan10000) 创作，使用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可。本地图对网格进行了体素化、截取、旋转和材质替换，将五组残骸放入 LCL 池中。
