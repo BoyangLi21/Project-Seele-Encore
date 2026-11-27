@@ -7,6 +7,7 @@ import com.projectseele.entity.LilithEntity;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
@@ -98,6 +99,18 @@ public final class LilithRenderer extends GeoEntityRenderer<LilithEntity>
                 entity.getX() + 20*s, entity.getY() + 30*s,
                 entity.getZ() + 44*s);
         return frustum.isVisible(visualBounds);
+    }
+
+    @Override
+    protected int getBlockLightLevel(LilithEntity entity, BlockPos floorProbe)
+    {
+        // The entity origin is at the lake. The mask and nailed wrists are
+        // more than forty blocks above it in the full-size chamber.
+        double scale = entity.getContainmentScale();
+        BlockPos face = entity.blockPosition().offset(0,
+                (int)Math.round(23.6 * scale), -(int)Math.round(2.4 * scale));
+        return Math.max(super.getBlockLightLevel(entity, floorProbe),
+                super.getBlockLightLevel(entity, face));
     }
 
     @Override

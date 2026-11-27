@@ -137,8 +137,7 @@
 - 指挥中心字幕/地图曾指向 **Central Dogma B-20**；具体完整楼层表未公开。
 - Terminal Dogma 位于 Central Dogma 下方约 **2,008 m**，按地表关系估算约
   地下 3 km，是最高权限区域。
-- Terminal Dogma 包含：Lilith 十字封印室、LCL 生产湖、失败 EVA 原型墓地、
-  Rei 克隆/空壳设施。
+- Terminal Dogma 深处有莉莉丝十字封印室和 LCL 湖。第 23 话还呈现了废弃 EVA 墓场与丽的复制槽，其层号及与封印室的连接关系仍待原作资料证实。[第 749 批场景对照](R65_DOGMA_CANON_AUDIT_20261127.zh.md)
 - Lilith 被钉在巨大红十字架上；LCL 湖是其血液形成的设施，不是普通橙色
   装饰地板。
 - 第 24 话表现了向深层下降、连续防爆隔离层和巨型门；这条路线应是一条

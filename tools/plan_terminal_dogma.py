@@ -166,7 +166,7 @@ def plan(world):
                 if not shell:
                     want[x, y, z] = AIR
                 elif y == ANTE_Y[0]:
-                    want[x, y, z] = GUIDE if x == 30 and z > ANTE_Z[0] else FLOOR
+                    want[x, y, z] = GUIDE if x in (30, 31) and z > ANTE_Z[0] else FLOOR
                 elif y == ANTE_Y[1]:
                     lamp = (x - 16) % 7 == 0 and (z - 241) % 6 == 0 and x not in ANTE_X and z != ANTE_Z[0]
                     want[x, y, z] = LAMP if lamp else WALL
@@ -178,7 +178,7 @@ def plan(world):
         for z in range(WALL_Z[0], WALL_Z[1] + 1):
             for y in range(GATE_Y[0] - 1, LINTEL_Y[1] + 1):
                 if y == GATE_Y[0] - 1:
-                    want[x, y, z] = FLOOR if inside(x, GATE_X) else FRAME
+                    want[x, y, z] = GUIDE if x in (30, 31) else (FLOOR if inside(x, GATE_X) else FRAME)
                 elif inside(y, LINTEL_Y):
                     want[x, y, z] = RED if y == LINTEL_Y[0] else LINTEL
                 elif x in FRAME_X:
@@ -209,7 +209,9 @@ def plan(world):
             for y in range(LCL_NEW_BOTTOM, LCL_FLOOR_OLD):
                 if not any(p in w.get(x, y, z) for p in PROTECTED):
                     want[x, y, z] = 'projectseele:lcl[level=0]'
-            if not any(p in w.get(x, BED_Y, z) for p in PROTECTED):
+            # A later basin pass can deepen this column below the R64 bed.
+            existing_bed = w.get(x, BED_Y, z)
+            if not existing_bed.startswith('projectseele:lcl') and not any(p in existing_bed for p in PROTECTED):
                 want[x, BED_Y, z] = BED
 
     # D5 cross arms up six blocks (the upright stays)
