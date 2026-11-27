@@ -89,6 +89,26 @@ def regrown_body(vertices):
     return np.concatenate(halves)
 
 
+def shade_skin(vertices):
+    # The source uses a flat two-pixel material and its unused UV coordinates
+    # include the exporter's float-max sentinel. Give every vertex a valid UV
+    # for a soft ivory-to-shadow ramp, including with shaders that light larger
+    # entities uniformly from one position.
+    light = np.array([-.32, .64, .70])
+    light /= np.linalg.norm(light)
+    amount = np.clip((vertices[:, 5:8] @ light + .78) / 1.78, 0, 1)
+    vertices[:, 3] = (.5 + 255 * amount) / 256
+    vertices[:, 4] = .5
+
+
+def skin_ramp(source):
+    ivory = np.asarray(source.convert('RGB'), dtype=float).mean(axis=(0, 1))
+    shadow = ivory * np.array([.67, .655, .72])
+    t = np.linspace(0, 1, 256)[:, None]
+    strip = np.rint(shadow + (ivory - shadow) * t).astype(np.uint8)
+    return Image.fromarray(np.tile(strip[None, :, :], (4, 1, 1)))
+
+
 def bake_face(mask, eyes, original):
     xyz = mask[:, :3]
     xmin, ymin = xyz.min(axis=0)[:2]
@@ -133,6 +153,7 @@ def bake(source,out):
         mask=mesh(archive,'mask')
         eyes=mesh(archive,'eyes')
         texture=Image.open(io.BytesIO(archive.read(ROOT+'textures/entity/lilith_mask.png')))
+        skin = skin_ramp(Image.open(io.BytesIO(archive.read(ROOT+'textures/entity/lilith_body.png'))))
         if texture.size==(512,768):
             raise ValueError('Select the original local mesh archive, before the gallery rework')
         def vertices(d):
@@ -141,8 +162,10 @@ def bake(source,out):
         image=bake_face(data,vertices(eyes),texture)
         mask['parts']['root']['vertices']=data.round(6).ravel().tolist()
         smooth = soften_body(vertices(body))
-        body['parts']['root']['vertices'] = smooth.round(6).ravel().tolist()
         grown = regrown_body(smooth)
+        for surface in (smooth, grown):
+            shade_skin(surface)
+        body['parts']['root']['vertices'] = smooth.round(6).ravel().tolist()
         regrown = dict(body, triangle_count=len(grown)//3, parts={
             'root': dict(body['parts']['root'], vertices=grown.round(6).ravel().tolist())
         })
@@ -152,6 +175,7 @@ def bake(source,out):
     for name,d in [('body',body),('mask',mask),('regrown',regrown)]:
         (dest/f'mesh/lilith_{name}.mesh.json').write_text(json.dumps(d,separators=(',',':')),'utf8')
     image.save(dest/'textures/entity/lilith_mask.png')
+    skin.save(dest/'textures/entity/lilith_body.png')
 
 
 if __name__=='__main__':
