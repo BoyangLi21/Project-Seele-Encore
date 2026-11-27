@@ -656,6 +656,8 @@ public final class EvaBodyPose
     public static Sample ordinaryReleaseTargetR52(EvaUnit01Entity e,float partial){return ordinaryReleaseTargetR52(e,ordinaryReleaseInputsR52(e,partial),e.level().getGameTime()+partial);}
     public static Sample sample(EvaUnit01Entity entity,float partial)
     {
+        if (EvaDogmaClimbR66.active(entity))
+            return EvaDogmaClimbR66.pose(entity,neutralForTransportR32(entity),partial);
         if(com.projectseele.physics.CombatBodyDynamics.active(entity))
         {
             var physical=com.projectseele.physics.CombatBodyDynamics.sample(entity,partial);

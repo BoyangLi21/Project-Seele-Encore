@@ -424,6 +424,13 @@ public final class EvaPoseGraph
         seatHinges(model);
         if(physical&&com.projectseele.physics.CombatBodyDynamics.phase(entity)==2)
             EvaGroundContactR56.keepRecoveryHandsUp(entity,model,modelToWorld,partialTick);
+        // The hands carry the body here. Floor placement and a retained service
+        // snapshot cannot replace the final wall contacts seen by the pilot.
+        if(entity.isGrippingDogmaWall())
+        {
+            var climbing=com.projectseele.entity.EvaBodyPose.sample(entity,partialTick);
+            motionWrites=EvaMechanicalServicePoseR52.write(climbing,model,"DOGMA_WALL_GRIP");
+        }
         EvaGroundContactR56.witnessLowestR63(entity,model,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         EvaPoseTransition.recordFinal(entity,model);
