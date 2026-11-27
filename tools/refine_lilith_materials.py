@@ -113,16 +113,8 @@ def bake_face(mask, eyes, original):
     right=sorted([p for p in centers if p[0]>0],key=lambda c:-c[1])
     if (len(left),len(right))!=(4,3):
         raise ValueError('Unexpected layout of seven eyes')
-    # Extend both sloping rows to form the incised triangular SEELE mark.
-    def x_at(row,y):
-        a,b=row[0],row[-1]
-        return a[0]+(y-a[1])*(b[0]-a[0])/(b[1]-a[1])
-    top=max(c[1] for c in centers)+7
-    lower=ymin+3
-    outline=[map_xy(x_at(left,top),top),map_xy(x_at(right,top),top),
-             map_xy((x_at(left,lower)+x_at(right,lower))/2,lower)]
-    for offset,col,w in [(2,(174,157,194),5),(0,(62,52,80),5),(-1,(90,75,108),2)]:
-        pts=[(round(x),round(y)+offset) for x,y in outline];draw.line(pts+pts[:1],col,width=w,joint='curve')
+    # The face_dark mesh already traces the inverted triangle across the curved
+    # mask. A second triangle in its diffuse texture appears offset in the game.
     for i,(cx,cy,_) in enumerate(centers):
         span=(6.1-.31*i);half_height=(2.15-.085*i)
         def almond(w,h):
