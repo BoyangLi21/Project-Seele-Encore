@@ -33,8 +33,6 @@ public final class LilithRenderer extends GeoEntityRenderer<LilithEntity>
     };
     private static final ResourceLocation PRIMARY_MESH =
             meshResource("lilith_body");
-    private static final ResourceLocation REGROWN_MESH =
-            meshResource("lilith_regrown");
 
     public LilithRenderer(EntityRendererProvider.Context context)
     {
@@ -45,17 +43,8 @@ public final class LilithRenderer extends GeoEntityRenderer<LilithEntity>
             ResourceLocation mesh = meshResource(layer);
             ResourceLocation texture =
                     resource("textures/entity/" + layer + ".png");
-            if (mesh.equals(PRIMARY_MESH))
-            {
-                this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
-                        entity -> !entity.isSpearShown() && LocalTriangleMeshLayer.hasPart(REGROWN_MESH, "root")
-                                ? REGROWN_MESH : PRIMARY_MESH, entity -> texture));
-            }
-            else
-            {
-                this.addRenderLayer(new LocalTriangleMeshLayer<>(this, entity -> mesh, entity -> texture,
-                        (entity, bone) -> !"lilith_spear".equals(layer) || entity.isSpearShown()));
-            }
+            this.addRenderLayer(new LocalTriangleMeshLayer<>(this, entity -> mesh, entity -> texture,
+                    (entity, bone) -> !"lilith_spear".equals(layer) || entity.isSpearShown()));
         }
         this.shadowRadius = 0.0F;
     }
