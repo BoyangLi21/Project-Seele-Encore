@@ -302,7 +302,7 @@ def catalogue(world):
         Facility("airport",(-540,-361,-334,-177),(-485,-461),
                  (floor("airport_underground","地下运输机场 · 停机坪",-475),),"apron"),
         Facility("spiral",(-606,861,-477,995),(-478,-456),
-                 (floor("spiral_station","GeoFront · 螺旋铁路站台",-467),),"station"),
+                 (floor("spiral_station","GS 螺旋线 · GeoFront 港口站",-467),),"station"),
     ]
     # UN surface ground can be below world zero. Each hangar selector follows
     # its actual building footprint instead of capturing the surrounding base.

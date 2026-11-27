@@ -1,6 +1,6 @@
 package com.projectseele.mixin.client;
 
-import com.projectseele.client.FacilityPronunciationR22;
+import com.projectseele.client.RailAnnouncementsR65;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -15,5 +15,5 @@ public abstract class MtrSpokenAnnouncementR25Mixin
     @ModifyArg(method = "*", at = @At(value = "INVOKE",
             target = "Lorg/mtr/mod/client/IDrawing;narrateOrAnnounce(Ljava/lang/String;Lorg/mtr/libraries/it/unimi/dsi/fastutil/objects/ObjectArrayList;)V"), index = 0, remap = false)
     private String projectSeele$pronounceNerv(String text)
-    { return FacilityPronunciationR22.spoken(text); }
+    { return RailAnnouncementsR65.spoken(text); }
 }

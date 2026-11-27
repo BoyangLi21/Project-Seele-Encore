@@ -1,0 +1,10 @@
+Project SEELE R65 railway announcements
+
+Original Japanese announcements synthesized offline with Open JTalk and HTS Voice "Mei".
+HTS Voice "Mei" was released by the MMDAgent Project Team, copyright 2009–2013
+Nagoya Institute of Technology, Department of Computer Science, under CC BY 3.0.
+https://www.mmdagent.jp/
+https://creativecommons.org/licenses/by/3.0/
+
+The station, terminus, interchange and through-service recordings use the normal Mei voice at 1.03 speed,
+normalized and encoded as mono Ogg Vorbis. The voice model is distributed separately.

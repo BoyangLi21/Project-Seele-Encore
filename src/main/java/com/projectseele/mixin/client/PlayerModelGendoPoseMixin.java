@@ -23,6 +23,15 @@ public abstract class PlayerModelGendoPoseMixin
             float limbSwing, float limbSwingAmount, float ageInTicks,
             float netHeadYaw, float headPitch, CallbackInfo callback)
     {
+        if (entity == net.minecraft.client.Minecraft.getInstance().player && com.projectseele.client.RailSeatsR65.seated())
+        {
+            PlayerModel<?> model = (PlayerModel<?>)(Object)this;
+            model.rightLeg.xRot = model.leftLeg.xRot = -1.41372F;
+            model.rightLeg.yRot = .31416F; model.leftLeg.yRot = -.31416F;
+            model.rightLeg.zRot = .07854F; model.leftLeg.zRot = -.07854F;
+            model.rightPants.copyFrom(model.rightLeg); model.leftPants.copyFrom(model.leftLeg);
+            return;
+        }
         if(entity.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity plug&&plug.hasCanonicalPose()
                 &&(!plug.isLockedToEva()||plug.usesPhysicalPilotSeatR52()))
         {
