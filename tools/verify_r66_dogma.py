@@ -145,17 +145,29 @@ def inspect(world):
     upon_open=walk if opening==25 else check_walk(w,(-42,-1230,259),points,True)
     outside=('old_room','graveyard','dummy_core','western_door_bridge')
     grips={}
-    for name,face,foot,top,z0,z1 in [('lower',145,-1264,-1051,237,248),('upper',150,-1051,-466,184,192)]:
+    # Native Unit-01 standing east, measured from its actual Forge
+    # server AABB during powered ascent. The width exceeds its registry width.
+    pose=(-9.52686882019043,9.52686882019043,-7.943214416503906,9.91646194458008)
+    for name,face,foot,top,z0,z1 in [('lower',145,-1264,-1051,240,244),('upper',150,-1051,-466,185,190)]:
         contacts={(face,max(foot+4,min(y+30,top-2)),z) for y in range(foot,top+1) for z in range(z0,z1+1)}
         gaps=[pos for pos in sorted(contacts) if chassis_clear(w.get(*pos) or AIR)]
-        grips[name]={'checked_contact_cells':len(contacts),'missing':len(gaps),'examples':gaps[:4]}
+        centre=face-1.5-pose[1]
+        clashes=[]
+        for z in np.arange(z0,z1+.01,.5):
+            for x,y in [(centre,y) for y in range(foot,top+1)]+[(x,top) for x in np.arange(centre,face+10.01,.5)]:
+                hit=solid.hits(math.floor(x+pose[0]),y,math.floor(z+pose[2]),
+                               math.ceil(x+pose[1])-1,y+59,math.ceil(z+pose[3])-1)
+                if hit:clashes.append([round(float(z),2),y,list(hit)])
+        grips[name]={'checked_contact_cells':len(contacts),'missing':len(gaps),'examples':gaps[:4],
+                     'observed_Unit01_pose_xz_offsets':list(pose),'aligned_x':centre,
+                     'pose_collision_count':len(clashes),'pose_collision_examples':clashes[:3]}
     return {'dimension':'projectseele:geofront','eva_full_box':[17,60,17],'door_saved_width':opening,
             'open_door_evaluation':'native open' if opening==25 else 'native leaves checked at saved width; full-open collision evaluated using the same leaf geometry',
             'door_discrepancies':len(mismatch),'door_examples':mismatch[:4],'sweeps':result,'wall_contacts':grips,
             'personnel_B_lift_walk_at_saved_width':walk,
             'personnel_B_lift_walk_after_full_open':upon_open,
             'personnel_full_open_evidence':'sampled native saved blocks' if opening==25 else 'evaluated animated door cells only; all surrounding terrain sampled from native save',
-            'all_ok':not mismatch and all(not v['missing'] for v in grips.values()) and all(walk[k] for k in outside) and all(upon_open.values())
+            'all_ok':not mismatch and all(not v['missing'] and not v['pose_collision_count'] for v in grips.values()) and all(walk[k] for k in outside) and all(upon_open.values())
                      and all(not v['blocked'] and not v['unsupported_floor_samples'] for v in result.values())}
 
 

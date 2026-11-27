@@ -43,6 +43,7 @@ public class ServerboundEvaControlPacket
     public static final int ACTION_DASH_START_R50=25;
     public static final int ACTION_DASH_STOP_R50=26;
     public static final int ACTION_FIXED_CANNON_R52=27;
+    public static final int ACTION_DOGMA_CLIMB_INPUT=28;
 
     public final int action;
     public final int requestId;
@@ -87,6 +88,7 @@ public class ServerboundEvaControlPacket
             {
                 switch (this.action)
                 {
+                    case ACTION_DOGMA_CLIMB_INPUT -> eva.setDogmaClimbInput(sender,this.requestId);
                     case ACTION_CYCLE_WEAPON -> eva.cycleWeapon(sender);
                     case ACTION_TOGGLE_AT_FIELD -> eva.toggleAtField(sender);
                     case ACTION_MELEE -> eva.meleeAttack(sender);

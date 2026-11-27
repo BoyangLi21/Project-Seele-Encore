@@ -357,6 +357,12 @@ public final class ClientForgeEvents
                 clearJumpRequest();
             }
             else handleJumpInput(eva, rawJump);
+            if (eva.isGrippingDogmaWall() && player.tickCount % 2 == 0)
+            {
+                int direction=(minecraft.options.keyUp.isDown()?1:0)-(minecraft.options.keyDown.isDown()?1:0);
+                SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(
+                        ServerboundEvaControlPacket.ACTION_DOGMA_CLIMB_INPUT,direction+1));
+            }
             minecraft.options.keyShift.setDown(false);
             player.setShiftKeyDown(false);
         }

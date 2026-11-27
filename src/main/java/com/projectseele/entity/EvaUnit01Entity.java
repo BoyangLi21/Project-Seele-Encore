@@ -732,6 +732,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private boolean clientVisualMoving;
     private int dogmaGripRequestR66 = Integer.MIN_VALUE;
     private long dogmaGripHintR66;
+    int dogmaDirectionR66;
+    long dogmaInputUntilR66;
     private boolean clientVisualAirborne;
     private boolean clientVisualAscending;
     private int clientVisualGroundTicks;
@@ -6181,6 +6183,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public void aiStep()
     {
+        if (!this.level().isClientSide && EvaDogmaClimbR66.active(this)) EvaDogmaClimbR66.step(this);
         if (!this.level().isClientSide && this.tickCount % 20 == 0 && this.tickCount >= this.dogmaGripHintR66
                 && EvaDogmaClimbR66.hint(this)) this.dogmaGripHintR66=this.tickCount+400;
         if(!this.level().isClientSide)this.expireLegacyRecoveryR51();
@@ -8148,6 +8151,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         return EvaDogmaClimbR66.active(this);
     }
 
+    public void setDogmaClimbInput(ServerPlayer pilot,int encoded)
+    {
+        if (!this.level().isClientSide && this.getControllingPassenger()==pilot && this.isGrippingDogmaWall()
+                && encoded>=0 && encoded<=2)
+        {
+            this.dogmaDirectionR66=encoded-1;
+            this.dogmaInputUntilR66=this.level().getGameTime()+6;
+        }
+    }
+
     /**
      * Carrier rails and launch machinery own the chassis transform while their
      * locks are active. Leaving local vehicle authority enabled made the pilot
@@ -8389,7 +8402,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public void travel(Vec3 input)
     {
-        if (EvaDogmaClimbR66.travel(this)) return;
+        if (EvaDogmaClimbR66.active(this)) return;
         if(CombatFeelR31.travel(this))return;
         if(!this.level().isClientSide&&this.getPilotEntity() instanceof TrainingPilotEntity
                 &&com.projectseele.world.NervPilotCombatR30.controls(this)&&this.autonomousInputAtR30!=Long.MIN_VALUE&&this.level().getGameTime()-this.autonomousInputAtR30<=2)

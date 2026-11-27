@@ -19,8 +19,8 @@ final class EvaDogmaClimbR66
     {
         double lip() { return face+10; }
     }
-    private static final Wall LOWER=new Wall(new BlockPos(146,-1054,242),-1264,-1051,145,237,248);
-    private static final Wall UPPER=new Wall(new BlockPos(151,-469,188),-1051,-466,150,184,192);
+    private static final Wall LOWER=new Wall(new BlockPos(146,-1054,242),-1264,-1051,145,240,244);
+    private static final Wall UPPER=new Wall(new BlockPos(151,-469,188),-1051,-466,150,185,190);
 
     private static Wall wall(EvaUnit01Entity eva)
     {
@@ -55,6 +55,7 @@ final class EvaDogmaClimbR66
         boolean onLip = feet >= wall.top - .1 && eva.getX() >= wall.face - 9 && eva.getX() <= wall.lip() + 1;
         if (!byWall && !onLip) return false;
         eva.getEntityData().set(EvaUnit01Entity.DOGMA_GRIP_R66,true);
+        eva.dogmaDirectionR66=0;
         eva.setDeltaMovement(Vec3.ZERO);
         eva.resetFallDistance();
         pilot.displayClientMessage(Component.translatable("message.projectseele.dogma_climb.controls",
@@ -75,32 +76,33 @@ final class EvaDogmaClimbR66
     private static void release(EvaUnit01Entity eva)
     {
         eva.getEntityData().set(EvaUnit01Entity.DOGMA_GRIP_R66,false);
+        eva.dogmaDirectionR66=0;
         eva.setDeltaMovement(Vec3.ZERO);
         eva.resetFallDistance();
     }
 
-    static boolean travel(EvaUnit01Entity eva)
+    static void step(EvaUnit01Entity eva)
     {
-        if (!active(eva)) return false;
-        if (eva.level().isClientSide) return true;
         Wall wall=wall(eva);
-        if (!(eva.getControllingPassenger() instanceof Player pilot) || eva.isPilotControlLocked()
+        if (!(eva.getControllingPassenger() instanceof Player) || eva.isPilotControlLocked()
                 || eva.isPilotProne() || eva.isPilotCrouching() || !installed(eva,wall))
         {
             release(eva);
-            return false;
+            return;
         }
         eva.setYRot(-90);
         eva.yBodyRot = -90;
         eva.setDeltaMovement(Vec3.ZERO);
         eva.resetFallDistance();
-        double forward = Mth.clamp(pilot.zza,-1,1);
-        if (Math.abs(forward) < .02) return true;
+        int forward=eva.level().getGameTime()<=eva.dogmaInputUntilR66?eva.dogmaDirectionR66:0;
+        if (forward == 0) return;
         double y = eva.getY();
-        double gripX = wall.face - eva.getBbWidth() / 2.0;
+        // The posed chassis can extend beyond the nominal 17-block width.
+        // Leave room for its actual forward extent before moving it vertically.
+        double gripX=eva.getX()+wall.face-eva.getBoundingBox().maxX-1.5;
         Vec3 delta;
-        if (forward < 0 && y >= wall.top - .05 && eva.getX() > gripX + .02)
-            delta = new Vec3(Math.max(gripX - eva.getX(), forward * .95),0,0);
+        if (eva.getX()>gripX+.02 && (y<wall.top-.05 || forward<0))
+            delta = new Vec3(Math.max(gripX-eva.getX(),-.95),0,0);
         else if (forward > 0 && y >= wall.top - .05)
             delta = new Vec3(Math.min(wall.lip() - eva.getX(), forward * .95),0,0);
         else
@@ -111,7 +113,7 @@ final class EvaDogmaClimbR66
             if (state.getCollisionShape(eva.level(),contact).isEmpty())
             {
                 release(eva);
-                return false;
+                return;
             }
             delta = new Vec3(0,Mth.clamp(forward*.85,wall.foot-y,wall.top-y),0);
         }
@@ -123,7 +125,6 @@ final class EvaDogmaClimbR66
             eva.finishCapturedActionEndpointR45();
             release(eva);
         }
-        return true;
     }
 
     static EvaBodyPose.Sample pose(EvaUnit01Entity eva, EvaBodyPose.Sample base, float partial)
