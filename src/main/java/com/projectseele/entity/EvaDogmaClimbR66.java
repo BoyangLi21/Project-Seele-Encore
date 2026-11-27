@@ -50,10 +50,11 @@ final class EvaDogmaClimbR66
         double feet = eva.getY();
         Wall wall=wall(eva);
         if (eva.isPilotControlLocked() || eva.isPilotProne() || eva.isPilotCrouching()
-                || !installed(eva,wall) || feet < wall.foot - .5 || feet > wall.top + .6) return false;
+                || !installed(eva,wall) || feet < wall.foot - .5) return false;
         boolean byWall = Math.abs(eva.getBoundingBox().maxX - wall.face) <= 2.5;
-        boolean onLip = feet >= wall.top - .1 && eva.getX() >= wall.face - 9 && eva.getX() <= wall.lip() + 1;
-        if (!byWall && !onLip) return false;
+        boolean onLip = feet >= wall.top - .1 && feet <= wall.top+3
+                && eva.getX() >= wall.face - 9 && eva.getX() <= wall.lip() + 3;
+        if ((!byWall || feet>wall.top+.6) && !onLip) return false;
         eva.getEntityData().set(EvaUnit01Entity.DOGMA_GRIP_R66,true);
         eva.dogmaDirectionR66=0;
         eva.setDeltaMovement(Vec3.ZERO);
@@ -66,8 +67,8 @@ final class EvaDogmaClimbR66
     static boolean hint(EvaUnit01Entity eva)
     {
         Wall wall=wall(eva);
-        if (wall==null || active(eva) || eva.getX()<wall.face-12 || eva.getX()>wall.lip()+1
-                || eva.getY()<wall.foot-.5 || eva.getY()>wall.top+.6
+        if (wall==null || active(eva) || eva.getX()<wall.face-12 || eva.getX()>wall.lip()+3
+                || eva.getY()<wall.foot-.5 || eva.getY()>wall.top+3
                 || !(eva.getControllingPassenger() instanceof ServerPlayer pilot) || !installed(eva,wall)) return false;
         pilot.displayClientMessage(Component.translatable("message.projectseele.dogma_climb.grip",Component.keybind("key.jump")),true);
         return true;
