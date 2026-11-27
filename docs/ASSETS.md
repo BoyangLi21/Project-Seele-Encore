@@ -594,4 +594,6 @@ R65 第二轮试玩（第 13 项，机库里使徒死后警报还在响）：`fa
 
 ## EVA 墓场残骸
 
-[Evo No Armor as a marble sculpture](https://sketchfab.com/3d-models/evo-no-armor-as-a-marble-sculpture-3139cbd2727b4297b12f8648ec397a86) 由 [SmileyMan10000](https://sketchfab.com/SmileyMan10000) 创作，使用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可。本地图对网格进行了体素化、截取、旋转和材质替换，将五组残骸放入 LCL 池中。
+[Evo No Armor as a marble sculpture](https://sketchfab.com/3d-models/evo-no-armor-as-a-marble-sculpture-3139cbd2727b4297b12f8648ec397a86) 由 [SmileyMan10000](https://sketchfab.com/SmileyMan10000) 创作，使用 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) 许可。墓场使用原 COLLADA 的头、眼球、截断躯干和四肢三角网格，采样作者的反照率与环境遮蔽贴图，调整姿态和浸没深度，并补作肋骨和椎骨。头颈、肩、腰和四肢切口按实际截面补面，肌理、骨皮质和骨髓截面由本项目制作。
+
+芦之湖的三台集光楼使用 K-Kazama（KazamaHikana）的完整 FBX。游戏内分别布置转台、镜面与盘座，保留原作几何，重设朝向与材质色。模型按 CC BY 4.0 使用。[Solar Harvester from Evangelion](https://sketchfab.com/3d-models/solar-harvester-from-evangelion-c52a028006494b278164e5480d66427c) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)

@@ -20,7 +20,10 @@ import java.util.List;
 /** Fixed, measured arrivals in the current commissioned world (/seele tp, /seele enter). Never builds terrain. */
 public final class SeeleTravelCommandsR43
 {
-    public record Destination(String key,String label,Vec3 point,float yaw) {}
+    public record Destination(String key,String label,Vec3 point,float yaw,float pitch)
+    {
+        public Destination(String key,String label,Vec3 point,float yaw){this(key,label,point,yaw,0);}
+    }
     public static final List<Destination> DESTINATIONS=List.of(
         new Destination("entrance","ops.projectseele.travel.entrance",new Vec3(-360.5,81,730.5),0),
         new Destination("command","ops.projectseele.travel.command",new Vec3(28.5,-406,269.5),0),
@@ -57,7 +60,7 @@ public final class SeeleTravelCommandsR43
         {
             var directory=NervTravelDirectoryR52.installed(level);
             return directory==null?List.of():directory.arrivals().stream()
-                    .map(a->new Destination(a.key(),a.label(),a.position(),a.yaw())).toList();
+                    .map(a->new Destination(a.key(),a.label(),a.position(),a.yaw(),a.pitch())).toList();
         }
         var result=new java.util.ArrayList<>(DESTINATIONS);
         result.add(new Destination("hangar","ops.projectseele.travel.hangar",Vec3.ZERO,0));
@@ -94,7 +97,7 @@ public final class SeeleTravelCommandsR43
             var directory=NervTravelDirectoryR52.installed(level);
             if(directory==null)return unavailable(source);
             var arrival=directory.arrival(key);
-            if(arrival!=null)destination=new Destination(arrival.key(),arrival.label(),arrival.position(),arrival.yaw());
+            if(arrival!=null)destination=new Destination(arrival.key(),arrival.label(),arrival.position(),arrival.yaw(),arrival.pitch());
         }
         else
         {
@@ -130,7 +133,7 @@ public final class SeeleTravelCommandsR43
         {
             source.sendFailure(Component.translatable("message.projectseele.travel.cannot_dismount"));return 0;
         }
-        player.teleportTo(level,p.x,p.y,p.z,destination.yaw(),0);player.fallDistance=0;player.setDeltaMovement(Vec3.ZERO);
+        player.teleportTo(level,p.x,p.y,p.z,destination.yaw(),destination.pitch());player.fallDistance=0;player.setDeltaMovement(Vec3.ZERO);
         source.sendSuccess(()->Component.translatable("message.projectseele.travel.arrived", OperationText.read(destination.label())),false);return 1;
     }
     private SeeleTravelCommandsR43() {}

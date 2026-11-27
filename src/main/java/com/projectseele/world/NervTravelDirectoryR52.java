@@ -18,7 +18,11 @@ public final class NervTravelDirectoryR52
 {
     public static final String FILE = "r52/travel.json";
     public static final String SCHEMA = "projectseele.r52.travel-directory.v1";
-    public record Arrival(String key,String label,String component,String entryId,Vec3 position,float yaw) {}
+    public record Arrival(String key,String label,String component,String entryId,Vec3 position,float yaw,float pitch)
+    {
+        public Arrival(String key,String label,String component,String entryId,Vec3 position,float yaw)
+        {this(key,label,component,entryId,position,yaw,0);}
+    }
     public record Document(long epoch,String directoryFingerprint,List<Arrival> arrivals)
     {
         public Arrival arrival(String key)
@@ -105,7 +109,9 @@ public final class NervTravelDirectoryR52
             double yaw=row.get("yaw").getAsDouble();
             require(Double.isFinite(position.lengthSqr())&&Math.abs(position.x)<29999984&&Math.abs(position.z)<29999984
                     &&Math.abs(position.y)<4096&&Double.isFinite(yaw)&&Math.abs(yaw)<=360,"Finite in-world arrival and heading required");
-            require(arrivals.putIfAbsent(key,new Arrival(key,label,component,entry,position,(float)yaw))==null,"Duplicate arrival key");
+            double pitch=row.has("pitch") ? row.get("pitch").getAsDouble() : 0;
+            require(Double.isFinite(pitch)&&Math.abs(pitch)<=90,"Finite arrival pitch required");
+            require(arrivals.putIfAbsent(key,new Arrival(key,label,component,entry,position,(float)yaw,(float)pitch))==null,"Duplicate arrival key");
         }
         require(arrivals.keySet().containsAll(List.of("entrance","command","hangar","station","dogma","observation")),
                 "Installed headquarters, hangar, Terminal and station entrances required");

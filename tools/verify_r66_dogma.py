@@ -60,7 +60,9 @@ def connect(a,b):
     return [tuple(round(a[i]+(b[i]-a[i])*t/max(steps,1)) for i in range(3)) for t in range(steps+1)]
 
 
-def check_walk(w,start,targets,open_door=False,central_deck=False):
+def check_walk(w,start,targets,open_door=False,central_deck=False,
+               bounds=(-88,94,93,390)):
+    x0,x1,z0,z1 = bounds
     def open_at(x,y,z):
         if central_deck and open_door and 18<=x<=42 and 258<=z<=260 and -1230<=y<=-1202:
             return True
@@ -69,16 +71,16 @@ def check_walk(w,start,targets,open_door=False,central_deck=False):
         else:
             block=w.get(x,y,z) or ''
         return chassis_clear(block) or 'wall_sign' in block or '_wall_torch' in block or '_door[' in block or '_button[' in block or '_pressure_plate[' in block
-    queue=deque([start]);seen={start}
-    while queue:
+    queue=deque([start]);seen={start};pending=set(targets.values())-{start}
+    while queue and pending:
         x,y,z=queue.popleft()
         for dx,dz in ((-1,0),(1,0),(0,-1),(0,1)):
             for dy in (0,-1,1):
                 q=(x+dx,y+dy,z+dz)
-                if q in seen or not (-88<=q[0]<=47 and -1261<=q[1]<=-1227 and 93<=q[2]<=344): continue
+                if q in seen or not (x0<=q[0]<=x1 and -1261<=q[1]<=-1227 and z0<=q[2]<=z1): continue
                 a,b,c=q
                 if open_at(a,b,c) and open_at(a,b+1,c) and not open_at(a,b-1,c):
-                    seen.add(q);queue.append(q)
+                    seen.add(q);queue.append(q);pending.discard(q)
                     break
     return {k:list(v) if v in seen else None for k,v in targets.items()}
 
@@ -86,6 +88,7 @@ def check_walk(w,start,targets,open_door=False,central_deck=False):
 def inspect(world):
     w=World(world/REGION)
     normal_walk = {}
+    gallery_checks = {}
     manifest = world / 'r52/dogma_interlocks.nbt'
     if manifest.is_file():
         import nbtlib
@@ -103,12 +106,38 @@ def inspect(world):
                     names.append(material)
                 ids[(y & 15) * 256 + (z & 15) * 16 + (x & 15)] = names.index(material)
         apply_gate(3)
+        # Keep the older geometry test available for worlds without the dogleg.
+        revised = w.get(16,-1256,340) == "projectseele:nerv_floor_panel"
+        new_target = {"lower_dogleg_end": (16,-1255,340)} if revised else {
+            "inspection_bridge_end": (31,-1230,343)}
+        if revised:
+            west, east = -31, 91
+            north, south = 270, 382
+            corners = [(west,north),(west,south),(east,south),(east,north)]
+            belts = [(-34,-28,268,386),(-32,93,381,387),
+                     (89,94,268,386),(-32,93,262,273)]
+            for (x,z), (X,Z), belt in zip(corners, corners[1:]+corners[:1], belts):
+                gallery_checks[f"ring_{x}_{z}_to_{X}_{Z}"] = bool(check_walk(
+                    w, (x,-1230,z), {"end":(X,-1230,Z)}, bounds=belt)["end"])
+            def retired_span_clear():
+                return all(chassis_clear(w.get(x,y,z)) for x in range(23,38)
+                           for y in range(-1234,-1228) for z in range(288,345))
+            def jamb_clear():
+                iron = [(x,y,z) for x,z in ((8,268),(16,261)) for y in range(-1230,-1224)]
+                return all(w.get(*p) != "minecraft:iron_block" for p in [*iron,(8,-1225,261)])
+            gallery_checks["normal_centre_open"] = retired_span_clear()
+            gallery_checks["normal_right_jamb_clear"] = jamb_clear()
+            gallery_checks["lower_turn_guard"] = all("nerv_edge_rail" in w.get(x,-1255,z)
+                for x,z in ((5,330),(11,330),(18,340),(16,337),(16,342)))
         normal_walk = check_walk(w, (-42,-1230,259), {
             'first_lab': (-23,-1230,197), 'tank_console': (-11,-1230,119),
             'graveyard': (-32,-1230,164), 'central_door': (31,-1230,257),
-            'inspection_bridge_end': (31,-1230,343)
+            **new_target
         }, open_door=True, central_deck=True)
         apply_gate(4)
+        if revised:
+            gallery_checks["emergency_centre_open"] = retired_span_clear()
+            gallery_checks["emergency_right_jamb_clear"] = jamb_clear()
     opening=sum(w.get(x,-1202,258)==AIR for x in range(18,43))
     solid=Occupancy(w,opening<25)
     routes={}
@@ -168,6 +197,8 @@ def inspect(world):
     points={'old_room':(-21,-1230,200),'graveyard':(-32,-1230,143),'dummy_core':(3,-1230,122),
             'western_door_bridge':(19,-1230,256),'lake_view':(18,-1230,279),'lower_lake_overlook':(10,-1255,311)}
     if normal_walk:
+        if gallery_checks:
+            points["lower_dogleg_end"] = (16,-1255,340)
         points.update(old_room=(-23,-1230,197), dummy_core=(-11,-1230,119))
     walk=check_walk(w,(-42,-1230,259),points)
     upon_open=walk if opening==25 else check_walk(w,(-42,-1230,259),points,True)
@@ -196,7 +227,8 @@ def inspect(world):
             'personnel_B_lift_walk_after_full_open':upon_open,
             'personnel_full_open_evidence':'sampled native saved blocks' if opening==25 else 'evaluated animated door cells only; all surrounding terrain sampled from native save',
             'normal_personnel_walk_after_door_access': normal_walk,
-            'all_ok':all(normal_walk.values()) and not mismatch and all(not v['missing'] and not v['pose_collision_count'] for v in grips.values()) and all(walk[k] for k in outside) and all(upon_open.values())
+            'ring_and_central_span':gallery_checks,
+            'all_ok':all(gallery_checks.values()) and all(normal_walk.values()) and not mismatch and all(not v['missing'] and not v['pose_collision_count'] for v in grips.values()) and all(walk[k] for k in outside) and all(upon_open.values())
                      and all(not v['blocked'] and not v['unsupported_floor_samples'] for v in result.values())}
 
 
