@@ -1,7 +1,8 @@
 package com.projectseele.world;
 
 import com.google.gson.JsonParser;
-import com.projectseele.registry.ModBlocks;
+import java.util.ArrayList;
+import java.util.List;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +19,7 @@ import net.minecraft.world.phys.Vec3;
 /** The reserve operator banks are in the independently placed GeoFront command podium. */
 public final class ReserveCommandHall
 {
-    private static final AABB ROOM = new AABB(222,-463,374,256,-452,417);
+    private static final AABB ROOM = new AABB(222,-463,374,258,-452,417);
     private static final BlockPos LIGHT_SWITCH = new BlockPos(231,-461,383);
     private static final BlockPos SCREEN_SWITCH = new BlockPos(231,-461,389);
     private static final Map<BlockPos,Integer> KEYS = readKeys();
@@ -66,28 +67,32 @@ public final class ReserveCommandHall
 
     public static boolean viewer(Level level,Vec3 point)
     {
-        return ROOM.contains(point) && present(level);
+        return ROOM.contains(point) && present(level) && powered(level);
     }
 
     public static int action(Level level,BlockPos pos)
     {
         Integer action = KEYS.get(pos);
-        return action!=null && present(level) ? action : -1;
+        return action!=null && present(level) && powered(level) ? action : -1;
+    }
+
+    static List<BlockPos> litSigns()
+    {
+        var signs = new ArrayList<BlockPos>();
+        for (var key : KEYS.keySet()) signs.add(key.offset(-1,-1,0));
+        signs.add(LIGHT_SWITCH.offset(-1,-1,0));
+        signs.add(new BlockPos(247,-459,407));
+        return signs;
+    }
+
+    private static boolean powered(Level level)
+    {
+        return level.getBlockState(LIGHT_SWITCH).getValue(BlockStateProperties.POWERED);
     }
 
     public static void updateLights(ServerLevel level)
     {
-        if (!present(level)) return;
-        boolean on=level.getBlockState(LIGHT_SWITCH).getValue(BlockStateProperties.POWERED);
-        for (int x=225;x<=246;x+=7)
-            for (int z : new int[]{380,388,404,411})
-            {
-                var pos=new BlockPos(x,-454,z);
-                if (!level.hasChunkAt(pos)) continue;
-                var state=level.getBlockState(pos);
-                if (state.is(ModBlocks.NERV_CEILING_LIGHT.get()) && state.getValue(BlockStateProperties.LIT)!=on)
-                    level.setBlock(pos,state.setValue(BlockStateProperties.LIT,on),3);
-            }
+        if (present(level)) ReserveHallPower.apply(level,powered(level));
     }
 
     private ReserveCommandHall() {}

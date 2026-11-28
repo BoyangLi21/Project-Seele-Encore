@@ -20,11 +20,17 @@ public final class CityLowriseAddonR48
             "r48_launch_control_ne", "r48_launch_control_se");
     private CityLowriseAddonR48() { }
 
-    /** Only the two surveyed R66 landmark crowns enlarge their original vertical envelopes. */
+    /** Surveyed crowns may enlarge only the sixteen specified district frames and the two R66 frames. */
     static boolean retainsTowerFrame(int index, CompoundTag original, CompoundTag current)
     {
         if (current.contains("DistrictCrownHeight")) {
             int[] frame = switch (index) {
+                case 23 -> new int[] {-50, 300, 62, 119};
+                case 29 -> new int[] {-10, 300, 62, 117};
+                case 34 -> new int[] {30, 340, 62, 117};
+                case 35 -> new int[] {30, 380, 56, 111};
+                case 39 -> new int[] {70, 300, 74, 131};
+                case 40 -> new int[] {70, 340, 68, 124};
                 case 65 -> new int[] {-250, 340, 20, 56};
                 case 66 -> new int[] {-210, 220, 27, 68};
                 case 70 -> new int[] {-170, 260, 20, 48};

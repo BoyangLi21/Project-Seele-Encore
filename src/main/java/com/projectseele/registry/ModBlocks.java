@@ -160,6 +160,9 @@ public final class ModBlocks
                     Blocks.POLISHED_DEEPSLATE).strength(8.0F, 1200.0F)
                     .lightLevel(state -> 6).noOcclusion()));
 
+    public static final RegistryObject<Block> RESERVE_BLACKOUT_CURTAIN = BLOCKS.register(
+            "reserve_blackout_curtain", com.projectseele.world.ReserveBlackoutCurtain::new);
+
     /** Scratch-free structural glazing for command-room sight lines. */
     public static final RegistryObject<Block> CLEAR_GLASS = BLOCKS.register(
             "clear_glass",

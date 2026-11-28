@@ -11,7 +11,12 @@ public class Tokyo3CargoR66 extends R66RegionPatch {
     static final Path DATA=Path.of("dimensions/projectseele/geofront/data");
     static final class Edit {
         final int x,y,z; final String before,after;
-        Edit(String[] a){x=Integer.parseInt(a[0]);y=Integer.parseInt(a[1]);z=Integer.parseInt(a[2]);before=a[3];after=a[4];}
+        Edit(String[] cells) {
+            this(Integer.parseInt(cells[0]), Integer.parseInt(cells[1]), Integer.parseInt(cells[2]), cells[3], cells[4]);
+        }
+        Edit(int x, int y, int z, String before, String after) {
+            this.x=x; this.y=y; this.z=z; this.before=before; this.after=after;
+        }
     }
     static long packed(int x,int y,int z){return ((x&0x3ffffffL)<<38)|((z&0x3ffffffL)<<12)|(y&4095);}
     static int x(long p){return (int)(p>>38);} static int y(long p){return (int)(p<<52>>52);} static int z(long p){return (int)(p<<26>>38);}
@@ -53,7 +58,30 @@ public class Tokyo3CargoR66 extends R66RegionPatch {
         void write(Path file)throws Exception{try(var o=zipOut(file)){o.writeInt(0x46423444);o.writeShort(palette.size());for(String s:palette.keySet())o.writeUTF(s);o.writeInt(rows.size());
             for(var c:rows.entrySet()){o.writeShort(c.getKey());o.writeShort(c.getValue().size());for(var s:c.getValue().entrySet()){o.writeShort(s.getKey());o.writeShort(s.getValue().size());for(var e:s.getValue().entrySet()){o.writeShort(e.getKey());o.writeShort(palette.get(e.getValue()[0]));o.writeShort(palette.get(e.getValue()[1]));}}}}}
     }
+    // Four original lowering journals predate the entrances already present in the moving cargo.
+    // Reconcile just those measured entrance frames before adding the new crown operations.
+    static void restoreEntrance(Map journal, Map<Long,Map> cargo, int owner, int cx, int cz) {
+        if (!Set.of(29, 34, 35, 39).contains(owner)) return;
+        var cells = indexed((Seq) journal.get("Cells"));
+        List<Edit> missing = new ArrayList<>();
+        for (int x=-1; x<=2; x++) for (int y=1; y<=3; y++) for (int z=8; z<=9; z++) {
+            if (x!=-1 && x!=2 && y!=3) continue;
+            long p = packed(x,y,z);
+            Map body = Objects.requireNonNull(cargo.get(p), "missing owner entrance");
+            String block = name(body.get("State"));
+            if (cells.containsKey(p)) verify(cells.get(p), block, "entrance state");
+            else {
+                if (!(block.equals("minecraft:gray_concrete") || block.equals("minecraft:light_gray_concrete") || block.equals("minecraft:gray_stained_glass"))) {
+                    throw new IllegalStateException("Unexpected entrance material " + block);
+                }
+                missing.add(new Edit(x,y,z,AIR,block));
+            }
+        }
+        if (!missing.isEmpty()) journal(journal, missing, cx, cz);
+    }
     public static void main(String[] args)throws Exception{
+        if(args.length<3 || args.length>4 || args.length==4 && !args[3].equals("--school-district"))throw new IllegalArgumentException("source plan output [--school-district]");
+        boolean school=args.length==4;
         Path source=Path.of(args[0]),plan=Path.of(args[1]),out=Path.of(args[2]),data=source.resolve(DATA);
         if(source.toAbsolutePath().normalize().startsWith(out.toAbsolutePath().normalize())||out.toAbsolutePath().normalize().startsWith(source.toAbsolutePath().normalize()))throw new IllegalArgumentException("output must be a separate overlay");
         var ledgerFile=Files.list(data).filter(f->f.getFileName().toString().startsWith("projectseele_city_rigid_control_r45_")).findFirst().orElseThrow();
@@ -63,23 +91,36 @@ public class Tokyo3CargoR66 extends R66RegionPatch {
         String[] trips={uuid((int[])ledger.get("Journey")),uuid((int[])tag(ledger,"PreviousCommittedLedgerR48").get("Journey"))};
         Path generation=Path.of("city_rigid_generation_r45/cargo"),journals=Path.of("city_rigid_journal_r45");Map<String,Region> regions=new TreeMap<>();int depth=((Number)ledger.get("Depth")).intValue(),count=0;
         // Clear checked static shaft material before writing any lowered crown occupying the same cells.
-        Path fixed=plan.resolve("streetscape.tsv.gz");if(Files.isRegularFile(fixed))for(Edit e:edits(fixed)){regions.computeIfAbsent("r."+(e.x>>9)+"."+(e.z>>9),k->new Region()).add(e.x,e.y,e.z,e.before,e.after);count++;}
+        Path fixed=plan.resolve(school?"shaft.tsv.gz":"streetscape.tsv.gz");if(Files.isRegularFile(fixed))for(Edit e:edits(fixed)){regions.computeIfAbsent("r."+(e.x>>9)+"."+(e.z>>9),k->new Region()).add(e.x,e.y,e.z,e.before,e.after);count++;}
         boolean crowns=Files.isRegularFile(plan.resolve("crown-heights.tsv"));
         var files=Files.list(plan).filter(f->f.getFileName().toString().matches("[0-9]+\\.tsv\\.gz")).sorted().toList();
         for(Path file:files){int i=Integer.parseInt(file.getFileName().toString().split("\\.")[0]);Map tw=(Map)((Seq)topo.get("Towers")).get(i);long cp=(long)tw.get("Centre");int cx=x(cp),cy=y(cp),cz=z(cp),base=depth==0?cy:(int)tw.get("RetractedBaseY");
             var updates=edits(file);String n=i+".dat";Path recipe=generation.resolve(n);var root=load(data.resolve(recipe));var building=(Map)((Seq)tag(root,"data").get("Buildings")).get(0);var cargo=indexed((Seq)building.get("Cargo"));Map foot=tag(tw,"Footprint");
+            int previous=(int)tw.get("Height");
             if(crowns){
-                int oldHeight=i==37?104:120,newHeight=i==37?130:153;
-                if((i!=37&&i!=43)||cx!=(i==37?70:110)||cz!=100||cy!=80||!tw.get("Height").equals(oldHeight)||!building.get("Height").equals(oldHeight))throw new IllegalStateException("wrong crown preimage");
-                tw.put("Height",newHeight);tw.put("R66CrownHeight",newHeight);building.put("Height",newHeight);
+                int[] frame = school ? switch(i){
+                    case 23 -> new int[]{-50,300,62,119};
+                    case 29 -> new int[]{-10,300,62,117};
+                    case 34 -> new int[]{30,340,62,117};
+                    case 35 -> new int[]{30,380,56,111};
+                    case 39 -> new int[]{70,300,74,131};
+                    case 40 -> new int[]{70,340,68,124};
+                    default -> throw new IllegalStateException("unexpected district crown");
+                } : switch(i){
+                    case 37 -> new int[]{70,100,104,130};
+                    case 43 -> new int[]{110,100,120,153};
+                    default -> throw new IllegalStateException("unexpected twin crown");
+                };
+                if(cx!=frame[0] || cz!=frame[1] || cy!=80 || previous!=frame[2] || !building.get("Height").equals(previous))throw new IllegalStateException("wrong crown preimage");
+                tw.put("Height",frame[3]);tw.put(school?"DistrictCrownHeight":"R66CrownHeight",frame[3]);building.put("Height",frame[3]);
             }
             for(Edit e:updates){if(e.x<(int)foot.get("MinX")||e.x>(int)foot.get("MaxX")||e.z<(int)foot.get("MinZ")||e.z>(int)foot.get("MaxZ")||e.y<9||e.y>(int)tw.get("Height")+3)throw new IllegalStateException("outside owner");
                 long p=packed(e.x,e.y,e.z);verify(cargo.get(p),e.before,"recipe "+i);replace(cargo,p,e.after.equals(AIR)?null:cell(p,e.after));int xx=cx+e.x,yy=base+e.y,zz=cz+e.z;
                 regions.computeIfAbsent("r."+(xx>>9)+"."+(zz>>9),k->new Region()).add(xx,yy,zz,e.before,e.after);count++;}
             writeRows(building,"Cargo",cargo);save(out.resolve(DATA).resolve(recipe),root);
-            for(String trip:trips){Path rel=journals.resolve(trip).resolve(n);var j=load(data.resolve(rel));if(!j.get("Index").equals(i)||!j.get("WorldUUID").equals(ledger.get("WorldUUID")))throw new IllegalStateException("foreign ledger");if(crowns){if(!j.get("Height").equals(i==37?104:120))throw new IllegalStateException("wrong historical crown");j.put("Height",tw.get("Height"));}journal(j,updates,cx,cz);save(out.resolve(DATA).resolve(rel),j);}
+            for(String trip:trips){Path rel=journals.resolve(trip).resolve(n);var j=load(data.resolve(rel));if(!j.get("Index").equals(i)||!j.get("WorldUUID").equals(ledger.get("WorldUUID")))throw new IllegalStateException("foreign ledger");if(crowns){if(!j.get("Height").equals(previous))throw new IllegalStateException("wrong historical crown");j.put("Height",tw.get("Height"));}if(school)restoreEntrance(j,cargo,i,cx,cz);journal(j,updates,cx,cz);save(out.resolve(DATA).resolve(rel),j);}
             System.out.println("owner "+i+" "+updates.size()+" cells, "+cargo.size()+" final");}
-        if(crowns){if(files.size()!=2)throw new IllegalStateException("partial pair");save(out.resolve(DATA).resolve(topoFile.getFileName()),topoRoot);}
+        if(crowns){if(files.size()!=(school?6:2))throw new IllegalStateException("incomplete set of crowns");save(out.resolve(DATA).resolve(topoFile.getFileName()),topoRoot);}
         Path delta=out.resolve("deltas");Files.createDirectories(delta);for(var r:regions.entrySet())r.getValue().write(delta.resolve(r.getKey()+".delta.gz"));
         System.out.println("depth="+depth+" edited="+count+" regions="+regions.size());
     }
