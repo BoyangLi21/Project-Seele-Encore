@@ -598,9 +598,9 @@ R65 第二轮试玩（第 13 项，机库里使徒死后警报还在响）：`fa
 
 芦之湖的三台集光楼使用 K-Kazama（KazamaHikana）的完整 FBX。游戏内分别布置转台、镜面与盘座，保留原作几何，重设朝向与材质色。模型按 CC BY 4.0 使用。[Solar Harvester from Evangelion](https://sketchfab.com/3d-models/solar-harvester-from-evangelion-c52a028006494b278164e5480d66427c) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
-二号终端的弧形集光墙和双侧翼取自 polcuenca 的 *Evangelion Geofront*。地图从场景的 Edificis 中分离墙体和基座网格，按原 UV 明度选择原版方块，并新建内部指挥席与地面电梯。[模型与作者](https://sketchfab.com/3d-models/evangelion-geofront-1fb54331408147c3b9fb502b6c883cb0) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+二号终端的弧形集光墙和双侧翼取自 polcuenca 的 *Evangelion Geofront*。地图从场景的 Edificis 中分离墙体和基座网格，保留原模型的弯曲轮廓与双翼，以白色石英和混凝土重做外饰。四层环绕玻璃观景廊、带屏幕的指挥席和地面电梯为地图新增。[模型与作者](https://sketchfab.com/3d-models/evangelion-geofront-1fb54331408147c3b9fb502b6c883cb0) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 芦之湖观光船由 Project SEELE 为本地图建模、制图并配置 MTR 的登船口和甲板。船身的金色涂装、木饰客舱与露天观景甲板参考小田急箱根的「クイーン芦ノ湖」。船长按本图 20 格船坞缩放至 19 格。
 [小田急箱根官方船舶介绍](https://www.hakonenavi.jp/hakone-kankosen/queen/)
 
-芦之湖三台 K-Kazama 集光楼沿用上列 FBX。此次在湖中转向 180 度，尺寸扩大为上一版的 8/3，并依原三角面生成半格精度的原生碰撞与含水基座。
+芦之湖三台 K-Kazama 集光楼沿用上列 FBX。此次在湖中转向 180 度，尺寸扩大为上一版的 8/3，并依原三角面生成半格精度的原生碰撞与含水基座。镜面、外壳与支撑采用重新配制的白色和浅灰色。

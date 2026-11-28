@@ -30,6 +30,7 @@ import com.projectseele.world.FacilityV2CommandInteriorDirector;
 import net.minecraft.world.level.block.Blocks;
 import com.projectseele.world.NervOperationsCentreBuilder;
 import com.projectseele.world.S20CommandPresentationDirector;
+import com.projectseele.world.ReserveCommandHall;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.CameraType;
@@ -629,7 +630,8 @@ public final class EvaCommandFeedClient
         }
         boolean r52Headquarters=FacilityFrameClientR52.claimed(level);
         if(r52Headquarters&&!FacilityFrameClientR52.headquartersBound(level))return;
-        if(r52Headquarters&&!FacilityFrameClientR52.insidePyramid(level,event.getCamera().getPosition()))
+        boolean reserve = r52Headquarters && ReserveCommandHall.viewer(level,event.getCamera().getPosition());
+        if(r52Headquarters&&!reserve&&!FacilityFrameClientR52.insidePyramid(level,event.getCamera().getPosition()))
         {return;}
         if (activeLevel != level)
         {
@@ -638,6 +640,12 @@ public final class EvaCommandFeedClient
             {
                 LAST_FRAME_NANOS[index] = 0L;
             }
+        }
+
+        if (reserve)
+        {
+            renderReserveHall(event,minecraft);
+            return;
         }
 
         var v2Centre = FacilitySchemaV2.CANDIDATE_CENTRES.get(
@@ -696,11 +704,7 @@ public final class EvaCommandFeedClient
         Vec3 camera = event.getCamera().getPosition();
         for (int variant = 0; variant < 3; variant++)
         {
-            boolean live = TEXTURES[variant] != null
-                    && now - LAST_FRAME_NANOS[variant]
-                    <= FRAME_STALE_NANOS;
-            ResourceLocation texture = live ? TEXTURE_IDS[variant]
-                    : STANDBY_TEXTURE_IDS[variant];
+            ResourceLocation texture = feedTexture(variant,now);
             if (s20)
             {
                 Vec3 centre = FacilityFrameClientR52.headquarters(level,new Vec3(
@@ -747,8 +751,10 @@ public final class EvaCommandFeedClient
                     TACTICAL_TEXTURE_ID, minecraft, 15.0F, 40.5F,
                     S20_SCREEN_YAW, S20_LOWER_SCREEN_PITCH,
                     SCREEN_VISIBILITY[3]);
-            renderPilotStatusBoard(event.getPoseStack(), camera, minecraft,
-                    SCREEN_VISIBILITY[3]);
+            renderPilotStatusBoard(event.getPoseStack(), camera, minecraft, SCREEN_VISIBILITY[3],
+                    FacilityFrameClientR52.headquarters(level,new Vec3(
+                        S20CommandPresentationDirector.LOWER_SCREEN_X,S20CommandPresentationDirector.LOWER_SCREEN_Y,
+                        S20CommandPresentationDirector.LOWER_SCREEN_Z)),0.0F,-S20_LOWER_SCREEN_PITCH,1.0F);
         }
         if (s20 && cityTexture != null)
         {
@@ -761,6 +767,40 @@ public final class EvaCommandFeedClient
                     CITY_TEXTURE_ID, minecraft, 38.0F, 12.5F,
                     180.0F, 0.0F, SCREEN_VISIBILITY[4]);
         }
+    }
+
+    private static ResourceLocation feedTexture(int variant,long now)
+    {
+        boolean live = TEXTURES[variant]!=null && now-LAST_FRAME_NANOS[variant]<=FRAME_STALE_NANOS;
+        return live ? TEXTURE_IDS[variant] : STANDBY_TEXTURE_IDS[variant];
+    }
+
+    private static void renderReserveHall(RenderLevelStageEvent event,Minecraft minecraft)
+    {
+        ensureStandbyTextures(minecraft);
+        ensureTacticalTexture(minecraft);
+        ensureCityTexture(minecraft);
+        updateCommandScreenTransitions();
+        long now=System.nanoTime();
+        Vec3 camera=event.getCamera().getPosition();
+        var poses=event.getPoseStack();
+        // All five rasters face the operator desks. Leave the east aisle behind their solid backing.
+        double face=246.97D;
+        float videoWidth=5.5F;
+        for (int unit=0;unit<3;unit++)
+        {
+            var centre=new Vec3(face,-455.70D,390.25D+6.25D*unit);
+            renderScreen(poses,camera,centre,feedTexture(unit,now),minecraft,videoWidth,
+                    videoWidth*ServerboundEvaVideoFramePacket.FRAME_HEIGHT/ServerboundEvaVideoFramePacket.FRAME_WIDTH,
+                    -90,0,SCREEN_VISIBILITY[unit]);
+        }
+        float scale=0.18F;
+        var tactical=new Vec3(face,-457.75D,385.65D);
+        renderScreen(poses,camera,tactical,TACTICAL_TEXTURE_ID,minecraft,15.0F*scale,40.5F*scale,
+                -90,0,SCREEN_VISIBILITY[3]);
+        renderPilotStatusBoard(poses,camera,minecraft,SCREEN_VISIBILITY[3],tactical,90,0,scale);
+        renderScreen(poses,camera,new Vec3(face,-459.67D,396.5D),CITY_TEXTURE_ID,minecraft,14.0F,4.60F,
+                -90,0,SCREEN_VISIBILITY[4]);
     }
 
     /** Receives the server-sampled fleet telemetry for the tactical board. */
@@ -823,7 +863,7 @@ public final class EvaCommandFeedClient
      */
     private static void renderPilotStatusBoard(
             PoseStack poseStack, Vec3 camera, Minecraft minecraft,
-            float visibility)
+            float visibility, Vec3 actual, float yaw, float pitch, float scale)
     {
         float eased = visibility * visibility * (3.0F - 2.0F * visibility);
         if (eased <= 0.05F)
@@ -831,9 +871,6 @@ public final class EvaCommandFeedClient
             return;
         }
         poseStack.pushPose();
-        Vec3 actual=FacilityFrameClientR52.headquarters(minecraft.level,new Vec3(
-                S20CommandPresentationDirector.LOWER_SCREEN_X,S20CommandPresentationDirector.LOWER_SCREEN_Y,
-                S20CommandPresentationDirector.LOWER_SCREEN_Z));
         poseStack.translate(actual.x-camera.x,actual.y-camera.y,actual.z-camera.z);
         /*
          * The raster plane is built as yaw 180 then pitch.  Conjugating that
@@ -842,7 +879,9 @@ public final class EvaCommandFeedClient
          * mirroring it instead reverses the winding and the text render type
          * culls every quad away.
          */
-        poseStack.mulPose(Axis.XP.rotationDegrees(-S20_LOWER_SCREEN_PITCH));
+        poseStack.mulPose(Axis.YP.rotationDegrees(yaw));
+        poseStack.mulPose(Axis.XP.rotationDegrees(pitch));
+        poseStack.scale(scale,scale,scale);
         poseStack.translate(0.0D, 0.0D, -0.03D);
         poseStack.scale(1.0F, eased, 1.0F);
         poseStack.scale(-TACTICAL_TEXT_SCALE, -TACTICAL_TEXT_SCALE,

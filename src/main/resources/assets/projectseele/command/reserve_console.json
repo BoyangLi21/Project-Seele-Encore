@@ -1,0 +1,234 @@
+[
+  {
+    "x": 231,
+    "z": 382,
+    "label": "都市管制",
+    "keys": [
+      {
+        "id": 0,
+        "block": "warped_button",
+        "label": "街区升起"
+      },
+      {
+        "id": 1,
+        "block": "crimson_button",
+        "label": "街区收纳"
+      },
+      {
+        "id": "lights",
+        "block": "lever",
+        "label": "大厅照明"
+      }
+    ]
+  },
+  {
+    "x": 231,
+    "z": 389,
+    "label": "影像开关",
+    "keys": [
+      {
+        "id": 2,
+        "block": "oak_button",
+        "label": "EVA-00"
+      },
+      {
+        "id": 3,
+        "block": "warped_button",
+        "label": "EVA-01"
+      },
+      {
+        "id": 4,
+        "block": "crimson_button",
+        "label": "EVA-02"
+      }
+    ]
+  },
+  {
+    "x": 231,
+    "z": 396,
+    "label": "屏幕开关",
+    "keys": [
+      {
+        "id": 5,
+        "block": "bamboo_button",
+        "label": "战术遥测"
+      },
+      {
+        "id": 15,
+        "block": "stone_button",
+        "label": "城市状态"
+      }
+    ]
+  },
+  {
+    "x": 231,
+    "z": 403,
+    "label": "装备大楼",
+    "keys": [
+      {
+        "id": 19,
+        "block": "crimson_button",
+        "label": "全体展开"
+      },
+      {
+        "id": 20,
+        "block": "warped_button",
+        "label": "全体收回"
+      }
+    ]
+  },
+  {
+    "x": 237,
+    "z": 382,
+    "label": "出击准备",
+    "keys": [
+      {
+        "id": 8,
+        "block": "crimson_button",
+        "label": "EVA-00"
+      },
+      {
+        "id": 7,
+        "block": "crimson_button",
+        "label": "EVA-01"
+      },
+      {
+        "id": 6,
+        "block": "crimson_button",
+        "label": "EVA-02"
+      }
+    ]
+  },
+  {
+    "x": 237,
+    "z": 389,
+    "label": "弹射出击",
+    "keys": [
+      {
+        "id": 11,
+        "block": "oak_button",
+        "label": "EVA-00"
+      },
+      {
+        "id": 10,
+        "block": "oak_button",
+        "label": "EVA-01"
+      },
+      {
+        "id": 9,
+        "block": "oak_button",
+        "label": "EVA-02"
+      }
+    ]
+  },
+  {
+    "x": 237,
+    "z": 396,
+    "label": "地面回收",
+    "keys": [
+      {
+        "id": 14,
+        "block": "crimson_button",
+        "label": "EVA-00"
+      },
+      {
+        "id": 13,
+        "block": "crimson_button",
+        "label": "EVA-01"
+      },
+      {
+        "id": 12,
+        "block": "crimson_button",
+        "label": "EVA-02"
+      }
+    ]
+  },
+  {
+    "x": 237,
+    "z": 403,
+    "label": "取消出击",
+    "keys": [
+      {
+        "id": 18,
+        "block": "oak_button",
+        "label": "EVA-00"
+      },
+      {
+        "id": 17,
+        "block": "oak_button",
+        "label": "EVA-01"
+      },
+      {
+        "id": 16,
+        "block": "oak_button",
+        "label": "EVA-02"
+      }
+    ]
+  },
+  {
+    "x": 243,
+    "z": 382,
+    "label": "出口 · 地底",
+    "keys": [
+      {
+        "id": 21,
+        "block": "crimson_button",
+        "label": "EVA-00"
+      },
+      {
+        "id": 24,
+        "block": "crimson_button",
+        "label": "EVA-01"
+      },
+      {
+        "id": 27,
+        "block": "crimson_button",
+        "label": "EVA-02"
+      }
+    ]
+  },
+  {
+    "x": 243,
+    "z": 389,
+    "label": "出口 · 地表",
+    "keys": [
+      {
+        "id": 22,
+        "block": "oak_button",
+        "label": "EVA-00"
+      },
+      {
+        "id": 25,
+        "block": "oak_button",
+        "label": "EVA-01"
+      },
+      {
+        "id": 28,
+        "block": "oak_button",
+        "label": "EVA-02"
+      }
+    ]
+  },
+  {
+    "x": 243,
+    "z": 396,
+    "label": "出口 · 箱根",
+    "keys": [
+      {
+        "id": 23,
+        "block": "birch_button",
+        "label": "EVA-00"
+      },
+      {
+        "id": 26,
+        "block": "birch_button",
+        "label": "EVA-01"
+      },
+      {
+        "id": 29,
+        "block": "birch_button",
+        "label": "EVA-02"
+      }
+    ]
+  }
+]

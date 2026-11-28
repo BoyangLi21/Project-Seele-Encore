@@ -480,8 +480,8 @@ public final class S20CommandPresentationDirector
         Vec3 centre=new Vec3(28.0D,-416.0D,300.0D);if(frame!=null)centre=frame.apply(centre);
         final Vec3 actual=centre;
         return level.players().stream().anyMatch(player ->
-                player.distanceToSqr(actual)
-                        <= 160.0D * 160.0D);
+                player.distanceToSqr(actual) <= 160.0D * 160.0D
+                        || ReserveCommandHall.viewer(level,player.position()));
     }
 
     private static NervCommandSeatEntity installSeat(

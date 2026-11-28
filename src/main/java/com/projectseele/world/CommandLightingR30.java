@@ -36,7 +36,9 @@ public final class CommandLightingR30
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
         if(event.phase!=TickEvent.Phase.END||event.getServer().getTickCount()%5!=0)return;
-        var level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return;var circuit=read(event.getServer());
+        var level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return;
+        ReserveCommandHall.updateLights(level);
+        var circuit=read(event.getServer());
         if(circuit.lamps.isEmpty()||!level.hasChunkAt(circuit.lever))return;
         var lever=level.getBlockState(circuit.lever);
         if(!lever.is(Blocks.LEVER))return;

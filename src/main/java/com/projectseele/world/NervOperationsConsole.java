@@ -508,7 +508,11 @@ public final class NervOperationsConsole
         ServerLevel level = player.serverLevel();
         if(NervRouteRuntimeR52.claimed(level))
         {
-            var outlet=NervOutletControlsR53.at(level,position);
+            int reserveAction=ReserveCommandHall.action(level,position);
+            var outlet=reserveAction>=S20_CONTROL_COUNT
+                    ? new NervOutletControlsR53.Control((reserveAction-S20_CONTROL_COUNT)/3,
+                        NervOutletControlsR53.TARGETS.get((reserveAction-S20_CONTROL_COUNT)%3),position)
+                    : NervOutletControlsR53.at(level,position);
             if(outlet!=null)
             {
                 var result=NervOutletControlsR53.request(player,outlet);
@@ -517,7 +521,7 @@ public final class NervOperationsConsole
                 return true;
             }
             var frame=NervHeadquartersFrameR52.frame(level);if(frame==null)return false;
-            int action=authoredS20ActionAt(frame.inverse(position));
+            int action=reserveAction>=0 ? reserveAction : authoredS20ActionAt(frame.inverse(position));
             var actual=level.getBlockState(position);
             return action>=0&&actual.getBlock() instanceof ButtonBlock&&actual.canSurvive(level,position)
                     &&level.getBlockEntity(position)==null&&handleS20Action(player,level,action,position);
