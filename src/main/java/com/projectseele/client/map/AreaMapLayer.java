@@ -90,6 +90,13 @@ public record AreaMapLayer(String id, String label, Bounds bounds, int priority,
     /** Stay fixed over the authored area, then follow the player across its surveyed margin. */
     public Bounds hudView(double x, double z)
     {
+        // A local moving window keeps entrances and the runway legible inside the large cavern.
+        if (hudFrame == null && id.equals("geofront")) {
+            int w = Math.min(256, bounds.width()), h = Math.min(256, bounds.depth());
+            int left = (int)Math.max(bounds.minX(), Math.min(bounds.maxX() - w, Math.floor(x) - w / 2));
+            int top = (int)Math.max(bounds.minZ(), Math.min(bounds.maxZ() - h, Math.floor(z) - h / 2));
+            return new Bounds(left, bounds.minY(), top, left + w, bounds.maxY(), top + h);
+        }
         if (hudFrame == null) return bounds;
         int left = follow(x, hudFrame.minX, hudFrame.maxX, bounds.minX, bounds.maxX);
         int top = follow(z, hudFrame.minZ, hudFrame.maxZ, bounds.minZ, bounds.maxZ);

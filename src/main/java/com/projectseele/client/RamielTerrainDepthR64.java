@@ -67,6 +67,11 @@ public final class RamielTerrainDepthR64
 
     record DepthSample(int texture, float scale, float offset) {}
 
+    public static boolean beginScenery(Matrix4f projection)
+    {
+        return !GiantFarViewR61.usingTerrainDepth() && begin(projection);
+    }
+
     static boolean begin(Matrix4f worldProjection)
     {
         DepthSample sample = sample(worldProjection);
@@ -105,7 +110,7 @@ public final class RamielTerrainDepthR64
         }
     }
 
-    static void end()
+    public static void end()
     {
         try (State state = new State()) {
             glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);

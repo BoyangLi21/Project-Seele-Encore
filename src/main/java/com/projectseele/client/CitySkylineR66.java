@@ -29,7 +29,6 @@ public final class CitySkylineR66 {
     private static boolean captured, queryPending;
     private static long lastQuery = -1;
     private static final int[] firstQuad=new int[COUNT], quadCount=new int[COUNT];
-    private static final Integer[] ordered=new Integer[COUNT];
     private static volatile long filtered;
     private static float lastReview=-5;
     private static final boolean REVIEW=Boolean.getBoolean("projectseele.citySkylineReviewR66");
@@ -63,7 +62,7 @@ public final class CitySkylineR66 {
             for(int i=0;i<COUNT;i++){
                 int[] s=specs[i];for(int k=0;k<8;k++)s[k]=in.readShort();
                 int n=in.readInt();if(n<=0||n>100000)throw new IOException("Invalid skyline surface count");
-                ordered[i]=i;firstQuad[i]=instances;quadCount[i]=n;instances+=n;int roof=0;
+                firstQuad[i]=instances;quadCount[i]=n;instances+=n;int roof=0;
                 for(int q=0;q<n;q++){int face=in.readUnsignedByte(),plane=in.readShort();in.skipNBytes(10);if(face==4)roof=Math.max(roof,plane);}
                 for(int x=s[0]+s[4];x<=s[0]+s[5];x++)for(int z=s[2]+s[6];z<=s[2]+s[7];z++){
                     int k=(z-MIN_Z)*WIDTH+x-MIN_X;
@@ -131,11 +130,12 @@ public final class CitySkylineR66 {
         sampler=glGenSamplers();glSamplerParameteri(sampler,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glSamplerParameteri(sampler,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
     }
     private static int uniform(String name){return glGetUniformLocation(program,name);}
-    // Isolate surveyed facade colour from Iris's deferred material and atmosphere passes.
-    // The real scene's depth attachment is borrowed read-only; sorting the precomputed
-    // convex exterior slices retains inter-building occlusion without changing scene depth.
+    private static int shellDepth, nativeCopy;
+
+    /** City shells need a writable depth buffer of their own. Native and DH depths are read-only inputs. */
     private static boolean beginColour(int[] box) {
-        if(box[0]!=0 || box[1]!=0 || glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING)==0)return false;
+        int source=glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+        if(box[0]!=0 || box[1]!=0 || source==0)return false;
         int type=glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE);
         if(type!=GL_TEXTURE && type!=GL_RENDERBUFFER)return false;
         int attachment=glGetFramebufferAttachmentParameteri(GL_DRAW_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
@@ -147,12 +147,32 @@ public final class CitySkylineR66 {
             glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
             glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,box[2],box[3],0,GL_RGBA,GL_UNSIGNED_BYTE,0L);
             glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,colourTexture,0);glDrawBuffer(GL_COLOR_ATTACHMENT0);
+            int previous=glGetInteger(GL_RENDERBUFFER_BINDING);
+            if(shellDepth==0)shellDepth=glGenRenderbuffers();
+            glBindRenderbuffer(GL_RENDERBUFFER,shellDepth);
+            glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH_COMPONENT32F,box[2],box[3]);
+            glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,shellDepth);
+            glBindRenderbuffer(GL_RENDERBUFFER,previous);
+            if(nativeCopy!=0){glDeleteTextures(nativeCopy);nativeCopy=0;}
             screenW=box[2];screenH=box[3];
         }
-        if(type==GL_TEXTURE)glFramebufferTexture(GL_DRAW_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,attachment,0);
-        else glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,attachment);
         if(glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE)return false;
-        glDisable(GL_SCISSOR_TEST);glDisable(GL_STENCIL_TEST);glColorMaski(0,true,true,true,true);glClearBufferfv(GL_COLOR,0,new float[]{0,0,0,0});
+        glActiveTexture(GL_TEXTURE9);
+        if(type==GL_TEXTURE)glBindTexture(GL_TEXTURE_2D,attachment);
+        else {
+            if(nativeCopy==0) {
+                nativeCopy=glGenTextures();glBindTexture(GL_TEXTURE_2D,nativeCopy);
+                glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT32F,screenW,screenH,0,GL_DEPTH_COMPONENT,GL_FLOAT,0L);
+                glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAX_LEVEL,0);
+            } else glBindTexture(GL_TEXTURE_2D,nativeCopy);
+            int previous=glGetInteger(GL_READ_FRAMEBUFFER_BINDING);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER,source);
+            glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,screenW,screenH);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER,previous);
+        }
+        glBindSampler(9,sampler);glUniform1i(uniform("nativeDepth"),9);
+        glDisable(GL_SCISSOR_TEST);glDisable(GL_STENCIL_TEST);glColorMaski(0,true,true,true,true);glDepthMask(true);
+        glClearBufferfv(GL_COLOR,0,new float[]{0,0,0,0});glClearBufferfv(GL_DEPTH,0,new float[]{1});
         return true;
     }
     @SubscribeEvent public static void frame(net.minecraftforge.event.TickEvent.RenderTickEvent event) {
@@ -189,6 +209,9 @@ public final class CitySkylineR66 {
         var eye=event.getCamera().getPosition();if(eye.y<58||Math.abs(eye.x-30)>4000||Math.abs(eye.z-220)>4000)return;
         float[] offsets=CityNightLightsR65.skylineOffsets(world,world.getGameTime()+event.getPartialTick());if(offsets==null)return;
         try(var state=new CityNightLightsR65.RenderState();var mem=MemoryStack.stackPush()){
+            glActiveTexture(GL_TEXTURE9);
+            int oldTexture=glGetInteger(GL_TEXTURE_BINDING_2D), oldSampler=glGetIntegeri(GL_SAMPLER_BINDING,9);
+            try {
             if(program==0)initialize();
             glUseProgram(program);glBindVertexArray(vao);
             glUniformMatrix4fv(uniform("pose"),false,event.getPoseStack().last().pose().get(mem.mallocFloat(16)));
@@ -207,10 +230,7 @@ public final class CitySkylineR66 {
             glActiveTexture(GL_TEXTURE8);glBindSampler(8,sampler);glBindTexture(GL_TEXTURE_2D,depth==null?0:depth.texture());
             glUniform1i(uniform("lod"),8);glUniform1i(uniform("haveLod"),depth==null?0:1);
             if(depth!=null)glUniform2f(uniform("lodTransform"),depth.scale(),depth.offset());
-            glDisable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LEQUAL);glDepthMask(false);glDisablei(GL_BLEND,0);
-            java.util.Arrays.sort(ordered,java.util.Comparator.comparingDouble((Integer i)->{
-                int[] t=specs[i];double x=t[0]-eye.x,z=t[2]-eye.z;return -(x*x+z*z);
-            }));
+            glDisable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);glDepthFunc(GL_LESS);glDepthMask(true);glDisablei(GL_BLEND,0);
             glBindBuffer(GL_ARRAY_BUFFER,vbo);
             if(REVIEW && queryPending && glGetQueryObjecti(query,GL_QUERY_RESULT_AVAILABLE)!=0){
                 int count=glGetQueryObjecti(query,GL_QUERY_RESULT);queryPending=false;
@@ -220,10 +240,13 @@ public final class CitySkylineR66 {
             if(sample){if(query==0)query=glGenQueries();glBeginQuery(GL_SAMPLES_PASSED,query);lastQuery=world.getGameTime();}
             try {
                 double near=Math.max(32,(mc.options.getEffectiveRenderDistance()-2)*16);
-                for(int i:ordered){int[] t=specs[i];if(offsets[i]<0 || Math.max(Math.abs(t[0]-eye.x),Math.abs(t[2]-eye.z))<near || offsets[i]>=.9999F)continue;quadRange(i);}
+                for(int i=0;i<COUNT;i++){int[] t=specs[i];if(offsets[i]<0 || Math.max(Math.abs(t[0]-eye.x),Math.abs(t[2]-eye.z))<near || offsets[i]>=.9999F)continue;quadRange(i);}
             }finally{if(sample){glEndQuery(GL_SAMPLES_PASSED);queryPending=true;}}
             captured=true;
             if(REVIEW && Math.abs(lastReview-offsets[37])>.025F){lastReview=offsets[37];ProjectSeele.LOGGER.info("R66 fixed observer eye {} tower37={} cargoQuads={} clippedDhColumns={}",event.getCamera().getBlockPosition(),lastReview,instances,filtered);}
+            } finally {
+                glActiveTexture(GL_TEXTURE9);glBindTexture(GL_TEXTURE_2D,oldTexture);glBindSampler(9,oldSampler);
+            }
         }catch(IOException | RuntimeException | LinkageError ex){unavailable=true;bound=null;YashimaBlackoutR64.rebuildFarView();ProjectSeele.LOGGER.warn("Tokyo-3 skyline renderer unavailable",ex);}
     }
     private CitySkylineR66() {}

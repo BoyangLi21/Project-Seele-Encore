@@ -68,7 +68,7 @@ public final class AreaMapDisplay
         graphics.pose().pushPose();
         graphics.pose().translate(left, top, 1);
         graphics.pose().scale((float)mapW, (float)mapH, 1);
-        graphics.blit(layer.preview(), 0, 0, 1, 1, (float)(view.minX() - bounds.minX()),
+        graphics.blit(layer.id().equals("geofront") ? layer.texture() : layer.preview(), 0, 0, 1, 1, (float)(view.minX() - bounds.minX()),
                 (float)(view.minZ() - bounds.minZ()), view.width(), view.depth(), bounds.width(), bounds.depth());
         graphics.pose().popPose();
 

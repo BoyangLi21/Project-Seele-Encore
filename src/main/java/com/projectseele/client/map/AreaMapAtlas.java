@@ -84,7 +84,7 @@ public final class AreaMapAtlas extends SimplePreparableReloadListener<List<Area
                                 || hudFrame.minZ() < area.minZ() || hudFrame.maxZ() > area.maxZ()) hudFrame = null;
                     }
                     // display "native": Xaero draws this volume itself (its baked cave map); caves: Xaero's cave mode is allowed here.
-                    if (row.has("display") && "native".equals(row.get("display").getAsString())) pendingNative.add(row.get("id").getAsString());
+                    if (!"geofront".equals(row.get("id").getAsString()) && row.has("display") && "native".equals(row.get("display").getAsString())) pendingNative.add(row.get("id").getAsString());
                     if (row.has("caves") && row.get("caves").getAsBoolean()) pendingCaves.add(row.get("id").getAsString());
                     layers.add(new AreaMapLayer(row.get("id").getAsString(), row.get("label").getAsString(), area,
                             row.get("priority").getAsInt(), texture, preview, masks.get(mask), heights.get(bottom),
@@ -138,7 +138,12 @@ public final class AreaMapAtlas extends SimplePreparableReloadListener<List<Area
     /** The authored surface atlas, including its surveyed lower terrain envelope. */
     public static AreaMapLayer surface()
     {
-        return layers.stream().filter(layer -> layer.id().equals("surface")).findFirst().orElse(null);
+        return byId("surface");
+    }
+
+    public static AreaMapLayer byId(String id)
+    {
+        return layers.stream().filter(layer -> layer.id().equals(id)).findFirst().orElse(null);
     }
 
     public static AreaMapLayer current(ResourceKey<Level> viewedDimension)

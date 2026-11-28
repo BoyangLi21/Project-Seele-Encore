@@ -14,7 +14,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 import net.minecraft.client.Minecraft;
+import com.projectseele.client.RamielTerrainDepthR64;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import org.joml.Vector3f;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
@@ -31,6 +35,7 @@ import org.joml.Matrix4f;
 public final class DogmaScenery
 {
     private static final ResourceLocation MODEL = new ResourceLocation(ProjectSeele.MODID, "geofront/survey_sculptures.bin.gz");
+    private static final ResourceLocation WHITE = new ResourceLocation("minecraft", "textures/block/white_concrete.png");
     private static final List<Piece> PIECES = new ArrayList<>();
     private static boolean attempted;
     private static boolean shaderLighting;
@@ -81,7 +86,7 @@ public final class DogmaScenery
             if (input.readInt() != 0x45564131) throw new IOException("Invalid scenery header");
             int pieces = input.readUnsignedShort();
             if (pieces > 64) throw new IOException("Too many survey pieces");
-            for (int p = 0; p < pieces; p++)
+            for (int piece = 0; piece < pieces; piece++)
             {
                 int x = input.readInt(), y = input.readInt(), z = input.readInt();
                 AABB bounds = new AABB(input.readFloat(), input.readFloat(), input.readFloat(),
@@ -97,15 +102,35 @@ public final class DogmaScenery
                     for (int axis = 0; axis < 3; axis++) positions[3 * v + axis] = input.readFloat();
                     colours[v] = input.readInt();
                 }
-                BufferBuilder builder = new BufferBuilder(16 * indices);
-                builder.begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
-                for (int n = 0; n < indices; n++)
+                boolean outdoor = y > 0;
+                BufferBuilder builder = new BufferBuilder((outdoor ? 36 : 16) * indices);
+                builder.begin(VertexFormat.Mode.TRIANGLES, outdoor ? DefaultVertexFormat.NEW_ENTITY : DefaultVertexFormat.POSITION_COLOR);
+                int[] triangle = new int[3];
+                Vector3f a = new Vector3f(), b = new Vector3f();
+                for (int n = 0; n < indices; n += 3)
                 {
-                    int v = input.readInt();
-                    if (v < 0 || v >= count) throw new IOException("Invalid survey index");
-                    int c = colours[v];
-                    builder.vertex(positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2])
-                            .color(lut[(c >> 16) & 255], lut[(c >> 8) & 255], lut[c & 255], 255).endVertex();
+                    for (int k = 0; k < 3; k++) {
+                        int v = input.readInt();
+                        if (v < 0 || v >= count) throw new IOException("Invalid survey index");
+                        triangle[k] = v * 3;
+                    }
+                    int p = triangle[0], q = triangle[1], t = triangle[2];
+                    a.set(positions[q]-positions[p], positions[q+1]-positions[p+1], positions[q+2]-positions[p+2]);
+                    b.set(positions[t]-positions[p], positions[t+1]-positions[p+1], positions[t+2]-positions[p+2]);
+                    a.cross(b);
+                    if (a.lengthSquared() > 1e-12F) a.normalize(); else a.set(0,1,0);
+                    // The original vertex colours included a fixed daylight term. Recover the swatch
+                    // before the native entity shader applies the current sun, weather, lightmap and fog.
+                    float baked = .54F + .4F * Math.max(0F,(.48F*a.x+.76F*a.y-.44F*a.z)/.9998F) + .1F*Math.max(0F,a.y);
+                    for (int v : triangle) {
+                        int c = colours[v/3];
+                        int red = c >> 16 & 255, green = c >> 8 & 255, blue = c & 255;
+                        var vertex = builder.vertex(positions[v],positions[v+1],positions[v+2]);
+                        if (outdoor) vertex.color(Math.min(255,Math.round(red/baked)), Math.min(255,Math.round(green/baked)),
+                                Math.min(255,Math.round(blue/baked)),255).uv(.5F,.5F).overlayCoords(OverlayTexture.NO_OVERLAY)
+                                .uv2(LightTexture.pack(0,15)).normal(a.x,a.y,a.z).endVertex();
+                        else vertex.color(lut[red],lut[green],lut[blue],255).endVertex();
+                    }
                 }
                 var buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
                 buffer.bind();
@@ -147,33 +172,35 @@ public final class DogmaScenery
             shaderLighting = shaders;
         }
         if (!attempted) load();
-        var state = RenderType.debugQuads();
-        boolean started = false;
-        for (Piece piece : PIECES)
-        {
-            if (piece.bounds.distanceToSqr(camera) > 1024.0 * 1024.0 || !event.getFrustum().isVisible(piece.bounds)) continue;
-            if (!started)
+        boolean outdoor = camera.y > -360;
+        var state = outdoor ? RenderType.entitySolid(WHITE) : RenderType.debugQuads();
+        boolean started = false, borrowed = false;
+        try {
+            for (Piece piece : PIECES)
             {
-                state.setupRenderState();
-                RenderSystem.enableDepthTest();
-                RenderSystem.depthMask(true);
-                RenderSystem.disableCull();
-                RenderSystem.disableBlend();
-                started = true;
+                if ((piece.y > 0) != outdoor || piece.bounds.distanceToSqr(camera) > 1024.0 * 1024.0
+                        || !event.getFrustum().isVisible(piece.bounds)) continue;
+                if (!started) {
+                    if (outdoor) borrowed = RamielTerrainDepthR64.beginScenery(event.getProjectionMatrix());
+                    state.setupRenderState();
+                    RenderSystem.enableDepthTest();
+                    RenderSystem.depthMask(true);
+                    RenderSystem.disableCull();
+                    RenderSystem.disableBlend();
+                    started = true;
+                }
+                Matrix4f view = new Matrix4f(event.getPoseStack().last().pose())
+                        .translate((float)(piece.x - camera.x), (float)(piece.y - camera.y), (float)(piece.z - camera.z));
+                piece.buffer.bind();
+                piece.buffer.drawWithShader(view, event.getProjectionMatrix(), outdoor ? RenderSystem.getShader() : GameRenderer.getPositionColorShader());
             }
-            float light = piece.y > 0 ? .32F + .68F * (1F - mc.level.getSkyDarken() / 15F) : 1F;
-            RenderSystem.setShaderColor(light, light, light, 1);
-            Matrix4f view = new Matrix4f(event.getPoseStack().last().pose())
-                    .translate((float)(piece.x - camera.x), (float)(piece.y - camera.y), (float)(piece.z - camera.z));
-            piece.buffer.bind();
-            piece.buffer.drawWithShader(view, event.getProjectionMatrix(), GameRenderer.getPositionColorShader());
-        }
-        if (started)
-        {
-            VertexBuffer.unbind();
-            RenderSystem.setShaderColor(1, 1, 1, 1);
-            RenderSystem.enableCull();
-            state.clearRenderState();
+        } finally {
+            if (started) {
+                VertexBuffer.unbind();
+                RenderSystem.enableCull();
+                state.clearRenderState();
+            }
+            if (borrowed) RamielTerrainDepthR64.end();
         }
     }
 }

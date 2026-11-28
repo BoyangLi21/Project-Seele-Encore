@@ -101,9 +101,7 @@ abstract class AreaMapWorldMixin
     @Inject(method = {"render", "m_88315_"}, at = @At(value = "INVOKE", target = "Lxaero/map/MapProcessor;getGlobalVersion()I"))
     private void projectseele$underNativeDetail(GuiGraphics graphics, int x, int y, float partial, CallbackInfo ci)
     {
-        var window = Minecraft.getInstance().getWindow();
-        projectseele$undergroundView = projectseele$layer != null && !projectseele$layer.id().equals("surface")
-                && projectseele$layer.overlapsView(cameraX, cameraZ, window.getWidth() / (2 * scale), window.getHeight() / (2 * scale));
+        projectseele$undergroundView = projectseele$layer != null && !projectseele$layer.id().equals("surface");
         if (projectseele$showNativeDetail()) AreaMapDisplay.worldTerrain(graphics, projectseele$layer, cameraX, cameraZ, false);
     }
 

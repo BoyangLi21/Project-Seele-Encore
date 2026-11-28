@@ -58,11 +58,12 @@ final class GeoFrontSurfaceCoverR65
                 int foliage = BiomeColors.getAverageFoliageColor(mc.level, eye), grass = BiomeColors.getAverageGrassColor(mc.level, eye);
                 int water = BiomeColors.getAverageWaterColor(mc.level, eye);
                 AreaMapLayer atlas = AreaMapAtlas.surface();
+                var hangars = AreaMapAtlas.byId("un_hangars");
                 groundAtlas = atlas;
                 loading = CompletableFuture.supplyAsync(() -> {
                     try (var input = new DataInputStream(new BufferedInputStream(new GZIPInputStream(file.get().open()))))
                     {
-                        return read(input, foliage, grass, water, atlas);
+                        return read(input, foliage, grass, water, atlas, hangars == null ? null : hangars.bounds());
                     }
                     catch (IOException e) { throw new java.io.UncheckedIOException(e); }
                 }, net.minecraft.Util.backgroundExecutor());
@@ -77,7 +78,7 @@ final class GeoFrontSurfaceCoverR65
     }
 
     private static Survey read(DataInputStream in, int foliage, int grass, int water,
-                               AreaMapLayer atlas) throws IOException
+                               AreaMapLayer atlas, AreaMapLayer.Bounds hangars) throws IOException
     {
         if (in.readInt() != 0x53465331) throw new IOException("Unknown surface survey");
         int x = in.readInt(), z = in.readInt(), w = in.readInt(), h = in.readInt(), step = in.readInt(), floor = in.readInt();
@@ -146,8 +147,13 @@ final class GeoFrontSurfaceCoverR65
                             if ((row[offset] & 0x40) == 0 && (row[offset] != 0 || row[offset + 1] != 0))
                                 bottom = buildingGrade(heights, bounds, mx, mz, bottom, step);
                             int surveyed = (row[offset] & 31) * 256 + (row[offset + 1] & 255);
-                            if (surveyed != 0 && surveyed + floor - (bottom + 56) > step * 8)
+                            if ((row[offset] & 0x40) != 0 && surveyed != 0 && surveyed + floor - (bottom + 56) > step * 8)
                                 bottom = recoverRim(heights, bounds, mx, mz, bottom, surveyed + floor - 56, step);
+                            // The apron continues beneath both moving hangar gates. A roof sample cannot
+                            // interpolate through that opening, even if the adjacent sample is also a roof.
+                            if (hangars != null && worldX >= hangars.minX() - step && worldX < hangars.maxX() + step
+                                    && worldZ >= hangars.minZ() - step && worldZ < hangars.maxZ() + step)
+                                bottom = Math.min(bottom, hangars.minY() - 56);
                             int top = bottom + 56 - floor;
                             if (top < 1 || top >= 8192) continue;
                             row[offset] = (byte)(0x60 | top >> 8);
